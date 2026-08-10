@@ -96,6 +96,410 @@ function setFamilyCode(code) {
   localStorage.setItem("family_code_is_custom", "1");
   window.location.reload();
 }
+// =====================================================================
+// --- Phase A (Family ID Foundation) — শুধু প্রস্তুতি, কোনো read/write ---
+// --- path এখনো বদলায়নি। app এখনও data_<familyCode>-ই পড়ে/লেখে। এই ---
+// --- অংশ শুধু নীরবে familyId তৈরি করে ও familyCodes/<code> → familyId ---
+// --- lookup mapping লেখে (best-effort, ব্যর্থ হলেও app-এর মূল কাজ ---
+// --- অপ্রভাবিত থাকে) — যাতে ভবিষ্যতে migration সহজে শুরু করা যায়। ---
+// =====================================================================
+function getFamilyId() {
+  let id = localStorage.getItem("family_id");
+  if (!id) {
+    // FAMILY_CODE_CHARS/generateSecureCode() পুনর্ব্যবহার — একই নিরাপদ,
+    // ভুল-পড়া-প্রতিরোধী charset।
+    id = generateSecureCode(20);
+    localStorage.setItem("family_id", id);
+  }
+  return id;
+}
+// একবারই লেখে (setOnce) — বিদ্যমান mapping থাকলে ছোঁয়া হয় না, ফলে
+// একাধিক ডিভাইস থেকে একই family-এর জন্য বারবার কল হলেও নিরাপদ।
+async function ensureFamilyCodeMapping() {
+  try {
+    const code = getFamilyCode();
+    const ref = db.collection("familyCodes").doc(code);
+    const snap = await ref.get();
+    if (snap.exists) {
+      // BUG FIX: আগে এখানে কিছুই করা হতো না যখন mapping আগে থেকেই থাকত
+      // (যেমন অন্য device থেকে তৈরি) — ফলে এই device-এর local family_id
+      // কখনো server-এর familyId-এর সাথে sync হতো না, এবং getFamilyId()
+      // (অন্য কোনো কল-সাইট থেকে প্রথমবার ডাকা হলে) ভুলভাবে একটা নতুন,
+      // ভিন্ন random id বানিয়ে ফেলত। এখন server-ই সবসময় source of truth —
+      // local family_id server-এর familyId-এর সাথে না মিললে (বা না
+      // থাকলে) local-কে server অনুযায়ী মিলিয়ে নেওয়া হয়। এটি self-healing:
+      // আগে থেকে ভুল/mismatched local family_id থাকলেও পরের বুটেই ঠিক
+      // হয়ে যাবে।
+      const serverFamilyId = snap.data() ? snap.data().familyId : null;
+      if (serverFamilyId && localStorage.getItem("family_id") !== serverFamilyId) {
+        localStorage.setItem("family_id", serverFamilyId);
+      }
+    } else {
+      await ref.set({ familyId: getFamilyId(), createdAt: Date.now() });
+    }
+  } catch {
+    // Best-effort — future-migration prep, app boot কখনো এর জন্য আটকাবে না।
+  }
+}
+// families/<familyId> ডকুমেন্টই family-এর "root/meta" ডকুমেন্ট হিসেবে
+// কাজ করবে (design doc-এর "families/<familyId>/meta" ধারণার একটি ছোট,
+// সরলীকৃত বাস্তবায়ন — future members/entries subcollection এই একই
+// root doc-এর নিচে নেস্ট হবে)। এই মুহূর্তে এটি শুধু background prep;
+// কোনো UI feature এখনো এর ওপর নির্ভর করে না।
+function familyDocRef() {
+  return db.collection("families").doc(getFamilyId());
+}
+async function ensureFamilyMeta() {
+  try {
+    const ref = familyDocRef();
+    const snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        familyId: getFamilyId(),
+        familyCode: getFamilyCode(),
+        isCustomCode: localStorage.getItem("family_code_is_custom") === "1",
+        createdAt: Date.now(),
+        createdByUid: auth.currentUser ? auth.currentUser.uid : null,
+        schemaVersion: 1,
+        adminUids: []
+      });
+    }
+  } catch {
+    // Best-effort — future-migration prep।
+  }
+}
+// প্রথম Admin claim — ডিজাইন অনুযায়ী শুধু দুটি ট্রিগারে ডাকা হবে:
+// (১) কেউ custom Family Code সেট করলে, (২) কেউ Google Sign-in link করলে।
+// এই দুটির মধ্যে যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
+// "প্রথম-আসা" নিয়মটি Firestore Rules-এ server-side enforced (adminUids
+// ফাঁকা থাকলেই কেবল লেখা গৃহীত হয়), শুধু client-side check নয়।
+async function claimFirstAdminIfEligible() {
+  if (!auth.currentUser) return;
+  try {
+    await ensureFamilyMeta();
+    const ref = familyDocRef();
+    const snap = await ref.get();
+    const current = snap.exists ? snap.data().adminUids || [] : [];
+    if (current.length === 0) {
+      await ref.update({ adminUids: [auth.currentUser.uid], updatedAt: Date.now() });
+    }
+  } catch {
+    // Best-effort — Admin claim ব্যর্থ হলেও মূল ফিচার (Family Code set /
+    // Google link) কখনো ব্লক হবে না; পরের trigger-এ আবার চেষ্টা হবে।
+  }
+}
+// =====================================================================
+// --- Phase C prep: Dry-run Readiness Check (READ-ONLY, শুধু ম্যানুয়াল) ---
+// =====================================================================
+// এই ফাংশন কোনো UI বাটনের সাথে যুক্ত নয় এবং boot/app flow-এর কোনো অংশে
+// স্বয়ংক্রিয়ভাবে ডাকা হয় না — শুধু browser DevTools console থেকে
+// ম্যানুয়ালি চালানোর জন্য (`dryRunPhaseCReadinessCheck()` লিখে Enter)।
+// এটি data_<familyCode> collection-এর ওপর একটিমাত্র read (.get()) করে
+// এবং শুধু গণনা/রিপোর্ট করে — কোনো write/update/delete করে না। উদ্দেশ্য:
+// Phase C-এর আসল migration script লেখার আগে scope (কতগুলো ডকুমেন্ট) ও
+// edge-case (updatedAt-বিহীন পুরনো ডকুমেন্ট, অপরিচিত key প্যাটার্ন)
+// আগে থেকে জানা।
+async function dryRunPhaseCReadinessCheck() {
+  console.log("[Phase C dry-run] শুরু হচ্ছে — শুধু read, কোনো write হবে না। Family:", getFamilyCode());
+  const snap = await db.collection(getCollectionName()).get();
+  const report = {
+    totalDocs: snap.size,
+    members: 0,
+    entries: 0,
+    weekly: 0,
+    customFields: 0,
+    meetings: 0,
+    other: 0,
+    missingUpdatedAt: [],
+    unexpectedKeyPattern: []
+  };
+  snap.docs.forEach(doc => {
+    const id = doc.id;
+    const data = doc.data();
+    if (id.startsWith("member:")) report.members += 1;
+    else if (id.startsWith("entry:")) report.entries += 1;
+    else if (id.startsWith("weekly:")) report.weekly += 1;
+    else if (id === "custom_fields") report.customFields += 1;
+    else if (id.startsWith("meeting_rows_v2:")) report.meetings += 1;
+    else report.other += 1;
+
+    const isMemberScoped = id.startsWith("member:") || id.startsWith("entry:") || id.startsWith("weekly:");
+    if (isMemberScoped && (data.updatedAt === undefined || data.updatedAt === null)) {
+      report.missingUpdatedAt.push(id);
+    }
+
+    const parts = id.split(":");
+    const isKnownPrefix = ["member", "entry", "weekly"].includes(parts[0])
+      || id === "custom_fields"
+      || id.startsWith("meeting_rows_v2:");
+    if (!isKnownPrefix) report.unexpectedKeyPattern.push(id);
+  });
+  console.log("[Phase C dry-run] সম্পন্ন — রিপোর্ট (কোনো ডাটা পরিবর্তিত হয়নি):");
+  console.table({
+    "মোট ডকুমেন্ট": report.totalDocs,
+    "member:": report.members,
+    "entry:": report.entries,
+    "weekly:": report.weekly,
+    "custom_fields": report.customFields,
+    "meeting_rows_v2:": report.meetings,
+    "অপরিচিত/other": report.other
+  });
+  if (report.missingUpdatedAt.length) {
+    console.warn("[Phase C dry-run] updatedAt-বিহীন ডকুমেন্ট (backward-compat fallback দরকার হতে পারে):", report.missingUpdatedAt);
+  }
+  if (report.unexpectedKeyPattern.length) {
+    console.warn("[Phase C dry-run] অপরিচিত key প্যাটার্ন (ম্যানুয়াল রিভিউ দরকার):", report.unexpectedKeyPattern);
+  }
+  return report;
+}
+// শুধু ম্যানুয়াল console-invocation-এর জন্য window-এ এক্সপোজ — কোনো UI
+// বাটন/মেনু আইটেম নেই, তাই সাধারণ ব্যবহারকারীর জন্য এটি অদৃশ্য/অপ্রবেশ্য।
+if (typeof window !== "undefined") {
+  window.dryRunPhaseCReadinessCheck = dryRunPhaseCReadinessCheck;
+}
+// =====================================================================
+// --- Phase C: Copy ধাপ (শুধু কপি — Verify/Switch/Cleanup এখানে নেই) ---
+// =====================================================================
+// এই ফাংশনও UI বাটনের সাথে যুক্ত নয়, boot flow-এ ডাকা হয় না — শুধু
+// browser console থেকে ম্যানুয়ালি (`copyPhaseCData()`)। কাজ:
+//   ১. Guard — familyCodes/<code>-এ server-side mapped familyId, local
+//      getFamilyId()-এর সাথে মেলা বাধ্যতামূলক। না মিললে/না পাওয়া গেলে
+//      সাথে সাথে return করে থামে — এর নিচের কোনো write কোডই চলে না।
+//   ২. member:/entry:/weekly: prefix-ওয়ালা ডকুমেন্ট (legacy bare
+//      "members" doc বাদ) families/<verifiedFamilyId>/members|entries|
+//      weekly-তে কপি করে — data_<familyCode> সম্পূর্ণ অস্পৃশ্য থাকে।
+//   ৩. শেষে শুধু একটা report log করে থামে — কোনো Verify/Switch/Cleanup
+//      ফাংশন এখানে (বা কোথাও) এখনো লেখাই হয়নি, তাই chain হওয়ার সুযোগ নেই।
+async function copyPhaseCData() {
+  console.log("[Phase C copy] শুরু হচ্ছে — প্রথমে guard যাচাই (server-verified familyId)...");
+  const code = getFamilyCode();
+  const localId = getFamilyId();
+  let serverId = null;
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(code).get();
+    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+  } catch (err) {
+    console.error("[Phase C copy] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। কোনো write হয়নি।", err);
+    return { aborted: true, reason: "lookup-failed" };
+  }
+  if (!serverId) {
+    console.error("[Phase C copy] Guard ব্যর্থ — familyCodes/<code> ডকুমেন্ট পাওয়া যায়নি। কোনো write হয়নি। আগে ensureFamilyCodeMapping() চালান।");
+    return { aborted: true, reason: "no-mapping" };
+  }
+  if (serverId !== localId) {
+    console.error(`[Phase C copy] Guard ব্যর্থ — local familyId (${localId}) ও server-verified familyId (${serverId}) ভিন্ন। কোনো write হয়নি — এগোনো নিরাপদ নয়।`);
+    return { aborted: true, reason: "mismatch", localId, serverId };
+  }
+  console.log("[Phase C copy] Guard পাস — server-verified familyId:", serverId);
+
+  // legacyCollectionMap — Rules-level migrationState gating-এর জন্য
+  // প্রয়োজনীয় mapping (আগে approved Integration Plan অনুযায়ী)। setOnce:
+  // doc আগে থেকেই থাকলে touch করা হয় না, শুধু existing value
+  // server-verified familyId-এর সাথে মেলে কিনা guard করা হয় (উপরের
+  // familyCodes guard-এর একই disciplined pattern) — না মিললে থামে।
+  const mapRef = db.collection("legacyCollectionMap").doc(getCollectionName());
+  try {
+    const mapSnap = await mapRef.get();
+    if (mapSnap.exists) {
+      const existingFamilyId = mapSnap.data().familyId;
+      if (existingFamilyId !== serverId) {
+        console.error(`[Phase C copy] Guard ব্যর্থ — legacyCollectionMap-এ বিদ্যমান familyId (${existingFamilyId}) ও server-verified familyId (${serverId}) ভিন্ন। কোনো data write হয়নি।`);
+        return { aborted: true, reason: "map-mismatch", existingFamilyId, serverId };
+      }
+    } else {
+      await mapRef.set({ familyId: serverId, createdAt: Date.now() });
+    }
+  } catch (err) {
+    console.error("[Phase C copy] Guard ব্যর্থ — legacyCollectionMap read/write করতে সমস্যা হয়েছে। কোনো data write হয়নি।", err);
+    return { aborted: true, reason: "map-write-failed" };
+  }
+
+  const snap = await db.collection(getCollectionName()).get();
+  const memberDocs = [];
+  const entryDocs = [];
+  const weeklyDocs = [];
+  const skipped = [];
+  snap.docs.forEach(doc => {
+    const id = doc.id;
+    const data = doc.data();
+    if (id.startsWith("member:")) {
+      memberDocs.push({ id: id.slice("member:".length), data });
+    } else if (id.startsWith("entry:")) {
+      const rest = id.slice("entry:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) { skipped.push(id); return; }
+      entryDocs.push({ id: `${rest.slice(0, idx)}_${rest.slice(idx + 1)}`, data });
+    } else if (id.startsWith("weekly:")) {
+      const rest = id.slice("weekly:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) { skipped.push(id); return; }
+      weeklyDocs.push({ id: `${rest.slice(0, idx)}_${rest.slice(idx + 1)}`, data });
+    }
+    // custom_fields, meeting_rows_v2:, legacy bare "members" — এই Copy
+    // ধাপে ইচ্ছাকৃতভাবে বাদ (স্কোপ শুধু member/entry/weekly, design doc
+    // অনুযায়ী — বাকিগুলো পরবর্তী কোনো ধাপে, আলাদা approval-এ)।
+  });
+
+  const familyRoot = db.collection("families").doc(serverId);
+  const CHUNK_SIZE = 450;
+  async function writeChunked(items, subcollection) {
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const batch = db.batch();
+      items.slice(i, i + CHUNK_SIZE).forEach(({ id, data }) => {
+        batch.set(familyRoot.collection(subcollection).doc(id), data);
+      });
+      await batch.commit();
+    }
+  }
+  await writeChunked(memberDocs, "members");
+  await writeChunked(entryDocs, "entries");
+  await writeChunked(weeklyDocs, "weekly");
+
+  const report = {
+    familyId: serverId,
+    copiedMembers: memberDocs.length,
+    copiedEntries: entryDocs.length,
+    copiedWeekly: weeklyDocs.length,
+    skipped
+  };
+  console.log("[Phase C copy] সম্পন্ন — এখানে কোনো Verify/Switch/Cleanup হয়নি, শুধু কপি। data_<familyCode> সম্পূর্ণ অপরিবর্তিত, app এখনও পুরনো path-ই পড়ছে/লিখছে। রিপোর্ট:");
+  console.table({
+    "verified familyId": report.familyId,
+    "কপি হওয়া members": report.copiedMembers,
+    "কপি হওয়া entries": report.copiedEntries,
+    "কপি হওয়া weekly": report.copiedWeekly
+  });
+  if (skipped.length) console.warn("[Phase C copy] অপরিচিত ফরম্যাটের কারণে skip:", skipped);
+  return report;
+}
+if (typeof window !== "undefined") {
+  window.copyPhaseCData = copyPhaseCData;
+}
+// =====================================================================
+// --- Phase C: Verify ধাপ (READ-ONLY — কোনো write/auto-fix/re-copy নেই) ---
+// =====================================================================
+// শুধু browser console থেকে ম্যানুয়ালি (`verifyPhaseCData()`)। এই
+// ফাংশন কোনো write করে না, কিছু auto-fix/re-copy করে না, এবং কোনো
+// পরবর্তী ধাপ (Switch/Cleanup) নিজে থেকে ডাকে না — শুধু source
+// (data_<familyCode>) ও target (families/<familyId>/...) পাশাপাশি পড়ে
+// একটা তুলনা-রিপোর্ট দেয়, সিদ্ধান্ত সবসময় ম্যানুয়াল থাকে।
+async function verifyPhaseCData() {
+  console.log("[Phase C verify] শুরু হচ্ছে — সম্পূর্ণ read-only, প্রথমে guard যাচাই...");
+  const code = getFamilyCode();
+  const localId = getFamilyId();
+  let serverId = null;
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(code).get();
+    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+  } catch (err) {
+    console.error("[Phase C verify] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। থামানো হলো।", err);
+    return { aborted: true, reason: "lookup-failed" };
+  }
+  if (!serverId) {
+    console.error("[Phase C verify] Guard ব্যর্থ — familyCodes/<code> ডকুমেন্ট পাওয়া যায়নি। থামানো হলো।");
+    return { aborted: true, reason: "no-mapping" };
+  }
+  if (serverId !== localId) {
+    console.error(`[Phase C verify] Guard ব্যর্থ — local familyId (${localId}) ও server-verified familyId (${serverId}) ভিন্ন। থামানো হলো।`);
+    return { aborted: true, reason: "mismatch", localId, serverId };
+  }
+  console.log("[Phase C verify] Guard পাস — server-verified familyId:", serverId);
+
+  // --- Source (data_<familyCode>) থেকে expected target-id -> data ম্যাপ তৈরি ---
+  const sourceSnap = await db.collection(getCollectionName()).get();
+  const expected = { members: {}, entries: {}, weekly: {} };
+  sourceSnap.docs.forEach(doc => {
+    const id = doc.id;
+    const data = doc.data();
+    if (id.startsWith("member:")) {
+      expected.members[id.slice("member:".length)] = data;
+    } else if (id.startsWith("entry:")) {
+      const rest = id.slice("entry:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return;
+      expected.entries[`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`] = data;
+    } else if (id.startsWith("weekly:")) {
+      const rest = id.slice("weekly:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return;
+      expected.weekly[`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`] = data;
+    }
+  });
+
+  // --- Target (families/<familyId>/...) থেকে actual পড়া ---
+  const familyRoot = db.collection("families").doc(serverId);
+  const [membersSnap, entriesSnap, weeklySnap] = await Promise.all([
+    familyRoot.collection("members").get(),
+    familyRoot.collection("entries").get(),
+    familyRoot.collection("weekly").get()
+  ]);
+  const actual = {
+    members: Object.fromEntries(membersSnap.docs.map(d => [d.id, d.data()])),
+    entries: Object.fromEntries(entriesSnap.docs.map(d => [d.id, d.data()])),
+    weekly: Object.fromEntries(weeklySnap.docs.map(d => [d.id, d.data()]))
+  };
+
+  // গুরুত্বপূর্ণ ফিল্ড (ownerUid, updatedAt, value/name/gender) key-by-key
+  // deep-compare করা হয় — শুধু doc-সংখ্যা মেলা যথেষ্ট নয়।
+  function compareDoc(exp, act) {
+    if (!exp || !act) return false;
+    const keys = new Set([...Object.keys(exp), ...Object.keys(act)]);
+    for (const k of keys) {
+      if (JSON.stringify(exp[k]) !== JSON.stringify(act[k])) return false;
+    }
+    return true;
+  }
+
+  function diffSection(name, expMap, actMap) {
+    const expIds = Object.keys(expMap);
+    const actIds = Object.keys(actMap);
+    const missingInTarget = expIds.filter(id => !(id in actMap));
+    const extraInTarget = actIds.filter(id => !(id in expMap));
+    const fieldMismatches = expIds
+      .filter(id => id in actMap)
+      .filter(id => !compareDoc(expMap[id], actMap[id]));
+    return {
+      section: name,
+      expectedCount: expIds.length,
+      actualCount: actIds.length,
+      missingInTarget,
+      extraInTarget,
+      fieldMismatches
+    };
+  }
+
+  const results = [
+    diffSection("members", expected.members, actual.members),
+    diffSection("entries", expected.entries, actual.entries),
+    diffSection("weekly", expected.weekly, actual.weekly)
+  ];
+
+  const allOk = results.every(r =>
+    r.expectedCount === r.actualCount &&
+    r.missingInTarget.length === 0 &&
+    r.extraInTarget.length === 0 &&
+    r.fieldMismatches.length === 0
+  );
+
+  console.log(`[Phase C verify] সম্পন্ন — ${allOk ? "✅ সব মিলেছে" : "⚠️ অমিল পাওয়া গেছে"}। কোনো write/fix করা হয়নি, শুধু রিপোর্ট।`);
+  console.table(results.map(r => ({
+    section: r.section,
+    expected: r.expectedCount,
+    actual: r.actualCount,
+    missing: r.missingInTarget.length,
+    extra: r.extraInTarget.length,
+    fieldMismatch: r.fieldMismatches.length
+  })));
+  results.forEach(r => {
+    if (r.missingInTarget.length) console.warn(`[Phase C verify] ${r.section}: target-এ নেই —`, r.missingInTarget);
+    if (r.extraInTarget.length) console.warn(`[Phase C verify] ${r.section}: target-এ অতিরিক্ত (অপ্রত্যাশিত) —`, r.extraInTarget);
+    if (r.fieldMismatches.length) console.warn(`[Phase C verify] ${r.section}: field মিলছে না —`, r.fieldMismatches);
+  });
+  return { familyId: serverId, allOk, results };
+}
+if (typeof window !== "undefined") {
+  window.verifyPhaseCData = verifyPhaseCData;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
@@ -1995,16 +2399,19 @@ function meetingKey(year, month0) {
 async function saveMeetingData(year, month0, data) {
   await appStorage.set(meetingKey(year, month0), JSON.stringify(data), true);
 }
-async function loadWeekly(memberId, year, month0) {
+async function loadWeekly(migrationState, memberId, year, month0) {
   try {
-    const res = await appStorage.get(weeklyKey(memberId, year, month0), true);
-    return res ? JSON.parse(res.value) : {};
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const doc = await ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))).get();
+    if (!doc.exists) return {};
+    return JSON.parse(doc.data().value);
   } catch {
     return {};
   }
 }
-async function saveWeekly(memberId, year, month0, data, ownerUid) {
-  await db.collection(getCollectionName()).doc(weeklyKey(memberId, year, month0)).set({
+async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  await ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))).set({
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
@@ -2021,6 +2428,41 @@ async function loadLegacyMembers() {
   } catch {
     return [];
   }
+}
+
+// =====================================================================
+// --- Switch prep: Path Resolver (Step 1 — শুধু DEFINE করা হলো, এখনো
+// কোনো caller/ফাংশন এটি ব্যবহার করছে না। migrationState অনুযায়ী legacy
+// বনাম v2 collection ও doc-id convention নির্ধারণ করবে — future Step-এ
+// ধাপে ধাপে saveEntry/loadMembersV2/monthEntries listener ইত্যাদিকে এই
+// resolver-aware করা হবে। "locked" state ইচ্ছাকৃতভাবে legacy resolver
+// পায় (read তখনো legacy-ই authoritative; write আটকানো Rules+UI গার্ড
+// দিয়ে হবে, resolver-এর দায়িত্ব না)। ---
+// =====================================================================
+function resolvePathContext(migrationState, familyCode, familyId) {
+  if (migrationState === "v2") {
+    const familyRoot = db.collection("families").doc(familyId);
+    return {
+      mode: "v2",
+      membersRef: familyRoot.collection("members"),
+      entriesRef: familyRoot.collection("entries"),
+      weeklyRef: familyRoot.collection("weekly"),
+      memberDocId: (id) => id,
+      entryDocId: (memberId, dateKey) => `${memberId}_${dateKey}`,
+      weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
+    };
+  }
+  // legacy ("legacy" বা "locked" বা fallback) — বর্তমান আচরণ অপরিবর্তিত
+  const legacyRef = db.collection(`data_${familyCode}`);
+  return {
+    mode: "legacy",
+    membersRef: legacyRef,
+    entriesRef: legacyRef,
+    weeklyRef: legacyRef,
+    memberDocId: (id) => `member:${id}`,
+    entryDocId: (memberId, dateKey) => `entry:${memberId}:${dateKey}`,
+    weeklyDocId: (memberId, monthPref) => `weekly:${memberId}:${monthPref}`
+  };
 }
 
 // --- Device-Claim member storage (v2) — one real Firestore document per
@@ -2047,20 +2489,22 @@ async function loadMembersV2() {
 // entry/weekly-এর মতো updatedAt-ভিত্তিক conflict resolution করতে দেয়।
 // পুরনো (এই পরিবর্তনের আগে তৈরি) সদস্য ডকুমেন্টে updatedAt না-ও থাকতে
 // পারে — mergeBackupData() সেটাকে 0 ধরে নিরাপদ fallback আচরণ করে।
-async function saveMemberDoc(member) {
+async function saveMemberDoc(migrationState, member) {
   const {
     id,
     ...fields
   } = member;
-  await db.collection(getCollectionName()).doc(memberDocId(id)).set({
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  await ctx.membersRef.doc(ctx.memberDocId(id)).set({
     ...fields,
     updatedAt: Date.now()
   }, {
     merge: true
   });
 }
-async function deleteMemberDoc(id) {
-  await db.collection(getCollectionName()).doc(memberDocId(id)).delete();
+async function deleteMemberDoc(migrationState, id) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  await ctx.membersRef.doc(ctx.memberDocId(id)).delete();
 }
 // H-2 fix: previously a plain update() with no read-check, so two devices
 // claiming the same unclaimed member at nearly the same time could race —
@@ -2071,8 +2515,9 @@ async function deleteMemberDoc(id) {
 // unowned (or already owned by this same uid); otherwise we throw so the
 // caller's existing catch/alert can inform the user, instead of silently
 // overwriting another device's claim.
-async function claimMemberDoc(id, uid) {
-  const docRef = db.collection(getCollectionName()).doc(memberDocId(id));
+async function claimMemberDoc(migrationState, id, uid) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const docRef = ctx.membersRef.doc(ctx.memberDocId(id));
   await db.runTransaction(async tx => {
     const snap = await tx.get(docRef);
     const currentOwner = snap.exists ? snap.data().ownerUid ?? null : null;
@@ -2085,8 +2530,9 @@ async function claimMemberDoc(id, uid) {
     });
   });
 }
-async function releaseMemberDoc(id) {
-  await db.collection(getCollectionName()).doc(memberDocId(id)).update({
+async function releaseMemberDoc(migrationState, id) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  await ctx.membersRef.doc(ctx.memberDocId(id)).update({
     ownerUid: null,
     updatedAt: Date.now()
   });
@@ -2106,7 +2552,7 @@ async function migrateMembersIfNeeded() {
     createdAt: m.createdAt || Date.now()
   }));
   try {
-    await Promise.all(migrated.map(m => saveMemberDoc(m)));
+    await Promise.all(migrated.map(m => saveMemberDoc("legacy", m)));
   } catch {}
   return migrated;
 }
@@ -2121,20 +2567,30 @@ async function loadCustomFields() {
 async function saveCustomFields(fields) {
   await appStorage.set("custom_fields", JSON.stringify(fields), true);
 }
-async function loadEntry(memberId, key) {
+// Step 2 (Switch prep): migrationState-এর প্রথম parameter হিসেবে নেওয়া
+// হয় resolvePathContext()-কে ফিড করতে। migrationState "legacy" হলে
+// (বর্তমানে সবসময়ই তাই, যেহেতু Rules-এ এই field এখনো deploy হয়নি)
+// আউটপুট আগের হার্ডকোডেড আচরণের সাথে বিট-ফর-বিট অভিন্ন — resolver শুধু
+// db.collection(getCollectionName()) + entry:<memberId>:<key> ফেরত দেয়,
+// ঠিক যেমন আগে ছিল। familyCode/familyId প্রতিটি কলে fresh নেওয়া হয়
+// (কোনো cache/stale variable ব্যবহার হয় না)।
+async function loadEntry(migrationState, memberId, key) {
   try {
-    const res = await appStorage.get(`entry:${memberId}:${key}`, true);
-    return res ? JSON.parse(res.value) : null;
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const doc = await ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).get();
+    if (!doc.exists) return null;
+    return JSON.parse(doc.data().value);
   } catch {
     return null;
   }
 }
-async function saveEntry(memberId, key, data, ownerUid) {
+async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   // ownerUid is stamped from the member's CURRENT ownerUid at save time (not
   // the writer's own uid) so the entry stays consistent with claim state and
   // future Firestore rules can check request.auth.uid == resource.data.ownerUid
   // directly on this same document (no extra get() lookup needed).
-  await db.collection(getCollectionName()).doc(entryDocId(memberId, key)).set({
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  await ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).set({
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
@@ -2150,9 +2606,10 @@ function entryDocId(memberId, key) {
 // under that day's document. Only the last 5 versions are kept per day —
 // older ones are pruned right after each push so the subcollection never
 // grows unbounded.
-async function pushEntryHistory(memberId, key, oldData) {
+async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
-    const histRef = db.collection(getCollectionName()).doc(entryDocId(memberId, key)).collection("history");
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const histRef = ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).collection("history");
     await histRef.add({
       value: JSON.stringify(oldData),
       editedAt: Date.now()
@@ -2169,9 +2626,10 @@ async function pushEntryHistory(memberId, key, oldData) {
     // never block the actual save of the day's entry.
   }
 }
-async function fetchEntryHistory(memberId, key) {
+async function fetchEntryHistory(migrationState, memberId, key) {
   try {
-    const histRef = db.collection(getCollectionName()).doc(entryDocId(memberId, key)).collection("history");
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const histRef = ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).collection("history");
     const snap = await histRef.orderBy("editedAt", "desc").limit(5).get();
     return snap.docs.map(d => ({
       id: d.id,
@@ -2388,6 +2846,12 @@ function App() {
   useFonts();
   const [themeColor, setThemeColor] = useThemeColor();
   const [members, setMembers] = useState(null);
+  // Switch prep (Step 1): families/<familyId>.migrationState-এর লাইভ
+  // অবস্থা। undefined = "এখনো জানা যায়নি" (fail-closed) — "legacy" ধরে
+  // নেওয়া হয় না যতক্ষণ না সার্ভার থেকে প্রকৃত মান (বা নিশ্চিত absence)
+  // পাওয়া যায়। এই মুহূর্তে কোনো caller এই state ব্যবহার করছে না
+  // (unwired), শুধু loading-gate-কে প্রভাবিত করে।
+  const [migrationState, setMigrationState] = useState(undefined);
   const [selectedId, setSelectedId] = useState(null);
   const [addingMember, setAddingMember] = useState(false);
   const [newName, setNewName] = useState("");
@@ -2490,12 +2954,38 @@ function App() {
     });
   }
   useEffect(() => {
+    let migrationUnsub = null;
     (async () => {
       // Google sign-in বা family code — যেটাই আগে পাওয়া যায়, সেই অনুযায়ী
       // একই family/profile/records auto-load হওয়া নিশ্চিত করতে, member
       // লোড করার আগেই (Google-linked থাকলে) account-এর সংরক্ষিত family
       // code দিয়ে local code sync করে নেওয়া হচ্ছে।
       await syncFamilyCodeWithAccount();
+      // Phase A prep — non-blocking, best-effort; app boot এর জন্য অপেক্ষা করে না।
+      ensureFamilyCodeMapping();
+      ensureFamilyMeta();
+      // Switch prep (Step 1): migrationState listener attach করার আগে
+      // ensureFamilyCodeMapping()-কে আলাদাভাবে await করা হচ্ছে (উপরের
+      // fire-and-forget কলটি অপরিবর্তিত রাখা হয়েছে, বিদ্যমান আচরণ ভাঙা
+      // হয়নি) — কারণ local family_id boot-এর প্রথম মুহূর্তে server-এর
+      // সাথে out-of-sync/stale থাকতে পারে (self-heal সম্পন্ন না হওয়া
+      // পর্যন্ত)। getFamilyId() এখানে কল করার আগে সেই self-heal সম্পন্ন
+      // হয়েছে কিনা নিশ্চিত করতে এই দ্বিতীয়, awaited কলটি প্রয়োজন —
+      // ফাংশনটি idempotent/best-effort বলে দ্বিতীয়বার কল করা নিরাপদ।
+      await ensureFamilyCodeMapping();
+      const migrationFamilyId = getFamilyId();
+      migrationUnsub = db.collection("families").doc(migrationFamilyId).onSnapshot(
+        (snap) => {
+          const state = snap.exists ? (snap.data().migrationState || "legacy") : "legacy";
+          setMigrationState(state);
+        },
+        () => {
+          // Fail-closed: listener error হলে migrationState ইচ্ছাকৃতভাবে
+          // অপরিবর্তিত (undefined-ই) রাখা হচ্ছে — কোনো "legacy" fallback
+          // বা কোনো SDK auto-retry আচরণের ওপর নির্ভরতা নেই। App
+          // loading-gate-এ থেকে যাবে যতক্ষণ না একটি সফল snapshot আসে।
+        }
+      );
       const m = await migrateMembersIfNeeded();
       setMembers(m);
       // Fires once per app load (not per re-render) so the Analytics
@@ -2540,6 +3030,9 @@ function App() {
         setAddingMember(true);
       }
     })();
+    return () => {
+      if (migrationUnsub) migrationUnsub();
+    };
   }, []);
   const [recoveryMessage, setRecoveryMessage] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -2600,6 +3093,11 @@ function App() {
   // "manual member, no phone of their own" case. Read access is never
   // restricted, only writing.
   const isLockedForThisDevice = !!(selectedMember && selectedMember.ownerUid && (!auth.currentUser || selectedMember.ownerUid !== auth.currentUser.uid));
+  // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
+  // (approved design) is the real safety boundary; this is purely UX so the
+  // person sees a clear message instead of a raw Firestore permission error
+  // during the brief "locked" window of a family's Switch.
+  const isLockedForSwitch = migrationState === "locked";
   useEffect(() => {
     // Guard: on first render selectedId is still null (real value loads async).
     // Skip that null write so it never overwrites the previously saved
@@ -2609,13 +3107,13 @@ function App() {
     appStorage.set(`last-selected-member:${getFamilyCode()}`, JSON.stringify(selectedId), false).catch(() => {});
   }, [selectedId]);
   useEffect(() => {
-    if (!selectedId) return;
-    loadEntry(selectedId, dateKey(viewDate)).then(data => {
+    if (!selectedId || migrationState === undefined) return;
+    loadEntry(migrationState, selectedId, dateKey(viewDate)).then(data => {
       setEntry(data || {});
       originalEntryRef.current = data || null;
       entryDirtyRef.current = false;
     });
-  }, [selectedId, viewDate]);
+  }, [selectedId, viewDate, migrationState]);
 
   // Live-synced month entries: a single collection-scoped range query on
   // documentId() (entry:<memberId>:<YYYY-MM>-*) replaces what used to be
@@ -2634,15 +3132,20 @@ function App() {
   // have a saved entry (no doc = no read), instead of always issuing 31
   // reads whether or not a day was ever filled in.
   useEffect(() => {
-    if (!selectedId) {
+    if (!selectedId || migrationState === undefined) {
       setMonthEntries({});
       return;
     }
     const year = monthCursor.year;
     const month0 = monthCursor.month0;
-    const prefix = `entry:${selectedId}:${year}-${pad2(month0 + 1)}-`;
-    const colRef = db.collection(getCollectionName());
-    const q = colRef
+    // Step 2 (Switch prep): resolver দিয়ে collection ও prefix নির্ধারণ।
+    // migrationState "legacy" হলে (বর্তমানে সবসময়ই তাই) prefix ও colRef
+    // আগের হার্ডকোডেড মানের সাথে বিট-ফর-বিট অভিন্ন থাকে।
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const prefix = ctx.mode === "v2"
+      ? `${selectedId}_${year}-${pad2(month0 + 1)}-`
+      : `entry:${selectedId}:${year}-${pad2(month0 + 1)}-`;
+    const q = ctx.entriesRef
       .where(firebase.firestore.FieldPath.documentId(), ">=", prefix)
       .where(firebase.firestore.FieldPath.documentId(), "<", prefix + "\uf8ff");
     const unsub = q.onSnapshot(snap => {
@@ -2659,10 +3162,10 @@ function App() {
       setMonthEntries(liveData);
     }, () => {});
     return () => unsub();
-  }, [selectedId, monthCursor, monthRefreshKey]);
+  }, [selectedId, monthCursor, monthRefreshKey, migrationState]);
   const refreshWeekly = useCallback(() => {
-    if (!selectedId) return;
-    loadWeekly(selectedId, monthCursor.year, monthCursor.month0).then(data => {
+    if (!selectedId || migrationState === undefined) return;
+    loadWeekly(migrationState, selectedId, monthCursor.year, monthCursor.month0).then(data => {
       setWeekly(data);
       weeklyDirtyRef.current = false;
       const maxPossible = getWeekRanges(daysInMonth(monthCursor.year, monthCursor.month0)).length;
@@ -2673,7 +3176,7 @@ function App() {
       }
       setWeeklyRowCount(Math.min(Math.max(highestFilled, 1), maxPossible));
     });
-  }, [selectedId, monthCursor]);
+  }, [selectedId, monthCursor, migrationState]);
   useEffect(() => {
     refreshWeekly();
   }, [refreshWeekly]);
@@ -2951,6 +3454,11 @@ function App() {
       const proceedAnyway = window.confirm("নেটওয়ার্ক বা সার্ভার সমস্যার কারণে এই কোডে আগে থেকে কোনো ডাটা আছে কিনা তা যাচাই করা যায়নি। তবুও কি এই কোডে পরিবর্তন করে এগিয়ে যেতে চান?");
       if (!proceedAnyway) return;
     }
+    // Phase A: প্রথম Admin claim — familyId অপরিবর্তিত থাকে (শুধু code
+    // বদলাচ্ছে), তাই code বদলানোর *আগেই* বর্তমান family-এর জন্য claim
+    // চেষ্টা করা হচ্ছে। ব্যর্থ হলেও (best-effort) Family Code set flow
+    // কখনো আটকাবে না।
+    await claimFirstAdminIfEligible();
     setFamilyCode(code);
   }
   function handleGoToArchive() {
@@ -3054,9 +3562,13 @@ function App() {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে এডিট করা যাবে না।");
       return;
     }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     setSavingWeekly(true);
     try {
-      await saveWeekly(selectedId, monthCursor.year, monthCursor.month0, weekly, selectedMember?.ownerUid ?? null);
+      await saveWeekly(migrationState, selectedId, monthCursor.year, monthCursor.month0, weekly, selectedMember?.ownerUid ?? null);
       weeklyDirtyRef.current = false;
       setWeeklySavedTick(true);
       setTimeout(() => setWeeklySavedTick(false), 1600);
@@ -3067,6 +3579,10 @@ function App() {
     }
   }
   async function handleSaveMeeting() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     setSavingMeeting(true);
     try {
       await saveMeetingData(monthCursor.year, monthCursor.month0, meetingState);
@@ -3081,6 +3597,10 @@ function App() {
   }
   async function handleAddCustomField() {
     if (!newCustomLabel.trim()) return;
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const key = `custom_${Date.now()}`;
     const newField = {
       key,
@@ -3102,6 +3622,10 @@ function App() {
   async function handleAddMember() {
     const name = newName.trim();
     if (!name) return;
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     // Creating a member on this device claims it for the signed-in Google
     // account right away — that account's uid becomes the only one allowed
@@ -3121,7 +3645,7 @@ function App() {
     setNewGender("male");
     setAddingMember(false);
     try {
-      await saveMemberDoc(newMember);
+      await saveMemberDoc(migrationState, newMember);
     } catch (err) {
       alert("সদস্য সিংক করতে সমস্যা হয়েছে: " + err.message);
     }
@@ -3135,12 +3659,16 @@ function App() {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে বাদ দেওয়া যাবে না। প্রথমে সেই ডিভাইস থেকে দায়িত্ব ছাড়তে বলুন, তারপর বাদ দিন।");
       return;
     }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const ok = window.confirm(`আপনি কি নিশ্চিত "${m.name}" কে সদস্য তালিকা থেকে বাদ দিতে চান? এই সদস্যের নাম আর দেখা যাবে না, তবে পূর্বের সেভ করা ডাটা মুছে যাবে না।`);
     if (!ok) return;
     const next = (members || []).filter(x => x.id !== m.id);
     setMembers(next);
     try {
-      await deleteMemberDoc(m.id);
+      await deleteMemberDoc(migrationState, m.id);
     } catch (err) {
       alert("সদস্য সিংক করতে সমস্যা হয়েছে: " + err.message);
     }
@@ -3151,8 +3679,12 @@ function App() {
   async function handleClaimMember(m) {
     const uid = auth.currentUser ? auth.currentUser.uid : null;
     if (!uid) return;
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     try {
-      await claimMemberDoc(m.id, uid);
+      await claimMemberDoc(migrationState, m.id, uid);
       setMembers(prev => prev.map(x => x.id === m.id ? {
         ...x,
         ownerUid: uid
@@ -3173,10 +3705,14 @@ function App() {
       alert(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে আছে — এই সদস্যের দায়িত্ব শুধুমাত্র সেই ডিভাইস থেকেই ছাড়া যাবে, এখান থেকে সম্ভব নয়।`);
       return;
     }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const ok = window.confirm(`"${m.name}"-এর দায়িত্ব ছেড়ে দিতে চান? এরপর যেকোনো সাইন-ইন করা ডিভাইস এই সদস্যের দায়িত্ব নিতে পারবে।`);
     if (!ok) return;
     try {
-      await releaseMemberDoc(m.id);
+      await releaseMemberDoc(migrationState, m.id);
       setMembers(prev => prev.map(x => x.id === m.id ? {
         ...x,
         ownerUid: null
@@ -3239,17 +3775,21 @@ function App() {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে এডিট করা যাবে না।");
       return;
     }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     setSaving(true);
     try {
       const key = dateKey(viewDate);
       if (originalEntryRef.current) {
-        await pushEntryHistory(selectedId, key, originalEntryRef.current);
+        await pushEntryHistory(migrationState, selectedId, key, originalEntryRef.current);
       }
       const toSave = {
         ...entry,
         lastEditedAt: Date.now()
       };
-      await saveEntry(selectedId, key, toSave, selectedMember?.ownerUid ?? null);
+      await saveEntry(migrationState, selectedId, key, toSave, selectedMember?.ownerUid ?? null);
       originalEntryRef.current = toSave;
       setEntry(toSave);
       entryDirtyRef.current = false;
@@ -3267,7 +3807,7 @@ function App() {
     setShowHistoryModal(true);
     setLoadingHistory(true);
     try {
-      const list = await fetchEntryHistory(selectedId, dateKey(viewDate));
+      const list = await fetchEntryHistory(migrationState, selectedId, dateKey(viewDate));
       setHistoryList(list);
     } finally {
       setLoadingHistory(false);
@@ -3313,7 +3853,7 @@ function App() {
       avgPct: Math.round(avg * 100)
     };
   }, [monthEntries, monthCursor, selectedMember, allFields]);
-  if (members === null) return /*#__PURE__*/React.createElement("div", {
+  if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex items-center justify-center bg-[#F4F7F1]"
   }, /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
@@ -3723,6 +4263,7 @@ function App() {
       e.stopPropagation();
       handleClaimMember(m);
     },
+    disabled: isLockedForSwitch,
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0",
     title: "এই সদস্যের দায়িত্ব নিন"
   }, "দায়িত্ব নিন") : m.ownerUid === (auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
@@ -3730,6 +4271,7 @@ function App() {
       e.stopPropagation();
       handleReleaseMember(m);
     },
+    disabled: isLockedForSwitch,
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
     title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
   }, "আপনার") : /*#__PURE__*/React.createElement("span", {
@@ -3745,6 +4287,7 @@ function App() {
       e.stopPropagation();
       handleRemoveMember(m);
     },
+    disabled: isLockedForSwitch,
     className: "p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity",
     title: "সদস্য বাদ দিন"
   }, /*#__PURE__*/React.createElement(Trash, {
@@ -3945,6 +4488,7 @@ function App() {
     value: "female"
   }, "নারী")), /*#__PURE__*/React.createElement("button", {
     onClick: handleAddMember,
+    disabled: isLockedForSwitch,
     className: "px-3 py-1.5 rounded-xl text-xs font-bold bg-[#C89B3C] text-[#16302B]"
   }, "যোগ"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAddingMember(false),
@@ -4162,7 +4706,7 @@ function App() {
     className: "text-[11px] text-center text-slate-600 bg-slate-100 border border-slate-200 rounded-xl py-2 px-3"
   }, "এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে শুধু দেখা যাবে, এডিট করা যাবে না।"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSave,
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice,
+    disabled: isFutureDate(viewDate) || isLockedForThisDevice || isLockedForSwitch,
     className: "w-full h-12 rounded-2xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100",
     style: {
       background: savedTick ? "#4C8C74" : "var(--theme-primary)"
@@ -4249,7 +4793,7 @@ function App() {
     className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
   }))))))), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveWeekly,
-    disabled: isLockedForThisDevice,
+    disabled: isLockedForThisDevice || isLockedForSwitch,
     className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
   }, savingWeekly ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
@@ -4446,6 +4990,7 @@ function App() {
     size: 14
   })))))))), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveMeeting,
+    disabled: isLockedForSwitch,
     className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm"
   }, savingMeeting ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
@@ -4786,6 +5331,7 @@ function App() {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: handleAddCustomField,
+    disabled: isLockedForSwitch,
     className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold"
   }, "যোগ করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowAddCustom(false),
@@ -5046,6 +5592,12 @@ function GoogleAccountModal({
         window.location.reload();
         return;
       }
+      // Phase A: প্রথম Admin claim — শুধু non-switched case-এ (অর্থাৎ এই
+      // ডিভাইস তার নিজের বর্তমান family-তেই Google link করছে)। switched
+      // case-এ (অন্য ডিভাইস থেকে আগে link করা account, ভিন্ন family)
+      // ইচ্ছাকৃতভাবে claim করা হচ্ছে না — সেই family-এর Admin status
+      // ইতিমধ্যে নির্ধারিত থাকার কথা, ভুলভাবে নতুন claim এড়াতে।
+      await claimFirstAdminIfEligible();
       onClose();
       // সাইন-ইন সফল — এই Google অ্যাকাউন্টে আগে থেকে কোনো Drive ব্যাকআপ
       // থাকলে detect করে Restore-এর Popup দেখানোর সুযোগ App-কে দেওয়া হচ্ছে।
