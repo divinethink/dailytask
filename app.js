@@ -500,6 +500,270 @@ async function verifyPhaseCData() {
 if (typeof window !== "undefined") {
   window.verifyPhaseCData = verifyPhaseCData;
 }
+// =====================================================================
+// --- Phase C Switch: Reverse-sync ধাপ (v2 → legacy, Flip-পরবর্তী rollback
+// prep) — শুধু browser console থেকে ম্যানুয়ালি (`reverseSyncPhaseCData()`)।
+// =====================================================================
+// উদ্দেশ্য: Switch-এর Flip ধাপের পর যদি rollback প্রয়োজন হয়, তাহলে
+// migrationState "legacy"-তে ফিরিয়ে দেওয়ার *আগে* এই ফাংশন v2-তে ঘটে
+// যাওয়া সব পরিবর্তন (নতুন/আপডেট হওয়া entries-weekly, নতুন/আপডেট/ডিলিট
+// হওয়া members) legacy collection-এ প্রতিফলিত করে — যাতে rollback-এর পর
+// app legacy পড়া শুরু করলে কোনো ডাটা "হারিয়ে যাওয়া" মনে না হয়।
+//
+// এই ফাংশন কখনো v2 ডাটা touch করে না (শুধু read) — শুধু legacy collection-এ
+// write করে। data_<familyCode> ছাড়া অন্য কোনো কিছু পরিবর্তিত হয় না।
+//
+// Flip-timestamp source: families/<familyId>.updatedAt নিজেই ব্যবহার করা
+// হচ্ছে — কারণ migrationState পরিবর্তনের rule (firestore.rules-এ) বাধ্য
+// করে যে সেই update-এ updatedAt-ও একসাথে সেট হতে হবে (diff().affectedKeys()
+// hasOnly(['migrationState','updatedAt']))। তাই families doc-এর updatedAt-ই
+// নির্ভরযোগ্য "কবে Flip হয়েছিল" রেফারেন্স — আলাদা কোনো ম্যানুয়াল timestamp
+// input লাগে না।
+//
+// entries/weekly: delete function নেই (শুধু create/update path আছে,
+// deleteMemberDoc()-এর মতো কিছু নেই) — তাই এখানে শুধু updatedAt > flip
+// timestamp হলে candidate, timestamp-diff-ই যথেষ্ট।
+//
+// members: deleteMemberDoc() hard-delete করে, কোনো tombstone/updatedAt
+// marker রাখে না — তাই শুধু timestamp-diff দিয়ে deletion ধরা সম্ভব না।
+// এর বদলে members-এর জন্য সম্পূর্ণ id-set compare করা হয়: v2-তে নেই কিন্তু
+// legacy-তে আছে এমন member = Flip-পরবর্তী v2-তে deleted, তাই legacy থেকেও
+// delete করা হয়।
+//
+// Idempotent: বারবার চালানো নিরাপদ — প্রতিটি write conflict-resolution
+// করে (existing legacy updatedAt vs incoming v2 updatedAt, নতুনটাই থাকে,
+// কখনো পুরনো দিয়ে নতুন ডাটা ওভাররাইট হয় না), এবং delete শুধু তখনই হয়
+// যখন v2-তে সেই member সত্যিই অনুপস্থিত (state পুনরায় গণনা হয় প্রতি রান-এ,
+// আগের রান-এর ওপর নির্ভর করে না)।
+async function reverseSyncPhaseCData() {
+  console.log("[Reverse-sync] শুরু হচ্ছে — প্রথমে guard যাচাই (server-verified familyId)...");
+  const code = getFamilyCode();
+  const localId = getFamilyId();
+  let serverId = null;
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(code).get();
+    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+  } catch (err) {
+    console.error("[Reverse-sync] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। কোনো write হয়নি।", err);
+    return { aborted: true, reason: "lookup-failed" };
+  }
+  if (!serverId) {
+    console.error("[Reverse-sync] Guard ব্যর্থ — familyCodes/<code> ডকুমেন্ট পাওয়া যায়নি। কোনো write হয়নি।");
+    return { aborted: true, reason: "no-mapping" };
+  }
+  if (serverId !== localId) {
+    console.error(`[Reverse-sync] Guard ব্যর্থ — local familyId (${localId}) ও server-verified familyId (${serverId}) ভিন্ন। কোনো write হয়নি।`);
+    return { aborted: true, reason: "mismatch", localId, serverId };
+  }
+  console.log("[Reverse-sync] Guard পাস — server-verified familyId:", serverId);
+
+  const familyRef = db.collection("families").doc(serverId);
+  const familySnap = await familyRef.get();
+  if (!familySnap.exists) {
+    console.error("[Reverse-sync] families ডকুমেন্ট পাওয়া যায়নি। থামানো হলো।");
+    return { aborted: true, reason: "no-family-doc" };
+  }
+  const famData = familySnap.data();
+  if (famData.migrationState !== "locked") {
+    console.error(`[Reverse-sync] নিরাপত্তা-চেক ব্যর্থ — migrationState বর্তমানে "${famData.migrationState}", কিন্তু reverse-sync শুধুমাত্র "locked" state-এ চালানো নিরাপদ (v2-তে নতুন write বন্ধ থাকা অবস্থায়)। আগে migrationState "locked" করুন, তারপর আবার চেষ্টা করুন।`);
+    return { aborted: true, reason: "not-locked", currentState: famData.migrationState };
+  }
+  const flipTimestamp = famData.updatedAt || 0;
+  console.log("[Reverse-sync] flip-timestamp (families.updatedAt):", flipTimestamp, new Date(flipTimestamp).toISOString());
+
+  const familyRoot = db.collection("families").doc(serverId);
+  const CHUNK_SIZE = 450;
+  async function writeChunked(items) {
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const batch = db.batch();
+      items.slice(i, i + CHUNK_SIZE).forEach(({ ref, data, del }) => {
+        if (del) batch.delete(ref);
+        else batch.set(ref, data, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
+
+  const legacyColRef = db.collection(getCollectionName());
+
+  // --- entries/weekly: timestamp-diff (delete function নেই, শুধু candidate নির্বাচন) ---
+  async function reverseSyncTimestampScoped(subcollection, legacyPrefix, splitFn) {
+    const [v2Snap, legacySnap] = await Promise.all([
+      familyRoot.collection(subcollection).get(),
+      legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", legacyPrefix)
+        .where(firebase.firestore.FieldPath.documentId(), "<", legacyPrefix + "\uf8ff").get()
+    ]);
+    const existingLegacy = {};
+    legacySnap.docs.forEach(d => { existingLegacy[d.id] = d.data(); });
+
+    const writes = [];
+    let candidates = 0, written = 0, skippedOlder = 0;
+    v2Snap.docs.forEach(doc => {
+      const data = doc.data();
+      const updatedAt = data.updatedAt || 0;
+      if (updatedAt <= flipTimestamp) return; // Flip-এর আগেই কপি হয়ে গেছে, touch করার দরকার নেই
+      candidates += 1;
+      const legacyId = splitFn(doc.id);
+      const existing = existingLegacy[legacyId];
+      const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
+      if (existing && existingUpdatedAt >= updatedAt) { skippedOlder += 1; return; }
+      writes.push({ ref: legacyColRef.doc(legacyId), data });
+      written += 1;
+    });
+    await writeChunked(writes);
+    return { candidates, written, skippedOlder };
+  }
+
+  const entryResult = await reverseSyncTimestampScoped("entries", `entry:`, id => {
+    // v2 id: "<memberId>_<date>" → legacy id: "entry:<memberId>:<date>"
+    const idx = id.indexOf("_");
+    return `entry:${id.slice(0, idx)}:${id.slice(idx + 1)}`;
+  });
+  const weeklyResult = await reverseSyncTimestampScoped("weekly", `weekly:`, id => {
+    const idx = id.indexOf("_");
+    return `weekly:${id.slice(0, idx)}:${id.slice(idx + 1)}`;
+  });
+
+  // --- members: সম্পূর্ণ id-set compare (delete detection-এর জন্য আবশ্যক) ---
+  const [v2MembersSnap, legacyMembersSnap] = await Promise.all([
+    familyRoot.collection("members").get(),
+    legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+      .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get()
+  ]);
+  const v2Members = {};
+  v2MembersSnap.docs.forEach(d => { v2Members[d.id] = d.data(); });
+  const legacyMembers = {};
+  legacyMembersSnap.docs.forEach(d => { legacyMembers[d.id.slice("member:".length)] = d.data(); });
+
+  const memberWrites = [];
+  let memberUpdated = 0, memberSkippedOlder = 0, memberDeleted = 0;
+  Object.keys(v2Members).forEach(id => {
+    const data = v2Members[id];
+    const updatedAt = data.updatedAt || 0;
+    if (updatedAt <= flipTimestamp) return;
+    const legacyId = `member:${id}`;
+    const existing = legacyMembers[id];
+    const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
+    if (existing && existingUpdatedAt >= updatedAt) { memberSkippedOlder += 1; return; }
+    memberWrites.push({ ref: legacyColRef.doc(legacyId), data });
+    memberUpdated += 1;
+  });
+  Object.keys(legacyMembers).forEach(id => {
+    if (!(id in v2Members)) {
+      // v2-তে নেই কিন্তু legacy-তে আছে — Flip-পরবর্তী v2-deletion, legacy থেকেও সরাতে হবে
+      memberWrites.push({ ref: legacyColRef.doc(`member:${id}`), del: true });
+      memberDeleted += 1;
+    }
+  });
+  await writeChunked(memberWrites);
+
+  const report = {
+    familyId: serverId,
+    flipTimestamp,
+    entries: entryResult,
+    weekly: weeklyResult,
+    members: { updated: memberUpdated, deleted: memberDeleted, skippedOlder: memberSkippedOlder }
+  };
+  console.log("[Reverse-sync] সম্পন্ন — v2 ডাটা অস্পৃশ্য, শুধু legacy collection-এ প্রয়োজনীয় write/delete হয়েছে। রিপোর্ট:");
+  console.table({
+    "entries — candidate (post-flip)": report.entries.candidates,
+    "entries — লেখা হয়েছে": report.entries.written,
+    "weekly — candidate (post-flip)": report.weekly.candidates,
+    "weekly — লেখা হয়েছে": report.weekly.written,
+    "members — আপডেট/নতুন": report.members.updated,
+    "members — ডিলিট (v2-তে অনুপস্থিত)": report.members.deleted
+  });
+  return report;
+}
+if (typeof window !== "undefined") {
+  window.reverseSyncPhaseCData = reverseSyncPhaseCData;
+}
+// =====================================================================
+// --- Health-check: একটি family-এর migration-related consistency যাচাই
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix করে না) — শুধু browser console
+// থেকে ম্যানুয়ালি (`healthCheckFamily()` — বর্তমান device-এর family,
+// অথবা `healthCheckFamily("<অন্য familyId>")` — নির্দিষ্ট কোনো family)।
+// =====================================================================
+// উদ্দেশ্য: প্রতিবার আলাদা আলাদা console command চালিয়ে familyCode/
+// adminUids/legacyCollectionMap/migrationState নিজে নিজে মিলিয়ে দেখার
+// বদলে — একটি কল-এ সবকিছু একসাথে পরীক্ষা করে একটা সংক্ষিপ্ত রিপোর্ট দেয়,
+// যাতে owner-কে বারবার ম্যানুয়াল ধাপে ধাপে ডায়াগনস্টিক চালাতে না হয়।
+// এই ফাংশন কোনো guard-abort করে না (verify-only ফাংশনের মতোই) — বরং
+// প্রতিটা সমস্যা একটা "issues" তালিকায় জমা করে শেষে একসাথে দেখায়, যাতে
+// একটামাত্র সমস্যার কারণে বাকি checks স্কিপ না হয়।
+async function healthCheckFamily(familyIdOverride) {
+  const familyId = familyIdOverride || getFamilyId();
+  console.log("[Health-check] শুরু হচ্ছে (read-only) — familyId:", familyId);
+  const issues = [];
+  const info = {};
+
+  const familySnap = await db.collection("families").doc(familyId).get();
+  if (!familySnap.exists) {
+    console.error("[Health-check] families/" + familyId + " ডকুমেন্ট পাওয়া যায়নি — থামানো হলো।");
+    return { familyId, issues: ["families doc missing"], info };
+  }
+  const fam = familySnap.data();
+  info.familyCode = fam.familyCode;
+  info.migrationState = fam.migrationState || "(unset — legacy হিসেবে গণ্য হয়)";
+  info.adminUids = fam.adminUids;
+
+  // --- familyCode field validity ---
+  if (typeof fam.familyCode !== "string" || !fam.familyCode) {
+    issues.push("families.familyCode অনুপস্থিত বা স্ট্রিং নয়।");
+  }
+
+  // --- adminUids format validity (bracket-wrapped string bug pattern ধরার জন্য) ---
+  if (!Array.isArray(fam.adminUids)) {
+    issues.push("families.adminUids array না — টাইপ ভুল।");
+  } else {
+    fam.adminUids.forEach((uid, i) => {
+      if (typeof uid !== "string") {
+        issues.push(`adminUids[${i}] স্ট্রিং না।`);
+      } else if (uid.trim().startsWith("[") || uid.includes(",\"") || uid.includes("\",")) {
+        issues.push(`adminUids[${i}] সন্দেহজনক — একটার ভেতরে একাধিক uid bracket-wrapped থাকতে পারে: ${uid}`);
+      }
+    });
+  }
+
+  // --- familyCodes bidirectional consistency (familyCode -> familyId -> ফিরে একই familyCode) ---
+  if (typeof fam.familyCode === "string" && fam.familyCode) {
+    const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
+    if (!codeSnap.exists) {
+      issues.push(`familyCodes/${fam.familyCode} ডকুমেন্ট নেই — এই family-এর code দিয়ে familyId খুঁজে পাওয়া যাবে না।`);
+    } else if (codeSnap.data().familyId !== familyId) {
+      issues.push(`familyCodes/${fam.familyCode}.familyId (${codeSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
+    }
+
+    // --- legacyCollectionMap equation consistency ---
+    const expectedCollectionName = "data_" + fam.familyCode;
+    const mapSnap = await db.collection("legacyCollectionMap").doc(expectedCollectionName).get();
+    info.legacyCollectionMapExists = mapSnap.exists;
+    if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+      issues.push(`legacyCollectionMap/${expectedCollectionName}.familyId (${mapSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
+    }
+  }
+
+  // --- migrationState sanity ---
+  if (fam.migrationState !== undefined && !["legacy", "locked", "v2"].includes(fam.migrationState)) {
+    issues.push(`migrationState অপ্রত্যাশিত মান: "${fam.migrationState}" (শুধু legacy/locked/v2 বৈধ)।`);
+  }
+
+  console.log(issues.length === 0
+    ? "[Health-check] ✅ কোনো সমস্যা পাওয়া যায়নি।"
+    : `[Health-check] ⚠️ ${issues.length}টি সমস্যা পাওয়া গেছে —`);
+  console.table({
+    familyId,
+    familyCode: info.familyCode,
+    migrationState: info.migrationState,
+    "legacyCollectionMap আছে": info.legacyCollectionMapExists,
+    "adminUids সংখ্যা": Array.isArray(fam.adminUids) ? fam.adminUids.length : "N/A"
+  });
+  if (issues.length) issues.forEach(msg => console.warn("[Health-check]", msg));
+  return { familyId, issues, info };
+}
+if (typeof window !== "undefined") {
+  window.healthCheckFamily = healthCheckFamily;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
