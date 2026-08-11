@@ -97,6 +97,126 @@ function setFamilyCode(code) {
   window.location.reload();
 }
 // =====================================================================
+// --- §৫ Family Code Lifecycle Fix: দুটি পৃথক, স্পষ্ট-সীমাবদ্ধ অপারেশন ---
+// =====================================================================
+// এই দুটি ফাংশন এখনো কোনো UI বাটনের সাথে যুক্ত নয় এবং boot flow-এ ডাকা
+// হয় না — শুধু browser console থেকে ম্যানুয়ালি (owner-approved টেস্টিং/
+// রোলআউটের জন্য প্রস্তুত রাখা হলো)। বিদ্যমান "কাস্টম ফ্যামিলি কোড সেট
+// করুন" মেনু বাটন এখনো পুরনো setFamilyCode()-ই ব্যবহার করছে — এই fix
+// UI-তে wire করা একটি আলাদা, পরবর্তী owner-approved ধাপ।
+//
+// changeFamilyCodeForExistingFamily(newCode): একই familyId, শুধু নতুন
+// familyCode — dataCollectionName (আসল ডাটা কালেকশনের নাম) কখনো ছোঁয়া
+// হয় না, তাই বিদ্যমান data_<oldCode> কালেকশনই (কোনো copy/rename/delete
+// ছাড়া) স্বাভাবিকভাবে ব্যবহৃত হতে থাকে — শুধু পরিবারের "পরিচিতি কোড"
+// বদলায়। Admin-only (adminUids-এ থাকা uid ছাড়া কেউ পারবে না — Rules-এও
+// server-side enforced)। transaction ব্যবহার করা হয়েছে যাতে
+// familyCode-update ও নতুন/পুরনো familyCodes mapping — সব atomic হয়।
+async function changeFamilyCodeForExistingFamily(newCode) {
+  const normalized = (newCode || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
+    console.error(`[Family Code change] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    return { aborted: true, reason: "length" };
+  }
+  if (!isFamilyCodeCharsetValid(normalized)) {
+    console.error("[Family Code change] অবৈধ ক্যারেক্টার।");
+    return { aborted: true, reason: "charset" };
+  }
+  const familyId = getFamilyId();
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  if (!uid) {
+    console.error("[Family Code change] সাইন ইন করা নেই।");
+    return { aborted: true, reason: "no-auth" };
+  }
+  try {
+    let oldCode = null;
+    await db.runTransaction(async tx => {
+      const familyRef = db.collection("families").doc(familyId);
+      const snap = await tx.get(familyRef);
+      if (!snap.exists) throw new Error("families ডকুমেন্ট পাওয়া যায়নি।");
+      const fam = snap.data();
+      if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
+        throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
+      }
+      oldCode = fam.familyCode || null;
+      const newCodeRef = db.collection("familyCodes").doc(normalized);
+      const newCodeSnap = await tx.get(newCodeRef);
+      if (newCodeSnap.exists && newCodeSnap.data().familyId !== familyId) {
+        throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
+      }
+      tx.set(newCodeRef, { familyId, createdAt: Date.now() });
+      tx.update(familyRef, { familyCode: normalized, updatedAt: Date.now() });
+      // পুরনো familyCodes/<oldCode> mapping delete করা হচ্ছে (owner
+      // নিশ্চিত করেছেন এই ছোট family-তে ডাটা-হারানোর ঝুঁকি নেই) —
+      // dataCollectionName অপরিবর্তিত থাকায় আসল ডাটা কোনোভাবেই touched
+      // হয় না, শুধু code→familyId lookup-এর পুরনো এন্ট্রি সরানো হচ্ছে।
+      if (oldCode && oldCode !== normalized) {
+        tx.delete(db.collection("familyCodes").doc(oldCode));
+      }
+    });
+    console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_code_is_custom", "1");
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Family Code change] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.changeFamilyCodeForExistingFamily = changeFamilyCodeForExistingFamily;
+}
+// createNewFamily(newCode): সম্পূর্ণ নতুন familyId + familyCode +
+// dataCollectionName — stale localStorage.family_id কখনো reuse হয় না
+// (generateSecureCode(20) দিয়ে fresh id)। এটি একটি সম্পূর্ণ blank/নতুন
+// family তৈরি করে — বিদ্যমান কোনো family/data স্পর্শ করে না।
+async function createNewFamily(newCode) {
+  const normalized = (newCode || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
+    console.error(`[New Family] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    return { aborted: true, reason: "length" };
+  }
+  if (!isFamilyCodeCharsetValid(normalized)) {
+    console.error("[New Family] অবৈধ ক্যারেক্টার।");
+    return { aborted: true, reason: "charset" };
+  }
+  const newFamilyId = generateSecureCode(20);
+  try {
+    const codeRef = db.collection("familyCodes").doc(normalized);
+    const codeSnap = await codeRef.get();
+    if (codeSnap.exists) {
+      console.error("[New Family] এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে।");
+      return { aborted: true, reason: "code-taken" };
+    }
+    await codeRef.set({ familyId: newFamilyId, createdAt: Date.now() });
+    await db.collection("families").doc(newFamilyId).set({
+      familyId: newFamilyId,
+      familyCode: normalized,
+      isCustomCode: true,
+      dataCollectionName: `data_${normalized}`,
+      createdAt: Date.now(),
+      createdByUid: auth.currentUser ? auth.currentUser.uid : null,
+      schemaVersion: 1,
+      adminUids: []
+    });
+    console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_id", newFamilyId);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_code_is_custom", "1");
+    window.location.reload();
+    return { success: true, familyId: newFamilyId };
+  } catch (err) {
+    console.error("[New Family] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.createNewFamily = createNewFamily;
+}
+// =====================================================================
 // --- Phase A (Family ID Foundation) — শুধু প্রস্তুতি, কোনো read/write ---
 // --- path এখনো বদলায়নি। app এখনও data_<familyCode>-ই পড়ে/লেখে। এই ---
 // --- অংশ শুধু নীরবে familyId তৈরি করে ও familyCodes/<code> → familyId ---
@@ -154,10 +274,17 @@ async function ensureFamilyMeta() {
     const ref = familyDocRef();
     const snap = await ref.get();
     if (!snap.exists) {
+      // §৫ Family Code Lifecycle fix: dataCollectionName এখন থেকেই family
+      // তৈরির মুহূর্তে একবার স্থায়ীভাবে সেট হয় — এটাই সেই আসল Firestore
+      // কালেকশনের নাম যেখানে entries/members/weekly সবসময় থাকবে।
+      // familyCode ভবিষ্যতে যতবারই বদলাক (changeFamilyCodeForExistingFamily),
+      // dataCollectionName কখনো বদলাবে না — তাই আসল ডাটা কালেকশন কখনো
+      // "হারিয়ে যাবে না" বা code-change-এর সাথে ভেঙে পড়বে না।
       await ref.set({
         familyId: getFamilyId(),
         familyCode: getFamilyCode(),
         isCustomCode: localStorage.getItem("family_code_is_custom") === "1",
+        dataCollectionName: `data_${getFamilyCode()}`,
         createdAt: Date.now(),
         createdByUid: auth.currentUser ? auth.currentUser.uid : null,
         schemaVersion: 1,
@@ -166,6 +293,37 @@ async function ensureFamilyMeta() {
     }
   } catch {
     // Best-effort — future-migration prep।
+  }
+}
+// §৫ fix: বিদ্যমান (এই fix-এর আগে তৈরি হওয়া) family-দের dataCollectionName
+// field নেই — এই ফাংশন সেটা একবারই, নিরাপদে ব্যাকফিল করে। derived মান
+// সবসময় বর্তমান familyCode থেকেই বের করা হয় (getCollectionName() আগে
+// প্রতিটি কলে ঠিক এই একই মান লাইভ গণনা করত) — তাই কোনো ডাটা move/copy/
+// rename হয় না, শুধু এই নতুন metadata field একবার persist হয়। ব্যর্থ হলেও
+// (network/rules-not-yet-deployed) local cache-এ derived মান বসিয়ে app
+// আগের মতোই কাজ করে — পরের সফল বুটে আবার ব্যাকফিল চেষ্টা হবে (idempotent)।
+let cachedDataCollectionName = null;
+async function ensureDataCollectionName() {
+  try {
+    const ref = familyDocRef();
+    const snap = await ref.get();
+    const existing = snap.exists ? snap.data().dataCollectionName : null;
+    if (existing) {
+      cachedDataCollectionName = existing;
+      return;
+    }
+    const derived = `data_${getFamilyCode()}`;
+    if (snap.exists) {
+      try {
+        await ref.update({ dataCollectionName: derived, updatedAt: Date.now() });
+      } catch {
+        // Best-effort ব্যাকফিল — persist ব্যর্থ হলেও নিচের cache assignment
+        // দিয়ে app চলতি সেশনে ঠিকভাবেই কাজ করবে।
+      }
+    }
+    cachedDataCollectionName = derived;
+  } catch {
+    cachedDataCollectionName = null; // getCollectionName() নিচে নিরাপদ fallback করবে
   }
 }
 // প্রথম Admin claim — ডিজাইন অনুযায়ী শুধু দুটি ট্রিগারে ডাকা হবে:
@@ -910,7 +1068,13 @@ async function syncFamilyCodeWithAccount() {
     switched: false
   };
 }
-const getCollectionName = () => `data_${getFamilyCode()}`;
+// §৫ fix: এখন cache-ব্যাকড — boot-এ ensureDataCollectionName() একবার
+// families/{id}.dataCollectionName পড়ে/ব্যাকফিল করে cache পূরণ করে
+// (App-এর boot useEffect-এ awaited)। cache পূরণ হওয়ার আগে বা কোনো কারণে
+// ব্যর্থ হলে (network ইত্যাদি) আগের মতোই লাইভ familyCode থেকে derive করা
+// হয় — fully backward-compatible fallback, কোনো call site (৩০+ জায়গা)
+// পরিবর্তন করতে হয়নি কারণ ফাংশনটি এখনও সম্পূর্ণ synchronous।
+const getCollectionName = () => cachedDataCollectionName || `data_${getFamilyCode()}`;
 const appStorage = {
   async get(key, shared) {
     if (!shared) {
@@ -2809,8 +2973,15 @@ function resolvePathContext(migrationState, familyCode, familyId) {
       weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
     };
   }
-  // legacy ("legacy" বা "locked" বা fallback) — বর্তমান আচরণ অপরিবর্তিত
-  const legacyRef = db.collection(`data_${familyCode}`);
+  // legacy ("legacy" বা "locked" বা fallback)
+  // §৫ fix: আগে এখানে সরাসরি `data_${familyCode}` (লাইভ familyCode থেকে)
+  // ব্যবহার হতো — familyCode বদলালে saveEntry/loadEntry/saveMemberDoc
+  // ইত্যাদি সব ভুল কালেকশনে চলে যেত। এখন getCollectionName()
+  // (dataCollectionName-ব্যাকড, familyCode-independent) ব্যবহার হচ্ছে —
+  // familyCode যতবারই বদলাক, আসল ডাটা কালেকশন একই থাকে। বিদ্যমান সব
+  // caller familyCode param পাঠাতে থাকবে (API অপরিবর্তিত, harmless —
+  // legacy branch-এ শুধু আর ব্যবহৃত হচ্ছে না)।
+  const legacyRef = db.collection(getCollectionName());
   return {
     mode: "legacy",
     membersRef: legacyRef,
@@ -3330,6 +3501,13 @@ function App() {
       // হয়েছে কিনা নিশ্চিত করতে এই দ্বিতীয়, awaited কলটি প্রয়োজন —
       // ফাংশনটি idempotent/best-effort বলে দ্বিতীয়বার কল করা নিরাপদ।
       await ensureFamilyCodeMapping();
+      // §৫ fix: familyId self-heal সম্পন্ন হওয়ার পরই family doc নিশ্চিত
+      // (idempotent — আগে থেকে থাকলে no-op) ও dataCollectionName cache
+      // পূরণ করা হচ্ছে — এর পরের যেকোনো read/write (migrateMembersIfNeeded
+      // থেকে শুরু করে) getCollectionName()-এর সঠিক, familyCode-independent
+      // মান পাবে।
+      await ensureFamilyMeta();
+      await ensureDataCollectionName();
       const migrationFamilyId = getFamilyId();
       migrationUnsub = db.collection("families").doc(migrationFamilyId).onSnapshot(
         (snap) => {
