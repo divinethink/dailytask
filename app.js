@@ -764,6 +764,99 @@ async function healthCheckFamily(familyIdOverride) {
 if (typeof window !== "undefined") {
   window.healthCheckFamily = healthCheckFamily;
 }
+// =====================================================================
+// --- Multi-family Audit (সম্পূর্ণ READ-ONLY — কোনো write/fix/migration
+// করে না) — শুধু browser console থেকে ম্যানুয়ালি (`auditAllFamiliesHealthCheck()`)।
+// =====================================================================
+// উদ্দেশ্য: §৩-এ পাওয়া bug pattern (familyCode stale / adminUids
+// bracket-wrapped bug) অন্য যেকোনো family-তেও আছে কিনা — healthCheckFamily()-এর
+// একই checks প্রতিটি families/<id> ডকুমেন্টের ওপর প্রয়োগ করে একটা সংক্ষিপ্ত
+// summary টেবিল দেয়। প্রাইভেসি: কোনো পরিবারের raw familyCode বা adminUids
+// মান কখনো log করা হয় না — শুধু status/ফলাফল (OK/সমস্যা আছে) ও issue-সংখ্যা।
+async function auditAllFamiliesHealthCheck() {
+  console.log("[Multi-family audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix হবে না)...");
+  const familiesSnap = await db.collection("families").get();
+  const rows = [];
+  for (const doc of familiesSnap.docs) {
+    const familyId = doc.id;
+    const fam = doc.data();
+    const issues = [];
+
+    // --- familyCode presence/type (মান নয়, শুধু আছে/সঠিক টাইপ কিনা) ---
+    let familyCodeStatus = "OK";
+    if (typeof fam.familyCode !== "string" || !fam.familyCode) {
+      familyCodeStatus = "অনুপস্থিত/ভুল টাইপ";
+      issues.push("familyCode অনুপস্থিত/ভুল টাইপ");
+    } else {
+      // familyCodes/<code> <-> families/<id> bidirectional consistency —
+      // শুধু match/mismatch বলা হয়, code-এর মান কখনো log হয় না।
+      try {
+        const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
+        if (!codeSnap.exists) {
+          familyCodeStatus = "mapping অনুপস্থিত";
+          issues.push("familyCodes mapping অনুপস্থিত");
+        } else if (codeSnap.data().familyId !== familyId) {
+          familyCodeStatus = "mismatch";
+          issues.push("familyCodes.familyId এই family-এর সাথে মেলে না");
+        }
+      } catch {
+        familyCodeStatus = "যাচাই ব্যর্থ";
+        issues.push("familyCodes লুকআপ ব্যর্থ (নেটওয়ার্ক/পারমিশন)");
+      }
+      // legacyCollectionMap equation consistency (এখানেও শুধু exists/match বলা হয়)
+      try {
+        const mapSnap = await db.collection("legacyCollectionMap").doc("data_" + fam.familyCode).get();
+        if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+          issues.push("legacyCollectionMap.familyId এই family-এর সাথে মেলে না");
+        }
+      } catch {
+        issues.push("legacyCollectionMap লুকআপ ব্যর্থ");
+      }
+    }
+
+    // --- adminUids format (মান নয়, শুধু টাইপ/প্যাটার্ন সমস্যা আছে কিনা) ---
+    let adminUidsStatus = "OK";
+    if (!Array.isArray(fam.adminUids)) {
+      adminUidsStatus = "টাইপ ভুল";
+      issues.push("adminUids array না");
+    } else {
+      const hasSuspicious = fam.adminUids.some(uid =>
+        typeof uid !== "string" ||
+        uid.trim().startsWith("[") ||
+        uid.includes(",\"") ||
+        uid.includes("\",")
+      );
+      if (hasSuspicious) {
+        adminUidsStatus = "সন্দেহজনক প্যাটার্ন";
+        issues.push("adminUids-এ bracket-wrapped/multi-uid সন্দেহজনক প্যাটার্ন");
+      } else if (fam.adminUids.length === 0) {
+        adminUidsStatus = "খালি";
+      }
+    }
+
+    // --- migrationState sanity (শুধু valid/invalid) ---
+    if (fam.migrationState !== undefined && !["legacy", "locked", "v2"].includes(fam.migrationState)) {
+      issues.push("migrationState অপ্রত্যাশিত মান");
+    }
+
+    rows.push({
+      familyId,
+      "familyCode status": familyCodeStatus,
+      "adminUids status": adminUidsStatus,
+      "issues": issues.length
+    });
+  }
+
+  const totalIssues = rows.reduce((sum, r) => sum + r.issues, 0);
+  console.log(totalIssues === 0
+    ? `[Multi-family audit] ✅ মোট ${rows.length}টি family স্ক্যান হয়েছে — কোনো সমস্যা পাওয়া যায়নি।`
+    : `[Multi-family audit] ⚠️ মোট ${rows.length}টি family স্ক্যান হয়েছে — ${totalIssues}টি সমস্যা পাওয়া গেছে (নিচের টেবিলে দেখুন, শুধু status/সংখ্যা — কোনো raw code/uid নেই)।`);
+  console.table(rows);
+  return { totalFamilies: rows.length, totalIssues, rows };
+}
+if (typeof window !== "undefined") {
+  window.auditAllFamiliesHealthCheck = auditAllFamiliesHealthCheck;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
