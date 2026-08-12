@@ -3001,9 +3001,29 @@ function resolvePathContext(migrationState, familyCode, familyId) {
 function memberDocId(id) {
   return `member:${id}`;
 }
-async function loadMembersV2() {
+// Switch prep fix: আগে এই ফাংশন সবসময় hardcoded db.collection(getCollectionName())
+// (legacy data_<code>) থেকে "member:" prefix দিয়ে member: docs পড়ত —
+// migrationState-নির্বিশেষে, resolvePathContext() ব্যবহার করত না। Flip
+// (migrationState "v2") হওয়ার পর saveMemberDoc/claimMemberDoc/deleteMemberDoc
+// resolver-aware হওয়ায় নতুন সদস্য families/{id}/members/<id> (plain id, কোনো
+// "member:" prefix ছাড়া)-তে লেখা হতে থাকে — কিন্তু এই ফাংশন তখনো পুরনো legacy
+// path-েই খুঁজত, ফলে Flip-পরবর্তী কোনো নতুন সদস্য কখনো member-list-এ (UI-তে)
+// দেখা যেত না (silent mismatch, কোনো error ছাড়াই)। এখন migrationState param
+// নিয়ে resolvePathContext() ব্যবহার করা হচ্ছে — v2 হলে families/{id}/members
+// collection-এর সব doc সরাসরি পড়া হয় (id ইতিমধ্যে plain, কোনো slice দরকার
+// নেই); legacy/locked/undefined হলে আগের মতোই data_<code>-তে "member:" prefix
+// দিয়ে range-query হয় — বিদ্যমান আচরণ বিট-ফর-বিট অপরিবর্তিত থাকে।
+async function loadMembersV2(migrationState) {
   try {
-    const snap = await db.collection(getCollectionName()).where(firebase.firestore.FieldPath.documentId(), ">=", "member:").where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get();
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    if (ctx.mode === "v2") {
+      const snap = await ctx.membersRef.get();
+      return snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+    }
+    const snap = await ctx.membersRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:").where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get();
     return snap.docs.map(d => ({
       id: d.id.slice("member:".length),
       ...d.data()
@@ -3069,8 +3089,8 @@ async function releaseMemberDoc(migrationState, id) {
 // array-doc has members, copy each into its own v2 doc as "unclaimed"
 // (ownerUid: null) — any device may claim them later from the member list.
 // The legacy doc is left untouched (not deleted) as a safety net.
-async function migrateMembersIfNeeded() {
-  const v2 = await loadMembersV2();
+async function migrateMembersIfNeeded(migrationState) {
+  const v2 = await loadMembersV2(migrationState);
   if (v2.length) return v2;
   const legacy = await loadLegacyMembers();
   if (!legacy.length) return [];
@@ -3080,7 +3100,12 @@ async function migrateMembersIfNeeded() {
     createdAt: m.createdAt || Date.now()
   }));
   try {
-    await Promise.all(migrated.map(m => saveMemberDoc("legacy", m)));
+    // Switch prep fix: আগে এখানে hardcoded "legacy" পাস করা হতো —
+    // migrationState param যোগ হওয়ার পর এখন caller-এর প্রকৃত (server-verified)
+    // migrationState পাস করা হচ্ছে, যাতে কোনো family ইতিমধ্যে v2-তে থাকা
+    // অবস্থায় (edge case: v1 legacy array-doc আছে কিন্তু কোনো v2 member: doc
+    // এখনো নেই) এই one-time migration ভুল (legacy) path-এ লিখে না ফেলে।
+    await Promise.all(migrated.map(m => saveMemberDoc(migrationState, m)));
   } catch {}
   return migrated;
 }
@@ -3521,7 +3546,21 @@ function App() {
           // loading-gate-এ থেকে যাবে যতক্ষণ না একটি সফল snapshot আসে।
         }
       );
-      const m = await migrateMembersIfNeeded();
+      // loadMembersV2() fix: migrateMembersIfNeeded()-কে সঠিক migrationState
+      // পাস করার জন্য এখানে একটি পৃথক one-time get() করা হচ্ছে — উপরের
+      // onSnapshot() fire-and-forget (attach করা হয়েছে, awaited না), তাই তার
+      // প্রথম snapshot এই মুহূর্তে এসে পৌঁছেছে এই নিশ্চয়তা নেই (React state
+      // setMigrationState()-এর ওপর race-condition নির্ভরতা তৈরি করলে
+      // মাঝেমধ্যে stale/undefined migrationState দিয়ে সদস্য-তালিকা লোড হতে
+      // পারত)। এই get() ব্যর্থ হলেও (network ইত্যাদি) "legacy" ধরে নেওয়া
+      // নিরাপদ — resolvePathContext()-এর ডিফল্ট branch legacy-ই, তাই এটি
+      // আগের (এই fix-এর আগের) hardcoded আচরণের সাথে সামঞ্জস্যপূর্ণ fallback।
+      let bootMigrationState = "legacy";
+      try {
+        const migFamSnap = await db.collection("families").doc(migrationFamilyId).get();
+        bootMigrationState = migFamSnap.exists ? (migFamSnap.data().migrationState || "legacy") : "legacy";
+      } catch {}
+      const m = await migrateMembersIfNeeded(bootMigrationState);
       setMembers(m);
       // Fires once per app load (not per re-render) so the Analytics
       // dashboard can show how many distinct family spaces are actively
