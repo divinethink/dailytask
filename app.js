@@ -1336,17 +1336,107 @@ async function findOrCreateDriveBackupFolder() {
   localStorage.setItem(cacheKey, createJson.id);
   return createJson.id;
 }
+// =====================================================================
+// --- Backup/Restore Switch-awareness (helper): migrationState অনুযায়ী
+// legacy collection বা v2 subcollection থেকে সঠিক জায়গায় read/write করে,
+// কিন্তু backup ফাইলের বাইরের ফরম্যাট (legacy-style compound key:
+// "member:<id>", "entry:<id>:<date>", "weekly:<id>:<yyyy-mm>") সবসময়
+// অপরিবর্তিত রাখে — তাই পুরনো backup ফাইল এখনো import করা যাবে এবং
+// legacy family-তে এই দুই ফাংশনের আউটপুট/আচরণ আগের মতোই বিট-ফর-বিট
+// থাকে (mode !== "v2" শাখা)। custom_fields ও meeting_rows_v2: — এই দুটো
+// key v2 migration-এর স্কোপের বাইরে (app.js নিজেই এগুলো এখনো শুধু legacy
+// collection-এ রাখে), তাই এরা সবসময় legacy collection থেকেই পড়া/লেখা হয়,
+// migrationState নির্বিশেষে।
+// =====================================================================
+async function readAllFamilyDataForBackup(migrationState) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const result = {};
+  if (ctx.mode !== "v2") {
+    const snap = await db.collection(getCollectionName()).get();
+    snap.docs.forEach(doc => {
+      result[doc.id] = doc.data();
+    });
+    return result;
+  }
+  const [membersSnap, entriesSnap, weeklySnap, legacySnap] = await Promise.all([
+    ctx.membersRef.get(),
+    ctx.entriesRef.get(),
+    ctx.weeklyRef.get(),
+    db.collection(getCollectionName()).get()
+  ]);
+  membersSnap.docs.forEach(d => {
+    result[`member:${d.id}`] = d.data();
+  });
+  entriesSnap.docs.forEach(d => {
+    const idx = d.id.indexOf("_");
+    if (idx === -1) return;
+    result[`entry:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
+  });
+  weeklySnap.docs.forEach(d => {
+    const idx = d.id.indexOf("_");
+    if (idx === -1) return;
+    result[`weekly:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
+  });
+  legacySnap.docs.forEach(doc => {
+    const id = doc.id;
+    if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
+      result[id] = doc.data();
+    }
+  });
+  return result;
+}
+// items: [{key, data}] — key সবসময় উপরের legacy-style compound format-এই
+// আসে (Drive/local backup ফাইল থেকে parse করা)। migrationState অনুযায়ী
+// সঠিক legacy doc বা v2 subcollection doc-এ translate করে merge-write করে।
+async function writeParsedBackupToFamily(migrationState, items) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const CHUNK_SIZE = 450;
+  async function commitInChunks(writes) {
+    for (let i = 0; i < writes.length; i += CHUNK_SIZE) {
+      const batch = db.batch();
+      writes.slice(i, i + CHUNK_SIZE).forEach(({ ref, data }) => {
+        batch.set(ref, data, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
+  if (ctx.mode !== "v2") {
+    const colRef = db.collection(getCollectionName());
+    await commitInChunks(items.map(({ key, data }) => ({ ref: colRef.doc(key), data })));
+    return;
+  }
+  const legacyColRef = db.collection(getCollectionName());
+  const writes = items.map(({ key, data }) => {
+    if (key.startsWith("member:")) {
+      return { ref: ctx.membersRef.doc(key.slice("member:".length)), data };
+    }
+    if (key.startsWith("entry:")) {
+      const rest = key.slice("entry:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return null;
+      return { ref: ctx.entriesRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+    }
+    if (key.startsWith("weekly:")) {
+      const rest = key.slice("weekly:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return null;
+      return { ref: ctx.weeklyRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+    }
+    // custom_fields / meeting_rows_v2: — legacy-only (উপরের নোট দেখুন)
+    return { ref: legacyColRef.doc(key), data };
+  }).filter(Boolean);
+  await commitInChunks(writes);
+}
 // পুরো ফ্যামিলি Firestore কালেকশন + এই ডিভাইসের প্রয়োজনীয় সেটিংস একসাথে
 // করে একটি Versioned, Extensible ব্যাকআপ অবজেক্ট বানায়। ভবিষ্যতে
 // familyId/Family Metadata/Admin System যোগ হলে "family" অবজেক্টে নতুন
 // key যোগ করলেই হবে — schemaVersion বাড়িয়ে migration করা যাবে, পুরনো
 // ব্যাকআপ ফাইল ভাঙবে না।
-async function buildDriveBackupPayload() {
-  const snap = await db.collection(getCollectionName()).get();
-  const data = {};
-  snap.docs.forEach(doc => {
-    data[doc.id] = doc.data();
-  });
+// Switch prep fix: migrationState param যোগ হয়েছে — readAllFamilyDataForBackup()
+// v2 family-তে সঠিক (live) subcollection থেকে পড়ে, legacy/undefined হলে
+// আগের hardcoded getCollectionName() আচরণ বিট-ফর-বিট অপরিবর্তিত থাকে।
+async function buildDriveBackupPayload(migrationState) {
+  const data = await readAllFamilyDataForBackup(migrationState);
   let isCustomCode = false;
   let themeColor = null;
   try {
@@ -1412,14 +1502,16 @@ async function downloadDriveBackupContent(fileId) {
 }
 // ফ্যামিলি কোড ভিন্ন হলে নীরবে ওভাররাইট না করে ব্যবহারকারীকে জিজ্ঞাসা করে,
 // তারপর Firestore থেকে বর্তমান স্ন্যাপশট নিয়ে Drive-এ আপলোড করে।
-async function backupToGoogleDrive() {
+// Switch prep fix: migrationState param buildDriveBackupPayload()-এ forward
+// করা হয় যাতে v2 family-তে সঠিক (live) ডাটা backup হয়।
+async function backupToGoogleDrive(migrationState) {
   const existing = await findDriveBackupFile();
   const currentFamilyCode = getFamilyCode();
   if (existing && existing.appProperties && existing.appProperties.familyCode && existing.appProperties.familyCode !== currentFamilyCode) {
     const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি কোডের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
     if (!proceed) return { skipped: true };
   }
-  const payload = await buildDriveBackupPayload();
+  const payload = await buildDriveBackupPayload(migrationState);
   let folderId = null;
   if (!existing) {
     // শুধু নতুন ফাইল তৈরির সময়ই ফোল্ডার লাগবে — বিদ্যমান ফাইল আপডেটে
@@ -1449,11 +1541,16 @@ async function backupToGoogleDrive() {
 //     key-গুলোর ওপর দিয়ে লুপ চলে, Firestore-only key স্পর্শ করা হয় না।
 //   • অন্য ডিভাইসের claim করা সদস্যের entry/weekly/নিজের member: ডকুমেন্ট
 //     স্কিপ করা হয় (আগের মতোই)।
-async function mergeBackupData(parsed, options) {
+// Switch prep fix: migrationState নতুন প্রথম param — loadMembersV2()-কে
+// সঠিক migrationState পাস করা হয় (আগে param ছাড়া কল হতো, v2 family-তে
+// ownerByMemberId ভুলভাবে legacy collection থেকে গণনা হতো), existingDocsByKey
+// এখন readAllFamilyDataForBackup() (Switch-aware) থেকে আসে, এবং শেষের write
+// writeParsedBackupToFamily() দিয়ে হয় — legacy/undefined migrationState-এ
+// আউটপুট/আচরণ আগের মতোই বিট-ফর-বিট থাকে।
+async function mergeBackupData(migrationState, parsed, options) {
   const compareUpdatedAt = !!(options && options.compareUpdatedAt);
-  const colRef = db.collection(getCollectionName());
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
-  const currentMembers = await loadMembersV2();
+  const currentMembers = await loadMembersV2(migrationState);
   const ownerByMemberId = {};
   currentMembers.forEach(m => {
     ownerByMemberId[m.id] = m.ownerUid ?? null;
@@ -1463,10 +1560,7 @@ async function mergeBackupData(parsed, options) {
   }
   let existingDocsByKey = {};
   if (compareUpdatedAt) {
-    const snap = await colRef.get();
-    snap.docs.forEach(d => {
-      existingDocsByKey[d.id] = d.data();
-    });
+    existingDocsByKey = await readAllFamilyDataForBackup(migrationState);
   }
   const keys = Object.keys(parsed);
   const memberKeys = [];
@@ -1527,18 +1621,7 @@ async function mergeBackupData(parsed, options) {
     }
     otherKeys.push({ key, data: parsed[key] });
   });
-  const CHUNK_SIZE = 450;
-  async function commitInChunks(items) {
-    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-      const batch = db.batch();
-      items.slice(i, i + CHUNK_SIZE).forEach(({ key, data }) => {
-        batch.set(colRef.doc(key), data, { merge: true });
-      });
-      await batch.commit();
-    }
-  }
-  await commitInChunks(memberKeys);
-  await commitInChunks(otherKeys);
+  await writeParsedBackupToFamily(migrationState, [...memberKeys, ...otherKeys]);
   return {
     skippedKeys,
     skippedOlder,
@@ -1549,7 +1632,9 @@ async function mergeBackupData(parsed, options) {
 // Google Drive থেকে ডাউনলোড করা ব্যাকআপ যাচাই করে, প্রয়োজনে এই ডিভাইসের
 // family_code ব্যাকআপের সাথে মিলিয়ে সুইচ করে (নতুন ডিভাইসে "আগের অবস্থায়
 // ফেরা"-র মূল অংশ), তারপর Firestore-এ merge করে।
-async function restoreFromGoogleDrive(fileId) {
+// Switch prep fix: migrationState নতুন দ্বিতীয় param — mergeBackupData()-এ
+// forward করা হয় (Switch-aware write path)।
+async function restoreFromGoogleDrive(fileId, migrationState) {
   const backup = await downloadDriveBackupContent(fileId);
   if (!backup || typeof backup !== "object" || !backup.data || !backup.family || !backup.family.familyCode) {
     throw new Error("ব্যাকআপ ফাইলের ফরম্যাট চেনা যাচ্ছে না।");
@@ -1576,7 +1661,7 @@ async function restoreFromGoogleDrive(fileId) {
       localStorage.setItem("theme_color", backup.preferences.themeColor);
     } catch {}
   }
-  const result = await mergeBackupData(backup.data, { compareUpdatedAt: true });
+  const result = await mergeBackupData(migrationState, backup.data, { compareUpdatedAt: true });
   return { ...result, familyCode: backupFamilyCode };
 }
 
@@ -3782,17 +3867,22 @@ function App() {
     return () => unsubscribe();
   }, [monthCursor]);
   async function handleExportData() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     try {
       // File System Access (থাকলে) সবচেয়ে আগে চেষ্টা করা হয় —
       // showDirectoryPicker() অবশ্যই user gesture-এর মধ্যেই কল করতে হয়,
       // তাই এটি Firestore fetch-এর আগেই (handleExportData শুরু হওয়ার পর
       // প্রথম await হিসেবে) করা হচ্ছে।
       const fsaBaseDir = await getOrRequestFsaBaseDir();
-      const snap = await db.collection(getCollectionName()).get();
-      const exportObj = {};
-      snap.docs.forEach(doc => {
-        exportObj[doc.id] = doc.data();
-      });
+      // Switch prep fix: আগে এখানে সরাসরি db.collection(getCollectionName())
+      // (legacy) থেকে পড়া হতো — v2 family-তে এটি ভুল (stale) ডাটা export
+      // করত। এখন readAllFamilyDataForBackup() ব্যবহার করা হচ্ছে, যা
+      // migrationState অনুযায়ী সঠিক (live) জায়গা থেকে পড়ে এবং legacy-style
+      // key ফরম্যাটেই রিটার্ন করে — legacy family-তে আউটপুট অপরিবর্তিত।
+      const exportObj = await readAllFamilyDataForBackup(migrationState);
       // একই backup schema যা Google Drive ব্যাকআপেও ব্যবহৃত হয় (single
       // schema — আলাদা local-only format নেই)। family/preferences এখানে
       // অন্তর্ভুক্ত নয় কারণ mergeBackupData() শুধু .data ব্যবহার করে।
@@ -3876,6 +3966,10 @@ function App() {
   }
   // --- Google Drive Backup/Restore UI handlers ---
   async function handleDriveBackupClick() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     if (!isGoogleLinked()) {
       setShowBackupOptionsModal(false);
       setShowGoogleAccountModal(true);
@@ -3884,7 +3978,7 @@ function App() {
     setDriveBackupBusy(true);
     setDriveBackupStatus(null);
     try {
-      const result = await backupToGoogleDrive();
+      const result = await backupToGoogleDrive(migrationState);
       if (result.skipped) {
         setDriveBackupStatus({ type: "error", text: "ব্যাকআপ বাতিল করা হয়েছে।" });
       } else {
@@ -3897,6 +3991,10 @@ function App() {
     }
   }
   async function handleBothBackupClick() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     await handleExportData();
     await handleDriveBackupClick();
   }
@@ -3937,6 +4035,10 @@ function App() {
   // পাওয়া গেলে/ব্যর্থ হলে স্পষ্ট বার্তা দেখানো হয়।
   async function handleManualDriveRestoreClick() {
     setShowImportOptionsModal(false);
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     if (!isGoogleLinked()) {
       setShowGoogleAccountModal(true);
       return;
@@ -3945,9 +4047,13 @@ function App() {
   }
   async function handleConfirmDriveRestore() {
     if (!driveRestoreCandidate) return;
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     setDriveRestoreBusy(true);
     try {
-      await restoreFromGoogleDrive(driveRestoreCandidate.id);
+      await restoreFromGoogleDrive(driveRestoreCandidate.id, migrationState);
       window.alert("Google Drive থেকে ডাটা সফলভাবে রিস্টোর (মার্জ) করা হয়েছে।");
       window.location.reload();
     } catch (err) {
@@ -3958,6 +4064,10 @@ function App() {
     }
   }
   async function handleImportData(e) {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const fileReader = new FileReader();
     if (e.target.files && e.target.files[0]) {
       fileReader.readAsText(e.target.files[0], "UTF-8");
@@ -3985,7 +4095,7 @@ function App() {
           // লেখা হবে (merge: true সহ)। ownerUid normalize logic এবং অন্য
           // ডিভাইসের claim করা সদস্যের ডাটা স্কিপ করার নিয়ম অপরিবর্তিত আছে
           // (mergeBackupData()-এর ভেতরেই)।
-          const result = await mergeBackupData(parsed.data, { compareUpdatedAt: false });
+          const result = await mergeBackupData(migrationState, parsed.data, { compareUpdatedAt: false });
           if (result.skippedKeys.length) {
             alert(`ডাটা ইম্পোর্ট হয়েছে। তবে ${result.skippedKeys.length}টি এন্ট্রি স্কিপ করা হয়েছে, কারণ সেগুলো অন্য ডিভাইসের দায়িত্বে থাকা সদস্যের — সেগুলো সেই সদস্যের নিজের ডিভাইস থেকে ইম্পোর্ট করতে হবে।`);
           } else {
