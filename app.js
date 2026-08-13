@@ -202,6 +202,26 @@ async function createNewFamily(newCode) {
       schemaVersion: 1,
       adminUids: []
     });
+    // §৫ Flow A fix — creation-এর সময় Rules অনুযায়ী adminUids বাধ্যতামূলক
+    // [] থাকে (দেখুন firestore.rules create clause), তাই এখানে আলাদা
+    // update() call দিয়ে first admin claim করা হচ্ছে (Rules-এর update
+    // clause: adminUids.size()==0 → [request.auth.uid], শুধু
+    // adminUids+updatedAt diff) — reload-এর আগে, যাতে নতুন family
+    // admin-বিহীন অবস্থায় শুরু না হয়। Best-effort: ব্যর্থ হলেও পুরো
+    // family-creation abort হবে না (family তৈরি হয়ে গেছে), শুধু log হবে —
+    // পরে claimFirstAdminIfEligible() বা ম্যানুয়াল রিকভারি সম্ভব।
+    if (auth.currentUser) {
+      try {
+        await db.collection("families").doc(newFamilyId).update({
+          adminUids: [auth.currentUser.uid],
+          updatedAt: Date.now()
+        });
+      } catch (claimErr) {
+        console.error("[New Family] Admin claim ব্যর্থ (family তৈরি হয়েছে, কিন্তু admin claim হয়নি):", claimErr.message);
+      }
+    } else {
+      console.error("[New Family] auth.currentUser নেই — admin claim স্কিপ হলো।");
+    }
     console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। রিলোড হচ্ছে...`);
     localStorage.setItem("family_id", newFamilyId);
     localStorage.setItem("family_code", normalized);
@@ -1123,6 +1143,78 @@ if (typeof window !== "undefined") {
   window.auditGrandfatherCandidates = auditGrandfatherCandidates;
 }
 // =====================================================================
+// --- Access Approval Gate — Step 2: Grandfather Migration Write ---
+// (শুধু ম্যানুয়ালি browser console থেকে — `migrateApprovedGrandfatherAccess()`)
+// =====================================================================
+// এই ফাংশন শুধু owner-approved একটি নির্দিষ্ট (familyId, uid) তালিকার জন্য
+// families/{familyId}/accessRequests/{uid} = {status:"approved", ...} write
+// করে। কোনো Rules বদলায় না, কোনো existing data touch করে না। প্রতিটি
+// write-এর আগে uid বর্তমান adminUids/ownerUid তালিকায় আছে কিনা re-check
+// করা হয় (auditGrandfatherCandidates()-এর মতোই logic) — না থাকলে সেই
+// entry SKIP হয়, write হয় না। Write-এর পর read-back করে status যাচাই
+// করা হয়। তালিকা owner-approved ও hardcoded — কোনো dynamic input নেয় না।
+async function migrateApprovedGrandfatherAccess() {
+  const approvedList = [
+    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "yiirNJKJHlM27guiiS10zsp2FYT2", label: "TU_HI_RA@2022" },
+    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "9qwcHuuvcZMLVzOgmNzX4D0epLF3", label: "TU_HI_RA@2022" },
+    { familyId: "M83JR2MA7A69UJ8MQEK3", uid: "Wz6iZPY56zP14r7CUO9g2YvJNq32", label: "FAM-LN3B10" }
+  ];
+  console.log("[Grandfather migration] শুরু হচ্ছে — শুধু owner-approved তালিকার জন্য write+verify হবে। কোনো Rules/other data বদলাবে না।");
+  const results = [];
+  for (const { familyId, uid, label } of approvedList) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        results.push({ familyCode: label, familyId, uid, status: "SKIPPED", কারণ: "families doc পাওয়া যায়নি" });
+        continue;
+      }
+      const fam = famSnap.data();
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+
+      let ownerUids = [];
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+      } else {
+        const collectionName = fam.dataCollectionName || (fam.familyCode ? `data_${fam.familyCode}` : null);
+        if (collectionName) {
+          const memberSnap = await db.collection(collectionName)
+            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
+            .get();
+          ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        }
+      }
+
+      const isValid = adminUids.includes(uid) || ownerUids.includes(uid);
+      if (!isValid) {
+        results.push({ familyCode: label, familyId, uid, status: "SKIPPED", কারণ: "re-check ব্যর্থ — uid এখন admin/owner তালিকায় নেই" });
+        continue;
+      }
+
+      const reqRef = db.collection("families").doc(familyId).collection("accessRequests").doc(uid);
+      await reqRef.set({
+        status: "approved",
+        source: "grandfather-migration",
+        approvedAt: Date.now()
+      }, { merge: true });
+
+      const verifySnap = await reqRef.get();
+      const verifiedOk = verifySnap.exists && verifySnap.data().status === "approved";
+      results.push({ familyCode: label, familyId, uid, status: verifiedOk ? "OK" : "VERIFY_FAILED" });
+    } catch (err) {
+      results.push({ familyCode: label, familyId, uid, status: "ERROR", কারণ: String(err && err.message || err) });
+    }
+  }
+  console.log("[Grandfather migration] সম্পন্ন — ফলাফল:");
+  console.table(results);
+  return results;
+}
+if (typeof window !== "undefined") {
+  window.migrateApprovedGrandfatherAccess = migrateApprovedGrandfatherAccess;
+}
+// =====================================================================
 // --- Access Approval Gate — Step 1b: Orphan Families Audit
 // (সম্পূর্ণ READ-ONLY — কোনো write/fix/delete করে না) — শুধু browser
 // console থেকে ম্যানুয়ালি (`auditOrphanFamilies()`, বা
@@ -1256,12 +1348,28 @@ if (typeof window !== "undefined") {
 //      familyId ঠিক এই familyId-এর সাথে মেলে (অন্য কোনো family যদি
 //      ইতিমধ্যে এই code পুনর্ব্যবহার করে থাকে, ভুলবশত সেটা মুছে না যায়)
 //   ৩. legacyCollectionMap/{collectionName} — একই matching-guard সহ
+//
+// --- স্থায়ী নিরাপত্তা মডেল (allowlist নয়) ---
+// এই ফাংশন কোনো নির্দিষ্ট familyId তালিকায় hardcoded/সীমাবদ্ধ না — এটি
+// ভবিষ্যতে যেকোনো নতুন orphan family-র জন্যও কাজ করবে। নিরাপত্তা তিনটি
+// স্তরে নিশ্চিত করা হয়েছে:
+//   ১. Rules-level: শুধুমাত্র app creator uid (firestore.rules-এর
+//      isAppCreator()) families/familyCodes/legacyCollectionMap-এ delete
+//      করতে পারে — কোনো family admin, এমনকি এই ফাংশন চালালেও, পারবে না।
+//   ২. Explicit-list-only: caller-কে অবশ্যই auditOrphanFamilies()-এর
+//      সাম্প্রতিক (fresh) আউটপুট থেকে familyId তালিকা explicitly পাস
+//      করতে হবে — এই ফাংশন কখনো নিজে families collection স্ক্যান করে
+//      "সব orphan" আপনা-আপনি বের করে delete করে না।
+//   ৩. Delete-এর ঠিক আগে fresh re-verify (নিচে) — প্রতিটি familyId আবার
+//      পড়ে সত্যিই এখনো orphan (কোনো real data নেই) কিনা নিশ্চিত করা হয়;
+//      audit ও cleanup-এর মাঝে কেউ সেই family code দিয়ে নতুন কিছু শুরু
+//      করলে সেই family স্বয়ংক্রিয়ভাবে skip হবে, force-delete হবে না।
 async function cleanupOrphanFamilies(orphanFamilyIds) {
   if (!Array.isArray(orphanFamilyIds) || orphanFamilyIds.length === 0) {
-    console.error("[Orphan cleanup] orphanFamilyIds একটি non-empty অ্যারে হতে হবে — auditOrphanFamilies()-এর owner-verified আউটপুট থেকে তালিকা কপি করে পাস করুন। কোনো auto-discovery এখানে হয় না (নিরাপত্তার জন্য ইচ্ছাকৃত)।");
+    console.error("[Orphan cleanup] orphanFamilyIds একটি non-empty অ্যারে হতে হবে — auditOrphanFamilies()-এর সাম্প্রতিক (fresh) আউটপুট থেকে তালিকা কপি করে পাস করুন। কোনো auto-discovery এখানে হয় না (নিরাপত্তার জন্য ইচ্ছাকৃত)।");
     return { aborted: true, reason: "no-list" };
   }
-  const proceed = window.confirm(`${orphanFamilyIds.length}টি orphan family-এর metadata (families/familyCodes/legacyCollectionMap doc) স্থায়ীভাবে ডিলিট হবে। কোনো real ডাটা (data_<code> কালেকশন/members subcollection) touch হবে না — শুধু খালি metadata। এগিয়ে যাবেন?`);
+  const proceed = window.confirm(`${orphanFamilyIds.length}টি family-এর metadata (families/familyCodes/legacyCollectionMap doc) স্থায়ীভাবে ডিলিট হবে — প্রতিটি delete-এর আগে fresh re-verify হবে (আর orphan না থাকলে skip হবে)। কোনো real ডাটা (data_<code> কালেকশন/members subcollection) touch হবে না — শুধু খালি metadata। এগিয়ে যাবেন?`);
   if (!proceed) {
     console.log("[Orphan cleanup] ব্যবহারকারী বাতিল করেছেন — কোনো delete হয়নি।");
     return { aborted: true, reason: "user-cancelled" };
