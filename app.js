@@ -4023,6 +4023,12 @@ function App() {
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
   const [showMeetingInfoModal, setShowMeetingInfoModal] = useState(false);
   const [customFamCodeInput, setCustomFamCodeInput] = useState("");
+  // §৫ Family Code Lifecycle Fix — Admin-only "কোড রিনেম" মোডাল (একই
+  // familyId+data, শুধু কোড বদলায়) — বিদ্যমান "কাস্টম কোড" মোডাল থেকে
+  // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডাটা-বিচ্ছিন্নতা না ঘটে।
+  const [showRenameFamilyCodeModal, setShowRenameFamilyCodeModal] = useState(false);
+  const [renameFamCodeInput, setRenameFamCodeInput] = useState("");
+  const [renameFamCodeBusy, setRenameFamCodeBusy] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
@@ -4659,6 +4665,39 @@ function App() {
     // কখনো আটকাবে না।
     await claimFirstAdminIfEligible();
     setFamilyCode(code);
+  }
+  // §৫ Family Code Lifecycle Fix — Admin-only: বর্তমান family-এর কোড
+  // পরিবর্তন, dataCollectionName/data অপরিবর্তিত থাকে (changeFamilyCodeForExistingFamily
+  // নিজেই Rules-এ admin-enforced, তাই এখানে আলাদা করে isAdmin চেক না
+  // করলেও নিরাপদ — তবু UI-তে ভুল ব্যবহার এড়াতে বাটনটি isAdmin-গেটেড)।
+  async function handleRenameFamilyCode() {
+    const code = renameFamCodeInput.trim();
+    if (!code) return;
+    if (code.length < FAMILY_CODE_MIN_LENGTH) {
+      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      return;
+    }
+    if (!isFamilyCodeCharsetValid(code)) {
+      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      return;
+    }
+    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডাটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। পরিবারের বাকি সদস্যদের নতুন কোডটি জানাতে হবে।`)) return;
+    setRenameFamCodeBusy(true);
+    try {
+      const result = await changeFamilyCodeForExistingFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+          charset: "অবৈধ ক্যারেক্টার।",
+          "no-auth": "সাইন ইন করা নেই।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "কোড পরিবর্তন করা যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে changeFamilyCodeForExistingFamily নিজেই reload করে।
+    } finally {
+      setRenameFamCodeBusy(false);
+    }
   }
   function handleGoToArchive() {
     // আর্কাইভে যাওয়া একসাথে মাস ও তারিখ উভয়ই পরিবর্তন করে — তাই তিনটি
@@ -5449,6 +5488,18 @@ function App() {
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
   })))), isAdmin && /*#__PURE__*/React.createElement("div", {
+    className: "px-2 pb-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setIsMenuOpen(false);
+      setRenameFamCodeInput("");
+      setShowRenameFamilyCodeModal(true);
+    },
+    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " নিজের ফ্যামিলির কোড পরিবর্তন করুন (ডাটা অক্ষত)")), isAdmin && /*#__PURE__*/React.createElement("div", {
     className: "px-2 py-1 border-t border-slate-100"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -6276,6 +6327,34 @@ function App() {
     className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold"
   }, "সেভ ও সিংক করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeModal(false),
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+  }, "বাতিল")))), showRenameFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-1 text-slate-800"
+  }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের নতুন কোডটি জানিয়ে দিতে হবে।"), /*#__PURE__*/React.createElement("input", {
+    value: renameFamCodeInput,
+    onChange: e => setRenameFamCodeInput(e.target.value),
+    placeholder: "নতুন কোড লিখুন",
+    maxLength: 30,
+    disabled: renameFamCodeBusy,
+    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleRenameFamilyCode,
+    disabled: renameFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, renameFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowRenameFamilyCodeModal(false),
+    disabled: renameFamCodeBusy,
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
   }, "বাতিল")))), showAccessRequestsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
