@@ -3552,7 +3552,15 @@ async function loadMembersV2(migrationState) {
       id: d.id.slice("member:".length),
       ...d.data()
     }));
-  } catch {
+  } catch (err) {
+    // Access Approval Gate — Step 4: permission-denied আলাদাভাবে চিনতে
+    // হবে যাতে caller "সদস্য নেই" আর "access নেই" গুলিয়ে না ফেলে।
+    // অন্য সব error (network ইত্যাদি) আগের মতোই [] fallback।
+    if (err && err.code === "permission-denied") {
+      const tagged = new Error("access-denied");
+      tagged.accessDenied = true;
+      throw tagged;
+    }
     return [];
   }
 }
@@ -3929,6 +3937,13 @@ function App() {
   // পাওয়া যায়। এই মুহূর্তে কোনো caller এই state ব্যবহার করছে না
   // (unwired), শুধু loading-gate-কে প্রভাবিত করে।
   const [migrationState, setMigrationState] = useState(undefined);
+  // Access Approval Gate — Step 4: বর্তমান ব্যবহারকারী এই family-র admin
+  // কিনা (existing migFamSnap boot-fetch থেকেই সেট হয়, কোনো extra read
+  // যোগ করা হয়নি)। null = এখনো জানা যায়নি।
+  const [isAdmin, setIsAdmin] = useState(null);
+  // pending = নিজের accessRequest এখনো admin-approval-এর অপেক্ষায়;
+  // null = জানা যায়নি বা প্রযোজ্য না (admin/approved/legacy path)।
+  const [accessPending, setAccessPending] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [addingMember, setAddingMember] = useState(false);
   const [newName, setNewName] = useState("");
@@ -3977,6 +3992,10 @@ function App() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showFamilyCodeModal, setShowFamilyCodeModal] = useState(false);
+  // Access Approval Gate — Step 4: admin-only pending-request panel state।
+  const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
+  const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
+  const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showBackupOptionsModal, setShowBackupOptionsModal] = useState(false);
@@ -4083,8 +4102,38 @@ function App() {
       try {
         const migFamSnap = await db.collection("families").doc(migrationFamilyId).get();
         bootMigrationState = migFamSnap.exists ? (migFamSnap.data().migrationState || "legacy") : "legacy";
+        // Access Approval Gate — Step 4: একই fetch থেকে isAdmin বের করা,
+        // কোনো অতিরিক্ত read ছাড়াই।
+        const famAdminUids = migFamSnap.exists ? migFamSnap.data().adminUids : null;
+        const myUid = auth.currentUser ? auth.currentUser.uid : null;
+        setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
       } catch {}
-      const m = await migrateMembersIfNeeded(bootMigrationState);
+      let m;
+      try {
+        m = await migrateMembersIfNeeded(bootMigrationState);
+      } catch (err) {
+        if (err && err.accessDenied) {
+          // Access Approval Gate — Step 4: নিজের accessRequest দেখা, না
+          // থাকলে "pending" তৈরি করা (Rules-এ self-create শুধু pending-এ
+          // সীমাবদ্ধ)। এরপর UI "অনুমোদনের অপেক্ষায়" স্ক্রিন দেখাবে —
+          // members/customFields ইত্যাদি লোড করার চেষ্টা করা হবে না।
+          try {
+            const myUid = auth.currentUser ? auth.currentUser.uid : null;
+            if (myUid) {
+              const reqRef = db.collection("families").doc(migrationFamilyId)
+                .collection("accessRequests").doc(myUid);
+              const reqSnap = await reqRef.get();
+              if (!reqSnap.exists) {
+                await reqRef.set({ status: "pending", requestedAt: Date.now() });
+              }
+            }
+          } catch {}
+          setAccessPending(true);
+          setMembers([]);
+          return;
+        }
+        m = [];
+      }
       setMembers(m);
       // Fires once per app load (not per re-render) so the Analytics
       // dashboard can show how many distinct family spaces are actively
@@ -4552,6 +4601,33 @@ function App() {
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   }
+  // Access Approval Gate — Step 4: admin-only pending accessRequests লোড।
+  async function loadPendingAccessRequests() {
+    setLoadingAccessRequests(true);
+    try {
+      const famId = getFamilyId();
+      const snap = await db.collection("families").doc(famId)
+        .collection("accessRequests").where("status", "==", "pending").get();
+      setPendingAccessRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setPendingAccessRequests([]);
+    } finally {
+      setLoadingAccessRequests(false);
+    }
+  }
+  // decision: "approved" | "denied"। Rules-এ শুধু pending→approved/denied
+  // এবং শুধু status+decidedAt field অনুমোদিত।
+  async function decideAccessRequest(uid, decision) {
+    try {
+      const famId = getFamilyId();
+      await db.collection("families").doc(famId)
+        .collection("accessRequests").doc(uid)
+        .update({ status: decision, decidedAt: Date.now() });
+      setPendingAccessRequests(list => list.filter(r => r.id !== uid));
+    } catch (err) {
+      alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
   async function handleSaveCustomFamilyCode() {
     const code = customFamCodeInput.trim();
     if (!code) return;
@@ -4983,6 +5059,21 @@ function App() {
     color: "var(--theme-primary)",
     size: 32
   }));
+  // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
+  // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
+  // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
+  if (accessPending) return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-lg font-semibold",
+    style: { color: "var(--theme-primary)", fontFamily: "'Noto Serif Bengali', serif" }
+  }, "অনুমোদনের অপেক্ষায়"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-gray-600 max-w-xs"
+  }, "এই পরিবারের ডাটা দেখতে এডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
+    className: "px-4 py-2 rounded-2xl border shadow-sm bg-white",
+    style: { color: "var(--theme-primary)" },
+    onClick: () => window.location.reload()
+  }, "রিফ্রেশ করুন"));
   if (printMode) {
     const total = monthStats.total;
     const rows = Array.from({
@@ -5357,7 +5448,19 @@ function App() {
     title: "ফ্যামিলি কোড পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))), isAdmin && /*#__PURE__*/React.createElement("div", {
+    className: "px-2 py-1 border-t border-slate-100"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setIsMenuOpen(false);
+      setShowAccessRequestsModal(true);
+      loadPendingAccessRequests();
+    },
+    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
+  }, /*#__PURE__*/React.createElement(UsersIcon, {
+    size: 13
+  }), " প্রবেশাধিকার অনুরোধ")), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
@@ -6174,7 +6277,44 @@ function App() {
   }, "সেভ ও সিংক করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeModal(false),
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
+  }, "বাতিল")))), showAccessRequestsModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800"
+  }, "প্রবেশাধিকার অনুরোধ"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAccessRequestsModal(false)
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 18,
+    className: "text-slate-400"
+  }))), loadingAccessRequests ? /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-center py-6"
+  }, /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 20,
+    color: "var(--theme-primary)"
+  })) : pendingAccessRequests.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 py-3 text-center"
+  }, "কোনো পেন্ডিং অনুরোধ নেই।") : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 max-h-72 overflow-y-auto"
+  }, pendingAccessRequests.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "flex items-center justify-between gap-2 border border-slate-100 rounded-xl px-3 py-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] text-slate-600 truncate",
+    title: r.id
+  }, r.id.slice(0, 10) + "…"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 shrink-0"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => decideAccessRequest(r.id, "approved"),
+    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-700 text-white"
+  }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => decideAccessRequest(r.id, "denied"),
+    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
+  }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
     onLinked: checkDriveBackupAfterLink
   }), showBackupOptionsModal && /*#__PURE__*/React.createElement("div", {
