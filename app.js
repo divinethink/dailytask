@@ -156,6 +156,17 @@ async function changeFamilyCodeForExistingFamily(newCode) {
       }
     });
     console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
+    // §৫ fix — Google-linked হলে account-এর সাথে সংরক্ষিত familyCode-ও
+    // (users/{uid}.familyCode) আপডেট করা হচ্ছে, নইলে পরের বুটে
+    // syncFamilyCodeWithAccount() পুরনো account-linked কোড দেখে এই
+    // device-কে আবার পুরনো কোডে ফিরিয়ে দিতে পারে (ও ensureFamilyCodeMapping()
+    // তখন পুরনো familyCodes/<oldCode> mapping ভুলবশত পুনরায় তৈরি করে
+    // ফেলবে)। Best-effort — ব্যর্থ হলেও rename নিজে সফলই থাকে।
+    if (isGoogleLinked()) {
+      try {
+        await saveUserFamilyCode(uid, normalized);
+      } catch {}
+    }
     localStorage.setItem("family_code", normalized);
     localStorage.setItem("family_code_is_custom", "1");
     window.location.reload();
