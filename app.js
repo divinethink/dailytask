@@ -1122,6 +1122,110 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
 if (typeof window !== "undefined") {
   window.auditGrandfatherCandidates = auditGrandfatherCandidates;
 }
+// =====================================================================
+// --- Access Approval Gate — Step 1b: Orphan Families Audit
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix/delete করে না) — শুধু browser
+// console থেকে ম্যানুয়ালি (`auditOrphanFamilies()`, বা
+// `auditOrphanFamilies(["<familyId1>", ...])`)।
+// =====================================================================
+// প্রেক্ষাপট: আগের stray/test collection cleanup (§৩) শুধু top-level
+// data_<code> কালেকশন ডিলিট করেছিল — কিন্তু সংশ্লিষ্ট families/{id} root
+// doc, familyCodes/{code} mapping, ও legacyCollectionMap entry কখনো
+// ডিলিট হয়নি (এগুলো ensureFamilyMeta() দিয়ে lazily তৈরি হয়, bounce
+// visitor app খুললেই)। ফলে auditGrandfatherCandidates()-এর মতো যেকোনো
+// families collection-নির্ভর audit-এ এই "orphan" (মেটাডাটা আছে, আসল ডাটা
+// নেই) family-গুলোও ধরা পড়ে — কখনো কখনো তাদের adminUids-এ একটি stale uid
+// থাকতে পারে (bounce visitor custom code set/Google sign-in চেষ্টা করলে)।
+//
+// উদ্দেশ্য: প্রতিটি families/{id}-এর জন্য migrationState অনুযায়ী সঠিক
+// জায়গায় (legacy: data_<code> কালেকশনে যেকোনো ডকুমেন্ট; v2: members
+// subcollection-এ যেকোনো ডকুমেন্ট) সত্যিই কোনো ডাটা আছে কিনা .limit(1)
+// দিয়ে (read-quota সাশ্রয়ী) চেক করা — না থাকলে সেটিকে "orphan candidate"
+// হিসেবে চিহ্নিত করা। এই ফাংশন নিজে কিছুই ডিলিট করে না — শুধু owner
+// manual review-এর জন্য একটি তালিকা দেয়; পরবর্তী (এখনো implement করা
+// হয়নি) owner-approved ধাপে এই তালিকা থেকে families/familyCodes/
+// legacyCollectionMap — এই তিনটে doc একসাথে cleanup করা হবে।
+async function auditOrphanFamilies(extraFamilyIds) {
+  console.log("[Orphan audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/delete হবে না)...");
+  const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
+  const familyIdSet = new Set(extra);
+  try {
+    const familiesSnap = await db.collection("families").get();
+    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+  } catch (err) {
+    console.warn("[Orphan audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
+  }
+  if (familyIdSet.size === 0) {
+    console.warn("[Orphan audit] কোনো familyId পাওয়া যায়নি। থামানো হলো।");
+    return { totalFamilies: 0, orphanCount: 0, rows: [], details: {} };
+  }
+  console.log(`[Orphan audit] মোট ${familyIdSet.size}টি familyId নিয়ে audit চলছে।`);
+
+  const rows = [];
+  const details = {};
+  for (const familyId of familyIdSet) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        console.warn(`[Orphan audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+      const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+
+      let hasV2Data = false;
+      let hasLegacyData = false;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        hasV2Data = !membersSnap.empty;
+      }
+      if (collectionName) {
+        const legacySnap = await db.collection(collectionName).limit(1).get();
+        hasLegacyData = !legacySnap.empty;
+      }
+      const dataExists = hasV2Data || hasLegacyData;
+      const isOrphan = !dataExists;
+
+      // অতিরিক্ত consistency তথ্য (শুধু informational, orphan-নির্ধারণে ব্যবহৃত হয় না)
+      let familyCodesMappingExists = null;
+      if (familyCode) {
+        try {
+          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
+          familyCodesMappingExists = codeSnap.exists;
+        } catch {
+          familyCodesMappingExists = "যাচাই ব্যর্থ";
+        }
+      }
+
+      rows.push({
+        familyId,
+        familyCode: familyCode || "(নেই)",
+        migrationState,
+        collectionName: collectionName || "(নেই)",
+        ডাটাআছে: dataExists ? "হ্যাঁ" : "না",
+        orphanCandidate: isOrphan ? "⚠️ হ্যাঁ" : "না",
+        adminসংখ্যা: adminUids.length
+      });
+      details[familyId] = { familyCode, migrationState, collectionName, dataExists, isOrphan, adminUids, familyCodesMappingExists };
+    } catch (err) {
+      console.error(`[Orphan audit] familyId ${familyId} প্রসেস করতে সমস্যা হয়েছে (read ব্যর্থ, কোনো write হয়নি):`, err);
+    }
+  }
+
+  const orphanRows = rows.filter(r => r.orphanCandidate.includes("হ্যাঁ"));
+  console.log(`[Orphan audit] সম্পন্ন — ${rows.length}টি family প্রসেস হয়েছে, এর মধ্যে ${orphanRows.length}টি orphan candidate (কোনো real ডাটা নেই)। কোনো delete এখনো হয়নি — এটি শুধু owner review-এর জন্য প্রস্তুতিমূলক রিপোর্ট।`);
+  console.table(rows);
+  if (orphanRows.length) {
+    console.log("[Orphan audit] Orphan candidate familyId তালিকা (cleanup-এর জন্য পরবর্তী ধাপে ব্যবহার হবে, owner review-এর পর):", orphanRows.map(r => r.familyId));
+  }
+  return { totalFamilies: rows.length, orphanCount: orphanRows.length, rows, details };
+}
+if (typeof window !== "undefined") {
+  window.auditOrphanFamilies = auditOrphanFamilies;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
