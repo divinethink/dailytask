@@ -1226,6 +1226,126 @@ async function auditOrphanFamilies(extraFamilyIds) {
 if (typeof window !== "undefined") {
   window.auditOrphanFamilies = auditOrphanFamilies;
 }
+// =====================================================================
+// --- Access Approval Gate — Step 1c: Orphan Families Cleanup (owner-
+// approved WRITE — শুধু browser console থেকে ম্যানুয়ালি, explicit তালিকা
+// দিয়ে: `cleanupOrphanFamilies([...auditOrphanFamilies()-এর orphan
+// familyId তালিকা...])`)।
+// =====================================================================
+// এই ফাংশন ইচ্ছাকৃতভাবে familyId-এর তালিকা নিজে থেকে (families collection
+// পুনরায় স্ক্যান করে) বের করে না — শুধুমাত্র caller-এর দেওয়া explicit
+// অ্যারে গ্রহণ করে (auditOrphanFamilies()-এর owner-verified আউটপুট থেকে
+// কপি-পেস্ট করে দিতে হবে)। এটি ইচ্ছাকৃত নিরাপত্তা সিদ্ধান্ত: delete-এর
+// সময় নতুন করে auto-discovery চালালে ঠিক ঐ মুহূর্তে তৈরি হওয়া কোনো নতুন
+// (বৈধ) family ভুলবশত স্ক্যান-এ ঢুকে যাওয়ার তাত্ত্বিক ঝুঁকি (যদিও familyId
+// 20-char random বলে বাস্তবে অসম্ভবের কাছাকাছি) সম্পূর্ণ বাদ দেয় — শুধু
+// owner যা explicitly review করে দিয়েছেন, ঠিক তার ওপরেই কাজ হবে।
+//
+// প্রতিটি familyId-এর জন্য ডিলিট করার *ঠিক আগে* fresh read দিয়ে আবার
+// নিশ্চিত করা হয় যে family এখনো সত্যিই orphan (কোনো real data নেই) —
+// audit ও cleanup-এর মাঝের সময়ে কেউ যদি সেই familyCode দিয়ে নতুন কিছু
+// শুরু করে থাকেন (যতই অসম্ভাব্য হোক), সেই family স্বয়ংক্রিয়ভাবে skip
+// হয়ে যাবে, force-delete হবে না — কোনো data-loss ঝুঁকি নেই।
+//
+// শুধুমাত্র তিনটি "খালি মেটাডাটা" doc ডিলিট হয় — কোনো data_<code>
+// কালেকশন বা members/entries/weekly subcollection কখনো এই ফাংশন touch
+// করে না (সেগুলো আগে থেকেই orphan family-তে খালি/অনুপস্থিত থাকার কথা,
+// তবু সুরক্ষার জন্য এই ফাংশন সেসব delete করার চেষ্টাও করে না):
+//   ১. families/{familyId}
+//   ২. familyCodes/{familyCode}  — শুধু তখনই, যদি সেই mapping doc-এর
+//      familyId ঠিক এই familyId-এর সাথে মেলে (অন্য কোনো family যদি
+//      ইতিমধ্যে এই code পুনর্ব্যবহার করে থাকে, ভুলবশত সেটা মুছে না যায়)
+//   ৩. legacyCollectionMap/{collectionName} — একই matching-guard সহ
+async function cleanupOrphanFamilies(orphanFamilyIds) {
+  if (!Array.isArray(orphanFamilyIds) || orphanFamilyIds.length === 0) {
+    console.error("[Orphan cleanup] orphanFamilyIds একটি non-empty অ্যারে হতে হবে — auditOrphanFamilies()-এর owner-verified আউটপুট থেকে তালিকা কপি করে পাস করুন। কোনো auto-discovery এখানে হয় না (নিরাপত্তার জন্য ইচ্ছাকৃত)।");
+    return { aborted: true, reason: "no-list" };
+  }
+  const proceed = window.confirm(`${orphanFamilyIds.length}টি orphan family-এর metadata (families/familyCodes/legacyCollectionMap doc) স্থায়ীভাবে ডিলিট হবে। কোনো real ডাটা (data_<code> কালেকশন/members subcollection) touch হবে না — শুধু খালি metadata। এগিয়ে যাবেন?`);
+  if (!proceed) {
+    console.log("[Orphan cleanup] ব্যবহারকারী বাতিল করেছেন — কোনো delete হয়নি।");
+    return { aborted: true, reason: "user-cancelled" };
+  }
+
+  console.log(`[Orphan cleanup] শুরু হচ্ছে — ${orphanFamilyIds.length}টি familyId প্রসেস হবে, প্রতিটির জন্য delete-এর আগে fresh re-verify হবে।`);
+  const results = [];
+  for (const familyId of orphanFamilyIds) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        results.push({ familyId, status: "skip", reason: "already-gone" });
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+
+      // Fresh re-verify — audit-এর সময়ের পর কোনো real data তৈরি হয়েছে কিনা
+      let hasV2Data = false;
+      let hasLegacyData = false;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        hasV2Data = !membersSnap.empty;
+      }
+      if (collectionName) {
+        const legacySnap = await db.collection(collectionName).limit(1).get();
+        hasLegacyData = !legacySnap.empty;
+      }
+      if (hasV2Data || hasLegacyData) {
+        console.warn(`[Orphan cleanup] familyId=${familyId} আর orphan নেই (এখন real data পাওয়া গেছে) — SKIP করা হলো, delete হয়নি।`);
+        results.push({ familyId, status: "skip", reason: "no-longer-orphan" });
+        continue;
+      }
+
+      // ধাপ ১: families/{familyId} delete
+      await db.collection("families").doc(familyId).delete();
+
+      // ধাপ ২: familyCodes/{familyCode} — শুধু matching familyId হলে
+      let familyCodesDeleted = false;
+      if (familyCode) {
+        try {
+          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
+          if (codeSnap.exists && codeSnap.data().familyId === familyId) {
+            await db.collection("familyCodes").doc(familyCode).delete();
+            familyCodesDeleted = true;
+          }
+        } catch (err) {
+          console.warn(`[Orphan cleanup] familyId=${familyId} — familyCodes/${familyCode} delete করতে সমস্যা:`, err);
+        }
+      }
+
+      // ধাপ ৩: legacyCollectionMap/{collectionName} — শুধু matching familyId হলে
+      let legacyMapDeleted = false;
+      if (collectionName) {
+        try {
+          const mapSnap = await db.collection("legacyCollectionMap").doc(collectionName).get();
+          if (mapSnap.exists && mapSnap.data().familyId === familyId) {
+            await db.collection("legacyCollectionMap").doc(collectionName).delete();
+            legacyMapDeleted = true;
+          }
+        } catch (err) {
+          console.warn(`[Orphan cleanup] familyId=${familyId} — legacyCollectionMap/${collectionName} delete করতে সমস্যা:`, err);
+        }
+      }
+
+      results.push({ familyId, familyCode, status: "deleted", familyCodesDeleted, legacyMapDeleted });
+    } catch (err) {
+      console.error(`[Orphan cleanup] familyId=${familyId} প্রসেস করতে ব্যর্থ:`, err);
+      results.push({ familyId, status: "error", error: err.message });
+    }
+  }
+
+  const deletedCount = results.filter(r => r.status === "deleted").length;
+  const skippedCount = results.filter(r => r.status === "skip").length;
+  const errorCount = results.filter(r => r.status === "error").length;
+  console.log(`[Orphan cleanup] সম্পন্ন — ${deletedCount}টি ডিলিট হয়েছে, ${skippedCount}টি skip হয়েছে, ${errorCount}টি ত্রুটি হয়েছে।`);
+  console.table(results);
+  return { deletedCount, skippedCount, errorCount, results };
+}
+if (typeof window !== "undefined") {
+  window.cleanupOrphanFamilies = cleanupOrphanFamilies;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
