@@ -1,0 +1,300 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // অ্যাপের নিজস্ব কালেকশন যাচাই করার ফাংশন।
+    // M-1 fix: আগে শুধু '^data_.*' চেক হতো (যেকোনো দৈর্ঘ্য/ক্যারেক্টার),
+    // ফলে UI বাইপাস করে সরাসরি SDK দিয়ে যেকোনো নামের data_* কালেকশনে
+    // read/write সম্ভব ছিল। এখন app.js-এর client-side নিয়মের (৯-৩০
+    // ক্যারেক্টার, space/slash/backslash/quotation চিহ্নবিহীন — দেখুন
+    // FAMILY_CODE_MIN_LENGTH/MAX_LENGTH ও FAMILY_CODE_CHARSET_PATTERN)
+    // সাথে সামঞ্জস্যপূর্ণ একটি সীমা রাখা হয়েছে। Firestore rules-এর regex
+    // ইঞ্জিনে (RE2) lookahead সাপোর্ট নেই, তাই client-side-এর পুরো নিয়ম
+    // (pure-dot/reserved-pattern প্রত্যাখ্যান) হুবহু প্রতিলিপি করা যায়নি —
+    // এটি ইচ্ছাকৃতভাবে একটি নিরাপদ superset, যেন কোনো বিদ্যমান বৈধ
+    // ফ্যামিলি কোড ভেঙে না যায়।
+    // L-cleanup: আগে এখানে '|| name == 'daily_task_data'' নামে একটি লিগ্যাসি
+    // এলাউয়েন্স ছিল। app.js/backup — কোনো ফাইলেই এই কালেকশন নামটা আর
+    // ব্যবহৃত হয় না (getCollectionName() সবসময় `data_${code}` প্যাটার্নই
+    // রিটার্ন করে) — তাই এটি কোনো কার্যকারিতা ছাড়াই শুধু অতিরিক্ত attack
+    // surface তৈরি করছিল (কেউ চাইলে এই নির্দিষ্ট নামে সরাসরি read/write
+    // করতে পারত)। সরিয়ে ফেলা হলো — কোনো ব্রেকিং চেঞ্জ নয়।
+    function isAppCollection(name) {
+      return name.matches('^data_[^\\s/\\\\\'"]{9,30}$');
+    }
+
+    // একটা ownerUid ফাঁকা (unclaimed) অথবা বর্তমান ইউজারের কিনা
+    function isUnownedOrMine(uid) {
+      return uid == null || uid == request.auth.uid;
+    }
+
+    // entry:<memberId>:<date> এবং weekly:<memberId>:<yyyy-mm> — এই দুই
+    // ধরনের ডকুমেন্ট আইডি চেনা (memberId সবসময় দ্বিতীয় অংশ)
+    function isMemberScopedDoc(docId) {
+      return docId.matches('^(entry|weekly):.*');
+    }
+
+    // entry/weekly ডকুমেন্টের নিজের ভেতরের ownerUid না দেখে, সংশ্লিষ্ট
+    // member:<id> ডকুমেন্টের *বর্তমান* ownerUid দেখে অনুমতি দেওয়া হয় —
+    // এতে কোনো সদস্যের দায়িত্ব হাতবদল হলে (নতুন ফোন, ব্রাউজার ডাটা মোছা,
+    // অন্য ডিভাইসে re-claim) নতুন owner পুরনো সব এন্ট্রি/সাপ্তাহিক
+    // রিফ্লেকশনও সমস্যা ছাড়াই এডিট করতে পারে।
+    function currentMemberOwner(collectionName, docId) {
+      let memberId = docId.split(':')[1];
+      let memberPath = /databases/$(database)/documents/$(collectionName)/$('member:' + memberId);
+      // C-2 fix: get().data on a nonexistent document throws in Firestore
+      // Rules (per official docs, get() returns null if the doc doesn't
+      // exist), which fails the whole rule closed — permanently locking
+      // out writes to entry:/weekly: docs whose member: doc was deleted.
+      // Guarding with exists() first and returning null (unowned) instead
+      // restores the same "unclaimed member" access level already used
+      // elsewhere in this ruleset, rather than an unintended hard lock.
+      return exists(memberPath) ? get(memberPath).data.ownerUid : null;
+    }
+
+    // --- Phase C rollback safety fix (আজকের সিদ্ধান্ত) ---
+    // সমস্যা: legacy top-level collection (data_<code>) এর write-rule-এ
+    // কোনো admin-bypass ছিল না (শুধু নতুন families/{id}/members|entries|
+    // weekly subcollection rules-এ ছিল)। ফলে Flip-পরবর্তী rollback-এর
+    // সময় (reverseSyncPhaseCData()) যদি admin-কে অন্য সদস্যের owned
+    // entry/member touch করতে হয় (batch-এ একটাও mismatch থাকলে পুরো
+    // batch reject হয়), সেটা "Missing or insufficient permissions" দিয়ে
+    // ব্যর্থ হয় — বাস্তব real-family টেস্টে (দুই সদস্য, দুই ডিভাইস) এই
+    // সমস্যা ধরা পড়েছে।
+    //
+    // সমাধান (approved): broad/permanent admin-bypass না দিয়ে, শুধু
+    // migrationState == "locked" অবস্থায় সীমাবদ্ধ (time-boxed) bypass —
+    // "locked" state ইতিমধ্যেই Switch-এর transient window হিসেবে approved
+    // concept, তাই কোনো নতুন permission surface তৈরি হচ্ছে না। state
+    // locked থেকে সরে গেলে (v2/legacy-তে ফিরলে) bypass নিজে থেকেই বন্ধ
+    // হয়ে যায় — কোনো manual cleanup লাগে না, স্থায়ী attack-surface তৈরি
+    // হয় না। শুধু rollback-এর প্রকৃত প্রয়োজনের সময়টুকুতেই কার্যকর।
+    //
+    // legacyCollectionMap/{collectionName} থেকে familyId lookup করে,
+    // families/{familyId}-এর migrationState ও adminUids একই get() কলে
+    // চেক করা হয় (read-quota সাশ্রয়ের জন্য পৃথক isAdminOfFamily() কল না
+    // করে একটিমাত্র families doc read-এ দুটো শর্তই যাচাই করা হচ্ছে)।
+    function isFamilyLockedForAdmin(familyId) {
+      let familyPath = /databases/$(database)/documents/families/$(familyId);
+      return exists(familyPath)
+        && get(familyPath).data.migrationState == 'locked'
+        && get(familyPath).data.adminUids.hasAny([request.auth.uid]);
+    }
+    function isLegacyRollbackBypass(collectionName) {
+      let mapPath = /databases/$(database)/documents/legacyCollectionMap/$(collectionName);
+      return exists(mapPath) && isFamilyLockedForAdmin(get(mapPath).data.familyId);
+    }
+
+    // একটা ডকুমেন্ট এই ইউজার লিখতে পারবে কিনা — centralized permission check
+    // Phase C rollback fix: প্রাথমিক (owner-based) শর্ত false হলেও, যদি
+    // families.migrationState == "locked" এবং এই ইউজার সেই family-এর
+    // admin হন, তাহলে লেখা অনুমোদিত (isLegacyRollbackBypass, উপরে দেখুন)।
+    // || হওয়ায় প্রাথমিক শর্ত true হলে দ্বিতীয় (get()-নির্ভর) শর্ত মূল্যায়িতই
+    // হয় না (Firestore Rules lazy evaluation) — normal/non-locked ব্যবহারে
+    // কোনো অতিরিক্ত read-cost নেই।
+    function isWritable(collectionName, docId, data) {
+      return (isMemberScopedDoc(docId)
+        ? isUnownedOrMine(currentMemberOwner(collectionName, docId))
+        : (!('ownerUid' in data) || isUnownedOrMine(data.ownerUid)))
+        || isLegacyRollbackBypass(collectionName);
+    }
+
+    // --- Phase C prep: families/<familyId>/entries|weekly এর জন্য owner
+    // lookup (currentMemberOwner()-এর নতুন-subcollection সংস্করণ) ---
+    // ডকুমেন্ট আইডি কনভেনশন: "<memberId>_<date>" / "<memberId>_<yyyy-mm>"
+    // (Technical Design Document অনুযায়ী; colon-এর বদলে underscore, কারণ
+    // memberId নিজে hyphen ব্যবহার করে কিন্তু underscore নয় — তাই প্রথম
+    // "_"-এ split করলে memberId নিরাপদে আলাদা হয়ে যায়)। এই মুহূর্তে কোনো
+    // app code এই path পড়ে/লেখে না — শুধু future migration-এর জন্য rules
+    // আগে থেকে প্রস্তুত রাখা হচ্ছে।
+    function currentMemberOwnerV2(familyId, docId) {
+      let memberId = docId.split('_')[0];
+      let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
+      return exists(memberPath) ? get(memberPath).data.ownerUid : null;
+    }
+
+    // --- Phase C: Admin-bypass (শুধু bulk migration-এর জন্য) ---
+    // request.auth.uid যদি families/<familyId>-এর adminUids array-তে থাকে,
+    // তাহলে সেই ব্যক্তি migration/Copy ধাপে ownerUid-নির্বিশেষে members/
+    // entries/weekly-তে লিখতে পারবে। এটি *শুধু* Admin-এর জন্য অতিরিক্ত
+    // permission — সাধারণ (non-Admin) ব্যবহারকারীর জন্য বিদ্যমান
+    // isUnownedOrMine()-ভিত্তিক per-owner write-lock সম্পূর্ণ অপরিবর্তিত
+    // থাকছে (নিচের rules-এ isUnownedOrMine(...) || isAdminOfFamily(...)
+    // — দুটোর যেকোনো একটা true হলেই যথেষ্ট)।
+    function isAdminOfFamily(familyId) {
+      let familyPath = /databases/$(database)/documents/families/$(familyId);
+      return exists(familyPath)
+        && get(familyPath).data.adminUids.hasAny([request.auth.uid]);
+    }
+
+    // --- App creator-only delete permission (স্থায়ী) ---
+    // এই ক্ষমতা কোনো family-র adminUids-এর সাথে কখনো coupled না — এটা
+    // family-membership থেকে সম্পূর্ণ স্বাধীন, app-wide, single-uid-ভিত্তিক
+    // permission। কোনো family admin (যত বড় family-র হোক) এই তিনটা
+    // metadata collection-এ কখনো delete করতে পারবে না — শুধু এই uid।
+    function isAppCreator() {
+      return request.auth.uid == "yiirNJKJHlM27guiiS10zsp2FYT2";
+    }
+
+    match /{collectionName}/{docId} {
+
+      // রিড: যেকোনো লগইন করা (anonymous-সহ) ইউজার পড়তে পারবে
+      allow read: if request.auth != null && isAppCollection(collectionName);
+
+      // ক্রিয়েট: unowned অথবা নিজেকে owner বসাতে হবে
+      allow create: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, request.resource.data);
+
+      // আপডেট: আগের ও নতুন — দুটোই unowned/নিজের হতে হবে
+      allow update: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, resource.data)
+                    && isWritable(collectionName, docId, request.resource.data);
+
+      // ডিলিট: শুধু unowned/নিজের ডকুমেন্ট
+      allow delete: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, resource.data);
+
+      // এন্ট্রির এডিট-হিস্ট্রি সাবকালেকশন — প্যারেন্ট এন্ট্রির member-ভিত্তিক
+      // একই (বর্তমান-owner) নিয়ম প্রযোজ্য
+      match /history/{historyId} {
+        allow read: if request.auth != null && isAppCollection(collectionName);
+        allow create, update, delete: if request.auth != null
+          && isAppCollection(collectionName)
+          && isWritable(collectionName, docId, {});
+      }
+    }
+
+    // --- users/{uid}: Google-linked uid <-> familyCode mapping ---
+    // শুধুমাত্র নিজ uid-এর ডকুমেন্ট নিজে read/write করতে পারবে। এটি কোনো
+    // family/member ডাটা নয় — শুধু account-ভিত্তিক recovery mapping।
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // --- Phase A (Family ID Foundation) prep: familyCode -> familyId lookup ---
+    // শুধু প্রস্তুতিমূলক, additive collection — বিদ্যমান data_<familyCode>
+    // rules/logic এর কোনো অংশ বদলানো হয়নি। এই মুহূর্তে app শুধু create করে
+    // (একবারই, ensureFamilyCodeMapping()); update/delete এই Phase-এ বন্ধ
+    // রাখা হলো, কারণ Family Code migration (Phase D) এখনো implement হয়নি।
+    match /familyCodes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt'])
+        && request.resource.data.familyId is string
+        && request.resource.data.familyId.size() > 0;
+      allow update: if false;
+      allow delete: if request.auth != null && isAppCreator();
+    }
+
+    // --- legacyCollectionMap/{collectionName}: data_<code> কালেকশন থেকে
+    // familyId-এ reverse lookup (copyPhaseCData()-এর guard, ও
+    // healthCheckFamily()/auditAllFamiliesHealthCheck()-এর consistency
+    // check এখান থেকেই পড়ে; আজকের rollback fix-এও isLegacyRollbackBypass()
+    // এই একই collection থেকে familyId lookup করে)। আগে এই match ব্লক
+    // rules ফাইলে ছিল না বলে Firestore default-deny করছিল —
+    // "Missing or insufficient permissions" এর root cause এটাই। setOnce
+    // pattern: create শুধু একবারই (doc আগে থেকে না থাকলে), update/delete
+    // বন্ধ — ভুল entry হলে শুধু owner Firebase Console থেকে ম্যানুয়ালি
+    // ঠিক করবেন, client থেকে সম্ভব না (ইচ্ছাকৃত, owner-approved)।
+    match /legacyCollectionMap/{collectionName} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt'])
+        && request.resource.data.familyId is string
+        && request.resource.data.familyId.size() > 0;
+      allow update: if false;
+      allow delete: if request.auth != null && isAppCreator();
+    }
+
+    // --- Phase A-2: families/{familyId} root/meta ডকুমেন্ট ---
+    // এই মুহূর্তে শুধু background prep — কোনো live UI feature এখনো এর ওপর
+    // নির্ভর করে না। "প্রথম Admin" নিয়ম এখানেই server-side enforce করা
+    // হচ্ছে (শুধু client-side check নয়): adminUids একবার ফাঁকা থেকে
+    // ফাঁকা-নয় হতে পারবে, শুধু তখনই যদি নতুন array-তে ঠিক request করা uid
+    // থাকে — এভাবে দুইজন প্রায় একইসাথে claim করার চেষ্টা করলেও (race
+    // condition) Firestore-এর atomic write guarantee-র কারণে মাত্র
+    // একজনই সফল হবে, দ্বিতীয়জনের request reject হবে (rules পুনরায় নতুন
+    // state দেখে দ্বিতীয়বার true হবে না)।
+    match /families/{familyId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['familyId', 'familyCode', 'isCustomCode', 'createdAt',
+              'createdByUid', 'schemaVersion', 'adminUids', 'dataCollectionName'])
+        && request.resource.data.adminUids == []
+        // §৫ fix: dataCollectionName ঐচ্ছিক নয় বলে জোর করা হয়নি (পুরনো
+        // client version সাময়িক সময়ের জন্য এই field ছাড়াই create করতে
+        // পারে), তবে দেওয়া হলে অবশ্যই ঠিক familyCode থেকে deterministic-ভাবে
+        // derive করা হতে হবে — forge করে ভিন্ন কোনো কালেকশনে redirect করা
+        // যাবে না।
+        && (!('dataCollectionName' in request.resource.data)
+            || request.resource.data.dataCollectionName == 'data_' + request.resource.data.familyCode);
+      allow update: if request.auth != null
+        && resource.data.adminUids.size() == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'updatedAt'])
+        && request.resource.data.adminUids == [request.auth.uid];
+      // §৫ fix — dataCollectionName one-time backfill (ensureDataCollectionName()):
+      // শুধু তখনই অনুমতি যখন এই field আগে থেকে ছিলই না (একবার সেট হলে আর
+      // কখনো এই clause দিয়ে বদলানো যাবে না — immutable-once-set) এবং নতুন
+      // মান অবশ্যই resource-এর *বর্তমান* familyCode থেকে deterministic-ভাবে
+      // derive করা হতে হবে (forge করে অন্য কালেকশনে redirect করা অসম্ভব)।
+      allow update: if request.auth != null
+        && !('dataCollectionName' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dataCollectionName', 'updatedAt'])
+        && request.resource.data.dataCollectionName == 'data_' + resource.data.familyCode;
+      // §৫ fix — controlled familyCode change (changeFamilyCodeForExistingFamily()):
+      // শুধু বিদ্যমান Admin-রা পারবেন, শুধু familyCode+updatedAt affected
+      // হতে পারবে (dataCollectionName এই clause দিয়ে কখনো বদলানো যায় না —
+      // তাই আসল ডাটা কালেকশন সবসময় অপরিবর্তিত থাকে), এবং নতুন কোড
+      // client-side চার্সেট/দৈর্ঘ্যের সাথে সামঞ্জস্যপূর্ণ হতে হবে।
+      allow update: if request.auth != null
+        && resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['familyCode', 'updatedAt'])
+        && request.resource.data.familyCode is string
+        && request.resource.data.familyCode.matches('^[^\\s/\\\\\'"]{9,30}$');
+      allow delete: if request.auth != null && isAppCreator();
+
+      // --- Phase C prep: members/entries/weekly subcollection rules ---
+      // পুরোপুরি additive ও এই মুহূর্তে অব্যবহৃত — কোনো app code এখনো এই
+      // path পড়ে/লেখে না (app এখনো সম্পূর্ণভাবে data_<familyCode>-ই
+      // ব্যবহার করছে)। বর্তমান top-level isUnownedOrMine()/isWritable()-এর
+      // লজিক হুবহু পুনর্ব্যবহার করা হয়েছে, শুধু নতুন subcollection path-এর
+      // জন্য মানানসই করে — যাতে Phase C-এর আসল migration script চালানোর
+      // সময় rules নিয়ে আলাদা করে অপেক্ষা করতে না হয়।
+      match /members/{memberId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && (isUnownedOrMine(request.resource.data.ownerUid) || isAdminOfFamily(familyId));
+        allow update: if request.auth != null
+          && (isUnownedOrMine(resource.data.ownerUid) || isAdminOfFamily(familyId))
+          && (isUnownedOrMine(request.resource.data.ownerUid) || isAdminOfFamily(familyId));
+        allow delete: if request.auth != null
+          && (isUnownedOrMine(resource.data.ownerUid) || isAdminOfFamily(familyId));
+      }
+
+      match /entries/{entryId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null
+          && (isUnownedOrMine(currentMemberOwnerV2(familyId, entryId)) || isAdminOfFamily(familyId));
+      }
+
+      match /weekly/{weeklyId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null
+          && (isUnownedOrMine(currentMemberOwnerV2(familyId, weeklyId)) || isAdminOfFamily(familyId));
+      }
+    }
+
+    // --- PWA ইনস্টল কাউন্টার (গ্লোবাল, কোনো নির্দিষ্ট পরিবারের ডাটা নয়) ---
+    match /app_stats/{statId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['count', 'lastInstalledAt'])
+        && request.resource.data.count is number;
+      allow delete: if false;
+    }
+  }
+}
