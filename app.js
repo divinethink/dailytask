@@ -1015,6 +1015,113 @@ async function auditAllFamiliesHealthCheck() {
 if (typeof window !== "undefined") {
   window.auditAllFamiliesHealthCheck = auditAllFamiliesHealthCheck;
 }
+// =====================================================================
+// --- Access Approval Gate — Step 1: Grandfather Candidate Audit
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix/migration করে না) — শুধু browser
+// console থেকে ম্যানুয়ালি (`auditGrandfatherCandidates()`, বা নির্দিষ্ট
+// familyId-গুলো নিশ্চিত করতে `auditGrandfatherCandidates(["<familyId1>", ...])`)।
+// =====================================================================
+// উদ্দেশ্য: Access Approval Gate চালু করার আগে, প্রতিটি family-এর যেসব
+// uid ইতিমধ্যে বৈধভাবে সক্রিয় (কোনো member-এর ownerUid অথবা family-এর
+// adminUids-এ আছে) — তাদের একটি তালিকা তৈরি করা, যাতে পরের ধাপে
+// (grandfather migration — এখনো implement করা হয়নি, শুধু audit) এই
+// uid-গুলোকে auto-approved হিসেবে accessRequests-এ বসানো যায়। এই ফাংশন
+// নিজে কোনো write করে না — শুধু রিপোর্ট দেয়, চূড়ান্ত সিদ্ধান্ত owner-এর।
+//
+// সীমাবদ্ধতা (§৩-এ আগে চিহ্নিত): `families` collection-এর ওপর নির্ভর করে
+// সব family খুঁজে বের করা অনির্ভরযোগ্য, কারণ families/{id} doc lazily
+// তৈরি হয় (ensureFamilyMeta())। তাই এই ফাংশন `families` collection স্ক্যান
+// করার পাশাপাশি ঐচ্ছিক `extraFamilyIds` প্যারামিটার নেয় — Firebase Console-
+// এর root-level collection browser দিয়ে ম্যানুয়ালি শনাক্ত করা familyId
+// (owner ইতিমধ্যে জানেন: real family + বোনের family) এখানে পাস করলে সেগুলোও
+// নিশ্চিতভাবে audit-এ অন্তর্ভুক্ত হবে, `families` collection-এ miss হলেও।
+//
+// প্রতিটি family-এর জন্য migrationState অনুযায়ী সঠিক জায়গা থেকে সদস্যদের
+// ownerUid পড়া হয় (legacy: data_<collection>-এ "member:" prefix; v2:
+// families/{id}/members subcollection) — resolvePathContext()-এর একই
+// migrationState-branching নীতি অনুসরণ করা হয়েছে, তবে এই ফাংশন কোনো লেখা
+// করে না বলে resolvePathContext() নিজে ব্যবহার না করে সরাসরি read করা
+// হয়েছে (সরলতার জন্য, আচরণ একই)।
+async function auditGrandfatherCandidates(extraFamilyIds) {
+  console.log("[Grandfather audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix/migration হবে না)...");
+  const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
+  const familyIdSet = new Set(extra);
+  try {
+    const familiesSnap = await db.collection("families").get();
+    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+  } catch (err) {
+    console.warn("[Grandfather audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
+  }
+  if (familyIdSet.size === 0) {
+    console.warn("[Grandfather audit] কোনো familyId পাওয়া যায়নি (families collection খালি/অনুপস্থিত এবং extraFamilyIds দেওয়া হয়নি)। থামানো হলো।");
+    return { totalFamilies: 0, rows: [], details: {} };
+  }
+  console.log(`[Grandfather audit] মোট ${familyIdSet.size}টি familyId নিয়ে audit চলছে (families collection scan + extraFamilyIds মিলিয়ে)। মনে রাখবেন: families collection lazily তৈরি হয় বলে এটি সব real family নাও ধরতে পারে — Console root-browse দিয়ে চেনা familyId extraFamilyIds-এ পাস করা নিরাপদ (§৩)।`);
+
+  const rows = [];
+  const details = {};
+  for (const familyId of familyIdSet) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        console.warn(`[Grandfather audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+
+      let ownerUids = [];
+      let memberCount = 0;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        memberCount = membersSnap.size;
+        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+      } else {
+        // legacy/locked/undefined — dataCollectionName থাকলে সেটাই source of
+        // truth (§৫ fix), না থাকলে familyCode থেকে derive (আগের আচরণের সাথে
+        // সামঞ্জস্যপূর্ণ fallback)।
+        const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+        if (collectionName) {
+          const memberSnap = await db.collection(collectionName)
+            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
+            .get();
+          memberCount = memberSnap.size;
+          ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        } else {
+          console.warn(`[Grandfather audit] families/${familyId}-এ familyCode/dataCollectionName কিছুই নেই — সদস্য-owner পড়া সম্ভব হয়নি।`);
+        }
+      }
+
+      const candidateSet = new Set([...adminUids, ...ownerUids]);
+      const candidateUids = Array.from(candidateSet);
+
+      rows.push({
+        familyId,
+        familyCode: familyCode || "(নেই)",
+        migrationState,
+        মোটSদস্য: memberCount,
+        adminসংখ্যা: adminUids.length,
+        গ্র্যান্ডফাদারCandidateসংখ্যা: candidateUids.length
+      });
+      details[familyId] = { familyCode, migrationState, adminUids, ownerUids, candidateUids };
+    } catch (err) {
+      console.error(`[Grandfather audit] familyId ${familyId} প্রসেস করতে সমস্যা হয়েছে (read ব্যর্থ, কোনো write হয়নি):`, err);
+    }
+  }
+
+  console.log(`[Grandfather audit] সম্পন্ন — ${rows.length}টি family প্রসেস হয়েছে। সারসংক্ষেপ (নিচে) ও প্রতিটি family-এর candidate uid তালিকা (console-এ 'details' অবজেক্টে, বা এই ফাংশনের রিটার্ন ভ্যালুতে) দেখুন। কোনো write/approve এখনো হয়নি — এটি শুধু পরবর্তী owner-approved migration ধাপের জন্য প্রস্তুতিমূলক রিপোর্ট।`);
+  console.table(rows);
+  Object.entries(details).forEach(([familyId, d]) => {
+    console.log(`[Grandfather audit] familyId=${familyId} (${d.familyCode || "কোড নেই"}, ${d.migrationState}) — candidate uids:`, d.candidateUids);
+  });
+  return { totalFamilies: rows.length, rows, details };
+}
+if (typeof window !== "undefined") {
+  window.auditGrandfatherCandidates = auditGrandfatherCandidates;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
