@@ -4002,7 +4002,13 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showFamilyCodeModal, setShowFamilyCodeModal] = useState(false);
+  // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
+  // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
+  // EditIcon → দুই-অপশনের choice পপআপে merge করা হয়েছে (নিচে দেখুন)।
+  const [showFamilyCodeChoiceModal, setShowFamilyCodeChoiceModal] = useState(false);
+  const [showCreateNewFamilyModal, setShowCreateNewFamilyModal] = useState(false);
+  const [newFamCodeInput, setNewFamCodeInput] = useState("");
+  const [newFamCodeBusy, setNewFamCodeBusy] = useState(false);
   // Access Approval Gate — Step 4: admin-only pending-request panel state।
   const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
   const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
@@ -4033,13 +4039,26 @@ function App() {
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
   const [showMeetingInfoModal, setShowMeetingInfoModal] = useState(false);
-  const [customFamCodeInput, setCustomFamCodeInput] = useState("");
   // §৫ Family Code Lifecycle Fix — Admin-only "কোড রিনেম" মোডাল (একই
   // familyId+data, শুধু কোড বদলায়) — বিদ্যমান "কাস্টম কোড" মোডাল থেকে
   // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডাটা-বিচ্ছিন্নতা না ঘটে।
   const [showRenameFamilyCodeModal, setShowRenameFamilyCodeModal] = useState(false);
   const [renameFamCodeInput, setRenameFamCodeInput] = useState("");
   const [renameFamCodeBusy, setRenameFamCodeBusy] = useState(false);
+  // Family Code auto-propagate + notify: Admin কোড পরিবর্তন করলে বাকি
+  // সদস্যদের ডিভাইসে পরের বুটেই (families/{id} listener থেকে) নতুন কোড
+  // অটো বসে যায় ও রিলোডের পর একবার এই নোটিশ ব্যানার দেখানো হয় —
+  // localStorage flag দিয়ে "একবারই দেখানো" নিশ্চিত করা হয়েছে।
+  const [codeChangeNotice, setCodeChangeNotice] = useState(() => {
+    try {
+      const v = localStorage.getItem("family_code_change_notice");
+      if (v) {
+        localStorage.removeItem("family_code_change_notice");
+        return v;
+      }
+    } catch {}
+    return null;
+  });
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
@@ -4098,6 +4117,28 @@ function App() {
         (snap) => {
           const state = snap.exists ? (snap.data().migrationState || "legacy") : "legacy";
           setMigrationState(state);
+          // Family Code auto-propagate + notify: সার্ভারের families/{id}.familyCode
+          // এই ডিভাইসের local কোড থেকে ভিন্ন হলে (Admin অন্য কোথাও কোড
+          // পরিবর্তন করেছেন) — অটো নতুন কোড বসিয়ে, Google-linked হলে
+          // account-এও সংরক্ষণ করে, একবার রিলোড করা হয়; রিলোডের পর
+          // "family_code_change_notice" flag দেখে ব্যানার দেখানো হবে।
+          // familyId অপরিবর্তিত থাকায় এটি সম্পূর্ণ নিরাপদ — শুধু লেবেল sync।
+          try {
+            const serverCode = snap.exists ? snap.data().familyCode : null;
+            const localCode = getFamilyCode();
+            if (serverCode && serverCode.trim() && serverCode !== localCode) {
+              localStorage.setItem("family_code", serverCode);
+              localStorage.setItem("family_code_is_custom", "1");
+              localStorage.setItem("family_code_change_notice", serverCode);
+              const uid = auth.currentUser ? auth.currentUser.uid : null;
+              const doReload = () => window.location.reload();
+              if (uid && isGoogleLinked()) {
+                saveUserFamilyCode(uid, serverCode).then(doReload).catch(doReload);
+              } else {
+                doReload();
+              }
+            }
+          } catch {}
         },
         () => {
           // Fail-closed: listener error হলে migrationState ইচ্ছাকৃতভাবে
@@ -4645,37 +4686,39 @@ function App() {
       alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
     }
   }
-  async function handleSaveCustomFamilyCode() {
-    const code = customFamCodeInput.trim();
+  // "নতুন ফ্যামিলি কোড তৈরি করুন" — সব সদস্যের জন্য উন্মুক্ত (কারো নিজস্ব
+  // পৃথক family স্পেস দরকার হলে)। সম্পূর্ণ নতুন familyId+data — বর্তমান
+  // family/data কোনোভাবে touch হয় না, শুধু এই ডিভাইসটি নতুন (blank)
+  // family-তে সুইচ হয়ে যায়। createNewFamily() নিজেই এই ডিভাইসের uid-কে
+  // নতুন family-এর প্রথম Admin হিসেবে claim করে।
+  async function handleCreateNewFamily() {
+    const code = newFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`কাস্টম ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না। বাকি ছোট/বড় হাতের অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে।");
+      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
+    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    setNewFamCodeBusy(true);
     try {
-      // আগে শুধু legacy "members" ডকুমেন্ট চেক করা হতো, কিন্তু v2 (per-member
-      // member:<id>) সিস্টেমে সেই ডকুমেন্ট আর কখনো লেখা হয় না — ফলে আসলে
-      // ডাটা থাকা সত্ত্বেও এই চেক সবসময় "কোনো পুরনো রেকর্ড নেই" দেখাতো।
-      // এখন কালেকশনে আদৌ কোনো ডকুমেন্ট আছে কিনা তা সরাসরি চেক করা হচ্ছে।
-      const snap = await db.collection(`data_${code}`).limit(1).get();
-      const msg = !snap.empty
-        ? "এই কোডে আগের রেকর্ড পাওয়া গেছে — এতে সুইচ করলে সেই ডাটা ফিরে আসবে। এগিয়ে যাবেন?"
-        : "এই কোডে কোনো পুরনো রেকর্ড নেই — এটি নতুন খালি ফ্যামিলি স্পেস হবে। এগিয়ে যাবেন?";
-      if (!window.confirm(msg)) return;
-    } catch (err) {
-      const proceedAnyway = window.confirm("নেটওয়ার্ক বা সার্ভার সমস্যার কারণে এই কোডে আগে থেকে কোনো ডাটা আছে কিনা তা যাচাই করা যায়নি। তবুও কি এই কোডে পরিবর্তন করে এগিয়ে যেতে চান?");
-      if (!proceedAnyway) return;
+      const result = await createNewFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+          charset: "অবৈধ ক্যারেক্টার।",
+          "code-taken": "এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে, অন্য একটি কোড ব্যবহার করুন।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "নতুন ফ্যামিলি তৈরি করা যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে createNewFamily নিজেই reload করে।
+    } finally {
+      setNewFamCodeBusy(false);
     }
-    // Phase A: প্রথম Admin claim — familyId অপরিবর্তিত থাকে (শুধু code
-    // বদলাচ্ছে), তাই code বদলানোর *আগেই* বর্তমান family-এর জন্য claim
-    // চেষ্টা করা হচ্ছে। ব্যর্থ হলেও (best-effort) Family Code set flow
-    // কখনো আটকাবে না।
-    await claimFirstAdminIfEligible();
-    setFamilyCode(code);
   }
   // §৫ Family Code Lifecycle Fix — Admin-only: বর্তমান family-এর কোড
   // পরিবর্তন, dataCollectionName/data অপরিবর্তিত থাকে (changeFamilyCodeForExistingFamily
@@ -4692,7 +4735,7 @@ function App() {
       window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
-    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডাটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। পরিবারের বাকি সদস্যদের নতুন কোডটি জানাতে হবে।`)) return;
+    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডাটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
     setRenameFamCodeBusy(true);
     try {
       const result = await changeFamilyCodeForExistingFamily(code);
@@ -5491,7 +5534,7 @@ function App() {
   }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
-      setShowFamilyCodeModal(true);
+      setShowFamilyCodeChoiceModal(true);
       setIsMenuOpen(false);
     },
     className: "text-slate-500 hover:text-emerald-800 shrink-0 ml-2",
@@ -5499,18 +5542,6 @@ function App() {
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
   })))), isAdmin && /*#__PURE__*/React.createElement("div", {
-    className: "px-2 pb-1"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setIsMenuOpen(false);
-      setRenameFamCodeInput("");
-      setShowRenameFamilyCodeModal(true);
-    },
-    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }), " নিজের ফ্যামিলির কোড পরিবর্তন করুন (ডাটা অক্ষত)")), isAdmin && /*#__PURE__*/React.createElement("div", {
     className: "px-2 py-1 border-t border-slate-100"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -5851,6 +5882,23 @@ function App() {
     className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
   }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডাটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissMonthlyReminder,
+    className: "text-white/70 hover:text-white shrink-0"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 16
+  })))), codeChangeNotice && /*#__PURE__*/React.createElement("div", {
+    className: "px-5 mt-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-[#0E4B43] rounded-2xl p-4 flex items-start gap-3 shadow-sm"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "🔔"), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-white"
+  }, "আপনাদের ফ্যামিলি কোড এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
+  }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCodeChangeNotice(null),
     className: "text-white/70 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
@@ -6317,27 +6365,64 @@ function App() {
   }, "দেখুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowArchiveModal(false),
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
+  }, "বাতিল")))), showFamilyCodeChoiceModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-3 text-slate-800"
+  }, "ফ্যামিলি কোড"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setNewFamCodeInput("");
+      setShowCreateNewFamilyModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " নতুন ফ্যামিলি কোড তৈরি করুন"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setRenameFamCodeInput("");
+      setShowRenameFamilyCodeModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowFamilyCodeChoiceModal(false),
+    className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
+  }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "কাস্টম ফ্যামিলি কোড সেট করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নতুন ফ্যামিলি কোড তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "একটি অনন্য কোড দিন (যেমন: Fam-Khan-2026) যেন পরিবারের অন্য সদস্যরা এটি ব্যবহার করে ডাটা সিংক করতে পারে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
-    value: customFamCodeInput,
-    onChange: e => setCustomFamCodeInput(e.target.value),
+  }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+    value: newFamCodeInput,
+    onChange: e => setNewFamCodeInput(e.target.value),
     placeholder: "যেমন: Fam-Khan-2026",
     maxLength: 30,
+    disabled: newFamCodeBusy,
     className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
   }), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleSaveCustomFamilyCode,
-    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold"
-  }, "সেভ ও সিংক করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowFamilyCodeModal(false),
+    onClick: handleCreateNewFamily,
+    disabled: newFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, newFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "তৈরি করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowCreateNewFamilyModal(false),
+    disabled: newFamCodeBusy,
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
   }, "বাতিল")))), showRenameFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
@@ -6347,7 +6432,7 @@ function App() {
     className: "font-bold text-sm mb-1 text-slate-800"
   }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের নতুন কোডটি জানিয়ে দিতে হবে।"), /*#__PURE__*/React.createElement("input", {
+  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
     placeholder: "নতুন কোড লিখুন",
