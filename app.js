@@ -1156,8 +1156,8 @@ if (typeof window !== "undefined") {
 async function migrateApprovedGrandfatherAccess() {
   const approvedList = [
     { familyId: "R8K8B3KA33B4BMELD3C3", uid: "yiirNJKJHlM27guiiS10zsp2FYT2", label: "TU_HI_RA@2022" },
-    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "9qwcHuuvcZMLVzOgmNzX4D0epLF3", label: "TU_HI_RA@2022" },
-    { familyId: "M83JR2MA7A69UJ8MQEK3", uid: "Wz6iZPY56zP14r7CUO9g2YvJNq32", label: "FAM-LN3B10" }
+    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "Wz6iZPY56zP14r7CUO9g2YvJNq32", label: "TU_HI_RA@2022" },
+    { familyId: "M83JR2MA7A69UJ8MQEK3", uid: "0w24Er3vL9QXaElgpT0jGlRSP4E2", label: "FAM-LN3B10" }
   ];
   console.log("[Grandfather migration] শুরু হচ্ছে — শুধু owner-approved তালিকার জন্য write+verify হবে। কোনো Rules/other data বদলাবে না।");
   const results = [];
