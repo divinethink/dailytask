@@ -426,9 +426,11 @@ async function ensureLegacyCollectionMap() {
     // জন্য আটকাবে না; পরের বুটে আবার চেষ্টা হবে।
   }
 }
-// প্রথম Admin claim — ডিজাইন অনুযায়ী শুধু দুটি ট্রিগারে ডাকা হবে:
-// (১) কেউ custom Family Code সেট করলে, (২) কেউ Google Sign-in link করলে।
-// এই দুটির মধ্যে যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
+// প্রথম Admin claim — ডিজাইন অনুযায়ী তিনটি ট্রিগারে ডাকা হয়:
+// (১) কেউ custom Family Code সেট করলে, (২) কেউ Google Sign-in link করলে,
+// (৩) প্রতিটি app boot-এ (Legacy read-rule gate fix, নতুন) — যাতে
+// ব্র্যান্ড-নতুন/একা (adminUids:[]) family নিজের data পড়তে trigger #১/#২-এর
+// অপেক্ষা না করে। যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
 // "প্রথম-আসা" নিয়মটি Firestore Rules-এ server-side enforced (adminUids
 // ফাঁকা থাকলেই কেবল লেখা গৃহীত হয়), শুধু client-side check নয়।
 async function claimFirstAdminIfEligible() {
@@ -4184,6 +4186,16 @@ function App() {
       // মান পাবে।
       await ensureFamilyMeta();
       await ensureDataCollectionName();
+      // Legacy read-rule gate fix: ব্র্যান্ড-নতুন/একা (auto-generated,
+      // adminUids:[]) family-তে আগে শুধু "custom code সেট" বা "Google
+      // link" trigger-এ admin claim হতো — legacy read-gate deploy হওয়ার
+      // পর এই দুই trigger না ঘটা পর্যন্ত এমন family নিজেই নিজের data পড়তে
+      // পারছিল না (isApprovedMember()-এ admin/approved কেউ ছিল না)।
+      // এখানে boot-এই (idempotent, awaited) claim করে এই gap বন্ধ করা
+      // হলো — বিদ্যমান শেয়ার্ড family-তে (adminUids ইতিমধ্যে অ-খালি)
+      // কোনো প্রভাব নেই (ফাংশন internally no-op করে), Rules-এর
+      // "প্রথম-আসা" নিয়ম অপরিবর্তিত।
+      await claimFirstAdminIfEligible();
       // Legacy read-rule gate prep — non-blocking, best-effort; dataCollectionName
       // cache পূরণ হওয়ার পরই কল করা হচ্ছে (getCollectionName()-এর সঠিক মান
       // দরকার), কিন্তু boot এর জন্য অপেক্ষা করে না।
