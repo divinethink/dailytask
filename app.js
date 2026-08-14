@@ -4149,6 +4149,11 @@ function App() {
   // কিনা (existing migFamSnap boot-fetch থেকেই সেট হয়, কোনো extra read
   // যোগ করা হয়নি)। null = এখনো জানা যায়নি।
   const [isAdmin, setIsAdmin] = useState(null);
+  // Admin Visibility UI — বর্তমান family-র adminUids array (একই boot
+  // fetch থেকে সেট, কোনো extra read না)। badge/Make-Admin/Remove-Admin
+  // বাটন দেখানোর জন্য প্রয়োজন।
+  const [adminUidsList, setAdminUidsList] = useState([]);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   // pending = নিজের accessRequest এখনো admin-approval-এর অপেক্ষায়;
   // null = জানা যায়নি বা প্রযোজ্য না (admin/approved/legacy path)।
   const [accessPending, setAccessPending] = useState(false);
@@ -4379,6 +4384,7 @@ function App() {
         const famAdminUids = migFamSnap.exists ? migFamSnap.data().adminUids : null;
         const myUid = auth.currentUser ? auth.currentUser.uid : null;
         setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
+        setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
       } catch {}
       let m;
       try {
@@ -5254,6 +5260,80 @@ function App() {
       alert("দায়িত্ব ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
   }
+  // Admin Visibility UI — একজন claimed সদস্যকে Admin করা। Rules-এ scoped
+  // update clause (adminUids-এ ঠিক ১টা নতুন uid যোগ, বাকি সব অপরিবর্তিত)
+  // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
+  // নিজে দেয় না।
+  async function handleMakeAdmin(m) {
+    if (!m.ownerUid) {
+      alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
+      return;
+    }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
+    const ok = window.confirm(`"${m.name}"-কে এডমিন করতে চান? এডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayUnion(m.ownerUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.includes(m.ownerUid) ? prev : [...prev, m.ownerUid]);
+    } catch (err) {
+      alert("এডমিন করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  // অন্য একজন Admin-কে পদ থেকে বাদ দেওয়া (নিজেকে নয় — self-demote আলাদা,
+  // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
+  // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
+  async function handleRemoveAdmin(m) {
+    if (!m.ownerUid) return;
+    if (adminUidsList.length <= 1) {
+      alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
+      return;
+    }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
+    const ok = window.confirm(`"${m.name}"-কে এডমিন পদ থেকে বাদ দিতে চান?`);
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayRemove(m.ownerUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.filter(u => u !== m.ownerUid));
+    } catch (err) {
+      alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  // নিজের এডমিন পদ ছাড়া (self-demote) — profile dropdown থেকে, ইচ্ছাকৃতভাবে
+  // member-list বাটন থেকে আলাদা রাখা হয়েছে যাতে ভুল ক্লিকে নিজে lock-out
+  // না হয়ে যান।
+  async function handleSelfDemote() {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (!myUid) return;
+    if (adminUidsList.length <= 1) {
+      alert("আপনিই একমাত্র এডমিন — এই মুহূর্তে নিজের এডমিন পদ ছাড়তে পারবেন না। আগে অন্য কাউকে এডমিন করুন।");
+      return;
+    }
+    const ok = window.confirm("আপনি কি নিশ্চিত নিজের এডমিন পদ ছাড়তে চান?");
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayRemove(myUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.filter(u => u !== myUid));
+      setIsAdmin(false);
+      setShowProfileDropdown(false);
+    } catch (err) {
+      alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
+    }
+  }
   async function handleGoogleSignOut() {
     setIsMenuOpen(false);
     setShowAccountMenu(false);
@@ -5842,7 +5922,26 @@ function App() {
     title: "অন্য ডিভাইসের দায়িত্বে আছে — শুধুমাত্র সেই ডিভাইস থেকেই দায়িত্ব ছাড়া যাবে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 9
-  }), " সংরক্ষিত"), /*#__PURE__*/React.createElement("button", {
+  }), " সংরক্ষিত"), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
+    title: "এডমিন"
+  }, "এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleMakeAdmin(m);
+    },
+    disabled: isLockedForSwitch,
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
+    title: "এডমিন করুন"
+  }, "Make Admin"), isAdmin && m.ownerUid && adminUidsList.includes(m.ownerUid) && m.ownerUid !== (auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleRemoveAdmin(m);
+    },
+    disabled: isLockedForSwitch,
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+    title: "এডমিন পদ থেকে বাদ দিন"
+  }, "Remove Admin"), /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleRemoveMember(m);
@@ -6012,14 +6111,57 @@ function App() {
   }), " Google অ্যাকাউন্ট (রিকমন্ডেড)")))))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm",
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setShowProfileDropdown(v => !v);
+    },
+    className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform",
     style: {
       background: "#C89B3C",
       color: "#16302B"
     }
   }, /*#__PURE__*/React.createElement(User, {
     size: 13
-  }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন"), /*#__PURE__*/React.createElement("div", {
+  }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন", /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 12,
+    className: `transition-transform duration-200 ${showProfileDropdown ? "rotate-180" : ""}`
+  })), showProfileDropdown && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-40",
+    onClick: () => setShowProfileDropdown(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
+  }, (() => {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const ownMember = (members || []).find(x => x.ownerUid && myUid && x.ownerUid === myUid) || null;
+    const amAdmin = !!(myUid && adminUidsList.includes(myUid));
+    let sinceText = null;
+    if (ownMember && ownMember.createdAt) {
+      const d = new Date(ownMember.createdAt);
+      sinceText = `${toBn(d.getDate())} ${BN_MONTHS[d.getMonth()]} ${toBn(d.getFullYear())}`;
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "px-4 py-2 border-b border-slate-100"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "font-bold text-emerald-900 text-sm"
+    }, ownMember ? ownMember.name : (selectedMember ? selectedMember.name : "প্রোফাইল")), /*#__PURE__*/React.createElement("span", {
+      className: `inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
+    }, amAdmin ? "এডমিন" : "সদস্য")), /*#__PURE__*/React.createElement("div", {
+      className: "px-4 py-2 space-y-1 text-slate-500"
+    }, sinceText && /*#__PURE__*/React.createElement("div", null, "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
+      className: "text-slate-700"
+    }, sinceText)), /*#__PURE__*/React.createElement("div", null, "গুগল সংযুক্ত: ", /*#__PURE__*/React.createElement("b", {
+      className: "text-slate-700"
+    }, isGoogleLinked() ? "হ্যাঁ" : "না"))), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleSelfDemote(),
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
+    }, "নিজের এডমিন পদ ছাড়ুন")));
+  })()))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl shrink-0 border border-white/10"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm"
