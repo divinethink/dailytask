@@ -63,6 +63,57 @@ function generateSecureCode(length) {
   }
   return out;
 }
+// --- App creator-only client-side helper (Rules-এর isAppCreator()-এর সাথে
+// সামঞ্জস্যপূর্ণ একই UID) — শুধু convenience check, কোনো নিজস্ব
+// security boundary না (আসল নিরাপত্তা সবসময় Firestore Rules-এই enforced)।
+const APP_CREATOR_UID = "yiirNJKJHlM27guiiS10zsp2FYT2";
+function isCreatorAuth() {
+  return !!(auth.currentUser && auth.currentUser.uid === APP_CREATOR_UID);
+}
+// --- Creator family override (শুধু browser console, শুধু creator UID) ---
+// উদ্দেশ্য: creator-এর Google account অন্য family-র সাথে link করা থাকলেও
+// (users/{uid}.familyCode), boot-এ syncFamilyCodeWithAccount() যেন এই
+// ম্যানুয়ালি বেছে নেওয়া family-কে account-linked কোডে ফিরিয়ে না দেয়।
+// শুধু read/verify-এর জন্য — write permission পেতে হলে সেই family-র
+// adminUids-এ owner Firebase Console থেকে সাময়িকভাবে uid যোগ করতে হবে
+// (এই ফাংশন সেটা করে না)।
+const CREATOR_OVERRIDE_KEY = "dt_creator_family_override";
+async function enterFamilyAsCreator(code) {
+  if (!isCreatorAuth()) {
+    console.error("[Creator override] শুধু app creator-এর জন্য।");
+    return { aborted: true, reason: "not-creator" };
+  }
+  const normalized = (code || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  try {
+    const snap = await db.collection("familyCodes").doc(normalized).get();
+    if (!snap.exists) {
+      console.error("[Creator override] এই কোডের কোনো family পাওয়া যায়নি।");
+      return { aborted: true, reason: "not-found" };
+    }
+    const targetFamilyId = snap.data() ? snap.data().familyId : null;
+    if (!targetFamilyId) return { aborted: true, reason: "not-found" };
+    console.log(`[Creator override] সুইচ হচ্ছে — কোড: ${normalized}, familyId: ${targetFamilyId}। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_id", targetFamilyId);
+    localStorage.setItem(CREATOR_OVERRIDE_KEY, normalized);
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Creator override] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+function exitCreatorOverride() {
+  localStorage.removeItem(CREATOR_OVERRIDE_KEY);
+  localStorage.removeItem("family_code");
+  localStorage.removeItem("family_id");
+  window.location.reload();
+}
+if (typeof window !== "undefined") {
+  window.enterFamilyAsCreator = enterFamilyAsCreator;
+  window.exitCreatorOverride = exitCreatorOverride;
+}
 function getFamilyCode() {
   let code = localStorage.getItem("family_code");
   if (!code) {
@@ -1572,6 +1623,12 @@ async function syncFamilyCodeWithAccount() {
   if (!auth.currentUser || !isGoogleLinked()) return {
     switched: false
   };
+  // Creator override active থাকলে (enterFamilyAsCreator() দিয়ে ম্যানুয়ালি
+  // সেট করা, এবং flag বর্তমান family_code-এর সাথে মিলছে) — account-linked
+  // familyCode-এ ফিরিয়ে দেওয়া হবে না। শুধু creator UID-এর জন্য প্রযোজ্য।
+  if (isCreatorAuth() && localStorage.getItem(CREATOR_OVERRIDE_KEY) === getFamilyCode()) {
+    return { switched: false };
+  }
   const uid = auth.currentUser.uid;
   const remoteCode = await loadUserFamilyCode(uid);
   const localCode = getFamilyCode();
@@ -2301,6 +2358,22 @@ async function writeFsaBackupFile(baseDirHandle, fileName, jsonStr) {
   const writable = await fileHandle.createWritable();
   await writable.write(jsonStr);
   await writable.close();
+  // নতুন backup সফলভাবে লেখা+close হওয়ার *পরেই* একই family-র পুরনো backup
+  // ফাইলগুলো (নতুনটি বাদে) মুছে ফেলা হয় — folder-এ সবসময় latest ১টিই থাকে।
+  // filePrefix (familyCode-সহ) ম্যাচ করা ফাইলগুলোই টার্গেট, অন্য family/manual
+  // ফাইল অক্ষত থাকে। কোনো ফাইল delete ব্যর্থ হলে নীরবে skip — নতুন backup তো
+  // থেকেই গেছে, তাই data loss নেই।
+  try {
+    const filePrefix = fileName.replace(/_\d{8}_\d{4}\.json$/, "_");
+    for await (const [entryName, entryHandle] of folderHandle.entries()) {
+      if (entryName === fileName) continue;
+      if (entryHandle.kind !== "file") continue;
+      if (!entryName.startsWith(filePrefix) || !entryName.endsWith(".json")) continue;
+      try {
+        await folderHandle.removeEntry(entryName);
+      } catch {}
+    }
+  } catch {}
 }
 
 if ("serviceWorker" in navigator) {
