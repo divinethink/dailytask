@@ -259,6 +259,10 @@ async function createNewFamily(newCode) {
       familyCode: normalized,
       isCustomCode: true,
       dataCollectionName: `data_${normalized}`,
+      // বাগ-ফিক্স(২৭.৩): migrationState explicit "v2" — নইলে field-না-থাকা
+      // অবস্থায় joinExistingFamily() ডিফল্ট "legacy" ধরে ব্লক করে দিত
+      // ("এই ফ্যামিলি এখনো এই ফিচারের জন্য প্রস্তুত নয়" ভুল মেসেজ)।
+      migrationState: "v2",
       createdAt: Date.now(),
       createdByUid: auth.currentUser ? auth.currentUser.uid : null,
       schemaVersion: 1,
@@ -278,6 +282,11 @@ async function createNewFamily(newCode) {
           adminUids: [auth.currentUser.uid],
           updatedAt: Date.now()
         });
+        // বাগ-ফিক্স(২৭.১): admin claim সফল হলে পরের বুটে Recovery Key
+        // modal দেখানোর জন্য flag সেট — এটাই এখন একমাত্র জায়গা যেখান
+        // থেকে "নতুন family তৈরি" flow-এ modal শো হবে(সঠিক সময়ে, কোড
+        // তৈরির পরে)।
+        localStorage.setItem("pending_recovery_key_setup", "1");
       } catch (claimErr) {
         console.error("[New Family] Admin claim ব্যর্থ (family তৈরি হয়েছে, কিন্তু admin claim হয়নি):", claimErr.message);
       }
@@ -4263,6 +4272,18 @@ function App() {
   // fetch থেকে সেট, extra read নেই)। null/undefined মানে পুরনো family
   // যেখানে backfill হয়নি — সেক্ষেত্রে protection স্বয়ংক্রিয়ভাবে বাইপাস হয়।
   const [firstAdminUid, setFirstAdminUid] = useState(null);
+  // বাগ-ফিক্স(২৭.২): "প্রথম এডমিন" badge শুধু প্রথম এডমিনের *নিজের*
+  // member-profile-এ দেখানো উচিত, তিনি নিজে যাদের add করেছেন তাদের সবার
+  // ক্ষেত্রে না(ownerUid match করলেই badge দেখাতো — bug)। এখানে প্রথম
+  // এডমিনের uid-এর মালিকানাধীন member-গুলোর মধ্যে সবচেয়ে পুরনো(earliest
+  // createdAt)-টিকেই তার "নিজের প্রোফাইল" হিসেবে ধরা হচ্ছে(সাধারণ ব্যবহারে
+  // প্রথম এডমিন নিজেই প্রথম যে member add করেন সেটাই তার নিজের প্রোফাইল)।
+  const firstAdminOwnMemberId = React.useMemo(() => {
+    if (!firstAdminUid || !members || members.length === 0) return null;
+    const owned = members.filter(x => x.ownerUid === firstAdminUid);
+    if (owned.length === 0) return null;
+    return owned.reduce((a, b) => (a.createdAt || 0) <= (b.createdAt || 0) ? a : b).id;
+  }, [firstAdminUid, members]);
   // §Notification System — unread notifications(boot-এ onSnapshot দিয়ে
   // live-updated) ও panel খোলা আছে কিনা।
   const [notifications, setNotifications] = useState([]);
@@ -4389,6 +4410,9 @@ function App() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
   const [copiedCode, setCopiedCode] = useState(false);
+  // UI-only(bug/logic অপরিবর্তিত) — Recovery Key modal-এ copy বাটনের
+  // "কপি হয়েছে!" feedback-এর জন্য, copiedCode প্যাটার্নের অনুরূপ।
+  const [copiedRecoveryKey, setCopiedRecoveryKey] = useState(false);
   const [codeRevealed, setCodeRevealed] = useState(false);
   const originalEntryRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -4448,13 +4472,15 @@ function App() {
       // হলো — বিদ্যমান শেয়ার্ড family-তে (adminUids ইতিমধ্যে অ-খালি)
       // কোনো প্রভাব নেই (ফাংশন internally no-op করে), Rules-এর
       // "প্রথম-আসা" নিয়ম অপরিবর্তিত।
-      const justClaimedFirstAdmin = await claimFirstAdminIfEligible();
-      if (justClaimedFirstAdmin) {
-        // §Recovery Key — এই ডিভাইসই সদ্য প্রথম Admin হলো; key generate+hash
-        // করে hidden doc-এ সেভ করা হচ্ছে, plaintext শুধু modal-এ একবার
-        // দেখানোর জন্য state-এ রাখা হচ্ছে(best-effort — ব্যর্থ হলেও admin
-        // claim নিজে আগেই সফল হয়ে গেছে, পরে profile dropdown থেকে আলাদা
-        // ব্যবস্থা লাগবে না কারণ প্রথম claim একবারই হয়)।
+      await claimFirstAdminIfEligible();
+      // বাগ-ফিক্স(২৭.১): boot-trigger(#৩)-এ শুধু silently admin claim হয়
+      // (read-gate coverage-এর জন্য) — Recovery Key modal এখান থেকে আর
+      // দেখানো হয় না, কারণ এটি family code তৈরির *আগেই*(auto-generated
+      // throwaway family-তে) fire করে ভুল সময়ে modal দেখাতো। সঠিক flow:
+      // createNewFamily()-এর ঠিক পরের রিলোডে(pending_recovery_key_setup
+      // flag) বা Google-link trigger থেকেই এখন modal দেখানো হবে।
+      if (localStorage.getItem("pending_recovery_key_setup") === "1") {
+        localStorage.removeItem("pending_recovery_key_setup");
         setupRecoveryKeyForCurrentAdmin().then(key => {
           if (key) {
             setGeneratedRecoveryKey(key);
@@ -5508,6 +5534,24 @@ function App() {
       alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
   }
+  // Single Logout — Family code session + Google session, দুটোই একসাথে
+  // পরিষ্কার। কোনো Firestore/member ownership data পরিবর্তন হয় না — শুধু
+  // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
+  // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
+  async function handleFullLogout() {
+    const ok = window.confirm("আপনি লগআউট করলে এই ডিভাইস থেকে family code ও Google session — দুটোই মুছে যাবে। আবার প্রবেশ করতে Family Code লাগবে। আগান?");
+    if (!ok) return;
+    try {
+      await signOutToFreshAnonymous();
+    } catch (err) {
+      alert("লগআউট করতে সমস্যা হয়েছে: " + err.message);
+      return;
+    }
+    localStorage.removeItem("family_id");
+    localStorage.removeItem("family_code");
+    localStorage.removeItem("family_code_is_custom");
+    window.location.reload();
+  }
   async function handleGoogleSignOut() {
     setIsMenuOpen(false);
     setShowAccountMenu(false);
@@ -6099,7 +6143,7 @@ function App() {
   }), " সংরক্ষিত"), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
     title: "এডমিন"
-  }, "এডমিন"), m.ownerUid && firstAdminUid && m.ownerUid === firstAdminUid && /*#__PURE__*/React.createElement("span", {
+  }, "এডমিন"), m.id && firstAdminOwnMemberId && m.id === firstAdminOwnMemberId && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
     title: "প্রথম এডমিন — শুধু ইনিই নিজে পদ ছাড়তে পারেন"
   }, "প্রথম এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
@@ -6346,7 +6390,13 @@ function App() {
         setShowRecoveryClaim(true);
       },
       className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-700 text-xs font-semibold"
-    }, "Recovery Key দিয়ে Admin ফিরে পান")));
+    }, "Recovery Key দিয়ে Admin ফিরে পান")), /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 mt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleFullLogout(),
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
+    }, "লগআউট")));
   })()))), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
@@ -6366,7 +6416,15 @@ function App() {
     onClick: () => setShowNotifPanel(false)
   }), /*#__PURE__*/React.createElement("div", {
     className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs max-h-72 overflow-y-auto"
-  }, notifications.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-2 border-b border-slate-100 flex items-center gap-1.5 text-slate-700"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm"
+  }, "🔥"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+  }, toBn(streak)), " দিন ধারাবাহিক")), notifications.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-3 text-slate-400 text-center"
   }, "কোনো নতুন নোটিফিকেশন নেই") : notifications.map(n => /*#__PURE__*/React.createElement("div", {
     key: n.id,
@@ -6380,15 +6438,7 @@ function App() {
     className: "font-semibold text-slate-700"
   }, n.message), n.createdAt && /*#__PURE__*/React.createElement("div", {
     className: "text-[10px] text-slate-400 mt-0.5"
-  }, new Date(n.createdAt).toLocaleString("bn-BD"))))))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl shrink-0 border border-white/10"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm"
-  }, "🔥"), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-white"
-  }, /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(streak)), " দিন"))), addingMember && /*#__PURE__*/React.createElement("div", {
+  }, new Date(n.createdAt).toLocaleString("bn-BD")))))))), addingMember && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"
@@ -7149,16 +7199,30 @@ function App() {
   }, "আপনার Recovery Key"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "আপনি এই পরিবারের প্রথম এডমিন। Admin প্রবেশাধিকার হারালে(নতুন ডিভাইস, cache clear ইত্যাদি) এই key দিয়েই ফিরে পাবেন। এখনই স্ক্রিনশট নিন বা নিরাপদ জায়গায় লিখে রাখুন — এটি আর কখনো দেখানো হবে না।"), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-center mb-3",
+    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-2",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-bold text-emerald-900 tracking-wider select-all"
-  }, generatedRecoveryKey)), /*#__PURE__*/React.createElement("p", {
+  }, generatedRecoveryKey), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      navigator.clipboard.writeText(generatedRecoveryKey || "");
+      setCopiedRecoveryKey(true);
+      setTimeout(() => setCopiedRecoveryKey(false), 2000);
+    },
+    className: "shrink-0 p-1.5 rounded-lg hover:bg-slate-200 text-slate-500",
+    title: "কপি করুন"
+  }, copiedRecoveryKey ? /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold text-emerald-600"
+  }, "কপি হয়েছে!") : /*#__PURE__*/React.createElement(CopyIcon, {
+    size: 14
+  }))), /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mb-3"
   }, "মনে রাখবেন: এটি শুধু আপনার Admin পরিচয় ফিরে পাওয়ার চাবি — এটি দিয়ে হারানো ডাটা ফিরে পাওয়া যাবে না।"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setShowRecoveryKeyModal(false);
       setGeneratedRecoveryKey(null);
+      setCopiedRecoveryKey(false);
     },
     className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
   }, "সংরক্ষণ করেছি, বন্ধ করুন"))), showRecoveryClaim && /*#__PURE__*/React.createElement("div", {
