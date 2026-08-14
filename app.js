@@ -247,6 +247,51 @@ async function createNewFamily(newCode) {
 if (typeof window !== "undefined") {
   window.createNewFamily = createNewFamily;
 }
+// joinExistingFamily(code): বিদ্যমান কোনো family-তে "যোগ দেওয়া" — নতুন কোনো
+// family/data তৈরি হয় না। শুধু familyCodes/<code> lookup করে টার্গেট
+// familyId বের করা হয়, migrationState=="v2" কিনা যাচাই হয় (v2 ছাড়া blocked
+// — legacy read-gate এখনো implement হয়নি), তারপর এই ডিভাইসের localStorage
+// টার্গেট family-তে সুইচ করে reload হয়। এরপর বুট-টাইমের বিদ্যমান
+// accessDenied/self-request হ্যান্ডলিং (migrateMembersIfNeeded catch ব্লক)
+// নিজে থেকেই pending accessRequest তৈরি করবে অথবা আগে থেকে approved থাকলে
+// সরাসরি ঢুকিয়ে দেবে — এখানে নতুন করে সেই লজিক ডুপ্লিকেট করা হয়নি।
+async function joinExistingFamily(code) {
+  const normalized = (code || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized === getFamilyCode()) {
+    return { aborted: true, reason: "same-family" };
+  }
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    if (!codeSnap.exists) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
+    if (!targetFamilyId) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const famSnap = await db.collection("families").doc(targetFamilyId).get();
+    if (!famSnap.exists) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const migrationState = famSnap.data().migrationState || "legacy";
+    if (migrationState !== "v2") {
+      return { aborted: true, reason: "not-v2" };
+    }
+    console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${targetFamilyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+    localStorage.setItem("family_id", targetFamilyId);
+    localStorage.setItem("family_code", normalized);
+    localStorage.removeItem("family_code_is_custom");
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Join Family] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.joinExistingFamily = joinExistingFamily;
+}
 // =====================================================================
 // --- Phase A (Family ID Foundation) — শুধু প্রস্তুতি, কোনো read/write ---
 // --- path এখনো বদলায়নি। app এখনও data_<familyCode>-ই পড়ে/লেখে। এই ---
@@ -355,6 +400,30 @@ async function ensureDataCollectionName() {
     cachedDataCollectionName = derived;
   } catch {
     cachedDataCollectionName = null; // getCollectionName() নিচে নিরাপদ fallback করবে
+  }
+}
+// legacyCollectionMap backfill — আগে এই mapping শুধু Phase C copy script
+// (copyPhaseCData()) চালানোর সময় তৈরি হতো, তাই এখনো legacy-তে থাকা
+// family-দের (যেমন বোনের family) জন্য এই doc নেই। Legacy read-rule gate
+// (isApprovedMember() ভিত্তিক) deploy করার আগে এই mapping সব family-র জন্য
+// থাকা বাধ্যতামূলক — নাহলে rule deploy-এর সাথে সাথেই এখনো-legacy family-রা
+// lock out হয়ে যাবে। ensureFamilyCodeMapping()-এর মতোই setOnce (আগে থেকে
+// থাকলে ছোঁয়া হয় না), best-effort — ব্যর্থ হলেও app boot আটকাবে না, শুধু
+// পরের বুটে আবার চেষ্টা হবে। বিদ্যমান rule-ই এই create allow করে (কোনো
+// rule change ছাড়াই কাজ করে)।
+async function ensureLegacyCollectionMap() {
+  try {
+    const collectionName = getCollectionName();
+    if (!collectionName) return;
+    const mapRef = db.collection("legacyCollectionMap").doc(collectionName);
+    const snap = await mapRef.get();
+    if (!snap.exists) {
+      await mapRef.set({ familyId: getFamilyId(), createdAt: Date.now() });
+    }
+  } catch {
+    // Best-effort — legacy read-rule gate deploy-এর আগে backfill নিশ্চিত
+    // করতে সাহায্য করা এর উদ্দেশ্য, কিন্তু ব্যর্থ হলে app boot কখনো এর
+    // জন্য আটকাবে না; পরের বুটে আবার চেষ্টা হবে।
   }
 }
 // প্রথম Admin claim — ডিজাইন অনুযায়ী শুধু দুটি ট্রিগারে ডাকা হবে:
@@ -4009,6 +4078,9 @@ function App() {
   const [showCreateNewFamilyModal, setShowCreateNewFamilyModal] = useState(false);
   const [newFamCodeInput, setNewFamCodeInput] = useState("");
   const [newFamCodeBusy, setNewFamCodeBusy] = useState(false);
+  const [showJoinFamilyModal, setShowJoinFamilyModal] = useState(false);
+  const [joinFamCodeInput, setJoinFamCodeInput] = useState("");
+  const [joinFamCodeBusy, setJoinFamCodeBusy] = useState(false);
   // Access Approval Gate — Step 4: admin-only pending-request panel state।
   const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
   const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
@@ -4112,6 +4184,10 @@ function App() {
       // মান পাবে।
       await ensureFamilyMeta();
       await ensureDataCollectionName();
+      // Legacy read-rule gate prep — non-blocking, best-effort; dataCollectionName
+      // cache পূরণ হওয়ার পরই কল করা হচ্ছে (getCollectionName()-এর সঠিক মান
+      // দরকার), কিন্তু boot এর জন্য অপেক্ষা করে না।
+      ensureLegacyCollectionMap();
       const migrationFamilyId = getFamilyId();
       migrationUnsub = db.collection("families").doc(migrationFamilyId).onSnapshot(
         (snap) => {
@@ -4718,6 +4794,33 @@ function App() {
       // success হলে createNewFamily নিজেই reload করে।
     } finally {
       setNewFamCodeBusy(false);
+    }
+  }
+  // "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন" — সব সদস্যের জন্য উন্মুক্ত (নতুন
+  // device-এ আগে থেকে থাকা কোনো Family Code দিয়ে ঢোকার জন্য)। শুধু v2
+  // family-তে কাজ করে (legacy read-gate এখনো implement হয়নি বলে ইচ্ছাকৃতভাবে
+  // সীমিত)। joinExistingFamily() নিজেই device সুইচ করে reload করে — এরপর
+  // বুট-টাইম accessDenied হ্যান্ডলিং pending accessRequest তৈরি/approved
+  // চেক করবে।
+  async function handleJoinExistingFamily() {
+    const code = joinFamCodeInput.trim();
+    if (!code) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সেই ফ্যামিলিতে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    setJoinFamCodeBusy(true);
+    try {
+      const result = await joinExistingFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          "same-family": "আপনি ইতিমধ্যে এই ফ্যামিলিতে আছেন।",
+          "not-found": "এই কোডের কোনো ফ্যামিলি পাওয়া যায়নি। কোডটি আবার যাচাই করুন।",
+          "not-v2": "এই ফ্যামিলি এখনো এই ফিচারের জন্য প্রস্তুত নয়। ফ্যামিলির Admin-এর সাথে সরাসরি যোগাযোগ করুন।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "যোগ দেওয়া যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে joinExistingFamily নিজেই reload করে।
+    } finally {
+      setJoinFamCodeBusy(false);
     }
   }
   // §৫ Family Code Lifecycle Fix — Admin-only: বর্তমান family-এর কোড
@@ -6393,7 +6496,17 @@ function App() {
     className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
+  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setJoinFamCodeInput("");
+      setShowJoinFamilyModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeChoiceModal(false),
     className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
   }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
@@ -6423,6 +6536,34 @@ function App() {
   }) : "তৈরি করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowCreateNewFamilyModal(false),
     disabled: newFamCodeBusy,
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+  }, "বাতিল")))), showJoinFamilyModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-1 text-slate-800"
+  }, "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+    value: joinFamCodeInput,
+    onChange: e => setJoinFamCodeInput(e.target.value),
+    placeholder: "যেমন: FAM-XXXXXXXXX",
+    maxLength: 30,
+    disabled: joinFamCodeBusy,
+    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleJoinExistingFamily,
+    disabled: joinFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, joinFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "যোগ দিন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowJoinFamilyModal(false),
+    disabled: joinFamCodeBusy,
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
   }, "বাতিল")))), showRenameFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
