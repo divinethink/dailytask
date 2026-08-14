@@ -485,18 +485,91 @@ async function ensureLegacyCollectionMap() {
 // "প্রথম-আসা" নিয়মটি Firestore Rules-এ server-side enforced (adminUids
 // ফাঁকা থাকলেই কেবল লেখা গৃহীত হয়), শুধু client-side check নয়।
 async function claimFirstAdminIfEligible() {
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) return false;
   try {
     await ensureFamilyMeta();
     const ref = familyDocRef();
     const snap = await ref.get();
     const current = snap.exists ? snap.data().adminUids || [] : [];
     if (current.length === 0) {
-      await ref.update({ adminUids: [auth.currentUser.uid], updatedAt: Date.now() });
+      // §First Admin Protection — firstAdminUid একই write-এ, একবারই সেট
+      // (Rules-এ enforced — এই clause claim-মুহূর্তে ছাড়া আর কখনো fire
+      // করে না)।
+      await ref.update({
+        adminUids: [auth.currentUser.uid],
+        firstAdminUid: auth.currentUser.uid,
+        updatedAt: Date.now()
+      });
+      return true; // এই ডিভাইস/কলই সদ্য প্রথম Admin হলো — caller Recovery
+      // Key setup modal দেখাতে পারে।
     }
   } catch {
     // Best-effort — Admin claim ব্যর্থ হলেও মূল ফিচার (Family Code set /
     // Google link) কখনো ব্লক হবে না; পরের trigger-এ আবার চেষ্টা হবে।
+  }
+  return false;
+}
+// =====================================================================
+// --- §Recovery Key(First Admin) — Spark-compatible, plaintext কখনো
+// Firestore-এ যায় না ---
+// =====================================================================
+// SHA-256 hex hash(browser-native SubtleCrypto — কোনো library লাগে না)।
+async function sha256Hex(text) {
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+// ≥20-char high-entropy key, সহজে পড়া/টাইপ করা যায় এমন charset(বিভ্রান্তিকর
+// 0/O, 1/I/l বাদ দেওয়া হয়েছে)। crypto.getRandomValues — cryptographically
+// secure, Math.random() নয়।
+function generateRecoveryKey() {
+  const charset = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  let key = "";
+  for (let i = 0; i < bytes.length; i++) {
+    key += charset[bytes[i] % charset.length];
+    if (i % 4 === 3 && i !== bytes.length - 1) key += "-";
+  }
+  return key; // ২৪ ক্যারেক্টার + ৫টি ড্যাশ = মোট ২৪-char entropy(≥20 নিয়ম পূরণ)
+}
+// প্রথম Admin claim-এর ঠিক পরে ডাকা হয়(app.js boot flow) — key generate করে
+// শুধু hash-টা hidden private/recovery doc-এ লেখে(Rules: create-once,
+// read:false)। plaintext key শুধু caller-কে return হয়, কখনো persist হয় না।
+async function setupRecoveryKeyForCurrentAdmin() {
+  const key = generateRecoveryKey();
+  const hash = await sha256Hex(key);
+  try {
+    // .set() নন-merge — doc আগে থেকে থাকলে Rules(create-only, update:false)
+    // reject করবে, তাই এটি কার্যকরভাবে create-once।
+    await db.collection("families").doc(getFamilyId())
+      .collection("private").doc("recovery")
+      .set({ hash, createdAt: Date.now() });
+    return key;
+  } catch (err) {
+    console.error("[Recovery Key] সেট করতে ব্যর্থ:", err.message);
+    return null;
+  }
+}
+// Recovery Key দিয়ে admin claim — client নিজে key hash করে পাঠায়(plaintext
+// কখনো network-এ যায় না); Rules hidden hash-এর সাথে মিলিয়ে adminUids-এ
+// self-add অনুমোদন করে।
+async function claimAdminWithRecoveryKey(enteredKey) {
+  const trimmed = (enteredKey || "").trim();
+  if (!trimmed) return { ok: false, reason: "empty" };
+  if (!auth.currentUser) return { ok: false, reason: "no-auth" };
+  try {
+    const hash = await sha256Hex(trimmed);
+    await db.collection("families").doc(getFamilyId()).update({
+      adminUids: firebase.firestore.FieldValue.arrayUnion(auth.currentUser.uid),
+      recoveryHashAttempt: hash,
+      updatedAt: Date.now()
+    });
+    return { ok: true };
+  } catch (err) {
+    // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক,
+    // ব্যবহারকারীকে শুধু "ভুল key" বলা হবে(caller-এ)।
+    return { ok: false, reason: "denied", error: err.message };
   }
 }
 // =====================================================================
@@ -1610,6 +1683,39 @@ async function backfillLastActiveAt(familyId, confirm) {
 }
 if (typeof window !== "undefined") {
   window.backfillLastActiveAt = backfillLastActiveAt;
+}
+// §First Admin Protection — বিদ্যমান family(এই feature deploy হওয়ার আগে
+// claim হয়ে যাওয়া)-তে firstAdminUid field নেই। এই console-only, owner-manual
+// ফাংশন একবার চালিয়ে সঠিক uid সেট করে দিতে হবে(কোন uid firstAdmin তা owner
+// নিজেই জানেন — grandfather migration-এ যিনি প্রথম admin হয়েছিলেন)। ইতিমধ্যে
+// firstAdminUid সেট থাকলে overwrite করবে না(নিরাপত্তা — ভুলবশত দ্বিতীয়বার
+// চালালেও কোনো ক্ষতি নেই)।
+async function backfillFirstAdminUid(familyId, uid, confirm) {
+  const ref = db.collection("families").doc(familyId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    console.log(`[FirstAdmin backfill] familyId=${familyId} পাওয়া যায়নি।`);
+    return { ok: false, reason: "not-found" };
+  }
+  const fam = snap.data();
+  if (fam.firstAdminUid) {
+    console.log(`[FirstAdmin backfill] familyId=${familyId}-এ firstAdminUid ইতিমধ্যে সেট(${fam.firstAdminUid}) — কিছু করা হয়নি।`);
+    return { ok: false, reason: "already-set", current: fam.firstAdminUid };
+  }
+  if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
+    console.log(`[FirstAdmin backfill] uid=${uid} এই family-র adminUids-এ নেই — বাতিল করা হলো।`);
+    return { ok: false, reason: "uid-not-admin" };
+  }
+  if (!confirm) {
+    console.log(`[FirstAdmin backfill] dry-run — familyId=${familyId}-এ firstAdminUid=${uid} সেট হবে। আসল লেখা চালাতে backfillFirstAdminUid(familyId, uid, true) কল করুন।`);
+    return { ok: true, dryRun: true };
+  }
+  await ref.update({ firstAdminUid: uid, updatedAt: Date.now() });
+  console.log(`[FirstAdmin backfill] সম্পন্ন — familyId=${familyId}, firstAdminUid=${uid}।`);
+  return { ok: true, dryRun: false };
+}
+if (typeof window !== "undefined") {
+  window.backfillFirstAdminUid = backfillFirstAdminUid;
 }
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
@@ -4153,6 +4259,21 @@ function App() {
   // fetch থেকে সেট, কোনো extra read না)। badge/Make-Admin/Remove-Admin
   // বাটন দেখানোর জন্য প্রয়োজন।
   const [adminUidsList, setAdminUidsList] = useState([]);
+  // §First Admin Protection — বর্তমান family-র firstAdminUid(একই boot
+  // fetch থেকে সেট, extra read নেই)। null/undefined মানে পুরনো family
+  // যেখানে backfill হয়নি — সেক্ষেত্রে protection স্বয়ংক্রিয়ভাবে বাইপাস হয়।
+  const [firstAdminUid, setFirstAdminUid] = useState(null);
+  // §Notification System — unread notifications(boot-এ onSnapshot দিয়ে
+  // live-updated) ও panel খোলা আছে কিনা।
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  // §Recovery Key — first-admin claim-এর ঠিক পরে key দেখানোর modal, ও
+  // Recovery-দিয়ে-admin-দাবি করার UI toggle।
+  const [showRecoveryKeyModal, setShowRecoveryKeyModal] = useState(false);
+  const [generatedRecoveryKey, setGeneratedRecoveryKey] = useState(null);
+  const [showRecoveryClaim, setShowRecoveryClaim] = useState(false);
+  const [recoveryKeyInput, setRecoveryKeyInput] = useState("");
+  const [recoveryClaimBusy, setRecoveryClaimBusy] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   // pending = নিজের accessRequest এখনো admin-approval-এর অপেক্ষায়;
   // null = জানা যায়নি বা প্রযোজ্য না (admin/approved/legacy path)।
@@ -4292,6 +4413,7 @@ function App() {
   }
   useEffect(() => {
     let migrationUnsub = null;
+    let notifUnsub = null;
     (async () => {
       // Google sign-in বা family code — যেটাই আগে পাওয়া যায়, সেই অনুযায়ী
       // একই family/profile/records auto-load হওয়া নিশ্চিত করতে, member
@@ -4326,7 +4448,20 @@ function App() {
       // হলো — বিদ্যমান শেয়ার্ড family-তে (adminUids ইতিমধ্যে অ-খালি)
       // কোনো প্রভাব নেই (ফাংশন internally no-op করে), Rules-এর
       // "প্রথম-আসা" নিয়ম অপরিবর্তিত।
-      await claimFirstAdminIfEligible();
+      const justClaimedFirstAdmin = await claimFirstAdminIfEligible();
+      if (justClaimedFirstAdmin) {
+        // §Recovery Key — এই ডিভাইসই সদ্য প্রথম Admin হলো; key generate+hash
+        // করে hidden doc-এ সেভ করা হচ্ছে, plaintext শুধু modal-এ একবার
+        // দেখানোর জন্য state-এ রাখা হচ্ছে(best-effort — ব্যর্থ হলেও admin
+        // claim নিজে আগেই সফল হয়ে গেছে, পরে profile dropdown থেকে আলাদা
+        // ব্যবস্থা লাগবে না কারণ প্রথম claim একবারই হয়)।
+        setupRecoveryKeyForCurrentAdmin().then(key => {
+          if (key) {
+            setGeneratedRecoveryKey(key);
+            setShowRecoveryKeyModal(true);
+          }
+        });
+      }
       // Legacy read-rule gate prep — non-blocking, best-effort; dataCollectionName
       // cache পূরণ হওয়ার পরই কল করা হচ্ছে (getCollectionName()-এর সঠিক মান
       // দরকার), কিন্তু boot এর জন্য অপেক্ষা করে না।
@@ -4385,6 +4520,24 @@ function App() {
         const myUid = auth.currentUser ? auth.currentUser.uid : null;
         setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
         setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
+        // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
+        setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
+        // §Notification System — শুধু নিজের unread notification-এ live
+        // listener(count/badge-এর জন্য যথেষ্ট; panel খোলার সময় আলাদা করে
+        // full/read-সহ list fetch হবে)। Spark-এ negligible cost(৩-member
+        // স্কেলে খুবই কম doc)।
+        if (myUid) {
+          notifUnsub = db.collection("families").doc(migrationFamilyId)
+            .collection("notifications")
+            .where("targetUid", "==", myUid)
+            .where("read", "==", false)
+            .onSnapshot(
+              (nsnap) => {
+                setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
+              },
+              () => {}
+            );
+        }
       } catch {}
       let m;
       try {
@@ -4457,6 +4610,7 @@ function App() {
     })();
     return () => {
       if (migrationUnsub) migrationUnsub();
+      if (notifUnsub) notifUnsub();
     };
   }, []);
   const [recoveryMessage, setRecoveryMessage] = useState(false);
@@ -5281,6 +5435,18 @@ function App() {
         updatedAt: Date.now()
       });
       setAdminUidsList(prev => prev.includes(m.ownerUid) ? prev : [...prev, m.ownerUid]);
+      // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
+      // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
+      try {
+        await db.collection("families").doc(getFamilyId())
+          .collection("notifications").add({
+            targetUid: m.ownerUid,
+            type: "admin_assigned",
+            message: "আপনাকে এই পরিবারের এডমিন করা হয়েছে।",
+            createdAt: Date.now(),
+            read: false
+          });
+      } catch {}
     } catch (err) {
       alert("এডমিন করতে সমস্যা হয়েছে: " + err.message);
     }
@@ -5292,6 +5458,14 @@ function App() {
     if (!m.ownerUid) return;
     if (adminUidsList.length <= 1) {
       alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
+      return;
+    }
+    // §First Admin Protection — client-side pre-check(UX-এর জন্য, আসল
+    // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
+    // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (firstAdminUid && m.ownerUid === firstAdminUid && myUid !== firstAdminUid) {
+      alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
       return;
     }
     if (isLockedForSwitch) {
@@ -5925,7 +6099,10 @@ function App() {
   }), " সংরক্ষিত"), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
     title: "এডমিন"
-  }, "এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+  }, "এডমিন"), m.ownerUid && firstAdminUid && m.ownerUid === firstAdminUid && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
+    title: "প্রথম এডমিন — শুধু ইনিই নিজে পদ ছাড়তে পারেন"
+  }, "প্রথম এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
@@ -6160,8 +6337,50 @@ function App() {
       type: "button",
       onClick: () => handleSelfDemote(),
       className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
-    }, "নিজের এডমিন পদ ছাড়ুন")));
+    }, "নিজের এডমিন পদ ছাড়ুন")), !amAdmin && /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        setShowProfileDropdown(false);
+        setShowRecoveryClaim(true);
+      },
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-700 text-xs font-semibold"
+    }, "Recovery Key দিয়ে Admin ফিরে পান")));
   })()))), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setShowNotifPanel(v => !v);
+    },
+    className: "relative p-1.5 rounded-xl bg-white/10 border border-white/10 text-white active:scale-95 transition-transform",
+    title: "নোটিফিকেশন"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm leading-none"
+  }, "🔔"), notifications.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
+  }, toBn(notifications.length))), showNotifPanel && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-40",
+    onClick: () => setShowNotifPanel(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs max-h-72 overflow-y-auto"
+  }, notifications.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-3 text-slate-400 text-center"
+  }, "কোনো নতুন নোটিফিকেশন নেই") : notifications.map(n => /*#__PURE__*/React.createElement("div", {
+    key: n.id,
+    onClick: () => {
+      db.collection("families").doc(getFamilyId())
+        .collection("notifications").doc(n.id)
+        .update({ read: true }).catch(() => {});
+    },
+    className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-semibold text-slate-700"
+  }, n.message), n.createdAt && /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400 mt-0.5"
+  }, new Date(n.createdAt).toLocaleString("bn-BD"))))))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl shrink-0 border border-white/10"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm"
@@ -6912,8 +7131,80 @@ function App() {
     className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
   }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
-  }), showBackupOptionsModal && /*#__PURE__*/React.createElement("div", {
+    onLinked: checkDriveBackupAfterLink,
+    onFirstAdminClaimed: () => {
+      setupRecoveryKeyForCurrentAdmin().then(key => {
+        if (key) {
+          setGeneratedRecoveryKey(key);
+          setShowRecoveryKeyModal(true);
+        }
+      });
+    }
+  }), showRecoveryKeyModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "আপনার Recovery Key"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "আপনি এই পরিবারের প্রথম এডমিন। Admin প্রবেশাধিকার হারালে(নতুন ডিভাইস, cache clear ইত্যাদি) এই key দিয়েই ফিরে পাবেন। এখনই স্ক্রিনশট নিন বা নিরাপদ জায়গায় লিখে রাখুন — এটি আর কখনো দেখানো হবে না।"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-center mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-bold text-emerald-900 tracking-wider select-all"
+  }, generatedRecoveryKey)), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mb-3"
+  }, "মনে রাখবেন: এটি শুধু আপনার Admin পরিচয় ফিরে পাওয়ার চাবি — এটি দিয়ে হারানো ডাটা ফিরে পাওয়া যাবে না।"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowRecoveryKeyModal(false);
+      setGeneratedRecoveryKey(null);
+    },
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
+  }, "সংরক্ষণ করেছি, বন্ধ করুন"))), showRecoveryClaim && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "Recovery Key দিয়ে Admin ফিরে পান"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "এই পরিবারের প্রথম এডমিন সেটআপের সময় যে Recovery Key সংরক্ষণ করা হয়েছিল, সেটি দিন।"), /*#__PURE__*/React.createElement("input", {
+    value: recoveryKeyInput,
+    onChange: e => setRecoveryKeyInput(e.target.value),
+    placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: recoveryClaimBusy || !recoveryKeyInput.trim(),
+    onClick: async () => {
+      setRecoveryClaimBusy(true);
+      try {
+        const res = await claimAdminWithRecoveryKey(recoveryKeyInput);
+        if (res.ok) {
+          const myUid = auth.currentUser ? auth.currentUser.uid : null;
+          setIsAdmin(true);
+          setAdminUidsList(prev => myUid && !prev.includes(myUid) ? [...prev, myUid] : prev);
+          setShowRecoveryClaim(false);
+          setRecoveryKeyInput("");
+          alert("Admin প্রবেশাধিকার ফিরে পেয়েছেন।");
+        } else {
+          alert("Recovery Key মেলেনি — আবার চেষ্টা করুন।");
+        }
+      } finally {
+        setRecoveryClaimBusy(false);
+      }
+    },
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, recoveryClaimBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowRecoveryClaim(false);
+      setRecoveryKeyInput("");
+    },
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল")))), showBackupOptionsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -7432,7 +7723,8 @@ function signOutToFreshAnonymous() {
 }
 function GoogleAccountModal({
   onClose,
-  onLinked
+  onLinked,
+  onFirstAdminClaimed
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -7456,7 +7748,8 @@ function GoogleAccountModal({
       // case-এ (অন্য ডিভাইস থেকে আগে link করা account, ভিন্ন family)
       // ইচ্ছাকৃতভাবে claim করা হচ্ছে না — সেই family-এর Admin status
       // ইতিমধ্যে নির্ধারিত থাকার কথা, ভুলভাবে নতুন claim এড়াতে।
-      await claimFirstAdminIfEligible();
+      const justClaimed = await claimFirstAdminIfEligible();
+      if (justClaimed && onFirstAdminClaimed) onFirstAdminClaimed();
       onClose();
       // সাইন-ইন সফল — এই Google অ্যাকাউন্টে আগে থেকে কোনো Drive ব্যাকআপ
       // থাকলে detect করে Restore-এর Popup দেখানোর সুযোগ App-কে দেওয়া হচ্ছে।
