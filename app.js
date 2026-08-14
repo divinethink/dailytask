@@ -4520,11 +4520,21 @@ function App() {
             }
           } catch {}
         },
-        () => {
+        (err) => {
           // Fail-closed: listener error হলে migrationState ইচ্ছাকৃতভাবে
           // অপরিবর্তিত (undefined-ই) রাখা হচ্ছে — কোনো "legacy" fallback
           // বা কোনো SDK auto-retry আচরণের ওপর নির্ভরতা নেই। App
           // loading-gate-এ থেকে যাবে যতক্ষণ না একটি সফল snapshot আসে।
+          // Diagnostic(১৫ আগস্ট ২০২৬, Item ৩১): root cause pin করার জন্য
+          // সাময়িক console.error — permission-denied হলে ঠিক কোন
+          // familyId/uid-এ deny হচ্ছে তা দেখা যাবে।
+          console.error(
+            "[migrationState listener error]",
+            err && err.code,
+            err && err.message,
+            "familyId:", migrationFamilyId,
+            "uid:", auth.currentUser ? auth.currentUser.uid : null
+          );
         }
       );
       // loadMembersV2() fix: migrateMembersIfNeeded()-কে সঠিক migrationState
@@ -4581,7 +4591,12 @@ function App() {
                 .collection("accessRequests").doc(myUid);
               const reqSnap = await reqRef.get();
               if (!reqSnap.exists) {
-                await reqRef.set({ status: "pending", requestedAt: Date.now() });
+                // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved):
+                // নতুন access-request এখন সরাসরি "approved"-এ create হয়
+                // (আগে "pending" থাকত, admin approve করা লাগত)। Rules-এ
+                // self-create-এ approved status-ও allow করা হয়েছে।
+                // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
+                await reqRef.set({ status: "approved", requestedAt: Date.now() });
               }
             }
           } catch {}
@@ -7846,6 +7861,30 @@ function GoogleAccountModal({
             type: "error",
             text: "সাইন ইন করতে সমস্যা হয়েছে: " + (signInErr && (signInErr.message || signInErr.code))
           });
+        }
+      } else if (err && err.code === "auth/email-already-in-use") {
+        // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি সেশনের সাথে লিংক করা
+        // আছে, কিন্তু এক্ষেত্রে Firebase err.credential দেয় না (তাই উপরের
+        // credential-already-in-use path কাজ করে না)। রিকভারি হিসেবে
+        // সরাসরি signInWithPopup দিয়ে (link না করে) সেই পুরনো Google-লিংকড
+        // অ্যাকাউন্টে fresh sign-in করানো হচ্ছে।
+        try {
+          await auth.signInWithPopup(googleProvider);
+          try {
+            localStorage.setItem("dt_check_drive_after_reload", "1");
+          } catch {}
+          onClose();
+          window.location.reload();
+          return;
+        } catch (signInErr) {
+          if (signInErr && signInErr.code === "auth/popup-closed-by-user") {
+            // ব্যবহারকারী নিজেই পপআপ বন্ধ করেছেন — বার্তা দরকার নেই
+          } else {
+            setNotice({
+              type: "error",
+              text: "সাইন ইন করতে সমস্যা হয়েছে: " + (signInErr && (signInErr.message || signInErr.code))
+            });
+          }
         }
       } else {
         setNotice({
