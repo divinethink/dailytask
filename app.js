@@ -63,6 +63,57 @@ function generateSecureCode(length) {
   }
   return out;
 }
+// --- App creator-only client-side helper (Rules-এর isAppCreator()-এর সাথে
+// সামঞ্জস্যপূর্ণ একই UID) — শুধু convenience check, কোনো নিজস্ব
+// security boundary না (আসল নিরাপত্তা সবসময় Firestore Rules-এই enforced)।
+const APP_CREATOR_UID = "yiirNJKJHlM27guiiS10zsp2FYT2";
+function isCreatorAuth() {
+  return !!(auth.currentUser && auth.currentUser.uid === APP_CREATOR_UID);
+}
+// --- Creator family override (শুধু browser console, শুধু creator UID) ---
+// উদ্দেশ্য: creator-এর Google account অন্য family-র সাথে link করা থাকলেও
+// (users/{uid}.familyCode), boot-এ syncFamilyCodeWithAccount() যেন এই
+// ম্যানুয়ালি বেছে নেওয়া family-কে account-linked কোডে ফিরিয়ে না দেয়।
+// শুধু read/verify-এর জন্য — write permission পেতে হলে সেই family-র
+// adminUids-এ owner Firebase Console থেকে সাময়িকভাবে uid যোগ করতে হবে
+// (এই ফাংশন সেটা করে না)।
+const CREATOR_OVERRIDE_KEY = "dt_creator_family_override";
+async function enterFamilyAsCreator(code) {
+  if (!isCreatorAuth()) {
+    console.error("[Creator override] শুধু app creator-এর জন্য।");
+    return { aborted: true, reason: "not-creator" };
+  }
+  const normalized = (code || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  try {
+    const snap = await db.collection("familyCodes").doc(normalized).get();
+    if (!snap.exists) {
+      console.error("[Creator override] এই কোডের কোনো family পাওয়া যায়নি।");
+      return { aborted: true, reason: "not-found" };
+    }
+    const targetFamilyId = snap.data() ? snap.data().familyId : null;
+    if (!targetFamilyId) return { aborted: true, reason: "not-found" };
+    console.log(`[Creator override] সুইচ হচ্ছে — কোড: ${normalized}, familyId: ${targetFamilyId}। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_id", targetFamilyId);
+    localStorage.setItem(CREATOR_OVERRIDE_KEY, normalized);
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Creator override] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+function exitCreatorOverride() {
+  localStorage.removeItem(CREATOR_OVERRIDE_KEY);
+  localStorage.removeItem("family_code");
+  localStorage.removeItem("family_id");
+  window.location.reload();
+}
+if (typeof window !== "undefined") {
+  window.enterFamilyAsCreator = enterFamilyAsCreator;
+  window.exitCreatorOverride = exitCreatorOverride;
+}
 function getFamilyCode() {
   let code = localStorage.getItem("family_code");
   if (!code) {
@@ -95,6 +146,202 @@ function setFamilyCode(code) {
   localStorage.setItem("family_code", normalized);
   localStorage.setItem("family_code_is_custom", "1");
   window.location.reload();
+}
+// =====================================================================
+// --- §৫ Family Code Lifecycle Fix: দুটি পৃথক, স্পষ্ট-সীমাবদ্ধ অপারেশন ---
+// =====================================================================
+// এই দুটি ফাংশন এখনো কোনো UI বাটনের সাথে যুক্ত নয় এবং boot flow-এ ডাকা
+// হয় না — শুধু browser console থেকে ম্যানুয়ালি (owner-approved টেস্টিং/
+// রোলআউটের জন্য প্রস্তুত রাখা হলো)। বিদ্যমান "কাস্টম ফ্যামিলি কোড সেট
+// করুন" মেনু বাটন এখনো পুরনো setFamilyCode()-ই ব্যবহার করছে — এই fix
+// UI-তে wire করা একটি আলাদা, পরবর্তী owner-approved ধাপ।
+//
+// changeFamilyCodeForExistingFamily(newCode): একই familyId, শুধু নতুন
+// familyCode — dataCollectionName (আসল ডাটা কালেকশনের নাম) কখনো ছোঁয়া
+// হয় না, তাই বিদ্যমান data_<oldCode> কালেকশনই (কোনো copy/rename/delete
+// ছাড়া) স্বাভাবিকভাবে ব্যবহৃত হতে থাকে — শুধু পরিবারের "পরিচিতি কোড"
+// বদলায়। Admin-only (adminUids-এ থাকা uid ছাড়া কেউ পারবে না — Rules-এও
+// server-side enforced)। transaction ব্যবহার করা হয়েছে যাতে
+// familyCode-update ও নতুন/পুরনো familyCodes mapping — সব atomic হয়।
+async function changeFamilyCodeForExistingFamily(newCode) {
+  const normalized = (newCode || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
+    console.error(`[Family Code change] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    return { aborted: true, reason: "length" };
+  }
+  if (!isFamilyCodeCharsetValid(normalized)) {
+    console.error("[Family Code change] অবৈধ ক্যারেক্টার।");
+    return { aborted: true, reason: "charset" };
+  }
+  const familyId = getFamilyId();
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  if (!uid) {
+    console.error("[Family Code change] সাইন ইন করা নেই।");
+    return { aborted: true, reason: "no-auth" };
+  }
+  try {
+    let oldCode = null;
+    await db.runTransaction(async tx => {
+      const familyRef = db.collection("families").doc(familyId);
+      const snap = await tx.get(familyRef);
+      if (!snap.exists) throw new Error("families ডকুমেন্ট পাওয়া যায়নি।");
+      const fam = snap.data();
+      if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
+        throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
+      }
+      oldCode = fam.familyCode || null;
+      const newCodeRef = db.collection("familyCodes").doc(normalized);
+      const newCodeSnap = await tx.get(newCodeRef);
+      if (newCodeSnap.exists && newCodeSnap.data().familyId !== familyId) {
+        throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
+      }
+      tx.set(newCodeRef, { familyId, createdAt: Date.now() });
+      tx.update(familyRef, { familyCode: normalized, updatedAt: Date.now() });
+      // পুরনো familyCodes/<oldCode> mapping delete করা হচ্ছে (owner
+      // নিশ্চিত করেছেন এই ছোট family-তে ডাটা-হারানোর ঝুঁকি নেই) —
+      // dataCollectionName অপরিবর্তিত থাকায় আসল ডাটা কোনোভাবেই touched
+      // হয় না, শুধু code→familyId lookup-এর পুরনো এন্ট্রি সরানো হচ্ছে।
+      if (oldCode && oldCode !== normalized) {
+        tx.delete(db.collection("familyCodes").doc(oldCode));
+      }
+    });
+    console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
+    // §৫ fix — Google-linked হলে account-এর সাথে সংরক্ষিত familyCode-ও
+    // (users/{uid}.familyCode) আপডেট করা হচ্ছে, নইলে পরের বুটে
+    // syncFamilyCodeWithAccount() পুরনো account-linked কোড দেখে এই
+    // device-কে আবার পুরনো কোডে ফিরিয়ে দিতে পারে (ও ensureFamilyCodeMapping()
+    // তখন পুরনো familyCodes/<oldCode> mapping ভুলবশত পুনরায় তৈরি করে
+    // ফেলবে)। Best-effort — ব্যর্থ হলেও rename নিজে সফলই থাকে।
+    if (isGoogleLinked()) {
+      try {
+        await saveUserFamilyCode(uid, normalized);
+      } catch {}
+    }
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_code_is_custom", "1");
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Family Code change] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.changeFamilyCodeForExistingFamily = changeFamilyCodeForExistingFamily;
+}
+// createNewFamily(newCode): সম্পূর্ণ নতুন familyId + familyCode +
+// dataCollectionName — stale localStorage.family_id কখনো reuse হয় না
+// (generateSecureCode(20) দিয়ে fresh id)। এটি একটি সম্পূর্ণ blank/নতুন
+// family তৈরি করে — বিদ্যমান কোনো family/data স্পর্শ করে না।
+async function createNewFamily(newCode) {
+  const normalized = (newCode || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
+    console.error(`[New Family] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    return { aborted: true, reason: "length" };
+  }
+  if (!isFamilyCodeCharsetValid(normalized)) {
+    console.error("[New Family] অবৈধ ক্যারেক্টার।");
+    return { aborted: true, reason: "charset" };
+  }
+  const newFamilyId = generateSecureCode(20);
+  try {
+    const codeRef = db.collection("familyCodes").doc(normalized);
+    const codeSnap = await codeRef.get();
+    if (codeSnap.exists) {
+      console.error("[New Family] এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে।");
+      return { aborted: true, reason: "code-taken" };
+    }
+    await codeRef.set({ familyId: newFamilyId, createdAt: Date.now() });
+    await db.collection("families").doc(newFamilyId).set({
+      familyId: newFamilyId,
+      familyCode: normalized,
+      isCustomCode: true,
+      dataCollectionName: `data_${normalized}`,
+      createdAt: Date.now(),
+      createdByUid: auth.currentUser ? auth.currentUser.uid : null,
+      schemaVersion: 1,
+      adminUids: []
+    });
+    // §৫ Flow A fix — creation-এর সময় Rules অনুযায়ী adminUids বাধ্যতামূলক
+    // [] থাকে (দেখুন firestore.rules create clause), তাই এখানে আলাদা
+    // update() call দিয়ে first admin claim করা হচ্ছে (Rules-এর update
+    // clause: adminUids.size()==0 → [request.auth.uid], শুধু
+    // adminUids+updatedAt diff) — reload-এর আগে, যাতে নতুন family
+    // admin-বিহীন অবস্থায় শুরু না হয়। Best-effort: ব্যর্থ হলেও পুরো
+    // family-creation abort হবে না (family তৈরি হয়ে গেছে), শুধু log হবে —
+    // পরে claimFirstAdminIfEligible() বা ম্যানুয়াল রিকভারি সম্ভব।
+    if (auth.currentUser) {
+      try {
+        await db.collection("families").doc(newFamilyId).update({
+          adminUids: [auth.currentUser.uid],
+          updatedAt: Date.now()
+        });
+      } catch (claimErr) {
+        console.error("[New Family] Admin claim ব্যর্থ (family তৈরি হয়েছে, কিন্তু admin claim হয়নি):", claimErr.message);
+      }
+    } else {
+      console.error("[New Family] auth.currentUser নেই — admin claim স্কিপ হলো।");
+    }
+    console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_id", newFamilyId);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_code_is_custom", "1");
+    window.location.reload();
+    return { success: true, familyId: newFamilyId };
+  } catch (err) {
+    console.error("[New Family] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.createNewFamily = createNewFamily;
+}
+// joinExistingFamily(code): বিদ্যমান কোনো family-তে "যোগ দেওয়া" — নতুন কোনো
+// family/data তৈরি হয় না। শুধু familyCodes/<code> lookup করে টার্গেট
+// familyId বের করা হয়, migrationState=="v2" কিনা যাচাই হয় (v2 ছাড়া blocked
+// — legacy read-gate এখনো implement হয়নি), তারপর এই ডিভাইসের localStorage
+// টার্গেট family-তে সুইচ করে reload হয়। এরপর বুট-টাইমের বিদ্যমান
+// accessDenied/self-request হ্যান্ডলিং (migrateMembersIfNeeded catch ব্লক)
+// নিজে থেকেই pending accessRequest তৈরি করবে অথবা আগে থেকে approved থাকলে
+// সরাসরি ঢুকিয়ে দেবে — এখানে নতুন করে সেই লজিক ডুপ্লিকেট করা হয়নি।
+async function joinExistingFamily(code) {
+  const normalized = (code || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized === getFamilyCode()) {
+    return { aborted: true, reason: "same-family" };
+  }
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    if (!codeSnap.exists) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
+    if (!targetFamilyId) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const famSnap = await db.collection("families").doc(targetFamilyId).get();
+    if (!famSnap.exists) {
+      return { aborted: true, reason: "not-found" };
+    }
+    const migrationState = famSnap.data().migrationState || "legacy";
+    if (migrationState !== "v2") {
+      return { aborted: true, reason: "not-v2" };
+    }
+    console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${targetFamilyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+    localStorage.setItem("family_id", targetFamilyId);
+    localStorage.setItem("family_code", normalized);
+    localStorage.removeItem("family_code_is_custom");
+    window.location.reload();
+    return { success: true };
+  } catch (err) {
+    console.error("[Join Family] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.joinExistingFamily = joinExistingFamily;
 }
 // =====================================================================
 // --- Phase A (Family ID Foundation) — শুধু প্রস্তুতি, কোনো read/write ---
@@ -154,10 +401,17 @@ async function ensureFamilyMeta() {
     const ref = familyDocRef();
     const snap = await ref.get();
     if (!snap.exists) {
+      // §৫ Family Code Lifecycle fix: dataCollectionName এখন থেকেই family
+      // তৈরির মুহূর্তে একবার স্থায়ীভাবে সেট হয় — এটাই সেই আসল Firestore
+      // কালেকশনের নাম যেখানে entries/members/weekly সবসময় থাকবে।
+      // familyCode ভবিষ্যতে যতবারই বদলাক (changeFamilyCodeForExistingFamily),
+      // dataCollectionName কখনো বদলাবে না — তাই আসল ডাটা কালেকশন কখনো
+      // "হারিয়ে যাবে না" বা code-change-এর সাথে ভেঙে পড়বে না।
       await ref.set({
         familyId: getFamilyId(),
         familyCode: getFamilyCode(),
         isCustomCode: localStorage.getItem("family_code_is_custom") === "1",
+        dataCollectionName: `data_${getFamilyCode()}`,
         createdAt: Date.now(),
         createdByUid: auth.currentUser ? auth.currentUser.uid : null,
         schemaVersion: 1,
@@ -168,24 +422,154 @@ async function ensureFamilyMeta() {
     // Best-effort — future-migration prep।
   }
 }
-// প্রথম Admin claim — ডিজাইন অনুযায়ী শুধু দুটি ট্রিগারে ডাকা হবে:
-// (১) কেউ custom Family Code সেট করলে, (২) কেউ Google Sign-in link করলে।
-// এই দুটির মধ্যে যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
+// §৫ fix: বিদ্যমান (এই fix-এর আগে তৈরি হওয়া) family-দের dataCollectionName
+// field নেই — এই ফাংশন সেটা একবারই, নিরাপদে ব্যাকফিল করে। derived মান
+// সবসময় বর্তমান familyCode থেকেই বের করা হয় (getCollectionName() আগে
+// প্রতিটি কলে ঠিক এই একই মান লাইভ গণনা করত) — তাই কোনো ডাটা move/copy/
+// rename হয় না, শুধু এই নতুন metadata field একবার persist হয়। ব্যর্থ হলেও
+// (network/rules-not-yet-deployed) local cache-এ derived মান বসিয়ে app
+// আগের মতোই কাজ করে — পরের সফল বুটে আবার ব্যাকফিল চেষ্টা হবে (idempotent)।
+let cachedDataCollectionName = null;
+async function ensureDataCollectionName() {
+  try {
+    const ref = familyDocRef();
+    const snap = await ref.get();
+    const existing = snap.exists ? snap.data().dataCollectionName : null;
+    if (existing) {
+      cachedDataCollectionName = existing;
+      return;
+    }
+    const derived = `data_${getFamilyCode()}`;
+    if (snap.exists) {
+      try {
+        await ref.update({ dataCollectionName: derived, updatedAt: Date.now() });
+      } catch {
+        // Best-effort ব্যাকফিল — persist ব্যর্থ হলেও নিচের cache assignment
+        // দিয়ে app চলতি সেশনে ঠিকভাবেই কাজ করবে।
+      }
+    }
+    cachedDataCollectionName = derived;
+  } catch {
+    cachedDataCollectionName = null; // getCollectionName() নিচে নিরাপদ fallback করবে
+  }
+}
+// legacyCollectionMap backfill — আগে এই mapping শুধু Phase C copy script
+// (copyPhaseCData()) চালানোর সময় তৈরি হতো, তাই এখনো legacy-তে থাকা
+// family-দের (যেমন বোনের family) জন্য এই doc নেই। Legacy read-rule gate
+// (isApprovedMember() ভিত্তিক) deploy করার আগে এই mapping সব family-র জন্য
+// থাকা বাধ্যতামূলক — নাহলে rule deploy-এর সাথে সাথেই এখনো-legacy family-রা
+// lock out হয়ে যাবে। ensureFamilyCodeMapping()-এর মতোই setOnce (আগে থেকে
+// থাকলে ছোঁয়া হয় না), best-effort — ব্যর্থ হলেও app boot আটকাবে না, শুধু
+// পরের বুটে আবার চেষ্টা হবে। বিদ্যমান rule-ই এই create allow করে (কোনো
+// rule change ছাড়াই কাজ করে)।
+async function ensureLegacyCollectionMap() {
+  try {
+    const collectionName = getCollectionName();
+    if (!collectionName) return;
+    const mapRef = db.collection("legacyCollectionMap").doc(collectionName);
+    const snap = await mapRef.get();
+    if (!snap.exists) {
+      await mapRef.set({ familyId: getFamilyId(), createdAt: Date.now() });
+    }
+  } catch {
+    // Best-effort — legacy read-rule gate deploy-এর আগে backfill নিশ্চিত
+    // করতে সাহায্য করা এর উদ্দেশ্য, কিন্তু ব্যর্থ হলে app boot কখনো এর
+    // জন্য আটকাবে না; পরের বুটে আবার চেষ্টা হবে।
+  }
+}
+// প্রথম Admin claim — ডিজাইন অনুযায়ী তিনটি ট্রিগারে ডাকা হয়:
+// (১) কেউ custom Family Code সেট করলে, (২) কেউ Google Sign-in link করলে,
+// (৩) প্রতিটি app boot-এ (Legacy read-rule gate fix, নতুন) — যাতে
+// ব্র্যান্ড-নতুন/একা (adminUids:[]) family নিজের data পড়তে trigger #১/#২-এর
+// অপেক্ষা না করে। যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
 // "প্রথম-আসা" নিয়মটি Firestore Rules-এ server-side enforced (adminUids
 // ফাঁকা থাকলেই কেবল লেখা গৃহীত হয়), শুধু client-side check নয়।
 async function claimFirstAdminIfEligible() {
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) return false;
   try {
     await ensureFamilyMeta();
     const ref = familyDocRef();
     const snap = await ref.get();
     const current = snap.exists ? snap.data().adminUids || [] : [];
     if (current.length === 0) {
-      await ref.update({ adminUids: [auth.currentUser.uid], updatedAt: Date.now() });
+      // §First Admin Protection — firstAdminUid একই write-এ, একবারই সেট
+      // (Rules-এ enforced — এই clause claim-মুহূর্তে ছাড়া আর কখনো fire
+      // করে না)।
+      await ref.update({
+        adminUids: [auth.currentUser.uid],
+        firstAdminUid: auth.currentUser.uid,
+        updatedAt: Date.now()
+      });
+      return true; // এই ডিভাইস/কলই সদ্য প্রথম Admin হলো — caller Recovery
+      // Key setup modal দেখাতে পারে।
     }
   } catch {
     // Best-effort — Admin claim ব্যর্থ হলেও মূল ফিচার (Family Code set /
     // Google link) কখনো ব্লক হবে না; পরের trigger-এ আবার চেষ্টা হবে।
+  }
+  return false;
+}
+// =====================================================================
+// --- §Recovery Key(First Admin) — Spark-compatible, plaintext কখনো
+// Firestore-এ যায় না ---
+// =====================================================================
+// SHA-256 hex hash(browser-native SubtleCrypto — কোনো library লাগে না)।
+async function sha256Hex(text) {
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+// ≥20-char high-entropy key, সহজে পড়া/টাইপ করা যায় এমন charset(বিভ্রান্তিকর
+// 0/O, 1/I/l বাদ দেওয়া হয়েছে)। crypto.getRandomValues — cryptographically
+// secure, Math.random() নয়।
+function generateRecoveryKey() {
+  const charset = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  let key = "";
+  for (let i = 0; i < bytes.length; i++) {
+    key += charset[bytes[i] % charset.length];
+    if (i % 4 === 3 && i !== bytes.length - 1) key += "-";
+  }
+  return key; // ২৪ ক্যারেক্টার + ৫টি ড্যাশ = মোট ২৪-char entropy(≥20 নিয়ম পূরণ)
+}
+// প্রথম Admin claim-এর ঠিক পরে ডাকা হয়(app.js boot flow) — key generate করে
+// শুধু hash-টা hidden private/recovery doc-এ লেখে(Rules: create-once,
+// read:false)। plaintext key শুধু caller-কে return হয়, কখনো persist হয় না।
+async function setupRecoveryKeyForCurrentAdmin() {
+  const key = generateRecoveryKey();
+  const hash = await sha256Hex(key);
+  try {
+    // .set() নন-merge — doc আগে থেকে থাকলে Rules(create-only, update:false)
+    // reject করবে, তাই এটি কার্যকরভাবে create-once।
+    await db.collection("families").doc(getFamilyId())
+      .collection("private").doc("recovery")
+      .set({ hash, createdAt: Date.now() });
+    return key;
+  } catch (err) {
+    console.error("[Recovery Key] সেট করতে ব্যর্থ:", err.message);
+    return null;
+  }
+}
+// Recovery Key দিয়ে admin claim — client নিজে key hash করে পাঠায়(plaintext
+// কখনো network-এ যায় না); Rules hidden hash-এর সাথে মিলিয়ে adminUids-এ
+// self-add অনুমোদন করে।
+async function claimAdminWithRecoveryKey(enteredKey) {
+  const trimmed = (enteredKey || "").trim();
+  if (!trimmed) return { ok: false, reason: "empty" };
+  if (!auth.currentUser) return { ok: false, reason: "no-auth" };
+  try {
+    const hash = await sha256Hex(trimmed);
+    await db.collection("families").doc(getFamilyId()).update({
+      adminUids: firebase.firestore.FieldValue.arrayUnion(auth.currentUser.uid),
+      recoveryHashAttempt: hash,
+      updatedAt: Date.now()
+    });
+    return { ok: true };
+  } catch (err) {
+    // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক,
+    // ব্যবহারকারীকে শুধু "ভুল key" বলা হবে(caller-এ)।
+    return { ok: false, reason: "denied", error: err.message };
   }
 }
 // =====================================================================
@@ -500,6 +884,839 @@ async function verifyPhaseCData() {
 if (typeof window !== "undefined") {
   window.verifyPhaseCData = verifyPhaseCData;
 }
+// =====================================================================
+// --- Phase C Switch: Reverse-sync ধাপ (v2 → legacy, Flip-পরবর্তী rollback
+// prep) — শুধু browser console থেকে ম্যানুয়ালি (`reverseSyncPhaseCData()`)।
+// =====================================================================
+// উদ্দেশ্য: Switch-এর Flip ধাপের পর যদি rollback প্রয়োজন হয়, তাহলে
+// migrationState "legacy"-তে ফিরিয়ে দেওয়ার *আগে* এই ফাংশন v2-তে ঘটে
+// যাওয়া সব পরিবর্তন (নতুন/আপডেট হওয়া entries-weekly, নতুন/আপডেট/ডিলিট
+// হওয়া members) legacy collection-এ প্রতিফলিত করে — যাতে rollback-এর পর
+// app legacy পড়া শুরু করলে কোনো ডাটা "হারিয়ে যাওয়া" মনে না হয়।
+//
+// এই ফাংশন কখনো v2 ডাটা touch করে না (শুধু read) — শুধু legacy collection-এ
+// write করে। data_<familyCode> ছাড়া অন্য কোনো কিছু পরিবর্তিত হয় না।
+//
+// Flip-timestamp source: families/<familyId>.updatedAt নিজেই ব্যবহার করা
+// হচ্ছে — কারণ migrationState পরিবর্তনের rule (firestore.rules-এ) বাধ্য
+// করে যে সেই update-এ updatedAt-ও একসাথে সেট হতে হবে (diff().affectedKeys()
+// hasOnly(['migrationState','updatedAt']))। তাই families doc-এর updatedAt-ই
+// নির্ভরযোগ্য "কবে Flip হয়েছিল" রেফারেন্স — আলাদা কোনো ম্যানুয়াল timestamp
+// input লাগে না।
+//
+// entries/weekly: delete function নেই (শুধু create/update path আছে,
+// deleteMemberDoc()-এর মতো কিছু নেই) — তাই এখানে শুধু updatedAt > flip
+// timestamp হলে candidate, timestamp-diff-ই যথেষ্ট।
+//
+// members: deleteMemberDoc() hard-delete করে, কোনো tombstone/updatedAt
+// marker রাখে না — তাই শুধু timestamp-diff দিয়ে deletion ধরা সম্ভব না।
+// এর বদলে members-এর জন্য সম্পূর্ণ id-set compare করা হয়: v2-তে নেই কিন্তু
+// legacy-তে আছে এমন member = Flip-পরবর্তী v2-তে deleted, তাই legacy থেকেও
+// delete করা হয়।
+//
+// Idempotent: বারবার চালানো নিরাপদ — প্রতিটি write conflict-resolution
+// করে (existing legacy updatedAt vs incoming v2 updatedAt, নতুনটাই থাকে,
+// কখনো পুরনো দিয়ে নতুন ডাটা ওভাররাইট হয় না), এবং delete শুধু তখনই হয়
+// যখন v2-তে সেই member সত্যিই অনুপস্থিত (state পুনরায় গণনা হয় প্রতি রান-এ,
+// আগের রান-এর ওপর নির্ভর করে না)।
+async function reverseSyncPhaseCData() {
+  console.log("[Reverse-sync] শুরু হচ্ছে — প্রথমে guard যাচাই (server-verified familyId)...");
+  const code = getFamilyCode();
+  const localId = getFamilyId();
+  let serverId = null;
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(code).get();
+    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+  } catch (err) {
+    console.error("[Reverse-sync] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। কোনো write হয়নি।", err);
+    return { aborted: true, reason: "lookup-failed" };
+  }
+  if (!serverId) {
+    console.error("[Reverse-sync] Guard ব্যর্থ — familyCodes/<code> ডকুমেন্ট পাওয়া যায়নি। কোনো write হয়নি।");
+    return { aborted: true, reason: "no-mapping" };
+  }
+  if (serverId !== localId) {
+    console.error(`[Reverse-sync] Guard ব্যর্থ — local familyId (${localId}) ও server-verified familyId (${serverId}) ভিন্ন। কোনো write হয়নি।`);
+    return { aborted: true, reason: "mismatch", localId, serverId };
+  }
+  console.log("[Reverse-sync] Guard পাস — server-verified familyId:", serverId);
+
+  const familyRef = db.collection("families").doc(serverId);
+  const familySnap = await familyRef.get();
+  if (!familySnap.exists) {
+    console.error("[Reverse-sync] families ডকুমেন্ট পাওয়া যায়নি। থামানো হলো।");
+    return { aborted: true, reason: "no-family-doc" };
+  }
+  const famData = familySnap.data();
+  if (famData.migrationState !== "locked") {
+    console.error(`[Reverse-sync] নিরাপত্তা-চেক ব্যর্থ — migrationState বর্তমানে "${famData.migrationState}", কিন্তু reverse-sync শুধুমাত্র "locked" state-এ চালানো নিরাপদ (v2-তে নতুন write বন্ধ থাকা অবস্থায়)। আগে migrationState "locked" করুন, তারপর আবার চেষ্টা করুন।`);
+    return { aborted: true, reason: "not-locked", currentState: famData.migrationState };
+  }
+  const flipTimestamp = famData.updatedAt || 0;
+  console.log("[Reverse-sync] flip-timestamp (families.updatedAt):", flipTimestamp, new Date(flipTimestamp).toISOString());
+
+  const familyRoot = db.collection("families").doc(serverId);
+  const CHUNK_SIZE = 450;
+  async function writeChunked(items) {
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const batch = db.batch();
+      items.slice(i, i + CHUNK_SIZE).forEach(({ ref, data, del }) => {
+        if (del) batch.delete(ref);
+        else batch.set(ref, data, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
+
+  const legacyColRef = db.collection(getCollectionName());
+
+  // --- entries/weekly: timestamp-diff (delete function নেই, শুধু candidate নির্বাচন) ---
+  async function reverseSyncTimestampScoped(subcollection, legacyPrefix, splitFn) {
+    const [v2Snap, legacySnap] = await Promise.all([
+      familyRoot.collection(subcollection).get(),
+      legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", legacyPrefix)
+        .where(firebase.firestore.FieldPath.documentId(), "<", legacyPrefix + "\uf8ff").get()
+    ]);
+    const existingLegacy = {};
+    legacySnap.docs.forEach(d => { existingLegacy[d.id] = d.data(); });
+
+    const writes = [];
+    let candidates = 0, written = 0, skippedOlder = 0;
+    v2Snap.docs.forEach(doc => {
+      const data = doc.data();
+      const updatedAt = data.updatedAt || 0;
+      if (updatedAt <= flipTimestamp) return; // Flip-এর আগেই কপি হয়ে গেছে, touch করার দরকার নেই
+      candidates += 1;
+      const legacyId = splitFn(doc.id);
+      const existing = existingLegacy[legacyId];
+      const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
+      if (existing && existingUpdatedAt >= updatedAt) { skippedOlder += 1; return; }
+      writes.push({ ref: legacyColRef.doc(legacyId), data });
+      written += 1;
+    });
+    await writeChunked(writes);
+    return { candidates, written, skippedOlder };
+  }
+
+  const entryResult = await reverseSyncTimestampScoped("entries", `entry:`, id => {
+    // v2 id: "<memberId>_<date>" → legacy id: "entry:<memberId>:<date>"
+    const idx = id.indexOf("_");
+    return `entry:${id.slice(0, idx)}:${id.slice(idx + 1)}`;
+  });
+  const weeklyResult = await reverseSyncTimestampScoped("weekly", `weekly:`, id => {
+    const idx = id.indexOf("_");
+    return `weekly:${id.slice(0, idx)}:${id.slice(idx + 1)}`;
+  });
+
+  // --- members: সম্পূর্ণ id-set compare (delete detection-এর জন্য আবশ্যক) ---
+  const [v2MembersSnap, legacyMembersSnap] = await Promise.all([
+    familyRoot.collection("members").get(),
+    legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+      .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get()
+  ]);
+  const v2Members = {};
+  v2MembersSnap.docs.forEach(d => { v2Members[d.id] = d.data(); });
+  const legacyMembers = {};
+  legacyMembersSnap.docs.forEach(d => { legacyMembers[d.id.slice("member:".length)] = d.data(); });
+
+  const memberWrites = [];
+  let memberUpdated = 0, memberSkippedOlder = 0, memberDeleted = 0;
+  Object.keys(v2Members).forEach(id => {
+    const data = v2Members[id];
+    const updatedAt = data.updatedAt || 0;
+    if (updatedAt <= flipTimestamp) return;
+    const legacyId = `member:${id}`;
+    const existing = legacyMembers[id];
+    const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
+    if (existing && existingUpdatedAt >= updatedAt) { memberSkippedOlder += 1; return; }
+    memberWrites.push({ ref: legacyColRef.doc(legacyId), data });
+    memberUpdated += 1;
+  });
+  Object.keys(legacyMembers).forEach(id => {
+    if (!(id in v2Members)) {
+      // v2-তে নেই কিন্তু legacy-তে আছে — Flip-পরবর্তী v2-deletion, legacy থেকেও সরাতে হবে
+      memberWrites.push({ ref: legacyColRef.doc(`member:${id}`), del: true });
+      memberDeleted += 1;
+    }
+  });
+  await writeChunked(memberWrites);
+
+  const report = {
+    familyId: serverId,
+    flipTimestamp,
+    entries: entryResult,
+    weekly: weeklyResult,
+    members: { updated: memberUpdated, deleted: memberDeleted, skippedOlder: memberSkippedOlder }
+  };
+  console.log("[Reverse-sync] সম্পন্ন — v2 ডাটা অস্পৃশ্য, শুধু legacy collection-এ প্রয়োজনীয় write/delete হয়েছে। রিপোর্ট:");
+  console.table({
+    "entries — candidate (post-flip)": report.entries.candidates,
+    "entries — লেখা হয়েছে": report.entries.written,
+    "weekly — candidate (post-flip)": report.weekly.candidates,
+    "weekly — লেখা হয়েছে": report.weekly.written,
+    "members — আপডেট/নতুন": report.members.updated,
+    "members — ডিলিট (v2-তে অনুপস্থিত)": report.members.deleted
+  });
+  return report;
+}
+if (typeof window !== "undefined") {
+  window.reverseSyncPhaseCData = reverseSyncPhaseCData;
+}
+// =====================================================================
+// --- Health-check: একটি family-এর migration-related consistency যাচাই
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix করে না) — শুধু browser console
+// থেকে ম্যানুয়ালি (`healthCheckFamily()` — বর্তমান device-এর family,
+// অথবা `healthCheckFamily("<অন্য familyId>")` — নির্দিষ্ট কোনো family)।
+// =====================================================================
+// উদ্দেশ্য: প্রতিবার আলাদা আলাদা console command চালিয়ে familyCode/
+// adminUids/legacyCollectionMap/migrationState নিজে নিজে মিলিয়ে দেখার
+// বদলে — একটি কল-এ সবকিছু একসাথে পরীক্ষা করে একটা সংক্ষিপ্ত রিপোর্ট দেয়,
+// যাতে owner-কে বারবার ম্যানুয়াল ধাপে ধাপে ডায়াগনস্টিক চালাতে না হয়।
+// এই ফাংশন কোনো guard-abort করে না (verify-only ফাংশনের মতোই) — বরং
+// প্রতিটা সমস্যা একটা "issues" তালিকায় জমা করে শেষে একসাথে দেখায়, যাতে
+// একটামাত্র সমস্যার কারণে বাকি checks স্কিপ না হয়।
+async function healthCheckFamily(familyIdOverride) {
+  const familyId = familyIdOverride || getFamilyId();
+  console.log("[Health-check] শুরু হচ্ছে (read-only) — familyId:", familyId);
+  const issues = [];
+  const info = {};
+
+  const familySnap = await db.collection("families").doc(familyId).get();
+  if (!familySnap.exists) {
+    console.error("[Health-check] families/" + familyId + " ডকুমেন্ট পাওয়া যায়নি — থামানো হলো।");
+    return { familyId, issues: ["families doc missing"], info };
+  }
+  const fam = familySnap.data();
+  info.familyCode = fam.familyCode;
+  info.migrationState = fam.migrationState || "(unset — legacy হিসেবে গণ্য হয়)";
+  info.adminUids = fam.adminUids;
+
+  // --- familyCode field validity ---
+  if (typeof fam.familyCode !== "string" || !fam.familyCode) {
+    issues.push("families.familyCode অনুপস্থিত বা স্ট্রিং নয়।");
+  }
+
+  // --- adminUids format validity (bracket-wrapped string bug pattern ধরার জন্য) ---
+  if (!Array.isArray(fam.adminUids)) {
+    issues.push("families.adminUids array না — টাইপ ভুল।");
+  } else {
+    fam.adminUids.forEach((uid, i) => {
+      if (typeof uid !== "string") {
+        issues.push(`adminUids[${i}] স্ট্রিং না।`);
+      } else if (uid.trim().startsWith("[") || uid.includes(",\"") || uid.includes("\",")) {
+        issues.push(`adminUids[${i}] সন্দেহজনক — একটার ভেতরে একাধিক uid bracket-wrapped থাকতে পারে: ${uid}`);
+      }
+    });
+  }
+
+  // --- familyCodes bidirectional consistency (familyCode -> familyId -> ফিরে একই familyCode) ---
+  if (typeof fam.familyCode === "string" && fam.familyCode) {
+    const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
+    if (!codeSnap.exists) {
+      issues.push(`familyCodes/${fam.familyCode} ডকুমেন্ট নেই — এই family-এর code দিয়ে familyId খুঁজে পাওয়া যাবে না।`);
+    } else if (codeSnap.data().familyId !== familyId) {
+      issues.push(`familyCodes/${fam.familyCode}.familyId (${codeSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
+    }
+
+    // --- legacyCollectionMap equation consistency ---
+    const expectedCollectionName = "data_" + fam.familyCode;
+    const mapSnap = await db.collection("legacyCollectionMap").doc(expectedCollectionName).get();
+    info.legacyCollectionMapExists = mapSnap.exists;
+    if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+      issues.push(`legacyCollectionMap/${expectedCollectionName}.familyId (${mapSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
+    }
+  }
+
+  // --- migrationState sanity ---
+  if (fam.migrationState !== undefined && !["legacy", "locked", "v2"].includes(fam.migrationState)) {
+    issues.push(`migrationState অপ্রত্যাশিত মান: "${fam.migrationState}" (শুধু legacy/locked/v2 বৈধ)।`);
+  }
+
+  console.log(issues.length === 0
+    ? "[Health-check] ✅ কোনো সমস্যা পাওয়া যায়নি।"
+    : `[Health-check] ⚠️ ${issues.length}টি সমস্যা পাওয়া গেছে —`);
+  console.table({
+    familyId,
+    familyCode: info.familyCode,
+    migrationState: info.migrationState,
+    "legacyCollectionMap আছে": info.legacyCollectionMapExists,
+    "adminUids সংখ্যা": Array.isArray(fam.adminUids) ? fam.adminUids.length : "N/A"
+  });
+  if (issues.length) issues.forEach(msg => console.warn("[Health-check]", msg));
+  return { familyId, issues, info };
+}
+if (typeof window !== "undefined") {
+  window.healthCheckFamily = healthCheckFamily;
+}
+// =====================================================================
+// --- Multi-family Audit (সম্পূর্ণ READ-ONLY — কোনো write/fix/migration
+// করে না) — শুধু browser console থেকে ম্যানুয়ালি (`auditAllFamiliesHealthCheck()`)।
+// =====================================================================
+// উদ্দেশ্য: §৩-এ পাওয়া bug pattern (familyCode stale / adminUids
+// bracket-wrapped bug) অন্য যেকোনো family-তেও আছে কিনা — healthCheckFamily()-এর
+// একই checks প্রতিটি families/<id> ডকুমেন্টের ওপর প্রয়োগ করে একটা সংক্ষিপ্ত
+// summary টেবিল দেয়। প্রাইভেসি: কোনো পরিবারের raw familyCode বা adminUids
+// মান কখনো log করা হয় না — শুধু status/ফলাফল (OK/সমস্যা আছে) ও issue-সংখ্যা।
+async function auditAllFamiliesHealthCheck() {
+  console.log("[Multi-family audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix হবে না)...");
+  const familiesSnap = await db.collection("families").get();
+  const rows = [];
+  for (const doc of familiesSnap.docs) {
+    const familyId = doc.id;
+    const fam = doc.data();
+    const issues = [];
+
+    // --- familyCode presence/type (মান নয়, শুধু আছে/সঠিক টাইপ কিনা) ---
+    let familyCodeStatus = "OK";
+    if (typeof fam.familyCode !== "string" || !fam.familyCode) {
+      familyCodeStatus = "অনুপস্থিত/ভুল টাইপ";
+      issues.push("familyCode অনুপস্থিত/ভুল টাইপ");
+    } else {
+      // familyCodes/<code> <-> families/<id> bidirectional consistency —
+      // শুধু match/mismatch বলা হয়, code-এর মান কখনো log হয় না।
+      try {
+        const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
+        if (!codeSnap.exists) {
+          familyCodeStatus = "mapping অনুপস্থিত";
+          issues.push("familyCodes mapping অনুপস্থিত");
+        } else if (codeSnap.data().familyId !== familyId) {
+          familyCodeStatus = "mismatch";
+          issues.push("familyCodes.familyId এই family-এর সাথে মেলে না");
+        }
+      } catch {
+        familyCodeStatus = "যাচাই ব্যর্থ";
+        issues.push("familyCodes লুকআপ ব্যর্থ (নেটওয়ার্ক/পারমিশন)");
+      }
+      // legacyCollectionMap equation consistency (এখানেও শুধু exists/match বলা হয়)
+      try {
+        const mapSnap = await db.collection("legacyCollectionMap").doc("data_" + fam.familyCode).get();
+        if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+          issues.push("legacyCollectionMap.familyId এই family-এর সাথে মেলে না");
+        }
+      } catch {
+        issues.push("legacyCollectionMap লুকআপ ব্যর্থ");
+      }
+    }
+
+    // --- adminUids format (মান নয়, শুধু টাইপ/প্যাটার্ন সমস্যা আছে কিনা) ---
+    let adminUidsStatus = "OK";
+    if (!Array.isArray(fam.adminUids)) {
+      adminUidsStatus = "টাইপ ভুল";
+      issues.push("adminUids array না");
+    } else {
+      const hasSuspicious = fam.adminUids.some(uid =>
+        typeof uid !== "string" ||
+        uid.trim().startsWith("[") ||
+        uid.includes(",\"") ||
+        uid.includes("\",")
+      );
+      if (hasSuspicious) {
+        adminUidsStatus = "সন্দেহজনক প্যাটার্ন";
+        issues.push("adminUids-এ bracket-wrapped/multi-uid সন্দেহজনক প্যাটার্ন");
+      } else if (fam.adminUids.length === 0) {
+        adminUidsStatus = "খালি";
+      }
+    }
+
+    // --- migrationState sanity (শুধু valid/invalid) ---
+    if (fam.migrationState !== undefined && !["legacy", "locked", "v2"].includes(fam.migrationState)) {
+      issues.push("migrationState অপ্রত্যাশিত মান");
+    }
+
+    rows.push({
+      familyId,
+      "familyCode status": familyCodeStatus,
+      "adminUids status": adminUidsStatus,
+      "issues": issues.length
+    });
+  }
+
+  const totalIssues = rows.reduce((sum, r) => sum + r.issues, 0);
+  console.log(totalIssues === 0
+    ? `[Multi-family audit] ✅ মোট ${rows.length}টি family স্ক্যান হয়েছে — কোনো সমস্যা পাওয়া যায়নি।`
+    : `[Multi-family audit] ⚠️ মোট ${rows.length}টি family স্ক্যান হয়েছে — ${totalIssues}টি সমস্যা পাওয়া গেছে (নিচের টেবিলে দেখুন, শুধু status/সংখ্যা — কোনো raw code/uid নেই)।`);
+  console.table(rows);
+  return { totalFamilies: rows.length, totalIssues, rows };
+}
+if (typeof window !== "undefined") {
+  window.auditAllFamiliesHealthCheck = auditAllFamiliesHealthCheck;
+}
+// =====================================================================
+// --- Access Approval Gate — Step 1: Grandfather Candidate Audit
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix/migration করে না) — শুধু browser
+// console থেকে ম্যানুয়ালি (`auditGrandfatherCandidates()`, বা নির্দিষ্ট
+// familyId-গুলো নিশ্চিত করতে `auditGrandfatherCandidates(["<familyId1>", ...])`)।
+// =====================================================================
+// উদ্দেশ্য: Access Approval Gate চালু করার আগে, প্রতিটি family-এর যেসব
+// uid ইতিমধ্যে বৈধভাবে সক্রিয় (কোনো member-এর ownerUid অথবা family-এর
+// adminUids-এ আছে) — তাদের একটি তালিকা তৈরি করা, যাতে পরের ধাপে
+// (grandfather migration — এখনো implement করা হয়নি, শুধু audit) এই
+// uid-গুলোকে auto-approved হিসেবে accessRequests-এ বসানো যায়। এই ফাংশন
+// নিজে কোনো write করে না — শুধু রিপোর্ট দেয়, চূড়ান্ত সিদ্ধান্ত owner-এর।
+//
+// সীমাবদ্ধতা (§৩-এ আগে চিহ্নিত): `families` collection-এর ওপর নির্ভর করে
+// সব family খুঁজে বের করা অনির্ভরযোগ্য, কারণ families/{id} doc lazily
+// তৈরি হয় (ensureFamilyMeta())। তাই এই ফাংশন `families` collection স্ক্যান
+// করার পাশাপাশি ঐচ্ছিক `extraFamilyIds` প্যারামিটার নেয় — Firebase Console-
+// এর root-level collection browser দিয়ে ম্যানুয়ালি শনাক্ত করা familyId
+// (owner ইতিমধ্যে জানেন: real family + বোনের family) এখানে পাস করলে সেগুলোও
+// নিশ্চিতভাবে audit-এ অন্তর্ভুক্ত হবে, `families` collection-এ miss হলেও।
+//
+// প্রতিটি family-এর জন্য migrationState অনুযায়ী সঠিক জায়গা থেকে সদস্যদের
+// ownerUid পড়া হয় (legacy: data_<collection>-এ "member:" prefix; v2:
+// families/{id}/members subcollection) — resolvePathContext()-এর একই
+// migrationState-branching নীতি অনুসরণ করা হয়েছে, তবে এই ফাংশন কোনো লেখা
+// করে না বলে resolvePathContext() নিজে ব্যবহার না করে সরাসরি read করা
+// হয়েছে (সরলতার জন্য, আচরণ একই)।
+async function auditGrandfatherCandidates(extraFamilyIds) {
+  console.log("[Grandfather audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix/migration হবে না)...");
+  const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
+  const familyIdSet = new Set(extra);
+  try {
+    const familiesSnap = await db.collection("families").get();
+    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+  } catch (err) {
+    console.warn("[Grandfather audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
+  }
+  if (familyIdSet.size === 0) {
+    console.warn("[Grandfather audit] কোনো familyId পাওয়া যায়নি (families collection খালি/অনুপস্থিত এবং extraFamilyIds দেওয়া হয়নি)। থামানো হলো।");
+    return { totalFamilies: 0, rows: [], details: {} };
+  }
+  console.log(`[Grandfather audit] মোট ${familyIdSet.size}টি familyId নিয়ে audit চলছে (families collection scan + extraFamilyIds মিলিয়ে)। মনে রাখবেন: families collection lazily তৈরি হয় বলে এটি সব real family নাও ধরতে পারে — Console root-browse দিয়ে চেনা familyId extraFamilyIds-এ পাস করা নিরাপদ (§৩)।`);
+
+  const rows = [];
+  const details = {};
+  for (const familyId of familyIdSet) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        console.warn(`[Grandfather audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+
+      let ownerUids = [];
+      let memberCount = 0;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        memberCount = membersSnap.size;
+        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+      } else {
+        // legacy/locked/undefined — dataCollectionName থাকলে সেটাই source of
+        // truth (§৫ fix), না থাকলে familyCode থেকে derive (আগের আচরণের সাথে
+        // সামঞ্জস্যপূর্ণ fallback)।
+        const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+        if (collectionName) {
+          const memberSnap = await db.collection(collectionName)
+            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
+            .get();
+          memberCount = memberSnap.size;
+          ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        } else {
+          console.warn(`[Grandfather audit] families/${familyId}-এ familyCode/dataCollectionName কিছুই নেই — সদস্য-owner পড়া সম্ভব হয়নি।`);
+        }
+      }
+
+      const candidateSet = new Set([...adminUids, ...ownerUids]);
+      const candidateUids = Array.from(candidateSet);
+
+      rows.push({
+        familyId,
+        familyCode: familyCode || "(নেই)",
+        migrationState,
+        মোটSদস্য: memberCount,
+        adminসংখ্যা: adminUids.length,
+        গ্র্যান্ডফাদারCandidateসংখ্যা: candidateUids.length
+      });
+      details[familyId] = { familyCode, migrationState, adminUids, ownerUids, candidateUids };
+    } catch (err) {
+      console.error(`[Grandfather audit] familyId ${familyId} প্রসেস করতে সমস্যা হয়েছে (read ব্যর্থ, কোনো write হয়নি):`, err);
+    }
+  }
+
+  console.log(`[Grandfather audit] সম্পন্ন — ${rows.length}টি family প্রসেস হয়েছে। সারসংক্ষেপ (নিচে) ও প্রতিটি family-এর candidate uid তালিকা (console-এ 'details' অবজেক্টে, বা এই ফাংশনের রিটার্ন ভ্যালুতে) দেখুন। কোনো write/approve এখনো হয়নি — এটি শুধু পরবর্তী owner-approved migration ধাপের জন্য প্রস্তুতিমূলক রিপোর্ট।`);
+  console.table(rows);
+  Object.entries(details).forEach(([familyId, d]) => {
+    console.log(`[Grandfather audit] familyId=${familyId} (${d.familyCode || "কোড নেই"}, ${d.migrationState}) — candidate uids:`, d.candidateUids);
+  });
+  return { totalFamilies: rows.length, rows, details };
+}
+if (typeof window !== "undefined") {
+  window.auditGrandfatherCandidates = auditGrandfatherCandidates;
+}
+// =====================================================================
+// --- Access Approval Gate — Step 2: Grandfather Migration Write ---
+// (শুধু ম্যানুয়ালি browser console থেকে — `migrateApprovedGrandfatherAccess()`)
+// =====================================================================
+// এই ফাংশন শুধু owner-approved একটি নির্দিষ্ট (familyId, uid) তালিকার জন্য
+// families/{familyId}/accessRequests/{uid} = {status:"approved", ...} write
+// করে। কোনো Rules বদলায় না, কোনো existing data touch করে না। প্রতিটি
+// write-এর আগে uid বর্তমান adminUids/ownerUid তালিকায় আছে কিনা re-check
+// করা হয় (auditGrandfatherCandidates()-এর মতোই logic) — না থাকলে সেই
+// entry SKIP হয়, write হয় না। Write-এর পর read-back করে status যাচাই
+// করা হয়। তালিকা owner-approved ও hardcoded — কোনো dynamic input নেয় না।
+async function migrateApprovedGrandfatherAccess() {
+  const approvedList = [
+    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "yiirNJKJHlM27guiiS10zsp2FYT2", label: "TU_HI_RA@2022" },
+    { familyId: "R8K8B3KA33B4BMELD3C3", uid: "Wz6iZPY56zP14r7CUO9g2YvJNq32", label: "TU_HI_RA@2022" },
+    { familyId: "M83JR2MA7A69UJ8MQEK3", uid: "0w24Er3vL9QXaElgpT0jGlRSP4E2", label: "FAM-LN3B10" }
+  ];
+  console.log("[Grandfather migration] শুরু হচ্ছে — শুধু owner-approved তালিকার জন্য write+verify হবে। কোনো Rules/other data বদলাবে না।");
+  const results = [];
+  for (const { familyId, uid, label } of approvedList) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        results.push({ familyCode: label, familyId, uid, status: "SKIPPED", কারণ: "families doc পাওয়া যায়নি" });
+        continue;
+      }
+      const fam = famSnap.data();
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+
+      let ownerUids = [];
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+      } else {
+        const collectionName = fam.dataCollectionName || (fam.familyCode ? `data_${fam.familyCode}` : null);
+        if (collectionName) {
+          const memberSnap = await db.collection(collectionName)
+            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
+            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
+            .get();
+          ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        }
+      }
+
+      const isValid = adminUids.includes(uid) || ownerUids.includes(uid);
+      if (!isValid) {
+        results.push({ familyCode: label, familyId, uid, status: "SKIPPED", কারণ: "re-check ব্যর্থ — uid এখন admin/owner তালিকায় নেই" });
+        continue;
+      }
+
+      const reqRef = db.collection("families").doc(familyId).collection("accessRequests").doc(uid);
+      await reqRef.set({
+        status: "approved",
+        source: "grandfather-migration",
+        approvedAt: Date.now()
+      }, { merge: true });
+
+      const verifySnap = await reqRef.get();
+      const verifiedOk = verifySnap.exists && verifySnap.data().status === "approved";
+      results.push({ familyCode: label, familyId, uid, status: verifiedOk ? "OK" : "VERIFY_FAILED" });
+    } catch (err) {
+      results.push({ familyCode: label, familyId, uid, status: "ERROR", কারণ: String(err && err.message || err) });
+    }
+  }
+  console.log("[Grandfather migration] সম্পন্ন — ফলাফল:");
+  console.table(results);
+  return results;
+}
+if (typeof window !== "undefined") {
+  window.migrateApprovedGrandfatherAccess = migrateApprovedGrandfatherAccess;
+}
+// =====================================================================
+// --- Access Approval Gate — Step 1b: Orphan Families Audit
+// (সম্পূর্ণ READ-ONLY — কোনো write/fix/delete করে না) — শুধু browser
+// console থেকে ম্যানুয়ালি (`auditOrphanFamilies()`, বা
+// `auditOrphanFamilies(["<familyId1>", ...])`)।
+// =====================================================================
+// প্রেক্ষাপট: আগের stray/test collection cleanup (§৩) শুধু top-level
+// data_<code> কালেকশন ডিলিট করেছিল — কিন্তু সংশ্লিষ্ট families/{id} root
+// doc, familyCodes/{code} mapping, ও legacyCollectionMap entry কখনো
+// ডিলিট হয়নি (এগুলো ensureFamilyMeta() দিয়ে lazily তৈরি হয়, bounce
+// visitor app খুললেই)। ফলে auditGrandfatherCandidates()-এর মতো যেকোনো
+// families collection-নির্ভর audit-এ এই "orphan" (মেটাডাটা আছে, আসল ডাটা
+// নেই) family-গুলোও ধরা পড়ে — কখনো কখনো তাদের adminUids-এ একটি stale uid
+// থাকতে পারে (bounce visitor custom code set/Google sign-in চেষ্টা করলে)।
+//
+// উদ্দেশ্য: প্রতিটি families/{id}-এর জন্য migrationState অনুযায়ী সঠিক
+// জায়গায় (legacy: data_<code> কালেকশনে যেকোনো ডকুমেন্ট; v2: members
+// subcollection-এ যেকোনো ডকুমেন্ট) সত্যিই কোনো ডাটা আছে কিনা .limit(1)
+// দিয়ে (read-quota সাশ্রয়ী) চেক করা — না থাকলে সেটিকে "orphan candidate"
+// হিসেবে চিহ্নিত করা। এই ফাংশন নিজে কিছুই ডিলিট করে না — শুধু owner
+// manual review-এর জন্য একটি তালিকা দেয়; পরবর্তী (এখনো implement করা
+// হয়নি) owner-approved ধাপে এই তালিকা থেকে families/familyCodes/
+// legacyCollectionMap — এই তিনটে doc একসাথে cleanup করা হবে।
+async function auditOrphanFamilies(extraFamilyIds) {
+  console.log("[Orphan audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/delete হবে না)...");
+  const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
+  const familyIdSet = new Set(extra);
+  try {
+    const familiesSnap = await db.collection("families").get();
+    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+  } catch (err) {
+    console.warn("[Orphan audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
+  }
+  if (familyIdSet.size === 0) {
+    console.warn("[Orphan audit] কোনো familyId পাওয়া যায়নি। থামানো হলো।");
+    return { totalFamilies: 0, orphanCount: 0, rows: [], details: {} };
+  }
+  console.log(`[Orphan audit] মোট ${familyIdSet.size}টি familyId নিয়ে audit চলছে।`);
+
+  const rows = [];
+  const details = {};
+  for (const familyId of familyIdSet) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        console.warn(`[Orphan audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids.filter(u => typeof u === "string" && u) : [];
+      const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+
+      let hasV2Data = false;
+      let hasLegacyData = false;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        hasV2Data = !membersSnap.empty;
+      }
+      if (collectionName) {
+        const legacySnap = await db.collection(collectionName).limit(1).get();
+        hasLegacyData = !legacySnap.empty;
+      }
+      const dataExists = hasV2Data || hasLegacyData;
+      const isOrphan = !dataExists;
+
+      // অতিরিক্ত consistency তথ্য (শুধু informational, orphan-নির্ধারণে ব্যবহৃত হয় না)
+      let familyCodesMappingExists = null;
+      if (familyCode) {
+        try {
+          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
+          familyCodesMappingExists = codeSnap.exists;
+        } catch {
+          familyCodesMappingExists = "যাচাই ব্যর্থ";
+        }
+      }
+
+      rows.push({
+        familyId,
+        familyCode: familyCode || "(নেই)",
+        migrationState,
+        collectionName: collectionName || "(নেই)",
+        ডাটাআছে: dataExists ? "হ্যাঁ" : "না",
+        orphanCandidate: isOrphan ? "⚠️ হ্যাঁ" : "না",
+        adminসংখ্যা: adminUids.length
+      });
+      details[familyId] = { familyCode, migrationState, collectionName, dataExists, isOrphan, adminUids, familyCodesMappingExists };
+    } catch (err) {
+      console.error(`[Orphan audit] familyId ${familyId} প্রসেস করতে সমস্যা হয়েছে (read ব্যর্থ, কোনো write হয়নি):`, err);
+    }
+  }
+
+  const orphanRows = rows.filter(r => r.orphanCandidate.includes("হ্যাঁ"));
+  console.log(`[Orphan audit] সম্পন্ন — ${rows.length}টি family প্রসেস হয়েছে, এর মধ্যে ${orphanRows.length}টি orphan candidate (কোনো real ডাটা নেই)। কোনো delete এখনো হয়নি — এটি শুধু owner review-এর জন্য প্রস্তুতিমূলক রিপোর্ট।`);
+  console.table(rows);
+  if (orphanRows.length) {
+    console.log("[Orphan audit] Orphan candidate familyId তালিকা (cleanup-এর জন্য পরবর্তী ধাপে ব্যবহার হবে, owner review-এর পর):", orphanRows.map(r => r.familyId));
+  }
+  return { totalFamilies: rows.length, orphanCount: orphanRows.length, rows, details };
+}
+if (typeof window !== "undefined") {
+  window.auditOrphanFamilies = auditOrphanFamilies;
+}
+// =====================================================================
+// --- Access Approval Gate — Step 1c: Orphan Families Cleanup (owner-
+// approved WRITE — শুধু browser console থেকে ম্যানুয়ালি, explicit তালিকা
+// দিয়ে: `cleanupOrphanFamilies([...auditOrphanFamilies()-এর orphan
+// familyId তালিকা...])`)।
+// =====================================================================
+// এই ফাংশন ইচ্ছাকৃতভাবে familyId-এর তালিকা নিজে থেকে (families collection
+// পুনরায় স্ক্যান করে) বের করে না — শুধুমাত্র caller-এর দেওয়া explicit
+// অ্যারে গ্রহণ করে (auditOrphanFamilies()-এর owner-verified আউটপুট থেকে
+// কপি-পেস্ট করে দিতে হবে)। এটি ইচ্ছাকৃত নিরাপত্তা সিদ্ধান্ত: delete-এর
+// সময় নতুন করে auto-discovery চালালে ঠিক ঐ মুহূর্তে তৈরি হওয়া কোনো নতুন
+// (বৈধ) family ভুলবশত স্ক্যান-এ ঢুকে যাওয়ার তাত্ত্বিক ঝুঁকি (যদিও familyId
+// 20-char random বলে বাস্তবে অসম্ভবের কাছাকাছি) সম্পূর্ণ বাদ দেয় — শুধু
+// owner যা explicitly review করে দিয়েছেন, ঠিক তার ওপরেই কাজ হবে।
+//
+// প্রতিটি familyId-এর জন্য ডিলিট করার *ঠিক আগে* fresh read দিয়ে আবার
+// নিশ্চিত করা হয় যে family এখনো সত্যিই orphan (কোনো real data নেই) —
+// audit ও cleanup-এর মাঝের সময়ে কেউ যদি সেই familyCode দিয়ে নতুন কিছু
+// শুরু করে থাকেন (যতই অসম্ভাব্য হোক), সেই family স্বয়ংক্রিয়ভাবে skip
+// হয়ে যাবে, force-delete হবে না — কোনো data-loss ঝুঁকি নেই।
+//
+// শুধুমাত্র তিনটি "খালি মেটাডাটা" doc ডিলিট হয় — কোনো data_<code>
+// কালেকশন বা members/entries/weekly subcollection কখনো এই ফাংশন touch
+// করে না (সেগুলো আগে থেকেই orphan family-তে খালি/অনুপস্থিত থাকার কথা,
+// তবু সুরক্ষার জন্য এই ফাংশন সেসব delete করার চেষ্টাও করে না):
+//   ১. families/{familyId}
+//   ২. familyCodes/{familyCode}  — শুধু তখনই, যদি সেই mapping doc-এর
+//      familyId ঠিক এই familyId-এর সাথে মেলে (অন্য কোনো family যদি
+//      ইতিমধ্যে এই code পুনর্ব্যবহার করে থাকে, ভুলবশত সেটা মুছে না যায়)
+//   ৩. legacyCollectionMap/{collectionName} — একই matching-guard সহ
+//
+// --- স্থায়ী নিরাপত্তা মডেল (allowlist নয়) ---
+// এই ফাংশন কোনো নির্দিষ্ট familyId তালিকায় hardcoded/সীমাবদ্ধ না — এটি
+// ভবিষ্যতে যেকোনো নতুন orphan family-র জন্যও কাজ করবে। নিরাপত্তা তিনটি
+// স্তরে নিশ্চিত করা হয়েছে:
+//   ১. Rules-level: শুধুমাত্র app creator uid (firestore.rules-এর
+//      isAppCreator()) families/familyCodes/legacyCollectionMap-এ delete
+//      করতে পারে — কোনো family admin, এমনকি এই ফাংশন চালালেও, পারবে না।
+//   ২. Explicit-list-only: caller-কে অবশ্যই auditOrphanFamilies()-এর
+//      সাম্প্রতিক (fresh) আউটপুট থেকে familyId তালিকা explicitly পাস
+//      করতে হবে — এই ফাংশন কখনো নিজে families collection স্ক্যান করে
+//      "সব orphan" আপনা-আপনি বের করে delete করে না।
+//   ৩. Delete-এর ঠিক আগে fresh re-verify (নিচে) — প্রতিটি familyId আবার
+//      পড়ে সত্যিই এখনো orphan (কোনো real data নেই) কিনা নিশ্চিত করা হয়;
+//      audit ও cleanup-এর মাঝে কেউ সেই family code দিয়ে নতুন কিছু শুরু
+//      করলে সেই family স্বয়ংক্রিয়ভাবে skip হবে, force-delete হবে না।
+async function cleanupOrphanFamilies(orphanFamilyIds) {
+  if (!Array.isArray(orphanFamilyIds) || orphanFamilyIds.length === 0) {
+    console.error("[Orphan cleanup] orphanFamilyIds একটি non-empty অ্যারে হতে হবে — auditOrphanFamilies()-এর সাম্প্রতিক (fresh) আউটপুট থেকে তালিকা কপি করে পাস করুন। কোনো auto-discovery এখানে হয় না (নিরাপত্তার জন্য ইচ্ছাকৃত)।");
+    return { aborted: true, reason: "no-list" };
+  }
+  const proceed = window.confirm(`${orphanFamilyIds.length}টি family-এর metadata (families/familyCodes/legacyCollectionMap doc) স্থায়ীভাবে ডিলিট হবে — প্রতিটি delete-এর আগে fresh re-verify হবে (আর orphan না থাকলে skip হবে)। কোনো real ডাটা (data_<code> কালেকশন/members subcollection) touch হবে না — শুধু খালি metadata। এগিয়ে যাবেন?`);
+  if (!proceed) {
+    console.log("[Orphan cleanup] ব্যবহারকারী বাতিল করেছেন — কোনো delete হয়নি।");
+    return { aborted: true, reason: "user-cancelled" };
+  }
+
+  console.log(`[Orphan cleanup] শুরু হচ্ছে — ${orphanFamilyIds.length}টি familyId প্রসেস হবে, প্রতিটির জন্য delete-এর আগে fresh re-verify হবে।`);
+  const results = [];
+  for (const familyId of orphanFamilyIds) {
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (!famSnap.exists) {
+        results.push({ familyId, status: "skip", reason: "already-gone" });
+        continue;
+      }
+      const fam = famSnap.data();
+      const familyCode = typeof fam.familyCode === "string" ? fam.familyCode : null;
+      const migrationState = fam.migrationState || "legacy";
+      const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
+
+      // Fresh re-verify — audit-এর সময়ের পর কোনো real data তৈরি হয়েছে কিনা
+      let hasV2Data = false;
+      let hasLegacyData = false;
+      if (migrationState === "v2") {
+        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        hasV2Data = !membersSnap.empty;
+      }
+      if (collectionName) {
+        const legacySnap = await db.collection(collectionName).limit(1).get();
+        hasLegacyData = !legacySnap.empty;
+      }
+      if (hasV2Data || hasLegacyData) {
+        console.warn(`[Orphan cleanup] familyId=${familyId} আর orphan নেই (এখন real data পাওয়া গেছে) — SKIP করা হলো, delete হয়নি।`);
+        results.push({ familyId, status: "skip", reason: "no-longer-orphan" });
+        continue;
+      }
+
+      // ধাপ ১: families/{familyId} delete
+      await db.collection("families").doc(familyId).delete();
+
+      // ধাপ ২: familyCodes/{familyCode} — শুধু matching familyId হলে
+      let familyCodesDeleted = false;
+      if (familyCode) {
+        try {
+          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
+          if (codeSnap.exists && codeSnap.data().familyId === familyId) {
+            await db.collection("familyCodes").doc(familyCode).delete();
+            familyCodesDeleted = true;
+          }
+        } catch (err) {
+          console.warn(`[Orphan cleanup] familyId=${familyId} — familyCodes/${familyCode} delete করতে সমস্যা:`, err);
+        }
+      }
+
+      // ধাপ ৩: legacyCollectionMap/{collectionName} — শুধু matching familyId হলে
+      let legacyMapDeleted = false;
+      if (collectionName) {
+        try {
+          const mapSnap = await db.collection("legacyCollectionMap").doc(collectionName).get();
+          if (mapSnap.exists && mapSnap.data().familyId === familyId) {
+            await db.collection("legacyCollectionMap").doc(collectionName).delete();
+            legacyMapDeleted = true;
+          }
+        } catch (err) {
+          console.warn(`[Orphan cleanup] familyId=${familyId} — legacyCollectionMap/${collectionName} delete করতে সমস্যা:`, err);
+        }
+      }
+
+      results.push({ familyId, familyCode, status: "deleted", familyCodesDeleted, legacyMapDeleted });
+    } catch (err) {
+      console.error(`[Orphan cleanup] familyId=${familyId} প্রসেস করতে ব্যর্থ:`, err);
+      results.push({ familyId, status: "error", error: err.message });
+    }
+  }
+
+  const deletedCount = results.filter(r => r.status === "deleted").length;
+  const skippedCount = results.filter(r => r.status === "skip").length;
+  const errorCount = results.filter(r => r.status === "error").length;
+  console.log(`[Orphan cleanup] সম্পন্ন — ${deletedCount}টি ডিলিট হয়েছে, ${skippedCount}টি skip হয়েছে, ${errorCount}টি ত্রুটি হয়েছে।`);
+  console.table(results);
+  return { deletedCount, skippedCount, errorCount, results };
+}
+if (typeof window !== "undefined") {
+  window.cleanupOrphanFamilies = cleanupOrphanFamilies;
+}
+// --- Data Lifecycle Policy: one-time lastActiveAt backfill (owner-approved,
+// ১৪ আগস্ট ২০২৬) — console-only, dry-run first, প্রতিটি real family-তে ম্যানুয়ালি
+// familyId পাস করে চালাতে হবে। Baseline = আজকের timestamp (conservative — কোনো
+// সদস্য/family ভুলবশত early-inactive হিসেবে চিহ্নিত হবে না)। Idempotent: আগে থেকে
+// lastActiveAt থাকা doc merge:true-তে override হয় (re-run নিরাপদ, ক্ষতি নেই)।
+async function backfillLastActiveAt(familyId, confirm) {
+  const familyRoot = db.collection("families").doc(familyId);
+  const membersSnap = await familyRoot.collection("members").get();
+  console.log(`[Lifecycle backfill] familyId=${familyId} — ${membersSnap.size}টি member doc + ১টি family doc lastActiveAt পাবে।`);
+  if (!confirm) {
+    console.log("[Lifecycle backfill] dry-run শেষ — আসল লেখা চালাতে backfillLastActiveAt(familyId, true) কল করুন।");
+    return { familyId, memberCount: membersSnap.size, dryRun: true };
+  }
+  const ts = firebase.firestore.Timestamp.now();
+  const batch = db.batch();
+  membersSnap.docs.forEach(d => batch.set(d.ref, { lastActiveAt: ts }, { merge: true }));
+  batch.set(familyRoot, { lastActiveAt: ts }, { merge: true });
+  await batch.commit();
+  console.log(`[Lifecycle backfill] সম্পন্ন — familyId=${familyId}, ${membersSnap.size}টি member + family doc আপডেট হয়েছে।`);
+  return { familyId, memberCount: membersSnap.size, dryRun: false };
+}
+if (typeof window !== "undefined") {
+  window.backfillLastActiveAt = backfillLastActiveAt;
+}
+// §First Admin Protection — বিদ্যমান family(এই feature deploy হওয়ার আগে
+// claim হয়ে যাওয়া)-তে firstAdminUid field নেই। এই console-only, owner-manual
+// ফাংশন একবার চালিয়ে সঠিক uid সেট করে দিতে হবে(কোন uid firstAdmin তা owner
+// নিজেই জানেন — grandfather migration-এ যিনি প্রথম admin হয়েছিলেন)। ইতিমধ্যে
+// firstAdminUid সেট থাকলে overwrite করবে না(নিরাপত্তা — ভুলবশত দ্বিতীয়বার
+// চালালেও কোনো ক্ষতি নেই)।
+async function backfillFirstAdminUid(familyId, uid, confirm) {
+  const ref = db.collection("families").doc(familyId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    console.log(`[FirstAdmin backfill] familyId=${familyId} পাওয়া যায়নি।`);
+    return { ok: false, reason: "not-found" };
+  }
+  const fam = snap.data();
+  if (fam.firstAdminUid) {
+    console.log(`[FirstAdmin backfill] familyId=${familyId}-এ firstAdminUid ইতিমধ্যে সেট(${fam.firstAdminUid}) — কিছু করা হয়নি।`);
+    return { ok: false, reason: "already-set", current: fam.firstAdminUid };
+  }
+  if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
+    console.log(`[FirstAdmin backfill] uid=${uid} এই family-র adminUids-এ নেই — বাতিল করা হলো।`);
+    return { ok: false, reason: "uid-not-admin" };
+  }
+  if (!confirm) {
+    console.log(`[FirstAdmin backfill] dry-run — familyId=${familyId}-এ firstAdminUid=${uid} সেট হবে। আসল লেখা চালাতে backfillFirstAdminUid(familyId, uid, true) কল করুন।`);
+    return { ok: true, dryRun: true };
+  }
+  await ref.update({ firstAdminUid: uid, updatedAt: Date.now() });
+  console.log(`[FirstAdmin backfill] সম্পন্ন — familyId=${familyId}, firstAdminUid=${uid}।`);
+  return { ok: true, dryRun: false };
+}
+if (typeof window !== "undefined") {
+  window.backfillFirstAdminUid = backfillFirstAdminUid;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
@@ -536,6 +1753,12 @@ async function syncFamilyCodeWithAccount() {
   if (!auth.currentUser || !isGoogleLinked()) return {
     switched: false
   };
+  // Creator override active থাকলে (enterFamilyAsCreator() দিয়ে ম্যানুয়ালি
+  // সেট করা, এবং flag বর্তমান family_code-এর সাথে মিলছে) — account-linked
+  // familyCode-এ ফিরিয়ে দেওয়া হবে না। শুধু creator UID-এর জন্য প্রযোজ্য।
+  if (isCreatorAuth() && localStorage.getItem(CREATOR_OVERRIDE_KEY) === getFamilyCode()) {
+    return { switched: false };
+  }
   const uid = auth.currentUser.uid;
   const remoteCode = await loadUserFamilyCode(uid);
   const localCode = getFamilyCode();
@@ -553,7 +1776,13 @@ async function syncFamilyCodeWithAccount() {
     switched: false
   };
 }
-const getCollectionName = () => `data_${getFamilyCode()}`;
+// §৫ fix: এখন cache-ব্যাকড — boot-এ ensureDataCollectionName() একবার
+// families/{id}.dataCollectionName পড়ে/ব্যাকফিল করে cache পূরণ করে
+// (App-এর boot useEffect-এ awaited)। cache পূরণ হওয়ার আগে বা কোনো কারণে
+// ব্যর্থ হলে (network ইত্যাদি) আগের মতোই লাইভ familyCode থেকে derive করা
+// হয় — fully backward-compatible fallback, কোনো call site (৩০+ জায়গা)
+// পরিবর্তন করতে হয়নি কারণ ফাংশনটি এখনও সম্পূর্ণ synchronous।
+const getCollectionName = () => cachedDataCollectionName || `data_${getFamilyCode()}`;
 const appStorage = {
   async get(key, shared) {
     if (!shared) {
@@ -815,17 +2044,107 @@ async function findOrCreateDriveBackupFolder() {
   localStorage.setItem(cacheKey, createJson.id);
   return createJson.id;
 }
+// =====================================================================
+// --- Backup/Restore Switch-awareness (helper): migrationState অনুযায়ী
+// legacy collection বা v2 subcollection থেকে সঠিক জায়গায় read/write করে,
+// কিন্তু backup ফাইলের বাইরের ফরম্যাট (legacy-style compound key:
+// "member:<id>", "entry:<id>:<date>", "weekly:<id>:<yyyy-mm>") সবসময়
+// অপরিবর্তিত রাখে — তাই পুরনো backup ফাইল এখনো import করা যাবে এবং
+// legacy family-তে এই দুই ফাংশনের আউটপুট/আচরণ আগের মতোই বিট-ফর-বিট
+// থাকে (mode !== "v2" শাখা)। custom_fields ও meeting_rows_v2: — এই দুটো
+// key v2 migration-এর স্কোপের বাইরে (app.js নিজেই এগুলো এখনো শুধু legacy
+// collection-এ রাখে), তাই এরা সবসময় legacy collection থেকেই পড়া/লেখা হয়,
+// migrationState নির্বিশেষে।
+// =====================================================================
+async function readAllFamilyDataForBackup(migrationState) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const result = {};
+  if (ctx.mode !== "v2") {
+    const snap = await db.collection(getCollectionName()).get();
+    snap.docs.forEach(doc => {
+      result[doc.id] = doc.data();
+    });
+    return result;
+  }
+  const [membersSnap, entriesSnap, weeklySnap, legacySnap] = await Promise.all([
+    ctx.membersRef.get(),
+    ctx.entriesRef.get(),
+    ctx.weeklyRef.get(),
+    db.collection(getCollectionName()).get()
+  ]);
+  membersSnap.docs.forEach(d => {
+    result[`member:${d.id}`] = d.data();
+  });
+  entriesSnap.docs.forEach(d => {
+    const idx = d.id.indexOf("_");
+    if (idx === -1) return;
+    result[`entry:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
+  });
+  weeklySnap.docs.forEach(d => {
+    const idx = d.id.indexOf("_");
+    if (idx === -1) return;
+    result[`weekly:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
+  });
+  legacySnap.docs.forEach(doc => {
+    const id = doc.id;
+    if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
+      result[id] = doc.data();
+    }
+  });
+  return result;
+}
+// items: [{key, data}] — key সবসময় উপরের legacy-style compound format-এই
+// আসে (Drive/local backup ফাইল থেকে parse করা)। migrationState অনুযায়ী
+// সঠিক legacy doc বা v2 subcollection doc-এ translate করে merge-write করে।
+async function writeParsedBackupToFamily(migrationState, items) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const CHUNK_SIZE = 450;
+  async function commitInChunks(writes) {
+    for (let i = 0; i < writes.length; i += CHUNK_SIZE) {
+      const batch = db.batch();
+      writes.slice(i, i + CHUNK_SIZE).forEach(({ ref, data }) => {
+        batch.set(ref, data, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
+  if (ctx.mode !== "v2") {
+    const colRef = db.collection(getCollectionName());
+    await commitInChunks(items.map(({ key, data }) => ({ ref: colRef.doc(key), data })));
+    return;
+  }
+  const legacyColRef = db.collection(getCollectionName());
+  const writes = items.map(({ key, data }) => {
+    if (key.startsWith("member:")) {
+      return { ref: ctx.membersRef.doc(key.slice("member:".length)), data };
+    }
+    if (key.startsWith("entry:")) {
+      const rest = key.slice("entry:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return null;
+      return { ref: ctx.entriesRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+    }
+    if (key.startsWith("weekly:")) {
+      const rest = key.slice("weekly:".length);
+      const idx = rest.indexOf(":");
+      if (idx === -1) return null;
+      return { ref: ctx.weeklyRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+    }
+    // custom_fields / meeting_rows_v2: — legacy-only (উপরের নোট দেখুন)
+    return { ref: legacyColRef.doc(key), data };
+  }).filter(Boolean);
+  await commitInChunks(writes);
+}
 // পুরো ফ্যামিলি Firestore কালেকশন + এই ডিভাইসের প্রয়োজনীয় সেটিংস একসাথে
 // করে একটি Versioned, Extensible ব্যাকআপ অবজেক্ট বানায়। ভবিষ্যতে
 // familyId/Family Metadata/Admin System যোগ হলে "family" অবজেক্টে নতুন
 // key যোগ করলেই হবে — schemaVersion বাড়িয়ে migration করা যাবে, পুরনো
 // ব্যাকআপ ফাইল ভাঙবে না।
-async function buildDriveBackupPayload() {
-  const snap = await db.collection(getCollectionName()).get();
-  const data = {};
-  snap.docs.forEach(doc => {
-    data[doc.id] = doc.data();
-  });
+// Switch prep fix: migrationState param যোগ হয়েছে — readAllFamilyDataForBackup()
+// v2 family-তে সঠিক (live) subcollection থেকে পড়ে, legacy/undefined হলে
+// আগের hardcoded getCollectionName() আচরণ বিট-ফর-বিট অপরিবর্তিত থাকে।
+async function buildDriveBackupPayload(migrationState) {
+  const data = await readAllFamilyDataForBackup(migrationState);
   let isCustomCode = false;
   let themeColor = null;
   try {
@@ -891,14 +2210,16 @@ async function downloadDriveBackupContent(fileId) {
 }
 // ফ্যামিলি কোড ভিন্ন হলে নীরবে ওভাররাইট না করে ব্যবহারকারীকে জিজ্ঞাসা করে,
 // তারপর Firestore থেকে বর্তমান স্ন্যাপশট নিয়ে Drive-এ আপলোড করে।
-async function backupToGoogleDrive() {
+// Switch prep fix: migrationState param buildDriveBackupPayload()-এ forward
+// করা হয় যাতে v2 family-তে সঠিক (live) ডাটা backup হয়।
+async function backupToGoogleDrive(migrationState) {
   const existing = await findDriveBackupFile();
   const currentFamilyCode = getFamilyCode();
   if (existing && existing.appProperties && existing.appProperties.familyCode && existing.appProperties.familyCode !== currentFamilyCode) {
     const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি কোডের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
     if (!proceed) return { skipped: true };
   }
-  const payload = await buildDriveBackupPayload();
+  const payload = await buildDriveBackupPayload(migrationState);
   let folderId = null;
   if (!existing) {
     // শুধু নতুন ফাইল তৈরির সময়ই ফোল্ডার লাগবে — বিদ্যমান ফাইল আপডেটে
@@ -928,11 +2249,16 @@ async function backupToGoogleDrive() {
 //     key-গুলোর ওপর দিয়ে লুপ চলে, Firestore-only key স্পর্শ করা হয় না।
 //   • অন্য ডিভাইসের claim করা সদস্যের entry/weekly/নিজের member: ডকুমেন্ট
 //     স্কিপ করা হয় (আগের মতোই)।
-async function mergeBackupData(parsed, options) {
+// Switch prep fix: migrationState নতুন প্রথম param — loadMembersV2()-কে
+// সঠিক migrationState পাস করা হয় (আগে param ছাড়া কল হতো, v2 family-তে
+// ownerByMemberId ভুলভাবে legacy collection থেকে গণনা হতো), existingDocsByKey
+// এখন readAllFamilyDataForBackup() (Switch-aware) থেকে আসে, এবং শেষের write
+// writeParsedBackupToFamily() দিয়ে হয় — legacy/undefined migrationState-এ
+// আউটপুট/আচরণ আগের মতোই বিট-ফর-বিট থাকে।
+async function mergeBackupData(migrationState, parsed, options) {
   const compareUpdatedAt = !!(options && options.compareUpdatedAt);
-  const colRef = db.collection(getCollectionName());
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
-  const currentMembers = await loadMembersV2();
+  const currentMembers = await loadMembersV2(migrationState);
   const ownerByMemberId = {};
   currentMembers.forEach(m => {
     ownerByMemberId[m.id] = m.ownerUid ?? null;
@@ -942,10 +2268,7 @@ async function mergeBackupData(parsed, options) {
   }
   let existingDocsByKey = {};
   if (compareUpdatedAt) {
-    const snap = await colRef.get();
-    snap.docs.forEach(d => {
-      existingDocsByKey[d.id] = d.data();
-    });
+    existingDocsByKey = await readAllFamilyDataForBackup(migrationState);
   }
   const keys = Object.keys(parsed);
   const memberKeys = [];
@@ -1006,18 +2329,7 @@ async function mergeBackupData(parsed, options) {
     }
     otherKeys.push({ key, data: parsed[key] });
   });
-  const CHUNK_SIZE = 450;
-  async function commitInChunks(items) {
-    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-      const batch = db.batch();
-      items.slice(i, i + CHUNK_SIZE).forEach(({ key, data }) => {
-        batch.set(colRef.doc(key), data, { merge: true });
-      });
-      await batch.commit();
-    }
-  }
-  await commitInChunks(memberKeys);
-  await commitInChunks(otherKeys);
+  await writeParsedBackupToFamily(migrationState, [...memberKeys, ...otherKeys]);
   return {
     skippedKeys,
     skippedOlder,
@@ -1028,7 +2340,9 @@ async function mergeBackupData(parsed, options) {
 // Google Drive থেকে ডাউনলোড করা ব্যাকআপ যাচাই করে, প্রয়োজনে এই ডিভাইসের
 // family_code ব্যাকআপের সাথে মিলিয়ে সুইচ করে (নতুন ডিভাইসে "আগের অবস্থায়
 // ফেরা"-র মূল অংশ), তারপর Firestore-এ merge করে।
-async function restoreFromGoogleDrive(fileId) {
+// Switch prep fix: migrationState নতুন দ্বিতীয় param — mergeBackupData()-এ
+// forward করা হয় (Switch-aware write path)।
+async function restoreFromGoogleDrive(fileId, migrationState) {
   const backup = await downloadDriveBackupContent(fileId);
   if (!backup || typeof backup !== "object" || !backup.data || !backup.family || !backup.family.familyCode) {
     throw new Error("ব্যাকআপ ফাইলের ফরম্যাট চেনা যাচ্ছে না।");
@@ -1055,7 +2369,7 @@ async function restoreFromGoogleDrive(fileId) {
       localStorage.setItem("theme_color", backup.preferences.themeColor);
     } catch {}
   }
-  const result = await mergeBackupData(backup.data, { compareUpdatedAt: true });
+  const result = await mergeBackupData(migrationState, backup.data, { compareUpdatedAt: true });
   return { ...result, familyCode: backupFamilyCode };
 }
 
@@ -1174,6 +2488,22 @@ async function writeFsaBackupFile(baseDirHandle, fileName, jsonStr) {
   const writable = await fileHandle.createWritable();
   await writable.write(jsonStr);
   await writable.close();
+  // নতুন backup সফলভাবে লেখা+close হওয়ার *পরেই* একই family-র পুরনো backup
+  // ফাইলগুলো (নতুনটি বাদে) মুছে ফেলা হয় — folder-এ সবসময় latest ১টিই থাকে।
+  // filePrefix (familyCode-সহ) ম্যাচ করা ফাইলগুলোই টার্গেট, অন্য family/manual
+  // ফাইল অক্ষত থাকে। কোনো ফাইল delete ব্যর্থ হলে নীরবে skip — নতুন backup তো
+  // থেকেই গেছে, তাই data loss নেই।
+  try {
+    const filePrefix = fileName.replace(/_\d{8}_\d{4}\.json$/, "_");
+    for await (const [entryName, entryHandle] of folderHandle.entries()) {
+      if (entryName === fileName) continue;
+      if (entryHandle.kind !== "file") continue;
+      if (!entryName.startsWith(filePrefix) || !entryName.endsWith(".json")) continue;
+      try {
+        await folderHandle.removeEntry(entryName);
+      } catch {}
+    }
+  } catch {}
 }
 
 if ("serviceWorker" in navigator) {
@@ -2398,6 +3728,12 @@ function meetingKey(year, month0) {
 }
 async function saveMeetingData(year, month0, data) {
   await appStorage.set(meetingKey(year, month0), JSON.stringify(data), true);
+  // Data Lifecycle Policy: family-level activity stamp. Meeting doc lives in
+  // getCollectionName() (v2 schema migration deferred — see roadmap), so this
+  // is a separate write, not part of that batch.
+  db.collection("families").doc(getFamilyId()).set({
+    lastActiveAt: firebase.firestore.Timestamp.now()
+  }, { merge: true }).catch(() => {});
 }
 async function loadWeekly(migrationState, memberId, year, month0) {
   try {
@@ -2411,13 +3747,16 @@ async function loadWeekly(migrationState, memberId, year, month0) {
 }
 async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))).set({
+  const batch = db.batch();
+  batch.set(ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
   }, {
     merge: true
   });
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  await batch.commit();
 }
 // --- Legacy (v1) member storage — single "members" doc holding a JSON array.
 // Kept ONLY as a one-time migration source; do not write to it anymore.
@@ -2452,8 +3791,15 @@ function resolvePathContext(migrationState, familyCode, familyId) {
       weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
     };
   }
-  // legacy ("legacy" বা "locked" বা fallback) — বর্তমান আচরণ অপরিবর্তিত
-  const legacyRef = db.collection(`data_${familyCode}`);
+  // legacy ("legacy" বা "locked" বা fallback)
+  // §৫ fix: আগে এখানে সরাসরি `data_${familyCode}` (লাইভ familyCode থেকে)
+  // ব্যবহার হতো — familyCode বদলালে saveEntry/loadEntry/saveMemberDoc
+  // ইত্যাদি সব ভুল কালেকশনে চলে যেত। এখন getCollectionName()
+  // (dataCollectionName-ব্যাকড, familyCode-independent) ব্যবহার হচ্ছে —
+  // familyCode যতবারই বদলাক, আসল ডাটা কালেকশন একই থাকে। বিদ্যমান সব
+  // caller familyCode param পাঠাতে থাকবে (API অপরিবর্তিত, harmless —
+  // legacy branch-এ শুধু আর ব্যবহৃত হচ্ছে না)।
+  const legacyRef = db.collection(getCollectionName());
   return {
     mode: "legacy",
     membersRef: legacyRef,
@@ -2465,6 +3811,18 @@ function resolvePathContext(migrationState, familyCode, familyId) {
   };
 }
 
+// --- Data Lifecycle Policy: activity stamp (owner-approved, ১৪ আগস্ট ২০২৬) ---
+// lastActiveAt শুধুমাত্র inactivity/TTL cleanup-এর জন্য — ইচ্ছাকৃতভাবে নেটিভ
+// Firestore Timestamp (app-এর বাকি সব timestamp ফিল্ডের মতো Date.now()
+// epoch-number না), কারণ Firestore-এর TTL Policy শুধু native Timestamp
+// ফিল্ডে কাজ করে। এটা existing `updatedAt` (conflict-resolution/backup-merge
+// semantics)-কে স্পর্শ করে না — সম্পূর্ণ আলাদা, dedicated ফিল্ড।
+// memberRef/familyId যেকোনো একটি null দিলে সেই অংশ স্কিপ হয়।
+function stampLastActive(batch, memberRef, familyId) {
+  const ts = firebase.firestore.Timestamp.now();
+  if (memberRef) batch.set(memberRef, { lastActiveAt: ts }, { merge: true });
+  if (familyId) batch.set(db.collection("families").doc(familyId), { lastActiveAt: ts }, { merge: true });
+}
 // --- Device-Claim member storage (v2) — one real Firestore document per
 // member (doc id: "member:<id>") with plain top-level fields, so Firestore
 // security rules can read `ownerUid` directly (rules cannot see inside a
@@ -2473,14 +3831,42 @@ function resolvePathContext(migrationState, familyCode, familyId) {
 function memberDocId(id) {
   return `member:${id}`;
 }
-async function loadMembersV2() {
+// Switch prep fix: আগে এই ফাংশন সবসময় hardcoded db.collection(getCollectionName())
+// (legacy data_<code>) থেকে "member:" prefix দিয়ে member: docs পড়ত —
+// migrationState-নির্বিশেষে, resolvePathContext() ব্যবহার করত না। Flip
+// (migrationState "v2") হওয়ার পর saveMemberDoc/claimMemberDoc/deleteMemberDoc
+// resolver-aware হওয়ায় নতুন সদস্য families/{id}/members/<id> (plain id, কোনো
+// "member:" prefix ছাড়া)-তে লেখা হতে থাকে — কিন্তু এই ফাংশন তখনো পুরনো legacy
+// path-েই খুঁজত, ফলে Flip-পরবর্তী কোনো নতুন সদস্য কখনো member-list-এ (UI-তে)
+// দেখা যেত না (silent mismatch, কোনো error ছাড়াই)। এখন migrationState param
+// নিয়ে resolvePathContext() ব্যবহার করা হচ্ছে — v2 হলে families/{id}/members
+// collection-এর সব doc সরাসরি পড়া হয় (id ইতিমধ্যে plain, কোনো slice দরকার
+// নেই); legacy/locked/undefined হলে আগের মতোই data_<code>-তে "member:" prefix
+// দিয়ে range-query হয় — বিদ্যমান আচরণ বিট-ফর-বিট অপরিবর্তিত থাকে।
+async function loadMembersV2(migrationState) {
   try {
-    const snap = await db.collection(getCollectionName()).where(firebase.firestore.FieldPath.documentId(), ">=", "member:").where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get();
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    if (ctx.mode === "v2") {
+      const snap = await ctx.membersRef.get();
+      return snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+    }
+    const snap = await ctx.membersRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:").where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get();
     return snap.docs.map(d => ({
       id: d.id.slice("member:".length),
       ...d.data()
     }));
-  } catch {
+  } catch (err) {
+    // Access Approval Gate — Step 4: permission-denied আলাদাভাবে চিনতে
+    // হবে যাতে caller "সদস্য নেই" আর "access নেই" গুলিয়ে না ফেলে।
+    // অন্য সব error (network ইত্যাদি) আগের মতোই [] fallback।
+    if (err && err.code === "permission-denied") {
+      const tagged = new Error("access-denied");
+      tagged.accessDenied = true;
+      throw tagged;
+    }
     return [];
   }
 }
@@ -2495,12 +3881,17 @@ async function saveMemberDoc(migrationState, member) {
     ...fields
   } = member;
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.membersRef.doc(ctx.memberDocId(id)).set({
+  const memberRef = ctx.membersRef.doc(ctx.memberDocId(id));
+  const batch = db.batch();
+  batch.set(memberRef, {
     ...fields,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    lastActiveAt: firebase.firestore.Timestamp.now()
   }, {
     merge: true
   });
+  stampLastActive(batch, null, getFamilyId());
+  await batch.commit();
 }
 async function deleteMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -2541,8 +3932,8 @@ async function releaseMemberDoc(migrationState, id) {
 // array-doc has members, copy each into its own v2 doc as "unclaimed"
 // (ownerUid: null) — any device may claim them later from the member list.
 // The legacy doc is left untouched (not deleted) as a safety net.
-async function migrateMembersIfNeeded() {
-  const v2 = await loadMembersV2();
+async function migrateMembersIfNeeded(migrationState) {
+  const v2 = await loadMembersV2(migrationState);
   if (v2.length) return v2;
   const legacy = await loadLegacyMembers();
   if (!legacy.length) return [];
@@ -2552,7 +3943,12 @@ async function migrateMembersIfNeeded() {
     createdAt: m.createdAt || Date.now()
   }));
   try {
-    await Promise.all(migrated.map(m => saveMemberDoc("legacy", m)));
+    // Switch prep fix: আগে এখানে hardcoded "legacy" পাস করা হতো —
+    // migrationState param যোগ হওয়ার পর এখন caller-এর প্রকৃত (server-verified)
+    // migrationState পাস করা হচ্ছে, যাতে কোনো family ইতিমধ্যে v2-তে থাকা
+    // অবস্থায় (edge case: v1 legacy array-doc আছে কিন্তু কোনো v2 member: doc
+    // এখনো নেই) এই one-time migration ভুল (legacy) path-এ লিখে না ফেলে।
+    await Promise.all(migrated.map(m => saveMemberDoc(migrationState, m)));
   } catch {}
   return migrated;
 }
@@ -2590,13 +3986,16 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   // future Firestore rules can check request.auth.uid == resource.data.ownerUid
   // directly on this same document (no extra get() lookup needed).
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).set({
+  const batch = db.batch();
+  batch.set(ctx.entriesRef.doc(ctx.entryDocId(memberId, key)), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
   }, {
     merge: true
   });
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  await batch.commit();
 }
 function entryDocId(memberId, key) {
   return `entry:${memberId}:${key}`;
@@ -2852,6 +4251,33 @@ function App() {
   // পাওয়া যায়। এই মুহূর্তে কোনো caller এই state ব্যবহার করছে না
   // (unwired), শুধু loading-gate-কে প্রভাবিত করে।
   const [migrationState, setMigrationState] = useState(undefined);
+  // Access Approval Gate — Step 4: বর্তমান ব্যবহারকারী এই family-র admin
+  // কিনা (existing migFamSnap boot-fetch থেকেই সেট হয়, কোনো extra read
+  // যোগ করা হয়নি)। null = এখনো জানা যায়নি।
+  const [isAdmin, setIsAdmin] = useState(null);
+  // Admin Visibility UI — বর্তমান family-র adminUids array (একই boot
+  // fetch থেকে সেট, কোনো extra read না)। badge/Make-Admin/Remove-Admin
+  // বাটন দেখানোর জন্য প্রয়োজন।
+  const [adminUidsList, setAdminUidsList] = useState([]);
+  // §First Admin Protection — বর্তমান family-র firstAdminUid(একই boot
+  // fetch থেকে সেট, extra read নেই)। null/undefined মানে পুরনো family
+  // যেখানে backfill হয়নি — সেক্ষেত্রে protection স্বয়ংক্রিয়ভাবে বাইপাস হয়।
+  const [firstAdminUid, setFirstAdminUid] = useState(null);
+  // §Notification System — unread notifications(boot-এ onSnapshot দিয়ে
+  // live-updated) ও panel খোলা আছে কিনা।
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  // §Recovery Key — first-admin claim-এর ঠিক পরে key দেখানোর modal, ও
+  // Recovery-দিয়ে-admin-দাবি করার UI toggle।
+  const [showRecoveryKeyModal, setShowRecoveryKeyModal] = useState(false);
+  const [generatedRecoveryKey, setGeneratedRecoveryKey] = useState(null);
+  const [showRecoveryClaim, setShowRecoveryClaim] = useState(false);
+  const [recoveryKeyInput, setRecoveryKeyInput] = useState("");
+  const [recoveryClaimBusy, setRecoveryClaimBusy] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  // pending = নিজের accessRequest এখনো admin-approval-এর অপেক্ষায়;
+  // null = জানা যায়নি বা প্রযোজ্য না (admin/approved/legacy path)।
+  const [accessPending, setAccessPending] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [addingMember, setAddingMember] = useState(false);
   const [newName, setNewName] = useState("");
@@ -2899,7 +4325,20 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showFamilyCodeModal, setShowFamilyCodeModal] = useState(false);
+  // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
+  // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
+  // EditIcon → দুই-অপশনের choice পপআপে merge করা হয়েছে (নিচে দেখুন)।
+  const [showFamilyCodeChoiceModal, setShowFamilyCodeChoiceModal] = useState(false);
+  const [showCreateNewFamilyModal, setShowCreateNewFamilyModal] = useState(false);
+  const [newFamCodeInput, setNewFamCodeInput] = useState("");
+  const [newFamCodeBusy, setNewFamCodeBusy] = useState(false);
+  const [showJoinFamilyModal, setShowJoinFamilyModal] = useState(false);
+  const [joinFamCodeInput, setJoinFamCodeInput] = useState("");
+  const [joinFamCodeBusy, setJoinFamCodeBusy] = useState(false);
+  // Access Approval Gate — Step 4: admin-only pending-request panel state।
+  const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
+  const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
+  const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showBackupOptionsModal, setShowBackupOptionsModal] = useState(false);
@@ -2926,7 +4365,26 @@ function App() {
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
   const [showMeetingInfoModal, setShowMeetingInfoModal] = useState(false);
-  const [customFamCodeInput, setCustomFamCodeInput] = useState("");
+  // §৫ Family Code Lifecycle Fix — Admin-only "কোড রিনেম" মোডাল (একই
+  // familyId+data, শুধু কোড বদলায়) — বিদ্যমান "কাস্টম কোড" মোডাল থেকে
+  // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডাটা-বিচ্ছিন্নতা না ঘটে।
+  const [showRenameFamilyCodeModal, setShowRenameFamilyCodeModal] = useState(false);
+  const [renameFamCodeInput, setRenameFamCodeInput] = useState("");
+  const [renameFamCodeBusy, setRenameFamCodeBusy] = useState(false);
+  // Family Code auto-propagate + notify: Admin কোড পরিবর্তন করলে বাকি
+  // সদস্যদের ডিভাইসে পরের বুটেই (families/{id} listener থেকে) নতুন কোড
+  // অটো বসে যায় ও রিলোডের পর একবার এই নোটিশ ব্যানার দেখানো হয় —
+  // localStorage flag দিয়ে "একবারই দেখানো" নিশ্চিত করা হয়েছে।
+  const [codeChangeNotice, setCodeChangeNotice] = useState(() => {
+    try {
+      const v = localStorage.getItem("family_code_change_notice");
+      if (v) {
+        localStorage.removeItem("family_code_change_notice");
+        return v;
+      }
+    } catch {}
+    return null;
+  });
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
@@ -2955,6 +4413,7 @@ function App() {
   }
   useEffect(() => {
     let migrationUnsub = null;
+    let notifUnsub = null;
     (async () => {
       // Google sign-in বা family code — যেটাই আগে পাওয়া যায়, সেই অনুযায়ী
       // একই family/profile/records auto-load হওয়া নিশ্চিত করতে, member
@@ -2973,11 +4432,67 @@ function App() {
       // হয়েছে কিনা নিশ্চিত করতে এই দ্বিতীয়, awaited কলটি প্রয়োজন —
       // ফাংশনটি idempotent/best-effort বলে দ্বিতীয়বার কল করা নিরাপদ।
       await ensureFamilyCodeMapping();
+      // §৫ fix: familyId self-heal সম্পন্ন হওয়ার পরই family doc নিশ্চিত
+      // (idempotent — আগে থেকে থাকলে no-op) ও dataCollectionName cache
+      // পূরণ করা হচ্ছে — এর পরের যেকোনো read/write (migrateMembersIfNeeded
+      // থেকে শুরু করে) getCollectionName()-এর সঠিক, familyCode-independent
+      // মান পাবে।
+      await ensureFamilyMeta();
+      await ensureDataCollectionName();
+      // Legacy read-rule gate fix: ব্র্যান্ড-নতুন/একা (auto-generated,
+      // adminUids:[]) family-তে আগে শুধু "custom code সেট" বা "Google
+      // link" trigger-এ admin claim হতো — legacy read-gate deploy হওয়ার
+      // পর এই দুই trigger না ঘটা পর্যন্ত এমন family নিজেই নিজের data পড়তে
+      // পারছিল না (isApprovedMember()-এ admin/approved কেউ ছিল না)।
+      // এখানে boot-এই (idempotent, awaited) claim করে এই gap বন্ধ করা
+      // হলো — বিদ্যমান শেয়ার্ড family-তে (adminUids ইতিমধ্যে অ-খালি)
+      // কোনো প্রভাব নেই (ফাংশন internally no-op করে), Rules-এর
+      // "প্রথম-আসা" নিয়ম অপরিবর্তিত।
+      const justClaimedFirstAdmin = await claimFirstAdminIfEligible();
+      if (justClaimedFirstAdmin) {
+        // §Recovery Key — এই ডিভাইসই সদ্য প্রথম Admin হলো; key generate+hash
+        // করে hidden doc-এ সেভ করা হচ্ছে, plaintext শুধু modal-এ একবার
+        // দেখানোর জন্য state-এ রাখা হচ্ছে(best-effort — ব্যর্থ হলেও admin
+        // claim নিজে আগেই সফল হয়ে গেছে, পরে profile dropdown থেকে আলাদা
+        // ব্যবস্থা লাগবে না কারণ প্রথম claim একবারই হয়)।
+        setupRecoveryKeyForCurrentAdmin().then(key => {
+          if (key) {
+            setGeneratedRecoveryKey(key);
+            setShowRecoveryKeyModal(true);
+          }
+        });
+      }
+      // Legacy read-rule gate prep — non-blocking, best-effort; dataCollectionName
+      // cache পূরণ হওয়ার পরই কল করা হচ্ছে (getCollectionName()-এর সঠিক মান
+      // দরকার), কিন্তু boot এর জন্য অপেক্ষা করে না।
+      ensureLegacyCollectionMap();
       const migrationFamilyId = getFamilyId();
       migrationUnsub = db.collection("families").doc(migrationFamilyId).onSnapshot(
         (snap) => {
           const state = snap.exists ? (snap.data().migrationState || "legacy") : "legacy";
           setMigrationState(state);
+          // Family Code auto-propagate + notify: সার্ভারের families/{id}.familyCode
+          // এই ডিভাইসের local কোড থেকে ভিন্ন হলে (Admin অন্য কোথাও কোড
+          // পরিবর্তন করেছেন) — অটো নতুন কোড বসিয়ে, Google-linked হলে
+          // account-এও সংরক্ষণ করে, একবার রিলোড করা হয়; রিলোডের পর
+          // "family_code_change_notice" flag দেখে ব্যানার দেখানো হবে।
+          // familyId অপরিবর্তিত থাকায় এটি সম্পূর্ণ নিরাপদ — শুধু লেবেল sync।
+          try {
+            const serverCode = snap.exists ? snap.data().familyCode : null;
+            const localCode = getFamilyCode();
+            if (serverCode && serverCode.trim() && serverCode !== localCode) {
+              localStorage.setItem("family_code", serverCode);
+              localStorage.setItem("family_code_is_custom", "1");
+              localStorage.setItem("family_code_change_notice", serverCode);
+              const uid = auth.currentUser ? auth.currentUser.uid : null;
+              const doReload = () => window.location.reload();
+              if (uid && isGoogleLinked()) {
+                saveUserFamilyCode(uid, serverCode).then(doReload).catch(doReload);
+              } else {
+                doReload();
+              }
+            }
+          } catch {}
         },
         () => {
           // Fail-closed: listener error হলে migrationState ইচ্ছাকৃতভাবে
@@ -2986,7 +4501,70 @@ function App() {
           // loading-gate-এ থেকে যাবে যতক্ষণ না একটি সফল snapshot আসে।
         }
       );
-      const m = await migrateMembersIfNeeded();
+      // loadMembersV2() fix: migrateMembersIfNeeded()-কে সঠিক migrationState
+      // পাস করার জন্য এখানে একটি পৃথক one-time get() করা হচ্ছে — উপরের
+      // onSnapshot() fire-and-forget (attach করা হয়েছে, awaited না), তাই তার
+      // প্রথম snapshot এই মুহূর্তে এসে পৌঁছেছে এই নিশ্চয়তা নেই (React state
+      // setMigrationState()-এর ওপর race-condition নির্ভরতা তৈরি করলে
+      // মাঝেমধ্যে stale/undefined migrationState দিয়ে সদস্য-তালিকা লোড হতে
+      // পারত)। এই get() ব্যর্থ হলেও (network ইত্যাদি) "legacy" ধরে নেওয়া
+      // নিরাপদ — resolvePathContext()-এর ডিফল্ট branch legacy-ই, তাই এটি
+      // আগের (এই fix-এর আগের) hardcoded আচরণের সাথে সামঞ্জস্যপূর্ণ fallback।
+      let bootMigrationState = "legacy";
+      try {
+        const migFamSnap = await db.collection("families").doc(migrationFamilyId).get();
+        bootMigrationState = migFamSnap.exists ? (migFamSnap.data().migrationState || "legacy") : "legacy";
+        // Access Approval Gate — Step 4: একই fetch থেকে isAdmin বের করা,
+        // কোনো অতিরিক্ত read ছাড়াই।
+        const famAdminUids = migFamSnap.exists ? migFamSnap.data().adminUids : null;
+        const myUid = auth.currentUser ? auth.currentUser.uid : null;
+        setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
+        setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
+        // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
+        setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
+        // §Notification System — শুধু নিজের unread notification-এ live
+        // listener(count/badge-এর জন্য যথেষ্ট; panel খোলার সময় আলাদা করে
+        // full/read-সহ list fetch হবে)। Spark-এ negligible cost(৩-member
+        // স্কেলে খুবই কম doc)।
+        if (myUid) {
+          notifUnsub = db.collection("families").doc(migrationFamilyId)
+            .collection("notifications")
+            .where("targetUid", "==", myUid)
+            .where("read", "==", false)
+            .onSnapshot(
+              (nsnap) => {
+                setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
+              },
+              () => {}
+            );
+        }
+      } catch {}
+      let m;
+      try {
+        m = await migrateMembersIfNeeded(bootMigrationState);
+      } catch (err) {
+        if (err && err.accessDenied) {
+          // Access Approval Gate — Step 4: নিজের accessRequest দেখা, না
+          // থাকলে "pending" তৈরি করা (Rules-এ self-create শুধু pending-এ
+          // সীমাবদ্ধ)। এরপর UI "অনুমোদনের অপেক্ষায়" স্ক্রিন দেখাবে —
+          // members/customFields ইত্যাদি লোড করার চেষ্টা করা হবে না।
+          try {
+            const myUid = auth.currentUser ? auth.currentUser.uid : null;
+            if (myUid) {
+              const reqRef = db.collection("families").doc(migrationFamilyId)
+                .collection("accessRequests").doc(myUid);
+              const reqSnap = await reqRef.get();
+              if (!reqSnap.exists) {
+                await reqRef.set({ status: "pending", requestedAt: Date.now() });
+              }
+            }
+          } catch {}
+          setAccessPending(true);
+          setMembers([]);
+          return;
+        }
+        m = [];
+      }
       setMembers(m);
       // Fires once per app load (not per re-render) so the Analytics
       // dashboard can show how many distinct family spaces are actively
@@ -3032,6 +4610,7 @@ function App() {
     })();
     return () => {
       if (migrationUnsub) migrationUnsub();
+      if (notifUnsub) notifUnsub();
     };
   }, []);
   const [recoveryMessage, setRecoveryMessage] = useState(false);
@@ -3208,17 +4787,22 @@ function App() {
     return () => unsubscribe();
   }, [monthCursor]);
   async function handleExportData() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     try {
       // File System Access (থাকলে) সবচেয়ে আগে চেষ্টা করা হয় —
       // showDirectoryPicker() অবশ্যই user gesture-এর মধ্যেই কল করতে হয়,
       // তাই এটি Firestore fetch-এর আগেই (handleExportData শুরু হওয়ার পর
       // প্রথম await হিসেবে) করা হচ্ছে।
       const fsaBaseDir = await getOrRequestFsaBaseDir();
-      const snap = await db.collection(getCollectionName()).get();
-      const exportObj = {};
-      snap.docs.forEach(doc => {
-        exportObj[doc.id] = doc.data();
-      });
+      // Switch prep fix: আগে এখানে সরাসরি db.collection(getCollectionName())
+      // (legacy) থেকে পড়া হতো — v2 family-তে এটি ভুল (stale) ডাটা export
+      // করত। এখন readAllFamilyDataForBackup() ব্যবহার করা হচ্ছে, যা
+      // migrationState অনুযায়ী সঠিক (live) জায়গা থেকে পড়ে এবং legacy-style
+      // key ফরম্যাটেই রিটার্ন করে — legacy family-তে আউটপুট অপরিবর্তিত।
+      const exportObj = await readAllFamilyDataForBackup(migrationState);
       // একই backup schema যা Google Drive ব্যাকআপেও ব্যবহৃত হয় (single
       // schema — আলাদা local-only format নেই)। family/preferences এখানে
       // অন্তর্ভুক্ত নয় কারণ mergeBackupData() শুধু .data ব্যবহার করে।
@@ -3302,6 +4886,10 @@ function App() {
   }
   // --- Google Drive Backup/Restore UI handlers ---
   async function handleDriveBackupClick() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     if (!isGoogleLinked()) {
       setShowBackupOptionsModal(false);
       setShowGoogleAccountModal(true);
@@ -3310,7 +4898,7 @@ function App() {
     setDriveBackupBusy(true);
     setDriveBackupStatus(null);
     try {
-      const result = await backupToGoogleDrive();
+      const result = await backupToGoogleDrive(migrationState);
       if (result.skipped) {
         setDriveBackupStatus({ type: "error", text: "ব্যাকআপ বাতিল করা হয়েছে।" });
       } else {
@@ -3323,6 +4911,10 @@ function App() {
     }
   }
   async function handleBothBackupClick() {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     await handleExportData();
     await handleDriveBackupClick();
   }
@@ -3363,6 +4955,10 @@ function App() {
   // পাওয়া গেলে/ব্যর্থ হলে স্পষ্ট বার্তা দেখানো হয়।
   async function handleManualDriveRestoreClick() {
     setShowImportOptionsModal(false);
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     if (!isGoogleLinked()) {
       setShowGoogleAccountModal(true);
       return;
@@ -3371,9 +4967,13 @@ function App() {
   }
   async function handleConfirmDriveRestore() {
     if (!driveRestoreCandidate) return;
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     setDriveRestoreBusy(true);
     try {
-      await restoreFromGoogleDrive(driveRestoreCandidate.id);
+      await restoreFromGoogleDrive(driveRestoreCandidate.id, migrationState);
       window.alert("Google Drive থেকে ডাটা সফলভাবে রিস্টোর (মার্জ) করা হয়েছে।");
       window.location.reload();
     } catch (err) {
@@ -3384,6 +4984,10 @@ function App() {
     }
   }
   async function handleImportData(e) {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
     const fileReader = new FileReader();
     if (e.target.files && e.target.files[0]) {
       fileReader.readAsText(e.target.files[0], "UTF-8");
@@ -3411,7 +5015,7 @@ function App() {
           // লেখা হবে (merge: true সহ)। ownerUid normalize logic এবং অন্য
           // ডিভাইসের claim করা সদস্যের ডাটা স্কিপ করার নিয়ম অপরিবর্তিত আছে
           // (mergeBackupData()-এর ভেতরেই)।
-          const result = await mergeBackupData(parsed.data, { compareUpdatedAt: false });
+          const result = await mergeBackupData(migrationState, parsed.data, { compareUpdatedAt: false });
           if (result.skippedKeys.length) {
             alert(`ডাটা ইম্পোর্ট হয়েছে। তবে ${result.skippedKeys.length}টি এন্ট্রি স্কিপ করা হয়েছে, কারণ সেগুলো অন্য ডিভাইসের দায়িত্বে থাকা সদস্যের — সেগুলো সেই সদস্যের নিজের ডিভাইস থেকে ইম্পোর্ট করতে হবে।`);
           } else {
@@ -3429,37 +5033,126 @@ function App() {
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   }
-  async function handleSaveCustomFamilyCode() {
-    const code = customFamCodeInput.trim();
+  // Access Approval Gate — Step 4: admin-only pending accessRequests লোড।
+  async function loadPendingAccessRequests() {
+    setLoadingAccessRequests(true);
+    try {
+      const famId = getFamilyId();
+      const snap = await db.collection("families").doc(famId)
+        .collection("accessRequests").where("status", "==", "pending").get();
+      setPendingAccessRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setPendingAccessRequests([]);
+    } finally {
+      setLoadingAccessRequests(false);
+    }
+  }
+  // decision: "approved" | "denied"। Rules-এ শুধু pending→approved/denied
+  // এবং শুধু status+decidedAt field অনুমোদিত।
+  async function decideAccessRequest(uid, decision) {
+    try {
+      const famId = getFamilyId();
+      await db.collection("families").doc(famId)
+        .collection("accessRequests").doc(uid)
+        .update({ status: decision, decidedAt: Date.now() });
+      setPendingAccessRequests(list => list.filter(r => r.id !== uid));
+    } catch (err) {
+      alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  // "নতুন ফ্যামিলি কোড তৈরি করুন" — সব সদস্যের জন্য উন্মুক্ত (কারো নিজস্ব
+  // পৃথক family স্পেস দরকার হলে)। সম্পূর্ণ নতুন familyId+data — বর্তমান
+  // family/data কোনোভাবে touch হয় না, শুধু এই ডিভাইসটি নতুন (blank)
+  // family-তে সুইচ হয়ে যায়। createNewFamily() নিজেই এই ডিভাইসের uid-কে
+  // নতুন family-এর প্রথম Admin হিসেবে claim করে।
+  async function handleCreateNewFamily() {
+    const code = newFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`কাস্টম ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না। বাকি ছোট/বড় হাতের অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে।");
+      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
+    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    setNewFamCodeBusy(true);
     try {
-      // আগে শুধু legacy "members" ডকুমেন্ট চেক করা হতো, কিন্তু v2 (per-member
-      // member:<id>) সিস্টেমে সেই ডকুমেন্ট আর কখনো লেখা হয় না — ফলে আসলে
-      // ডাটা থাকা সত্ত্বেও এই চেক সবসময় "কোনো পুরনো রেকর্ড নেই" দেখাতো।
-      // এখন কালেকশনে আদৌ কোনো ডকুমেন্ট আছে কিনা তা সরাসরি চেক করা হচ্ছে।
-      const snap = await db.collection(`data_${code}`).limit(1).get();
-      const msg = !snap.empty
-        ? "এই কোডে আগের রেকর্ড পাওয়া গেছে — এতে সুইচ করলে সেই ডাটা ফিরে আসবে। এগিয়ে যাবেন?"
-        : "এই কোডে কোনো পুরনো রেকর্ড নেই — এটি নতুন খালি ফ্যামিলি স্পেস হবে। এগিয়ে যাবেন?";
-      if (!window.confirm(msg)) return;
-    } catch (err) {
-      const proceedAnyway = window.confirm("নেটওয়ার্ক বা সার্ভার সমস্যার কারণে এই কোডে আগে থেকে কোনো ডাটা আছে কিনা তা যাচাই করা যায়নি। তবুও কি এই কোডে পরিবর্তন করে এগিয়ে যেতে চান?");
-      if (!proceedAnyway) return;
+      const result = await createNewFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+          charset: "অবৈধ ক্যারেক্টার।",
+          "code-taken": "এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে, অন্য একটি কোড ব্যবহার করুন।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "নতুন ফ্যামিলি তৈরি করা যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে createNewFamily নিজেই reload করে।
+    } finally {
+      setNewFamCodeBusy(false);
     }
-    // Phase A: প্রথম Admin claim — familyId অপরিবর্তিত থাকে (শুধু code
-    // বদলাচ্ছে), তাই code বদলানোর *আগেই* বর্তমান family-এর জন্য claim
-    // চেষ্টা করা হচ্ছে। ব্যর্থ হলেও (best-effort) Family Code set flow
-    // কখনো আটকাবে না।
-    await claimFirstAdminIfEligible();
-    setFamilyCode(code);
+  }
+  // "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন" — সব সদস্যের জন্য উন্মুক্ত (নতুন
+  // device-এ আগে থেকে থাকা কোনো Family Code দিয়ে ঢোকার জন্য)। শুধু v2
+  // family-তে কাজ করে (legacy read-gate এখনো implement হয়নি বলে ইচ্ছাকৃতভাবে
+  // সীমিত)। joinExistingFamily() নিজেই device সুইচ করে reload করে — এরপর
+  // বুট-টাইম accessDenied হ্যান্ডলিং pending accessRequest তৈরি/approved
+  // চেক করবে।
+  async function handleJoinExistingFamily() {
+    const code = joinFamCodeInput.trim();
+    if (!code) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সেই ফ্যামিলিতে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    setJoinFamCodeBusy(true);
+    try {
+      const result = await joinExistingFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          "same-family": "আপনি ইতিমধ্যে এই ফ্যামিলিতে আছেন।",
+          "not-found": "এই কোডের কোনো ফ্যামিলি পাওয়া যায়নি। কোডটি আবার যাচাই করুন।",
+          "not-v2": "এই ফ্যামিলি এখনো এই ফিচারের জন্য প্রস্তুত নয়। ফ্যামিলির Admin-এর সাথে সরাসরি যোগাযোগ করুন।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "যোগ দেওয়া যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে joinExistingFamily নিজেই reload করে।
+    } finally {
+      setJoinFamCodeBusy(false);
+    }
+  }
+  // §৫ Family Code Lifecycle Fix — Admin-only: বর্তমান family-এর কোড
+  // পরিবর্তন, dataCollectionName/data অপরিবর্তিত থাকে (changeFamilyCodeForExistingFamily
+  // নিজেই Rules-এ admin-enforced, তাই এখানে আলাদা করে isAdmin চেক না
+  // করলেও নিরাপদ — তবু UI-তে ভুল ব্যবহার এড়াতে বাটনটি isAdmin-গেটেড)।
+  async function handleRenameFamilyCode() {
+    const code = renameFamCodeInput.trim();
+    if (!code) return;
+    if (code.length < FAMILY_CODE_MIN_LENGTH) {
+      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      return;
+    }
+    if (!isFamilyCodeCharsetValid(code)) {
+      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      return;
+    }
+    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডাটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
+    setRenameFamCodeBusy(true);
+    try {
+      const result = await changeFamilyCodeForExistingFamily(code);
+      if (result && result.aborted) {
+        const reasonMsg = {
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+          charset: "অবৈধ ক্যারেক্টার।",
+          "no-auth": "সাইন ইন করা নেই।",
+          error: result.error || "একটি সমস্যা হয়েছে।"
+        }[result.reason] || "কোড পরিবর্তন করা যায়নি।";
+        window.alert(reasonMsg);
+      }
+      // success হলে changeFamilyCodeForExistingFamily নিজেই reload করে।
+    } finally {
+      setRenameFamCodeBusy(false);
+    }
   }
   function handleGoToArchive() {
     // আর্কাইভে যাওয়া একসাথে মাস ও তারিখ উভয়ই পরিবর্তন করে — তাই তিনটি
@@ -3721,6 +5414,100 @@ function App() {
       alert("দায়িত্ব ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
   }
+  // Admin Visibility UI — একজন claimed সদস্যকে Admin করা। Rules-এ scoped
+  // update clause (adminUids-এ ঠিক ১টা নতুন uid যোগ, বাকি সব অপরিবর্তিত)
+  // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
+  // নিজে দেয় না।
+  async function handleMakeAdmin(m) {
+    if (!m.ownerUid) {
+      alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
+      return;
+    }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
+    const ok = window.confirm(`"${m.name}"-কে এডমিন করতে চান? এডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayUnion(m.ownerUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.includes(m.ownerUid) ? prev : [...prev, m.ownerUid]);
+      // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
+      // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
+      try {
+        await db.collection("families").doc(getFamilyId())
+          .collection("notifications").add({
+            targetUid: m.ownerUid,
+            type: "admin_assigned",
+            message: "আপনাকে এই পরিবারের এডমিন করা হয়েছে।",
+            createdAt: Date.now(),
+            read: false
+          });
+      } catch {}
+    } catch (err) {
+      alert("এডমিন করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  // অন্য একজন Admin-কে পদ থেকে বাদ দেওয়া (নিজেকে নয় — self-demote আলাদা,
+  // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
+  // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
+  async function handleRemoveAdmin(m) {
+    if (!m.ownerUid) return;
+    if (adminUidsList.length <= 1) {
+      alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
+      return;
+    }
+    // §First Admin Protection — client-side pre-check(UX-এর জন্য, আসল
+    // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
+    // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (firstAdminUid && m.ownerUid === firstAdminUid && myUid !== firstAdminUid) {
+      alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
+      return;
+    }
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
+    const ok = window.confirm(`"${m.name}"-কে এডমিন পদ থেকে বাদ দিতে চান?`);
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayRemove(m.ownerUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.filter(u => u !== m.ownerUid));
+    } catch (err) {
+      alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  // নিজের এডমিন পদ ছাড়া (self-demote) — profile dropdown থেকে, ইচ্ছাকৃতভাবে
+  // member-list বাটন থেকে আলাদা রাখা হয়েছে যাতে ভুল ক্লিকে নিজে lock-out
+  // না হয়ে যান।
+  async function handleSelfDemote() {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (!myUid) return;
+    if (adminUidsList.length <= 1) {
+      alert("আপনিই একমাত্র এডমিন — এই মুহূর্তে নিজের এডমিন পদ ছাড়তে পারবেন না। আগে অন্য কাউকে এডমিন করুন।");
+      return;
+    }
+    const ok = window.confirm("আপনি কি নিশ্চিত নিজের এডমিন পদ ছাড়তে চান?");
+    if (!ok) return;
+    try {
+      await db.collection("families").doc(getFamilyId()).update({
+        adminUids: firebase.firestore.FieldValue.arrayRemove(myUid),
+        updatedAt: Date.now()
+      });
+      setAdminUidsList(prev => prev.filter(u => u !== myUid));
+      setIsAdmin(false);
+      setShowProfileDropdown(false);
+    } catch (err) {
+      alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
+    }
+  }
   async function handleGoogleSignOut() {
     setIsMenuOpen(false);
     setShowAccountMenu(false);
@@ -3860,6 +5647,21 @@ function App() {
     color: "var(--theme-primary)",
     size: 32
   }));
+  // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
+  // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
+  // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
+  if (accessPending) return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-lg font-semibold",
+    style: { color: "var(--theme-primary)", fontFamily: "'Noto Serif Bengali', serif" }
+  }, "অনুমোদনের অপেক্ষায়"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-gray-600 max-w-xs"
+  }, "এই পরিবারের ডাটা দেখতে এডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
+    className: "px-4 py-2 rounded-2xl border shadow-sm bg-white",
+    style: { color: "var(--theme-primary)" },
+    onClick: () => window.location.reload()
+  }, "রিফ্রেশ করুন"));
   if (printMode) {
     const total = monthStats.total;
     const rows = Array.from({
@@ -4227,14 +6029,26 @@ function App() {
   }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
-      setShowFamilyCodeModal(true);
+      setShowFamilyCodeChoiceModal(true);
       setIsMenuOpen(false);
     },
     className: "text-slate-500 hover:text-emerald-800 shrink-0 ml-2",
     title: "ফ্যামিলি কোড পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))), isAdmin && /*#__PURE__*/React.createElement("div", {
+    className: "px-2 py-1 border-t border-slate-100"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setIsMenuOpen(false);
+      setShowAccessRequestsModal(true);
+      loadPendingAccessRequests();
+    },
+    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
+  }, /*#__PURE__*/React.createElement(UsersIcon, {
+    size: 13
+  }), " প্রবেশাধিকার অনুরোধ")), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
@@ -4282,7 +6096,29 @@ function App() {
     title: "অন্য ডিভাইসের দায়িত্বে আছে — শুধুমাত্র সেই ডিভাইস থেকেই দায়িত্ব ছাড়া যাবে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 9
-  }), " সংরক্ষিত"), /*#__PURE__*/React.createElement("button", {
+  }), " সংরক্ষিত"), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
+    title: "এডমিন"
+  }, "এডমিন"), m.ownerUid && firstAdminUid && m.ownerUid === firstAdminUid && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
+    title: "প্রথম এডমিন — শুধু ইনিই নিজে পদ ছাড়তে পারেন"
+  }, "প্রথম এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleMakeAdmin(m);
+    },
+    disabled: isLockedForSwitch,
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
+    title: "এডমিন করুন"
+  }, "Make Admin"), isAdmin && m.ownerUid && adminUidsList.includes(m.ownerUid) && m.ownerUid !== (auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleRemoveAdmin(m);
+    },
+    disabled: isLockedForSwitch,
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+    title: "এডমিন পদ থেকে বাদ দিন"
+  }, "Remove Admin"), /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleRemoveMember(m);
@@ -4452,14 +6288,99 @@ function App() {
   }), " Google অ্যাকাউন্ট (রিকমন্ডেড)")))))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm",
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setShowProfileDropdown(v => !v);
+    },
+    className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform",
     style: {
       background: "#C89B3C",
       color: "#16302B"
     }
   }, /*#__PURE__*/React.createElement(User, {
     size: 13
-  }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন"), /*#__PURE__*/React.createElement("div", {
+  }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন", /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 12,
+    className: `transition-transform duration-200 ${showProfileDropdown ? "rotate-180" : ""}`
+  })), showProfileDropdown && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-40",
+    onClick: () => setShowProfileDropdown(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
+  }, (() => {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const ownMember = (members || []).find(x => x.ownerUid && myUid && x.ownerUid === myUid) || null;
+    const amAdmin = !!(myUid && adminUidsList.includes(myUid));
+    let sinceText = null;
+    if (ownMember && ownMember.createdAt) {
+      const d = new Date(ownMember.createdAt);
+      sinceText = `${toBn(d.getDate())} ${BN_MONTHS[d.getMonth()]} ${toBn(d.getFullYear())}`;
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "px-4 py-2 border-b border-slate-100"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "font-bold text-emerald-900 text-sm"
+    }, ownMember ? ownMember.name : (selectedMember ? selectedMember.name : "প্রোফাইল")), /*#__PURE__*/React.createElement("span", {
+      className: `inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
+    }, amAdmin ? "এডমিন" : "সদস্য")), /*#__PURE__*/React.createElement("div", {
+      className: "px-4 py-2 space-y-1 text-slate-500"
+    }, sinceText && /*#__PURE__*/React.createElement("div", null, "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
+      className: "text-slate-700"
+    }, sinceText)), /*#__PURE__*/React.createElement("div", null, "গুগল সংযুক্ত: ", /*#__PURE__*/React.createElement("b", {
+      className: "text-slate-700"
+    }, isGoogleLinked() ? "হ্যাঁ" : "না"))), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleSelfDemote(),
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
+    }, "নিজের এডমিন পদ ছাড়ুন")), !amAdmin && /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        setShowProfileDropdown(false);
+        setShowRecoveryClaim(true);
+      },
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-700 text-xs font-semibold"
+    }, "Recovery Key দিয়ে Admin ফিরে পান")));
+  })()))), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setShowNotifPanel(v => !v);
+    },
+    className: "relative p-1.5 rounded-xl bg-white/10 border border-white/10 text-white active:scale-95 transition-transform",
+    title: "নোটিফিকেশন"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm leading-none"
+  }, "🔔"), notifications.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
+  }, toBn(notifications.length))), showNotifPanel && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-40",
+    onClick: () => setShowNotifPanel(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs max-h-72 overflow-y-auto"
+  }, notifications.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-3 text-slate-400 text-center"
+  }, "কোনো নতুন নোটিফিকেশন নেই") : notifications.map(n => /*#__PURE__*/React.createElement("div", {
+    key: n.id,
+    onClick: () => {
+      db.collection("families").doc(getFamilyId())
+        .collection("notifications").doc(n.id)
+        .update({ read: true }).catch(() => {});
+    },
+    className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-semibold text-slate-700"
+  }, n.message), n.createdAt && /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400 mt-0.5"
+  }, new Date(n.createdAt).toLocaleString("bn-BD"))))))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl shrink-0 border border-white/10"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm"
@@ -4563,6 +6484,23 @@ function App() {
     className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
   }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডাটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissMonthlyReminder,
+    className: "text-white/70 hover:text-white shrink-0"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 16
+  })))), codeChangeNotice && /*#__PURE__*/React.createElement("div", {
+    className: "px-5 mt-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-[#0E4B43] rounded-2xl p-4 flex items-start gap-3 shadow-sm"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "🔔"), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-white"
+  }, "আপনাদের ফ্যামিলি কোড এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
+  }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCodeChangeNotice(null),
     className: "text-white/70 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
@@ -5029,32 +6967,244 @@ function App() {
   }, "দেখুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowArchiveModal(false),
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
+  }, "বাতিল")))), showFamilyCodeChoiceModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-3 text-slate-800"
+  }, "ফ্যামিলি কোড"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setNewFamCodeInput("");
+      setShowCreateNewFamilyModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " নতুন ফ্যামিলি কোড তৈরি করুন"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setRenameFamCodeInput("");
+      setShowRenameFamilyCodeModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setJoinFamCodeInput("");
+      setShowJoinFamilyModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowFamilyCodeChoiceModal(false),
+    className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
+  }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "কাস্টম ফ্যামিলি কোড সেট করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নতুন ফ্যামিলি কোড তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "একটি অনন্য কোড দিন (যেমন: Fam-Khan-2026) যেন পরিবারের অন্য সদস্যরা এটি ব্যবহার করে ডাটা সিংক করতে পারে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
-    value: customFamCodeInput,
-    onChange: e => setCustomFamCodeInput(e.target.value),
+  }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+    value: newFamCodeInput,
+    onChange: e => setNewFamCodeInput(e.target.value),
     placeholder: "যেমন: Fam-Khan-2026",
     maxLength: 30,
+    disabled: newFamCodeBusy,
     className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
   }), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleSaveCustomFamilyCode,
-    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold"
-  }, "সেভ ও সিংক করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowFamilyCodeModal(false),
+    onClick: handleCreateNewFamily,
+    disabled: newFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, newFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "তৈরি করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowCreateNewFamilyModal(false),
+    disabled: newFamCodeBusy,
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
+  }, "বাতিল")))), showJoinFamilyModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-1 text-slate-800"
+  }, "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+    value: joinFamCodeInput,
+    onChange: e => setJoinFamCodeInput(e.target.value),
+    placeholder: "যেমন: FAM-XXXXXXXXX",
+    maxLength: 30,
+    disabled: joinFamCodeBusy,
+    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleJoinExistingFamily,
+    disabled: joinFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, joinFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "যোগ দিন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowJoinFamilyModal(false),
+    disabled: joinFamCodeBusy,
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+  }, "বাতিল")))), showRenameFamilyCodeModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-1 text-slate-800"
+  }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
+    value: renameFamCodeInput,
+    onChange: e => setRenameFamCodeInput(e.target.value),
+    placeholder: "নতুন কোড লিখুন",
+    maxLength: 30,
+    disabled: renameFamCodeBusy,
+    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleRenameFamilyCode,
+    disabled: renameFamCodeBusy,
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+  }, renameFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 14
+  }) : "কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowRenameFamilyCodeModal(false),
+    disabled: renameFamCodeBusy,
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+  }, "বাতিল")))), showAccessRequestsModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800"
+  }, "প্রবেশাধিকার অনুরোধ"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAccessRequestsModal(false)
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 18,
+    className: "text-slate-400"
+  }))), loadingAccessRequests ? /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-center py-6"
+  }, /*#__PURE__*/React.createElement(Loader2, {
+    className: "animate-spin",
+    size: 20,
+    color: "var(--theme-primary)"
+  })) : pendingAccessRequests.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 py-3 text-center"
+  }, "কোনো পেন্ডিং অনুরোধ নেই।") : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 max-h-72 overflow-y-auto"
+  }, pendingAccessRequests.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "flex items-center justify-between gap-2 border border-slate-100 rounded-xl px-3 py-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] text-slate-600 truncate",
+    title: r.id
+  }, r.id.slice(0, 10) + "…"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 shrink-0"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => decideAccessRequest(r.id, "approved"),
+    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-700 text-white"
+  }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => decideAccessRequest(r.id, "denied"),
+    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
+  }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
-  }), showBackupOptionsModal && /*#__PURE__*/React.createElement("div", {
+    onLinked: checkDriveBackupAfterLink,
+    onFirstAdminClaimed: () => {
+      setupRecoveryKeyForCurrentAdmin().then(key => {
+        if (key) {
+          setGeneratedRecoveryKey(key);
+          setShowRecoveryKeyModal(true);
+        }
+      });
+    }
+  }), showRecoveryKeyModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "আপনার Recovery Key"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "আপনি এই পরিবারের প্রথম এডমিন। Admin প্রবেশাধিকার হারালে(নতুন ডিভাইস, cache clear ইত্যাদি) এই key দিয়েই ফিরে পাবেন। এখনই স্ক্রিনশট নিন বা নিরাপদ জায়গায় লিখে রাখুন — এটি আর কখনো দেখানো হবে না।"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-center mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-bold text-emerald-900 tracking-wider select-all"
+  }, generatedRecoveryKey)), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mb-3"
+  }, "মনে রাখবেন: এটি শুধু আপনার Admin পরিচয় ফিরে পাওয়ার চাবি — এটি দিয়ে হারানো ডাটা ফিরে পাওয়া যাবে না।"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowRecoveryKeyModal(false);
+      setGeneratedRecoveryKey(null);
+    },
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
+  }, "সংরক্ষণ করেছি, বন্ধ করুন"))), showRecoveryClaim && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "Recovery Key দিয়ে Admin ফিরে পান"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "এই পরিবারের প্রথম এডমিন সেটআপের সময় যে Recovery Key সংরক্ষণ করা হয়েছিল, সেটি দিন।"), /*#__PURE__*/React.createElement("input", {
+    value: recoveryKeyInput,
+    onChange: e => setRecoveryKeyInput(e.target.value),
+    placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: recoveryClaimBusy || !recoveryKeyInput.trim(),
+    onClick: async () => {
+      setRecoveryClaimBusy(true);
+      try {
+        const res = await claimAdminWithRecoveryKey(recoveryKeyInput);
+        if (res.ok) {
+          const myUid = auth.currentUser ? auth.currentUser.uid : null;
+          setIsAdmin(true);
+          setAdminUidsList(prev => myUid && !prev.includes(myUid) ? [...prev, myUid] : prev);
+          setShowRecoveryClaim(false);
+          setRecoveryKeyInput("");
+          alert("Admin প্রবেশাধিকার ফিরে পেয়েছেন।");
+        } else {
+          alert("Recovery Key মেলেনি — আবার চেষ্টা করুন।");
+        }
+      } finally {
+        setRecoveryClaimBusy(false);
+      }
+    },
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, recoveryClaimBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowRecoveryClaim(false);
+      setRecoveryKeyInput("");
+    },
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল")))), showBackupOptionsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -5573,7 +7723,8 @@ function signOutToFreshAnonymous() {
 }
 function GoogleAccountModal({
   onClose,
-  onLinked
+  onLinked,
+  onFirstAdminClaimed
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -5597,7 +7748,8 @@ function GoogleAccountModal({
       // case-এ (অন্য ডিভাইস থেকে আগে link করা account, ভিন্ন family)
       // ইচ্ছাকৃতভাবে claim করা হচ্ছে না — সেই family-এর Admin status
       // ইতিমধ্যে নির্ধারিত থাকার কথা, ভুলভাবে নতুন claim এড়াতে।
-      await claimFirstAdminIfEligible();
+      const justClaimed = await claimFirstAdminIfEligible();
+      if (justClaimed && onFirstAdminClaimed) onFirstAdminClaimed();
       onClose();
       // সাইন-ইন সফল — এই Google অ্যাকাউন্টে আগে থেকে কোনো Drive ব্যাকআপ
       // থাকলে detect করে Restore-এর Popup দেখানোর সুযোগ App-কে দেওয়া হচ্ছে।
