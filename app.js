@@ -1587,6 +1587,30 @@ async function cleanupOrphanFamilies(orphanFamilyIds) {
 if (typeof window !== "undefined") {
   window.cleanupOrphanFamilies = cleanupOrphanFamilies;
 }
+// --- Data Lifecycle Policy: one-time lastActiveAt backfill (owner-approved,
+// ১৪ আগস্ট ২০২৬) — console-only, dry-run first, প্রতিটি real family-তে ম্যানুয়ালি
+// familyId পাস করে চালাতে হবে। Baseline = আজকের timestamp (conservative — কোনো
+// সদস্য/family ভুলবশত early-inactive হিসেবে চিহ্নিত হবে না)। Idempotent: আগে থেকে
+// lastActiveAt থাকা doc merge:true-তে override হয় (re-run নিরাপদ, ক্ষতি নেই)।
+async function backfillLastActiveAt(familyId, confirm) {
+  const familyRoot = db.collection("families").doc(familyId);
+  const membersSnap = await familyRoot.collection("members").get();
+  console.log(`[Lifecycle backfill] familyId=${familyId} — ${membersSnap.size}টি member doc + ১টি family doc lastActiveAt পাবে।`);
+  if (!confirm) {
+    console.log("[Lifecycle backfill] dry-run শেষ — আসল লেখা চালাতে backfillLastActiveAt(familyId, true) কল করুন।");
+    return { familyId, memberCount: membersSnap.size, dryRun: true };
+  }
+  const ts = firebase.firestore.Timestamp.now();
+  const batch = db.batch();
+  membersSnap.docs.forEach(d => batch.set(d.ref, { lastActiveAt: ts }, { merge: true }));
+  batch.set(familyRoot, { lastActiveAt: ts }, { merge: true });
+  await batch.commit();
+  console.log(`[Lifecycle backfill] সম্পন্ন — familyId=${familyId}, ${membersSnap.size}টি member + family doc আপডেট হয়েছে।`);
+  return { familyId, memberCount: membersSnap.size, dryRun: false };
+}
+if (typeof window !== "undefined") {
+  window.backfillLastActiveAt = backfillLastActiveAt;
+}
 // --- users/{uid} <-> familyCode mapping (Google-account-based recovery) ---
 // ছোট, ঐচ্ছিক কালেকশন — Google-linked uid-কে familyCode-এর সাথে যুক্ত রাখে
 // যাতে নতুন ডিভাইসে বা cache-clear-এর পরও শুধু Google sign-in করলেই সঠিক
@@ -3598,6 +3622,12 @@ function meetingKey(year, month0) {
 }
 async function saveMeetingData(year, month0, data) {
   await appStorage.set(meetingKey(year, month0), JSON.stringify(data), true);
+  // Data Lifecycle Policy: family-level activity stamp. Meeting doc lives in
+  // getCollectionName() (v2 schema migration deferred — see roadmap), so this
+  // is a separate write, not part of that batch.
+  db.collection("families").doc(getFamilyId()).set({
+    lastActiveAt: firebase.firestore.Timestamp.now()
+  }, { merge: true }).catch(() => {});
 }
 async function loadWeekly(migrationState, memberId, year, month0) {
   try {
@@ -3611,13 +3641,16 @@ async function loadWeekly(migrationState, memberId, year, month0) {
 }
 async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))).set({
+  const batch = db.batch();
+  batch.set(ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
   }, {
     merge: true
   });
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  await batch.commit();
 }
 // --- Legacy (v1) member storage — single "members" doc holding a JSON array.
 // Kept ONLY as a one-time migration source; do not write to it anymore.
@@ -3672,6 +3705,18 @@ function resolvePathContext(migrationState, familyCode, familyId) {
   };
 }
 
+// --- Data Lifecycle Policy: activity stamp (owner-approved, ১৪ আগস্ট ২০২৬) ---
+// lastActiveAt শুধুমাত্র inactivity/TTL cleanup-এর জন্য — ইচ্ছাকৃতভাবে নেটিভ
+// Firestore Timestamp (app-এর বাকি সব timestamp ফিল্ডের মতো Date.now()
+// epoch-number না), কারণ Firestore-এর TTL Policy শুধু native Timestamp
+// ফিল্ডে কাজ করে। এটা existing `updatedAt` (conflict-resolution/backup-merge
+// semantics)-কে স্পর্শ করে না — সম্পূর্ণ আলাদা, dedicated ফিল্ড।
+// memberRef/familyId যেকোনো একটি null দিলে সেই অংশ স্কিপ হয়।
+function stampLastActive(batch, memberRef, familyId) {
+  const ts = firebase.firestore.Timestamp.now();
+  if (memberRef) batch.set(memberRef, { lastActiveAt: ts }, { merge: true });
+  if (familyId) batch.set(db.collection("families").doc(familyId), { lastActiveAt: ts }, { merge: true });
+}
 // --- Device-Claim member storage (v2) — one real Firestore document per
 // member (doc id: "member:<id>") with plain top-level fields, so Firestore
 // security rules can read `ownerUid` directly (rules cannot see inside a
@@ -3730,12 +3775,17 @@ async function saveMemberDoc(migrationState, member) {
     ...fields
   } = member;
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.membersRef.doc(ctx.memberDocId(id)).set({
+  const memberRef = ctx.membersRef.doc(ctx.memberDocId(id));
+  const batch = db.batch();
+  batch.set(memberRef, {
     ...fields,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    lastActiveAt: firebase.firestore.Timestamp.now()
   }, {
     merge: true
   });
+  stampLastActive(batch, null, getFamilyId());
+  await batch.commit();
 }
 async function deleteMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -3830,13 +3880,16 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   // future Firestore rules can check request.auth.uid == resource.data.ownerUid
   // directly on this same document (no extra get() lookup needed).
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).set({
+  const batch = db.batch();
+  batch.set(ctx.entriesRef.doc(ctx.entryDocId(memberId, key)), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
   }, {
     merge: true
   });
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  await batch.commit();
 }
 function entryDocId(memberId, key) {
   return `entry:${memberId}:${key}`;
