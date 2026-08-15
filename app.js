@@ -280,6 +280,7 @@ async function createNewFamily(newCode) {
       try {
         await db.collection("families").doc(newFamilyId).update({
           adminUids: [auth.currentUser.uid],
+          firstAdminUid: auth.currentUser.uid,
           updatedAt: Date.now()
         });
       } catch (claimErr) {
@@ -6333,29 +6334,7 @@ function App() {
     title: "ফ্যামিলি কোড পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  })))), isAdmin && /*#__PURE__*/React.createElement("div", {
-    className: "px-2 py-1 border-t border-slate-100"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setIsMenuOpen(false);
-      setShowAccessRequestsModal(true);
-      loadPendingAccessRequests();
-    },
-    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
-  }, /*#__PURE__*/React.createElement(UsersIcon, {
-    size: 13
-  }), " প্রবেশাধিকার অনুরোধ"), migrationState === "v2" && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setIsMenuOpen(false);
-      setShowMemberRequestsModal(true);
-      loadPendingMemberRequests();
-    },
-    className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold"
-  }, /*#__PURE__*/React.createElement(UsersIcon, {
-    size: 13
-  }), " সদস্য অনুরোধ")), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
@@ -6379,18 +6358,7 @@ function App() {
     className: "flex items-center gap-1.5"
   }, m.id === selectedId && /*#__PURE__*/React.createElement("span", {
     className: "w-2 h-2 rounded-full bg-emerald-600"
-  }), (migrationState === "v2") && (m.ownerUid === (auth.currentUser && auth.currentUser.uid) || isAdmin) && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      setMemberKeyTarget(m);
-      setMemberKeyValue(null);
-      setMemberKeyRevealed(false);
-      setShowMemberKeyModal(true);
-      fetchMemberKey(m.id).then(setMemberKeyValue).catch(() => setMemberKeyValue(null));
-    },
-    className: "text-[10px] px-1 py-0.5 rounded-md text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 shrink-0",
-    title: "Member Key দেখুন"
-  }, "\uD83D\uDD11"), m.ownerUid === (auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
+  }), m.ownerUid === (auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleReleaseMember(m);
@@ -6407,8 +6375,8 @@ function App() {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0 flex items-center gap-0.5 cursor-default",
     title: "অন্য ডিভাইসের দায়িত্বে আছে — Member Key দিয়ে ফিরে পাওয়া যাবে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
-    size: 9
-  }), " সংরক্ষিত"), /*#__PURE__*/React.createElement("button", {
+    size: 10
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       if (migrationState === "v2") {
@@ -6430,11 +6398,7 @@ function App() {
     disabled: isLockedForSwitch,
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
     title: "এডমিন হিসেবে জোরপূর্বক মুক্ত করুন (অন্য ডিভাইস অনুপস্থিত/lost হলে ব্যবহার করুন)"
-  }, "মুক্ত করুন")), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
-
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
-    title: "এডমিন"
-  }, "এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+  }, "রিসেট করুন")), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
@@ -6681,7 +6645,20 @@ function App() {
       className: "text-slate-700"
     }, sinceText)), /*#__PURE__*/React.createElement("div", null, "গুগল সংযুক্ত: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
-    }, isGoogleLinked() ? "হ্যাঁ" : "না"))), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
+    }, isGoogleLinked() ? "হ্যাঁ" : "না"))), ownMember && /*#__PURE__*/React.createElement("div", {
+      className: "px-2 pt-1 border-t border-slate-100"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        setMemberKeyTarget(ownMember);
+        setMemberKeyValue(null);
+        setMemberKeyRevealed(false);
+        setShowMemberKeyModal(true);
+        setShowProfileDropdown(false);
+        fetchMemberKey(ownMember.id).then(setMemberKeyValue).catch(() => setMemberKeyValue(null));
+      },
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold"
+    }, "আপনার Member Key দেখুন")), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -6729,6 +6706,11 @@ function App() {
       db.collection("families").doc(getFamilyId())
         .collection("notifications").doc(n.id)
         .update({ read: true }).catch(() => {});
+      if (n.type === "member_request") {
+        setShowNotifPanel(false);
+        setShowMemberRequestsModal(true);
+        loadPendingMemberRequests();
+      }
     },
     className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
   }, /*#__PURE__*/React.createElement("div", {
@@ -7649,6 +7631,21 @@ function App() {
         setMyMemberRequestStatus("pending");
         setShowBecomeMemberModal(false);
         setBecomeMemberName("");
+        // §Notification System — সব admin-কে জানানো(device_joined-এর
+        // একই pattern) যাতে refresh ছাড়াই badge/panel-এ দেখা যায়।
+        // Best-effort — ব্যর্থ হলেও মূল request আগেই সফল।
+        try {
+          await Promise.all((adminUidsList || []).map(adminUid =>
+            db.collection("families").doc(getFamilyId())
+              .collection("notifications").add({
+                targetUid: adminUid,
+                type: "member_request",
+                message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
+                createdAt: Date.now(),
+                read: false
+              }).catch(() => {})
+          ));
+        } catch {}
       } catch (err) {
         alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
       } finally {
@@ -8553,7 +8550,12 @@ function OnboardingBridge({
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "Skip করুন")
+      }, "Skip করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "back",
+        onClick: () => onAdvance("keyReveal"),
+        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
+      }, "← ফিরে যান")
     ]);
   }
 
@@ -8573,14 +8575,14 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("button", {
         key: "key",
         onClick: () => onAdvance("keyClaim"),
-        className: "w-full h-12 rounded-2xl border-2 text-base font-bold active:scale-[0.98] transition-transform",
-        style: { borderColor: "#0E4B43", color: "#0E4B43" }
+        className: "w-full h-12 rounded-2xl border-2 text-sm font-bold active:scale-[0.98] transition-transform",
+        style: { borderColor: "#1D7A68", color: "#1D7A68" }
       }, "Member Key দিয়ে Sign-in করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "এখন বাদ দিন")
+      }, "স্কিপ করুন")
     ]);
   }
 
@@ -8718,8 +8720,8 @@ function Onboarding() {
       /*#__PURE__*/React.createElement("button", {
         key: "existing",
         onClick: () => setStep("existingFamily"),
-        className: "w-full max-w-xs h-12 rounded-2xl border-2 text-base font-bold active:scale-[0.98] transition-transform",
-        style: { borderColor: "#0E4B43", color: "#0E4B43" }
+        className: "w-full max-w-xs h-12 rounded-2xl border-2 text-sm font-bold active:scale-[0.98] transition-transform",
+        style: { borderColor: "#1D7A68", color: "#1D7A68" }
       }, "বিদ্যমান Family-এর সদস্য হলে Sign-in করুন")
     ]);
   }
