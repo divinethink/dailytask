@@ -4597,6 +4597,27 @@ function App() {
                 // self-create-এ approved status-ও allow করা হয়েছে।
                 // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
                 await reqRef.set({ status: "approved", requestedAt: Date.now() });
+                // §Notification System — device_joined(নতুন, ১৫ আগস্ট ২০২৬):
+                // auto-approve হওয়ার সাথে সাথে family-র সব admin-কে জানানো,
+                // যাতে অপরিচিত/অপ্রত্যাশিত ডিভাইস ধরা পড়লে admin ম্যানুয়ালি
+                // remove করতে পারেন। Best-effort — ব্যর্থ হলেও মূল approve
+                // flow আগেই সফল, তাই silently ignore।
+                try {
+                  const famSnapForNotif = await db.collection("families").doc(migrationFamilyId).get();
+                  const adminUidsForNotif = famSnapForNotif.exists
+                    ? (famSnapForNotif.data().adminUids || [])
+                    : [];
+                  await Promise.all(adminUidsForNotif.map(adminUid =>
+                    db.collection("families").doc(migrationFamilyId)
+                      .collection("notifications").add({
+                        targetUid: adminUid,
+                        type: "device_joined",
+                        message: "একটি নতুন ডিভাইস Family Code দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
+                        createdAt: Date.now(),
+                        read: false
+                      }).catch(() => {})
+                  ));
+                } catch {}
               }
             }
           } catch {}
@@ -5427,6 +5448,29 @@ function App() {
       alert("দায়িত্ব নিতে সমস্যা হয়েছে: " + err.message);
     }
   }
+  // §Admin Force-Release(নতুন, ১৫ আগস্ট ২০২৬) — অন্য (হয়তো অনুপস্থিত/lost)
+  // ডিভাইসের claim করা member-কে admin জোরপূর্বক unclaim করতে পারবেন,
+  // যাতে সেই ব্যক্তি নতুন ডিভাইস থেকে আবার "দায়িত্ব নিন" দিয়ে claim করতে
+  // পারেন। Rules ইতিমধ্যে admin-কে যেকোনো member-এর ownerUid পরিবর্তনের
+  // অনুমতি দেয় (isAdminOfFamily শাখা) — তাই কোনো Rules পরিবর্তন লাগেনি,
+  // শুধু existing releaseMemberDoc() reuse করা হচ্ছে admin path থেকে।
+  async function handleAdminForceRelease(m) {
+    if (isLockedForSwitch) {
+      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
+      return;
+    }
+    const ok = window.confirm(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে সংরক্ষিত আছে। এডমিন হিসেবে জোরপূর্বক মুক্ত করতে চান? এরপর যেকোনো ডিভাইস এই সদস্যের দায়িত্ব নিতে পারবে (নিশ্চিত হয়ে নিন যে আসল সদস্যই নতুন ডিভাইস থেকে দাবি করবেন)।`);
+    if (!ok) return;
+    try {
+      await releaseMemberDoc(migrationState, m.id);
+      setMembers(prev => prev.map(x => x.id === m.id ? {
+        ...x,
+        ownerUid: null
+      } : x));
+    } catch (err) {
+      alert("জোরপূর্বক মুক্ত করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
   async function handleReleaseMember(m) {
     // Firestore rules-এ isUnownedOrMine() চেক করে — অন্য ডিভাইসের claim
     // করা সদস্যকে release করার চেষ্টা করলে সার্ভার সবসময় reject করবে
@@ -5554,6 +5598,14 @@ function App() {
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
   // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
   async function handleFullLogout() {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const amAdmin = !!(myUid && adminUidsList.includes(myUid));
+    if (amAdmin && !isGoogleLinked()) {
+      const warnOk = window.confirm("⚠️ আপনি এই পরিবারের এডমিন এবং আপনার Google অ্যাকাউন্ট সংযুক্ত নেই। লগআউট করলে নতুন ডিভাইস/session থেকে আবার এডমিন অ্যাক্সেস ফিরে পেতে সমস্যা হতে পারে। আগে Google অ্যাকাউন্ট সংযুক্ত করার পরামর্শ দেওয়া হচ্ছে (Recovery Key দিয়েও ফিরে পাওয়া যাবে)। তারপরও কি লগআউট করতে চান?");
+      if (!warnOk) return;
+      const confirmAgainOk = window.confirm("আপনি নিশ্চিত? এডমিন হিসেবে Google-link ছাড়া লগআউট করলে re-access জটিল হতে পারে। চূড়ান্তভাবে আগাতে চান?");
+      if (!confirmAgainOk) return;
+    }
     const ok = window.confirm("আপনি লগআউট করলে এই ডিভাইস থেকে family code ও Google session — দুটোই মুছে যাবে। আবার প্রবেশ করতে Family Code লাগবে। আগান?");
     if (!ok) return;
     try {
@@ -6148,6 +6200,8 @@ function App() {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
     title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
   }, "আপনার") : /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement("span", {
     onClick: e => {
       e.stopPropagation();
     },
@@ -6155,13 +6209,18 @@ function App() {
     title: "অন্য ডিভাইসের দায়িত্বে আছে — শুধুমাত্র সেই ডিভাইস থেকেই দায়িত্ব ছাড়া যাবে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 9
-  }), " সংরক্ষিত"), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
+  }), " সংরক্ষিত"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleAdminForceRelease(m);
+    },
+    disabled: isLockedForSwitch,
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+    title: "এডমিন হিসেবে জোরপূর্বক মুক্ত করুন (অন্য ডিভাইস অনুপস্থিত/lost হলে ব্যবহার করুন)"
+  }, "মুক্ত করুন")), m.ownerUid && adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[#8a6a1f] border border-[#C89B3C]/40 shrink-0",
     title: "এডমিন"
-  }, "এডমিন"), m.id && firstAdminOwnMemberId && m.id === firstAdminOwnMemberId && /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
-    title: "প্রথম এডমিন — শুধু ইনিই নিজে পদ ছাড়তে পারেন"
-  }, "প্রথম এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+  }, "এডমিন"), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
@@ -6384,7 +6443,7 @@ function App() {
       className: "font-bold text-emerald-900 text-sm"
     }, ownMember ? ownMember.name : (selectedMember ? selectedMember.name : "প্রোফাইল")), /*#__PURE__*/React.createElement("span", {
       className: `inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
-    }, amAdmin ? "এডমিন" : "সদস্য")), /*#__PURE__*/React.createElement("div", {
+    }, amAdmin ? (myUid && firstAdminUid && myUid === firstAdminUid ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য")), /*#__PURE__*/React.createElement("div", {
       className: "px-4 py-2 space-y-1 text-slate-500"
     }, sinceText && /*#__PURE__*/React.createElement("div", null, "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
