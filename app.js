@@ -4380,6 +4380,33 @@ function App() {
   const [becomeMemberGender, setBecomeMemberGender] = useState("male");
   const [becomeMemberBusy, setBecomeMemberBusy] = useState(false);
   const [myMemberRequestStatus, setMyMemberRequestStatus] = useState(null);
+  // §Onboarding continuation — Family Code submit-এর পরে reload হওয়া
+  // সত্ত্বেও Onboarding() flow ধারাবাহিক রাখতে। sessionStorage flag
+  // Onboarding()-এ সেট হয়েছে; এখানে শুধু পড়া+ধাপ-অনুসরণ। কোনো নতুন
+  // Firestore collection/rule নেই — শুধু existing modal/function সঠিক
+  // ক্রমে auto-trigger হয় (OnboardingBridge কম্পোনেন্ট, নিচে render)।
+  const [onbFlow] = useState(() => {
+    try { return sessionStorage.getItem("dt_onboarding_flow"); } catch { return null; }
+  });
+  const [onbStep, setOnbStepRaw] = useState(() => {
+    try { return sessionStorage.getItem("dt_onboarding_step"); } catch { return null; }
+  });
+  function onbAdvance(nextStep) {
+    setOnbStepRaw(nextStep);
+    try {
+      if (nextStep) {
+        sessionStorage.setItem("dt_onboarding_step", nextStep);
+      } else {
+        sessionStorage.removeItem("dt_onboarding_step");
+        sessionStorage.removeItem("dt_onboarding_flow");
+      }
+    } catch {}
+  }
+  useEffect(() => {
+    if (onbFlow && !onbStep) {
+      onbAdvance(onbFlow === "newFamily" ? "addMember" : "choose");
+    }
+  }, [onbFlow]);
   const [showMemberRequestsModal, setShowMemberRequestsModal] = useState(false);
   const [pendingMemberRequests, setPendingMemberRequests] = useState([]);
   const [loadingMemberRequests, setLoadingMemberRequests] = useState(false);
@@ -7452,6 +7479,23 @@ function App() {
   }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
     onLinked: checkDriveBackupAfterLink
+  }), onbStep && /*#__PURE__*/React.createElement(OnboardingBridge, {
+    flow: onbFlow,
+    step: onbStep,
+    onAdvance: onbAdvance,
+    isAdmin: isAdmin,
+    myUid: auth.currentUser ? auth.currentUser.uid : null,
+    familyCode: getFamilyCode(),
+    members: members,
+    setMembers: setMembers,
+    setSelectedId: setSelectedId,
+    showGoogleAccountModal: showGoogleAccountModal,
+    setShowGoogleAccountModal: setShowGoogleAccountModal,
+    showBecomeMemberModal: showBecomeMemberModal,
+    setShowBecomeMemberModal: setShowBecomeMemberModal,
+    showClaimKeyModal: showClaimKeyModal,
+    setClaimKeyTarget: setClaimKeyTarget,
+    setShowClaimKeyModal: setShowClaimKeyModal
   }),
 
   // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
@@ -8312,6 +8356,268 @@ function GoogleAccountModal({
 // modal, "সদস্য হোন" modal, pending-approval screen) স্বাভাবিকভাবেই
 // দেখা যাবে। এখানে সেসবের কোনো কিছু duplicate করা হয়নি, existing
 // business logic-ও ছোঁয়া হয়নি।
+// §Onboarding continuation — Family Code দেওয়ার পরে (নতুন Family হলে
+// নাম/Gender/Google/Key-reveal/Sharing, বিদ্যমান Family হলে Google/
+// Member-Key/"সদস্য হোন") existing modal/function-গুলো সঠিক ক্রমে
+// auto-trigger করে। কোনো নতুন Firestore logic নেই — শুধু existing
+// createMemberWithKey()/GoogleAccountModal/claimKeyModal/
+// becomeMemberModal wiring। App()-এর ভিতরের state/setter props হিসেবে
+// পাস করা হয়েছে যাতে App()-এর existing modal ঠিক সেগুলোই reuse করে,
+// duplicate না হয়।
+function OnboardingBridge({
+  flow, step, onAdvance,
+  isAdmin, myUid, familyCode,
+  members, setMembers, setSelectedId,
+  showGoogleAccountModal, setShowGoogleAccountModal,
+  showBecomeMemberModal, setShowBecomeMemberModal,
+  showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal
+}) {
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState("male");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [newKey, setNewKey] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const prevGoogleOpen = useRef(false);
+  const prevBecomeOpen = useRef(false);
+  const prevClaimOpen = useRef(false);
+
+  // google/becomeMember ধাপে existing modal auto-open।
+  useEffect(() => {
+    if (step === "google" && !showGoogleAccountModal) setShowGoogleAccountModal(true);
+    if (step === "becomeMember" && !showBecomeMemberModal) setShowBecomeMemberModal(true);
+  }, [step]);
+
+  // Google modal বন্ধ হলে পরবর্তী ধাপ নির্ধারণ — নতুন Family হলে সরাসরি
+  // key-reveal; বিদ্যমান Family হলে UID match করলে done, না করলে
+  // "সদস্য হোন"।
+  useEffect(() => {
+    if (prevGoogleOpen.current && !showGoogleAccountModal && step === "google") {
+      if (flow === "newFamily") {
+        onAdvance("keyReveal");
+      } else {
+        const matched = !!(myUid && (members || []).some(m => m.ownerUid === myUid));
+        onAdvance(matched ? null : "becomeMember");
+      }
+    }
+    prevGoogleOpen.current = showGoogleAccountModal;
+  }, [showGoogleAccountModal]);
+
+  // "সদস্য হোন" মোডাল বন্ধ হলে onboarding সম্পূর্ণ — pending status
+  // existing myMemberRequestStatus UI নিজে থেকেই দেখাবে।
+  useEffect(() => {
+    if (prevBecomeOpen.current && !showBecomeMemberModal && step === "becomeMember") {
+      onAdvance(null);
+    }
+    prevBecomeOpen.current = showBecomeMemberModal;
+  }, [showBecomeMemberModal]);
+
+  // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
+  useEffect(() => {
+    if (prevClaimOpen.current && !showClaimKeyModal && step === "keyClaim") {
+      const matched = !!(myUid && (members || []).some(m => m.ownerUid === myUid));
+      if (matched) onAdvance(null);
+    }
+    prevClaimOpen.current = showClaimKeyModal;
+  }, [showClaimKeyModal, members]);
+
+  if (!step) return null;
+
+  const shell = children => /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100 text-center flex flex-col gap-3 items-center"
+  }, children));
+
+  if (step === "addMember") {
+    return shell([
+      /*#__PURE__*/React.createElement("div", {
+        key: "title",
+        className: "text-base font-semibold",
+        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+      }, "আপনার নাম লিখুন"),
+      /*#__PURE__*/React.createElement("input", {
+        key: "name",
+        type: "text",
+        value: name,
+        onChange: e => setName(e.target.value),
+        placeholder: "আপনার নাম",
+        disabled: busy,
+        className: "w-full h-11 px-4 rounded-xl border border-slate-200 text-sm text-center outline-none"
+      }),
+      /*#__PURE__*/React.createElement("div", {
+        key: "gender",
+        className: "flex gap-2 w-full"
+      }, ["male", "female"].map(g => /*#__PURE__*/React.createElement("button", {
+        key: g,
+        disabled: busy,
+        onClick: () => setGender(g),
+        className: "flex-1 h-10 rounded-xl text-xs font-bold border " + (gender === g ? "bg-[#0E4B43] text-white border-[#0E4B43]" : "border-slate-200 text-slate-600")
+      }, g === "male" ? "ছেলে" : "মেয়ে"))),
+      error && /*#__PURE__*/React.createElement("p", {
+        key: "err",
+        className: "text-xs text-red-600"
+      }, error),
+      /*#__PURE__*/React.createElement("button", {
+        key: "submit",
+        disabled: busy || !name.trim(),
+        onClick: async () => {
+          setBusy(true);
+          setError(null);
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          const newMember = {
+            id, name: name.trim(), gender, ownerUid: myUid,
+            createdAt: Date.now(), updatedAt: Date.now()
+          };
+          try {
+            const key = await createMemberWithKey(newMember);
+            setMembers(prev => [...(prev || []), newMember]);
+            setSelectedId(id);
+            setNewKey(key);
+            onAdvance("keyReveal");
+          } catch (err) {
+            setError("সমস্যা হয়েছে: " + err.message);
+          } finally {
+            setBusy(false);
+          }
+        },
+        className: "w-full h-11 rounded-xl text-white text-sm font-bold disabled:opacity-60",
+        style: { background: "#0E4B43" }
+      }, busy ? "..." : "এগিয়ে যান")
+    ]);
+  }
+
+  if (step === "keyReveal") {
+    return shell([
+      /*#__PURE__*/React.createElement("div", {
+        key: "title",
+        className: "text-base font-semibold",
+        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+      }, "আপনার Member Key: •••••••••"),
+      /*#__PURE__*/React.createElement("div", {
+        key: "key",
+        className: "w-full py-3 rounded-xl bg-slate-50 border border-slate-200 text-lg tracking-widest font-mono"
+      }, newKey || "—"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "note",
+        className: "text-xs text-slate-500"
+      }, "এই Key-টি মনে রাখুন অথবা নিরাপদে সংরক্ষণ করুন। যেকোনো সময় পরিবর্তন করতে পারবেন। Google Sign-in ছাড়া নতুন কোনো device-এ identity ফিরে পেতে এই Key প্রয়োজন হবে।"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "copy",
+        onClick: () => {
+          if (newKey && navigator.clipboard) {
+            navigator.clipboard.writeText(newKey).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }).catch(() => {});
+          }
+        },
+        className: "text-xs font-bold text-emerald-800 underline"
+      }, copied ? "কপি হয়েছে" : "কপি করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "next",
+        onClick: () => onAdvance("share"),
+        className: "w-full h-11 rounded-xl text-white text-sm font-bold",
+        style: { background: "#0E4B43" }
+      }, "এগিয়ে যান")
+    ]);
+  }
+
+  if (step === "share") {
+    return shell([
+      /*#__PURE__*/React.createElement("p", {
+        key: "text",
+        className: "text-sm text-slate-600"
+      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। আবার Family Code শেয়ার করে আপনার পরিবার বা দ্বীনি সার্কেলের সঙ্গে Daily Task sync করতে পারেন।"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "share",
+        onClick: async () => {
+          const text = `আপনাকে Daily Task app-এ পরিবারের সদস্য হিসেবে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হচ্ছে। Family Code: ${familyCode}`;
+          try {
+            if (navigator.share) {
+              await navigator.share({ title: "Daily Task", text });
+            } else if (navigator.clipboard) {
+              await navigator.clipboard.writeText(text);
+              alert("বার্তা কপি হয়েছে, এখন পাঠিয়ে দিন।");
+            }
+          } catch (err) {
+            // AbortError(ব্যবহারকারী নিজেই বাতিল করেছেন) সহ যেকোনো ত্রুটিতে
+            // নীরবে onboarding সম্পন্ন ধরা হচ্ছে — sharing বাধ্যতামূলক নয়।
+          }
+          onAdvance(null);
+        },
+        className: "w-full h-11 rounded-xl text-white text-sm font-bold",
+        style: { background: "#0E4B43" }
+      }, "পরিবারের সদস্য বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "skip",
+        onClick: () => onAdvance(null),
+        className: "text-xs text-slate-500 underline"
+      }, "Skip করুন")
+    ]);
+  }
+
+  if (step === "choose") {
+    return shell([
+      /*#__PURE__*/React.createElement("div", {
+        key: "title",
+        className: "text-base font-semibold",
+        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+      }, "আপনার পরিচয় ফিরে পান"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "google",
+        onClick: () => onAdvance("google"),
+        className: "w-full h-11 rounded-xl text-white text-sm font-bold",
+        style: { background: "#0E4B43" }
+      }, "Google Account দিয়ে Sign-in করুন (Recommended)"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "key",
+        onClick: () => onAdvance("keyClaim"),
+        className: "w-full h-11 rounded-xl border text-sm font-bold",
+        style: { borderColor: "#0E4B43", color: "#0E4B43" }
+      }, "Member Key দিয়ে Sign-in করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "skip",
+        onClick: () => onAdvance(null),
+        className: "text-xs text-slate-500 underline"
+      }, "এখন বাদ দিন")
+    ]);
+  }
+
+  if (step === "keyClaim") {
+    const list = members || [];
+    return shell([
+      /*#__PURE__*/React.createElement("div", {
+        key: "title",
+        className: "text-base font-semibold",
+        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+      }, "আপনার নাম বেছে নিন"),
+      list.length === 0 ? /*#__PURE__*/React.createElement("p", {
+        key: "empty",
+        className: "text-xs text-slate-500"
+      }, "লোড হচ্ছে বা কোনো সদস্য পাওয়া যায়নি।") : /*#__PURE__*/React.createElement("div", {
+        key: "list",
+        className: "w-full flex flex-col gap-2 max-h-60 overflow-y-auto"
+      }, list.map(m => /*#__PURE__*/React.createElement("button", {
+        key: m.id,
+        onClick: () => { setClaimKeyTarget(m); setShowClaimKeyModal(true); },
+        className: "w-full h-10 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      }, m.name))),
+      /*#__PURE__*/React.createElement("button", {
+        key: "become",
+        onClick: () => onAdvance("becomeMember"),
+        className: "text-xs text-emerald-800 underline"
+      }, "তালিকায় নেই, নতুন সদস্য হিসেবে যোগ দিন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "done",
+        onClick: () => onAdvance(null),
+        className: "text-xs text-slate-500 underline"
+      }, "পরে করব")
+    ]);
+  }
+
+  return null;
+}
 function Onboarding() {
   const [step, setStep] = useState("welcome"); // welcome | newFamily | existingFamily
   const [code, setCode] = useState("");
@@ -8332,8 +8638,15 @@ function Onboarding() {
   async function handleCreateNew() {
     setBusy(true);
     setError(null);
+    // Onboarding continuation flag — reload-এর পরে App() বুট হয়ে এই flag
+    // দেখে existing নাম/Gender/Google/Key-reveal/Sharing ধাপ auto-continue
+    // করবে (OnboardingBridge, নিচে App()-এ)। createNewFamily() ব্যর্থ হলে
+    // (aborted, reload হয়নি) নিচে flag মুছে ফেলা হয়, যাতে stray flag
+    // পরবর্তী কোনো unrelated বুটে ভুলভাবে trigger না করে।
+    try { sessionStorage.setItem("dt_onboarding_flow", "newFamily"); } catch {}
     const res = await createNewFamily(code);
     if (res && res.aborted) {
+      try { sessionStorage.removeItem("dt_onboarding_flow"); } catch {}
       setError(errorText(res.reason));
       setBusy(false);
     }
@@ -8343,8 +8656,10 @@ function Onboarding() {
   async function handleJoinExisting() {
     setBusy(true);
     setError(null);
+    try { sessionStorage.setItem("dt_onboarding_flow", "existingFamily"); } catch {}
     const res = await joinExistingFamily(code);
     if (res && res.aborted) {
+      try { sessionStorage.removeItem("dt_onboarding_flow"); } catch {}
       // ব্যর্থ হলে joinExistingFamily()-এর ভেতরে getFamilyCode() কল হওয়ার
       // পার্শ্বপ্রতিক্রিয়ায় একটি র‍্যান্ডম নিজস্ব family_code স্থায়ীভাবে
       // localStorage-এ বসে যেতে পারে — এই পরিষ্কার Onboarding প্রসঙ্গেই
