@@ -4033,13 +4033,38 @@ function memberPrivateKeyRef(memberId) {
 }
 // ১০-১২ digit numeric key — crypto-secure random(Math.random() নয়),
 // মনে রাখা/টাইপ করা সহজ রাখতে বিশুদ্ধ সংখ্যা।
+// §Member Key(শক্তিশালী ফরম্যাট, owner-approved ১৬ আগস্ট ২০২৬): সংখ্যা+
+// অক্ষর+সিম্বল মিশ্রিত, দৈর্ঘ্য ৯-১২(random)। বিভ্রান্তিকর ক্যারেক্টার(0/O/o,
+// 1/l/I) generation-এ বাদ দেওয়া হয়েছে(হাতে টাইপ করা সহজ রাখতে)। প্রতিটি
+// key-তে অন্তত ১টি সংখ্যা + ১টি অক্ষর + ১টি সিম্বল guarantee করা হয়, বাকি
+// ক্যারেক্টার পুরো pool থেকে cryptographically random, তারপর shuffle।
+// পুরনো(numeric-only, ইতিমধ্যে ইস্যু করা) key অপরিবর্তিত/বৈধ থাকবে(verify
+// শুধু hash-ভিত্তিক, charset-নির্ভর নয়) — শুধু নতুন/rotate করা key-এ এই
+// ফরম্যাট প্রযোজ্য। firestore.rules-এ memberKey regex একসাথে আপডেট করা
+// হয়েছে(superset — পুরনো numeric-ও এখনো match করে)।
 function generateMemberKeyPlain() {
-  const len = 10 + Math.floor(Math.random() * 3); // 10, 11, বা 12
-  const bytes = new Uint8Array(len);
-  crypto.getRandomValues(bytes);
-  let key = "";
-  for (let i = 0; i < len; i++) key += (bytes[i] % 10).toString();
-  return key;
+  const DIGITS = "23456789";
+  const UPPER = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  const LOWER = "abcdefghjkmnpqrstuvwxyz";
+  const SYMBOLS = "!@#$%&*+-_";
+  const POOL = DIGITS + UPPER + LOWER + SYMBOLS;
+  function randInt(maxExclusive) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % maxExclusive;
+  }
+  function randChar(set) {
+    return set[randInt(set.length)];
+  }
+  const len = 9 + randInt(4); // 9,10,11,12
+  const chars = [randChar(DIGITS), randChar(UPPER + LOWER), randChar(SYMBOLS)];
+  const remaining = len - chars.length;
+  for (let i = 0; i < remaining; i++) chars.push(randChar(POOL));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }
 // Member তৈরির সাথে সাথেই(admin-only path) key তৈরি — member doc ও
 // private/key doc একই batch-এ লেখা হয়, যাতে কখনো key-বিহীন member
