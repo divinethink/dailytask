@@ -1250,6 +1250,12 @@ if (typeof window !== "undefined") {
 // migrationState-branching নীতি অনুসরণ করা হয়েছে, তবে এই ফাংশন কোনো লেখা
 // করে না বলে resolvePathContext() নিজে ব্যবহার না করে সরাসরি read করা
 // হয়েছে (সরলতার জন্য, আচরণ একই)।
+// §Multi-device: v2 member doc থেকে সব owner uid বের করা (ownerUids array,
+// migration-window fallback হিসেবে পুরনো একক ownerUid)।
+function extractOwnerUidsFromMemberData(data) {
+  const arr = Array.isArray(data.ownerUids) ? data.ownerUids : (data.ownerUid ? [data.ownerUid] : []);
+  return arr.filter(u => typeof u === "string" && u);
+}
 async function auditGrandfatherCandidates(extraFamilyIds) {
   console.log("[Grandfather audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix/migration হবে না)...");
   const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
@@ -1285,7 +1291,7 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
       if (migrationState === "v2") {
         const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
         memberCount = membersSnap.size;
-        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        ownerUids = membersSnap.docs.flatMap(d => extractOwnerUidsFromMemberData(d.data()));
       } else {
         // legacy/locked/undefined — dataCollectionName থাকলে সেটাই source of
         // truth (§৫ fix), না থাকলে familyCode থেকে derive (আগের আচরণের সাথে
@@ -1331,6 +1337,86 @@ if (typeof window !== "undefined") {
   window.auditGrandfatherCandidates = auditGrandfatherCandidates;
 }
 // =====================================================================
+// --- Multi-device Migration: ownerUid(single) → ownerUids(array) ---
+// (শুধু ম্যানুয়ালি browser console থেকে — `migrateOwnerUidsToArray()`)
+// =====================================================================
+// নিয়ম (owner-approved, কড়াভাবে মানা হয়েছে):
+//   • শুধু v2 family, শুধু members collection স্পর্শ করে।
+//   • যে member doc-এ ইতিমধ্যে ownerUids (array) আছে — সম্পূর্ণ স্কিপ (idempotent,
+//     বারবার চালালেও নিরাপদ)।
+//   • যে member doc-এ ownerUid(string, non-empty) আছে কিন্তু ownerUids নেই —
+//     শুধু { ownerUids: [ownerUid] } লেখা হয় (merge:true, শুধু এই একটি key)।
+//   • unclaimed(ownerUid null/নেই) member — কোনো write হয় না, স্কিপ (স্কোপ-বহির্ভূত,
+//     app.js ইতিমধ্যে missing ownerUids-কে unclaimed হিসেবেই ব্যবহার করে —
+//     functionally কোনো পার্থক্য পড়ে না)।
+//   • পুরনো `ownerUid` field কখনো delete হয় না — dual-fallback নিরাপত্তা-জাল
+//     হিসেবে থেকে যায় (পরবর্তী cleanup session-এ সরানো হবে, সব family
+//     migration-verified হওয়ার পরে)।
+//   • কোনো entry/weekly/অন্য কোনো field/collection touch হয় না।
+// ব্যবহার:
+//   dryRun (default true) — শুধু রিপোর্ট দেখায়, কোনো write হয় না।
+//   migrateOwnerUidsToArray()                       → বর্তমান family, dry-run
+//   migrateOwnerUidsToArray(false)                   → বর্তমান family, LIVE write
+//   migrateOwnerUidsToArray(true, "otherFamilyId")   → নির্দিষ্ট family, dry-run
+async function migrateOwnerUidsToArray(dryRun, familyIdOverride) {
+  if (dryRun === undefined) dryRun = true;
+  const familyId = familyIdOverride || getFamilyId();
+  if (!familyId) {
+    console.error("[ownerUids Migration] familyId পাওয়া যায়নি।");
+    return null;
+  }
+  const famSnap = await db.collection("families").doc(familyId).get();
+  if (!famSnap.exists) {
+    console.error(`[ownerUids Migration] families/${familyId} পাওয়া যায়নি।`);
+    return null;
+  }
+  const fam = famSnap.data();
+  if (fam.migrationState !== "v2") {
+    console.error(`[ownerUids Migration] families/${familyId} v2 নয় (migrationState=${fam.migrationState || "নেই"}) — স্কিপ, কোনো write হয়নি।`);
+    return null;
+  }
+  const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+  const toMigrate = [];
+  const alreadyOk = [];
+  const skippedUnclaimed = [];
+  membersSnap.docs.forEach(doc => {
+    const data = doc.data();
+    if (Array.isArray(data.ownerUids)) {
+      alreadyOk.push({ id: doc.id, name: data.name || null, ownerUids: data.ownerUids });
+      return;
+    }
+    if (typeof data.ownerUid === "string" && data.ownerUid) {
+      toMigrate.push({ ref: doc.ref, id: doc.id, name: data.name || null, ownerUid: data.ownerUid });
+    } else {
+      skippedUnclaimed.push({ id: doc.id, name: data.name || null });
+    }
+  });
+  if (!dryRun && toMigrate.length) {
+    const batch = db.batch();
+    toMigrate.forEach(m => {
+      batch.set(m.ref, { ownerUids: [m.ownerUid] }, { merge: true });
+    });
+    await batch.commit();
+  }
+  const summary = {
+    familyId,
+    familyCode: fam.familyCode || null,
+    mode: dryRun ? "DRY-RUN (কোনো write হয়নি)" : "LIVE (write সম্পন্ন)",
+    totalMembers: membersSnap.size,
+    migrated: toMigrate.length,
+    alreadyHadOwnerUids: alreadyOk.length,
+    skippedUnclaimed: skippedUnclaimed.length
+  };
+  console.log(`[ownerUids Migration] family=${summary.familyCode || familyId} | ${summary.mode} | মোট সদস্য=${summary.totalMembers} | migrate${dryRun ? " হবে" : " হয়েছে"}=${summary.migrated} | ইতিমধ্যে ঠিক আছে=${summary.alreadyHadOwnerUids} | unclaimed(স্কিপ)=${summary.skippedUnclaimed}`);
+  if (toMigrate.length) {
+    console.table(toMigrate.map(m => ({ id: m.id, name: m.name, ownerUid: m.ownerUid, "→ ownerUids": `[${m.ownerUid}]` })));
+  }
+  return { summary, toMigrate: toMigrate.map(({ ref, ...rest }) => rest), alreadyOk, skippedUnclaimed };
+}
+if (typeof window !== "undefined") {
+  window.migrateOwnerUidsToArray = migrateOwnerUidsToArray;
+}
+// =====================================================================
 // --- Access Approval Gate — Step 2: Grandfather Migration Write ---
 // (শুধু ম্যানুয়ালি browser console থেকে — `migrateApprovedGrandfatherAccess()`)
 // =====================================================================
@@ -1363,7 +1449,7 @@ async function migrateApprovedGrandfatherAccess() {
       let ownerUids = [];
       if (migrationState === "v2") {
         const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
-        ownerUids = membersSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
+        ownerUids = membersSnap.docs.flatMap(d => extractOwnerUidsFromMemberData(d.data()));
       } else {
         const collectionName = fam.dataCollectionName || (fam.familyCode ? `data_${fam.familyCode}` : null);
         if (collectionName) {
@@ -2249,14 +2335,18 @@ async function backupToGoogleDrive(migrationState) {
 // আউটপুট/আচরণ আগের মতোই বিট-ফর-বিট থাকে।
 async function mergeBackupData(migrationState, parsed, options) {
   const compareUpdatedAt = !!(options && options.compareUpdatedAt);
+  const isV2 = migrationState === "v2";
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
   const currentMembers = await loadMembersV2(migrationState);
   const ownerByMemberId = {};
   currentMembers.forEach(m => {
-    ownerByMemberId[m.id] = m.ownerUid ?? null;
+    ownerByMemberId[m.id] = isV2 ? extractOwnerUidsFromMemberData(m) : (m.ownerUid ?? null);
   });
-  function isMineOrUnclaimed(uid) {
-    return !uid || uid === myUid;
+  function isMineOrUnclaimed(owner) {
+    if (isV2) {
+      return !owner || !owner.length || owner.includes(myUid);
+    }
+    return !owner || owner === myUid;
   }
   let existingDocsByKey = {};
   if (compareUpdatedAt) {
@@ -2293,21 +2383,30 @@ async function mergeBackupData(migrationState, parsed, options) {
           return; // বিদ্যমান Firestore ভার্সনই বহাল থাকবে
         }
         // backup নতুন — নাম/জেন্ডার ইত্যাদি ফিল্ড আপডেট হবে, কিন্তু বর্তমান
-        // (লাইভ) দায়িত্ব/ownerUid কখনো ব্যাকআপ দিয়ে ওভাররাইট হয় না। claim/
+        // (লাইভ) দায়িত্ব/ownerUid(s) কখনো ব্যাকআপ দিয়ে ওভাররাইট হয় না। claim/
         // release স্বাধীনভাবে ঘটে থাকে — একটি পুরনো ব্যাকআপ সেই লাইভ
         // দায়িত্ব-অবস্থাকে "টাইম-ট্রাভেল" করে বদলে দিতে পারবে না।
+        const liveOwnerData = isV2
+          ? { ownerUids: extractOwnerUidsFromMemberData(existingDocsByKey[key]) }
+          : { ownerUid: existingDocsByKey[key].ownerUid ?? null };
         memberKeys.push({
           key,
-          data: { ...parsed[key], ownerUid: existingDocsByKey[key].ownerUid ?? null }
+          data: { ...parsed[key], ...liveOwnerData }
         });
         return;
       }
       // একেবারে নতুন সদস্য — brand-new create
-      const backupOwner = parsed[key].ownerUid ?? null;
-      const normalizedOwner = backupOwner === myUid ? myUid : null;
+      let newOwnerData;
+      if (isV2) {
+        const backupOwners = extractOwnerUidsFromMemberData(parsed[key]);
+        newOwnerData = { ownerUids: (myUid && backupOwners.includes(myUid)) ? [myUid] : [] };
+      } else {
+        const backupOwner = parsed[key].ownerUid ?? null;
+        newOwnerData = { ownerUid: backupOwner === myUid ? myUid : null };
+      }
       memberKeys.push({
         key,
-        data: { ...parsed[key], ownerUid: normalizedOwner }
+        data: { ...parsed[key], ...newOwnerData }
       });
       return;
     }
@@ -3916,7 +4015,7 @@ async function claimMemberDoc(migrationState, id, uid) {
 async function releaseMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   await ctx.membersRef.doc(ctx.memberDocId(id)).update({
-    ownerUid: null,
+    ownerUids: [],
     updatedAt: Date.now()
   });
 }
@@ -3981,27 +4080,61 @@ async function fetchMemberKey(memberId) {
 async function changeMemberKey(memberId) {
   const key = generateMemberKeyPlain();
   const hash = await sha256Hex(key);
-  await memberPrivateKeyRef(memberId).update({
+  // set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর আগে
+  // তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
+  // "No document to update" error দিত)। merge:true দিয়ে create ও
+  // overwrite দুই ক্ষেত্রেই কাজ করবে।
+  await memberPrivateKeyRef(memberId).set({
     memberKey: key,
     memberKeyHash: hash,
     updatedAt: Date.now()
-  });
+  }, { merge: true });
   return key;
 }
 // Member Key দিয়ে claim(existing member-এর ownership ফিরে পাওয়া) —
 // client শুধু hash পাঠায়(plaintext কখনো network-এ যায় না), Rules
-// hidden memberKeyHash-এর সাথে মিলিয়ে ownerUid বদলানোর অনুমতি দেয়।
+// hidden memberKeyHash-এর সাথে মিলিয়ে ownerUids বদলানোর অনুমতি দেয়।
+// §Multi-device(v2-only, max 3): single ownerUid overwrite-এর বদলে এখন
+// transaction দিয়ে বর্তমান ownerUids পড়ে, ৩টির কম থাকলে/এই uid ইতিমধ্যে
+// থাকলে(no-op duplicate-prevention) append করা হয়; ৩টি পূর্ণ থাকলে এবং
+// এই uid নতুন হলে নির্ধারিত বার্তা সহ reject(Rules-এও একই limit
+// enforce করা হয়, এটা শুধু ভালো UX-এর জন্য client-side pre-check)।
 async function claimMemberWithKey(memberId, enteredKey, uid) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
   const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(memberId);
   try {
     const hash = await sha256Hex(trimmed);
-    await memberRef.update({
-      ownerUid: uid,
-      updatedAt: Date.now(),
-      claimKeyHashAttempt: hash
+    let limitReached = false;
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(memberRef);
+      const data = snap.exists ? snap.data() : {};
+      // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
+      const currentOwners = Array.isArray(data.ownerUids)
+        ? data.ownerUids
+        : (data.ownerUid ? [data.ownerUid] : []);
+      if (currentOwners.includes(uid)) {
+        // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify stamp।
+        tx.update(memberRef, {
+          ownerUids: currentOwners,
+          updatedAt: Date.now(),
+          claimKeyHashAttempt: hash
+        });
+        return;
+      }
+      if (currentOwners.length >= 3) {
+        limitReached = true;
+        return; // কোনো write হবে না
+      }
+      tx.update(memberRef, {
+        ownerUids: [...currentOwners, uid],
+        updatedAt: Date.now(),
+        claimKeyHashAttempt: hash
+      });
     });
+    if (limitReached) {
+      return { ok: false, reason: "limit" };
+    }
     return { ok: true };
   } catch (err) {
     // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক।
@@ -4351,7 +4484,7 @@ function App() {
   // প্রথম এডমিন নিজেই প্রথম যে member add করেন সেটাই তার নিজের প্রোফাইল)।
   const firstAdminOwnMemberId = React.useMemo(() => {
     if (!firstAdminUid || !members || members.length === 0) return null;
-    const owned = members.filter(x => x.ownerUid === firstAdminUid);
+    const owned = members.filter(x => x.ownerUids?.includes(firstAdminUid));
     if (owned.length === 0) return null;
     return owned.reduce((a, b) => (a.createdAt || 0) <= (b.createdAt || 0) ? a : b).id;
   }, [firstAdminUid, members]);
@@ -4369,6 +4502,9 @@ function App() {
   const [showMemberKeyModal, setShowMemberKeyModal] = useState(false);
   const [memberKeyTarget, setMemberKeyTarget] = useState(null);
   const [memberKeyValue, setMemberKeyValue] = useState(null);
+  // fetch শেষ হয়েছে কিন্তু key doc-ই নেই(পুরনো, Member Key System-এর আগে
+  // তৈরি member) — এই অবস্থাকে "এখনো লোড হচ্ছে"(null) থেকে আলাদা করতে।
+  const [memberKeyLoading, setMemberKeyLoading] = useState(false);
   const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
   const [memberKeyBusy, setMemberKeyBusy] = useState(false);
   const [copiedMemberKey, setCopiedMemberKey] = useState(false);
@@ -4695,17 +4831,14 @@ function App() {
                 // self-create-এ approved status-ও allow করা হয়েছে।
                 // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
                 await reqRef.set({ status: "approved", requestedAt: Date.now() });
-                // §Notification System — device_joined(নতুন, ১৫ আগস্ট ২০২৬):
-                // auto-approve হওয়ার সাথে সাথে family-র সব admin-কে জানানো,
-                // যাতে অপরিচিত/অপ্রত্যাশিত ডিভাইস ধরা পড়লে admin ম্যানুয়ালি
-                // remove করতে পারেন। Best-effort — ব্যর্থ হলেও মূল approve
-                // flow আগেই সফল, তাই silently ignore।
+                // যেহেতু মডারেশন অটো-অন, "অনুমোদনের অপেক্ষায়" স্ক্রিন
+                // দেখানোর দরকার নেই — সাথে সাথেই approved, তাই একবার
+                // reload করলে migrateMembersIfNeeded() স্বাভাবিকভাবে সফল
+                // হবে(নতুন accessRequest doc এখন approved অবস্থায় আছে)।
                 try {
-                  const famSnapForNotif = await db.collection("families").doc(migrationFamilyId).get();
-                  const adminUidsForNotif = famSnapForNotif.exists
-                    ? (famSnapForNotif.data().adminUids || [])
-                    : [];
-                  await Promise.all(adminUidsForNotif.map(adminUid =>
+                  const famSnapForNotif0 = await db.collection("families").doc(migrationFamilyId).get();
+                  const adminUidsForNotif0 = famSnapForNotif0.exists ? (famSnapForNotif0.data().adminUids || []) : [];
+                  await Promise.all(adminUidsForNotif0.map(adminUid =>
                     db.collection("families").doc(migrationFamilyId)
                       .collection("notifications").add({
                         targetUid: adminUid,
@@ -4716,7 +4849,13 @@ function App() {
                       }).catch(() => {})
                   ));
                 } catch {}
+                window.location.reload();
+                return;
               }
+              // reqSnap আগে থেকেই exists(status যাই হোক — approved/pending/
+              // denied legacy leftover) হলে এখানে কিছু করা হচ্ছে না, নিচের
+              // pending-screen fallback-এ যাবে(rare inconsistency-তে
+              // infinite-reload এড়াতে)।
             }
           } catch {}
           setAccessPending(true);
@@ -4831,7 +4970,7 @@ function App() {
   // Unclaimed members (ownerUid null) are editable by anyone — that's the
   // "manual member, no phone of their own" case. Read access is never
   // restricted, only writing.
-  const isLockedForThisDevice = !!(selectedMember && selectedMember.ownerUid && (!auth.currentUser || selectedMember.ownerUid !== auth.currentUser.uid));
+  const isLockedForThisDevice = !!(selectedMember && selectedMember.ownerUids && selectedMember.ownerUids.length && (!auth.currentUser || !selectedMember.ownerUids.includes(auth.currentUser.uid)));
   // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
   // (approved design) is the real safety boundary; this is purely UX so the
   // person sees a clear message instead of a raw Firestore permission error
@@ -5274,7 +5413,7 @@ function App() {
           id,
           name: req.name,
           gender: req.gender || "male",
-          ownerUid: req.id,
+          ownerUids: [req.id],
           createdAt: Date.now(),
           updatedAt: Date.now()
         };
@@ -5562,7 +5701,7 @@ function App() {
       id,
       name,
       gender: newGender,
-      ownerUid: null,
+      ownerUids: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -5589,7 +5728,7 @@ function App() {
     // অনুমতি দেয় — অন্য ডিভাইসের claim করা সদস্য মুছতে গেলে সার্ভার সেটা
     // reject করবে। আগে থেকে একই চেক না করলে UI optimistically সদস্যকে
     // লিস্ট থেকে সরিয়ে ফেলত, অথচ আসল ডিলিট ব্যর্থ হতো — বিভ্রান্তিকর।
-    if (m.ownerUid && (!auth.currentUser || m.ownerUid !== auth.currentUser.uid)) {
+    if ((m.ownerUids && m.ownerUids.length) && (!auth.currentUser || !m.ownerUids.includes(auth.currentUser.uid))) {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে বাদ দেওয়া যাবে না। প্রথমে সেই ডিভাইস থেকে দায়িত্ব ছাড়তে বলুন, তারপর বাদ দিন।");
       return;
     }
@@ -5652,7 +5791,7 @@ function App() {
       await releaseMemberDoc(migrationState, m.id);
       setMembers(prev => prev.map(x => x.id === m.id ? {
         ...x,
-        ownerUid: null
+        ownerUids: []
       } : x));
     } catch (err) {
       alert("জোরপূর্বক মুক্ত করতে সমস্যা হয়েছে: " + err.message);
@@ -5666,7 +5805,7 @@ function App() {
     // স্পষ্ট বার্তা দেখানো হচ্ছে, যাতে ব্যবহারকারী বুঝতে পারে এটা কেন
     // সম্ভব নয় এবং কী করতে হবে।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (m.ownerUid && m.ownerUid !== myUid) {
+    if ((m.ownerUids && m.ownerUids.length) && !m.ownerUids.includes(myUid)) {
       alert(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে আছে — এই সদস্যের দায়িত্ব শুধুমাত্র সেই ডিভাইস থেকেই ছাড়া যাবে, এখান থেকে সম্ভব নয়।`);
       return;
     }
@@ -5680,7 +5819,7 @@ function App() {
       await releaseMemberDoc(migrationState, m.id);
       setMembers(prev => prev.map(x => x.id === m.id ? {
         ...x,
-        ownerUid: null
+        ownerUids: []
       } : x));
     } catch (err) {
       alert("দায়িত্ব ছাড়তে সমস্যা হয়েছে: " + err.message);
@@ -5691,7 +5830,7 @@ function App() {
   // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
   // নিজে দেয় না।
   async function handleMakeAdmin(m) {
-    if (!m.ownerUid) {
+    if (!m.ownerUids || !m.ownerUids.length) {
       alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
       return;
     }
@@ -5703,21 +5842,21 @@ function App() {
     if (!ok) return;
     try {
       await db.collection("families").doc(getFamilyId()).update({
-        adminUids: firebase.firestore.FieldValue.arrayUnion(m.ownerUid),
+        adminUids: firebase.firestore.FieldValue.arrayUnion(...m.ownerUids),
         updatedAt: Date.now()
       });
-      setAdminUidsList(prev => prev.includes(m.ownerUid) ? prev : [...prev, m.ownerUid]);
+      setAdminUidsList(prev => Array.from(new Set([...prev, ...m.ownerUids])));
       // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
       // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
       try {
-        await db.collection("families").doc(getFamilyId())
+        await Promise.all(m.ownerUids.map(uid => db.collection("families").doc(getFamilyId())
           .collection("notifications").add({
-            targetUid: m.ownerUid,
+            targetUid: uid,
             type: "admin_assigned",
             message: "আপনাকে এই পরিবারের এডমিন করা হয়েছে।",
             createdAt: Date.now(),
             read: false
-          });
+          })));
       } catch {}
     } catch (err) {
       alert("এডমিন করতে সমস্যা হয়েছে: " + err.message);
@@ -5727,7 +5866,7 @@ function App() {
   // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
   // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
   async function handleRemoveAdmin(m) {
-    if (!m.ownerUid) return;
+    if (!m.ownerUids || !m.ownerUids.length) return;
     if (adminUidsList.length <= 1) {
       alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
       return;
@@ -5736,7 +5875,7 @@ function App() {
     // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
     // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && m.ownerUid === firstAdminUid && myUid !== firstAdminUid) {
+    if (firstAdminUid && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
       alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
       return;
     }
@@ -5748,10 +5887,10 @@ function App() {
     if (!ok) return;
     try {
       await db.collection("families").doc(getFamilyId()).update({
-        adminUids: firebase.firestore.FieldValue.arrayRemove(m.ownerUid),
+        adminUids: firebase.firestore.FieldValue.arrayRemove(...m.ownerUids),
         updatedAt: Date.now()
       });
-      setAdminUidsList(prev => prev.filter(u => u !== m.ownerUid));
+      setAdminUidsList(prev => prev.filter(u => !m.ownerUids.includes(u)));
     } catch (err) {
       alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
     }
@@ -6349,16 +6488,16 @@ function App() {
       setSelectedId(m.id);
       setIsMenuOpen(false);
     },
-    className: `flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer group ${m.id === selectedId ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"}`
+    className: `flex items-center justify-between flex-wrap gap-x-1 gap-y-1 px-2.5 py-1.5 rounded-lg cursor-pointer group ${m.id === selectedId ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"}`
   }, /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(User, {
     size: 13
   }), " ", m.name), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1.5"
+    className: "flex items-center flex-wrap justify-end gap-1"
   }, m.id === selectedId && /*#__PURE__*/React.createElement("span", {
     className: "w-2 h-2 rounded-full bg-emerald-600"
-  }), m.ownerUid === (auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
+  }), m.ownerUids?.includes(auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleReleaseMember(m);
@@ -6368,7 +6507,7 @@ function App() {
     title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
   }, "আপনার") : /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1"
-  }, m.ownerUid && /*#__PURE__*/React.createElement("span", {
+  }, !!(m.ownerUids && m.ownerUids.length) && /*#__PURE__*/React.createElement("span", {
     onClick: e => {
       e.stopPropagation();
     },
@@ -6387,32 +6526,32 @@ function App() {
         handleClaimMember(m);
       }
     },
-    disabled: isLockedForSwitch || (migrationState !== "v2" && !!m.ownerUid),
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0 disabled:opacity-40",
+    disabled: isLockedForSwitch || (migrationState !== "v2" && !!(m.ownerUids && m.ownerUids.length)),
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 shrink-0 disabled:opacity-40 whitespace-nowrap",
     title: "এই সদস্যের দায়িত্ব নিন(Member Key লাগবে)"
-  }, "দায়িত্ব নিন"), isAdmin && m.ownerUid && /*#__PURE__*/React.createElement("button", {
+  }, "দায়িত্ব নিন"), isAdmin && !!(m.ownerUids && m.ownerUids.length) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleAdminForceRelease(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
     title: "এডমিন হিসেবে জোরপূর্বক মুক্ত করুন (অন্য ডিভাইস অনুপস্থিত/lost হলে ব্যবহার করুন)"
-  }, "রিসেট করুন")), isAdmin && m.ownerUid && !adminUidsList.includes(m.ownerUid) && /*#__PURE__*/React.createElement("button", {
+  }, "রিসেট করুন")), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 whitespace-nowrap",
     title: "এডমিন করুন"
-  }, "Make Admin"), isAdmin && m.ownerUid && adminUidsList.includes(m.ownerUid) && m.ownerUid !== (auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
+  }, "Make Admin"), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => adminUidsList.includes(u)) && !m.ownerUids.includes(auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleRemoveAdmin(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-200 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
     title: "এডমিন পদ থেকে বাদ দিন"
   }, "Remove Admin"), /*#__PURE__*/React.createElement("button", {
     onClick: e => {
@@ -6426,7 +6565,7 @@ function App() {
     size: 12
   })))))), !addingMember ? (() => {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    const iAlreadyHaveMember = !!(myUid && (members || []).some(x => x.ownerUid === myUid));
+    const iAlreadyHaveMember = !!(myUid && (members || []).some(x => x.ownerUids?.includes(myUid)));
     // §Member Key সেশন: শুধু Admin সরাসরি member যোগ করতে পারবেন(v2)।
     // Non-admin ইতিমধ্যে নিজের member থাকলে বাটন দরকার নেই; pending
     // request থাকলে status দেখানো হবে; নাহলে "সদস্য হোন" দিয়ে অনুরোধ।
@@ -6626,7 +6765,7 @@ function App() {
     className: "absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
   }, (() => {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    const ownMember = (members || []).find(x => x.ownerUid && myUid && x.ownerUid === myUid) || null;
+    const ownMember = (members || []).find(x => myUid && x.ownerUids?.includes(myUid)) || null;
     const amAdmin = !!(myUid && adminUidsList.includes(myUid));
     let sinceText = null;
     if (ownMember && ownMember.createdAt) {
@@ -6652,10 +6791,13 @@ function App() {
       onClick: () => {
         setMemberKeyTarget(ownMember);
         setMemberKeyValue(null);
+        setMemberKeyLoading(true);
         setMemberKeyRevealed(false);
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
-        fetchMemberKey(ownMember.id).then(setMemberKeyValue).catch(() => setMemberKeyValue(null));
+        fetchMemberKey(ownMember.id)
+          .then(v => { setMemberKeyValue(v); setMemberKeyLoading(false); })
+          .catch(() => { setMemberKeyValue(null); setMemberKeyLoading(false); });
       },
       className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold"
     }, "আপনার Member Key দেখুন")), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
@@ -7495,10 +7637,12 @@ function App() {
   }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
   /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "নতুন ডিভাইসে \"দায়িত্ব নিন\" দিয়ে এই সদস্যের পরিচয়/ডাটা ফিরে পেতে এই key লাগবে। এটি গোপন রাখুন — মনে রাখুন বা নিরাপদ জায়গায় লিখে রাখুন।"),
-  memberKeyValue == null ? /*#__PURE__*/React.createElement("div", {
+  }, "নতুন ডিভাইসে \"দায়িত্ব নিন\" দিয়ে এই সদস্যের পরিচয়/ডাটা ফিরে পেতে এই key লাগবে। এটি গোপন এবং নিরাপদে সংরক্ষণ করুন।"),
+  memberKeyLoading ? /*#__PURE__*/React.createElement("div", {
     className: "flex justify-center py-4"
-  }, /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 18, color: "var(--theme-primary)" })) : /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 18, color: "var(--theme-primary)" })) : memberKeyValue == null ? /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3"
+  }, "এই সদস্যের জন্য এখনো কোনো Key তৈরি হয়নি। নিচের বাটনে ট্যাপ করে একটি তৈরি করুন।") : /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-2",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }, /*#__PURE__*/React.createElement("span", {
@@ -7519,23 +7663,25 @@ function App() {
     className: "text-[10px] font-bold text-emerald-600"
   }, "কপি হয়েছে!") : /*#__PURE__*/React.createElement(CopyIcon, { size: 14 }))),
   /*#__PURE__*/React.createElement("button", {
-    disabled: memberKeyBusy || memberKeyValue == null,
+    disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
-      const ok = window.confirm("নতুন Member Key তৈরি করতে চান? পুরনো key আর কাজ করবে না।");
-      if (!ok) return;
+      if (memberKeyValue != null) {
+        const ok = window.confirm("Key পরিবর্তন করতে চান? পুরনো key আর কাজ করবে না।");
+        if (!ok) return;
+      }
       setMemberKeyBusy(true);
       try {
         const key = await changeMemberKey(memberKeyTarget.id);
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
       } catch (err) {
-        alert("Key পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
+        alert("Key তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
       } finally {
         setMemberKeyBusy(false);
       }
     },
     className: "w-full py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600 mb-2 disabled:opacity-50"
-  }, memberKeyBusy ? "তৈরি হচ্ছে..." : "নতুন Key তৈরি করুন"),
+  }, memberKeyBusy ? "তৈরি হচ্ছে..." : (memberKeyValue == null ? "Key তৈরি করুন" : "Key পরিবর্তন করুন")),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMemberKeyModal(false),
     className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
@@ -7569,10 +7715,17 @@ function App() {
       try {
         const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
         if (res.ok) {
-          setMembers(prev => prev.map(x => x.id === claimKeyTarget.id ? { ...x, ownerUid: uid } : x));
+          setMembers(prev => prev.map(x => x.id === claimKeyTarget.id ? {
+            ...x,
+            ownerUids: Array.isArray(x.ownerUids)
+              ? (x.ownerUids.includes(uid) ? x.ownerUids : [...x.ownerUids, uid])
+              : (x.ownerUid && x.ownerUid !== uid ? [x.ownerUid, uid] : [uid])
+          } : x));
           setShowClaimKeyModal(false);
           setClaimKeyInput("");
           setClaimKeyTarget(null);
+        } else if (res.reason === "limit") {
+          alert("ইতোমধ্যে এই আইডি ৩টি ডিভাইসে লগইন অবস্থায় আছে, অনুগ্রহ করে আগে যেকোনো একটি থেকে লগআউট করুন।");
         } else {
           alert("Member Key মেলেনি — আবার চেষ্টা করুন।");
         }
@@ -8393,7 +8546,7 @@ function OnboardingBridge({
       if (flow === "newFamily") {
         onAdvance("keyReveal");
       } else {
-        const matched = !!(myUid && (members || []).some(m => m.ownerUid === myUid));
+        const matched = !!(myUid && (members || []).some(m => m.ownerUids?.includes(myUid)));
         onAdvance(matched ? null : "becomeMember");
       }
     }
@@ -8412,7 +8565,7 @@ function OnboardingBridge({
   // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
   useEffect(() => {
     if (prevClaimOpen.current && !showClaimKeyModal && step === "keyClaim") {
-      const matched = !!(myUid && (members || []).some(m => m.ownerUid === myUid));
+      const matched = !!(myUid && (members || []).some(m => m.ownerUids?.includes(myUid)));
       if (matched) onAdvance(null);
     }
     prevClaimOpen.current = showClaimKeyModal;
@@ -8428,6 +8581,20 @@ function OnboardingBridge({
 
   if (step === "addMember") {
     return shell([
+      /*#__PURE__*/React.createElement("button", {
+        key: "back",
+        type: "button",
+        onClick: () => {
+          // Onboarding বাতিল করে normal boot-এ ফেরত — সেখান থেকে বিদ্যমান
+          // "ফ্যামিলি কোড পরিবর্তন করুন"(EditIcon) দিয়ে কোড বদলানো যাবে।
+          try {
+            sessionStorage.removeItem("dt_onboarding_step");
+            sessionStorage.removeItem("dt_onboarding_flow");
+          } catch {}
+          window.location.reload();
+        },
+        className: "self-start -mt-1 -mb-2 text-sm font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-1"
+      }, "← ফিরে যান"),
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight",
@@ -8463,7 +8630,7 @@ function OnboardingBridge({
           setError(null);
           const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
           const newMember = {
-            id, name: name.trim(), gender, ownerUid: myUid,
+            id, name: name.trim(), gender, ownerUids: [myUid],
             createdAt: Date.now(), updatedAt: Date.now()
           };
           try {
