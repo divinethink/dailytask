@@ -5989,7 +5989,12 @@ function App() {
   // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
   async function handleRemoveAdmin(m) {
     if (!m.ownerUids || !m.ownerUids.length) return;
-    if (adminUidsList.length <= 1) {
+    // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "সর্বশেষ admin" এখন
+    // distinct ব্যক্তি(role==="admin" member সংখ্যা) দিয়ে গণনা, adminUids
+    // UID-count দিয়ে না(একই ব্যক্তির multi-device একাধিক UID থাকলে আগে এই
+    // guard ভুলভাবে bypass হতো)।
+    const adminPersonCount = (members || []).filter(x => x.role === "admin").length;
+    if (adminPersonCount <= 1) {
       alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
       return;
     }
@@ -6032,7 +6037,10 @@ function App() {
   async function handleSelfDemote() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     if (!myUid) return;
-    if (adminUidsList.length <= 1) {
+    // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "একমাত্র admin" এখন
+    // distinct ব্যক্তি(role==="admin") দিয়ে গণনা, UID-count দিয়ে না।
+    const adminPersonCount = (members || []).filter(x => x.role === "admin").length;
+    if (adminPersonCount <= 1) {
       alert("আপনিই একমাত্র এডমিন — এই মুহূর্তে নিজের এডমিন পদ ছাড়তে পারবেন না। আগে অন্য কাউকে এডমিন করুন।");
       return;
     }
@@ -6044,10 +6052,22 @@ function App() {
       // authoritative source, না মিললে role sync বাদ যায় — adminUids
       // sync তবুও হবে, যাতে lockout না হয়)।
       const myMember = (members || []).find(x => x.ownerUids && x.ownerUids.includes(myUid));
+      // বাগফিক্স — শুধু current-session myUid না, এই ব্যক্তির নিজের সব
+      // UID(multi-device claim থেকে) যেগুলো adminUids-এ আছে, একসাথে সরানো
+      // হচ্ছে(নাহলে role="member" হওয়ার পরও অন্য নিজস্ব UID adminUids-এ
+      // থেকে যেত — inconsistency)। ব্যতিক্রম: firstAdminUid-marked UID তখনই
+      // bundle-এ যাবে যখন caller ঠিক সেই UID দিয়ে authenticated — নাহলে
+      // rules-এর First Admin Protection পুরো write block করে দিত; তাই সেই
+      // UID বাদ রেখে বাকিগুলো সরানো হয়(protection invariant অক্ষুণ্ণ)।
+      const myOwnAdminUids = myMember
+        ? (myMember.ownerUids || []).filter(u =>
+            adminUidsList.includes(u) && (u !== firstAdminUid || myUid === firstAdminUid)
+          )
+        : [myUid];
       const famRef = db.collection("families").doc(getFamilyId());
       const batch = db.batch();
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayRemove(myUid),
+        adminUids: firebase.firestore.FieldValue.arrayRemove(...myOwnAdminUids),
         updatedAt: Date.now()
       });
       if (myMember) {
@@ -6057,7 +6077,7 @@ function App() {
         });
       }
       await batch.commit();
-      setAdminUidsList(prev => prev.filter(u => u !== myUid));
+      setAdminUidsList(prev => prev.filter(u => !myOwnAdminUids.includes(u)));
       setIsAdmin(false);
       setShowProfileDropdown(false);
     } catch (err) {
