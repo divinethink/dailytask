@@ -326,13 +326,22 @@ async function joinExistingFamily(code) {
     if (!targetFamilyId) {
       return { aborted: true, reason: "not-found" };
     }
-    const famSnap = await db.collection("families").doc(targetFamilyId).get();
-    if (!famSnap.exists) {
-      return { aborted: true, reason: "not-found" };
-    }
-    const migrationState = famSnap.data().migrationState || "legacy";
-    if (migrationState !== "v2") {
-      return { aborted: true, reason: "not-v2" };
+    // পুরনো unapproved/নতুন ডিভাইস থেকে এই family-র উপর এখনো approval নেই,
+    // তাই families/{familyId} read rules (isApprovedMember) block করতে
+    // পারে — সেক্ষেত্রে pre-check skip করে switch+reload-এ এগিয়ে যাওয়া হয়,
+    // বুট-ফ্লো নিজেই migrationState নিরাপদে resolve করবে (একই fallback
+    // pattern যা বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
+    try {
+      const famSnap = await db.collection("families").doc(targetFamilyId).get();
+      if (!famSnap.exists) {
+        return { aborted: true, reason: "not-found" };
+      }
+      const migrationState = famSnap.data().migrationState || "legacy";
+      if (migrationState !== "v2") {
+        return { aborted: true, reason: "not-v2" };
+      }
+    } catch (preCheckErr) {
+      console.warn("[Join Family] pre-check read blocked (সম্ভবত unapproved), switch চালিয়ে যাওয়া হচ্ছে:", preCheckErr.message);
     }
     console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${targetFamilyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
     localStorage.setItem("family_id", targetFamilyId);
