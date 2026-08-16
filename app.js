@@ -1791,6 +1791,67 @@ async function backfillFirstAdminUid(familyId, uid, confirm) {
   console.log(`[FirstAdmin backfill] সম্পন্ন — familyId=${familyId}, firstAdminUid=${uid}।`);
   return { ok: true, dryRun: false };
 }
+// §Hybrid Admin Role Model — Backfill: role field deploy-এর আগে যেসব
+// member ইতিমধ্যে family.adminUids-এ আছেন(কোনো ownerUids entry match করে),
+// তাদের role:"admin" সেট করা(idempotent — আগে থেকে role থাকলে skip, কোনো
+// field delete হয় না)। migrateOwnerUidsToArray-এর মতোই console-only,
+// dry-run-first pattern।
+async function backfillMemberRoles(dryRun, familyIdOverride) {
+  if (dryRun === undefined) dryRun = true;
+  const familyId = familyIdOverride || getFamilyId();
+  if (!familyId) {
+    console.error("[Role Backfill] familyId পাওয়া যায়নি।");
+    return null;
+  }
+  const famSnap = await db.collection("families").doc(familyId).get();
+  if (!famSnap.exists) {
+    console.error(`[Role Backfill] families/${familyId} পাওয়া যায়নি।`);
+    return null;
+  }
+  const fam = famSnap.data();
+  const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids : [];
+  const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+  const toBackfill = [];
+  const skipped = [];
+  membersSnap.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.role) {
+      skipped.push({ id: doc.id, name: data.name || null, reason: "role আগে থেকে সেট", role: data.role });
+      return;
+    }
+    const ownerUids = Array.isArray(data.ownerUids)
+      ? data.ownerUids
+      : (data.ownerUid ? [data.ownerUid] : []);
+    const isInAdminUids = ownerUids.some(u => adminUids.includes(u));
+    if (isInAdminUids) {
+      toBackfill.push({ ref: doc.ref, id: doc.id, name: data.name || null, ownerUids, proposedRole: "admin" });
+    } else {
+      skipped.push({ id: doc.id, name: data.name || null, reason: "adminUids-এ নেই — role সেট হবে না" });
+    }
+  });
+  if (!dryRun && toBackfill.length) {
+    const batch = db.batch();
+    toBackfill.forEach(m => {
+      batch.update(m.ref, { role: "admin", updatedAt: Date.now() });
+    });
+    await batch.commit();
+  }
+  const summary = {
+    familyId,
+    familyCode: fam.familyCode || null,
+    mode: dryRun ? "DRY-RUN (কোনো write হয়নি)" : "LIVE (write সম্পন্ন)",
+    totalMembers: membersSnap.size,
+    backfilled: toBackfill.length,
+    skipped: skipped.length
+  };
+  console.log(`[Role Backfill] family=${summary.familyCode || familyId} | ${summary.mode} | মোট সদস্য=${summary.totalMembers} | role:"admin" সেট${dryRun ? " হবে" : " হয়েছে"}=${summary.backfilled} | skip=${summary.skipped}`);
+  console.table(toBackfill.map(m => ({ id: m.id, name: m.name, ownerUids: JSON.stringify(m.ownerUids), "is-in-adminUids": true, "proposed role": m.proposedRole })));
+  if (skipped.length) console.table(skipped);
+  return { summary, toBackfill: toBackfill.map(({ ref, ...rest }) => rest), skipped };
+}
+if (typeof window !== "undefined") {
+  window.backfillMemberRoles = backfillMemberRoles;
+}
 if (typeof window !== "undefined") {
   window.backfillFirstAdminUid = backfillFirstAdminUid;
 }
@@ -4137,6 +4198,7 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
   const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(memberId);
+  const famRef = db.collection("families").doc(getFamilyId());
   try {
     const hash = await sha256Hex(trimmed);
     let limitReached = false;
@@ -4147,6 +4209,12 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
       const currentOwners = Array.isArray(data.ownerUids)
         ? data.ownerUids
         : (data.ownerUid ? [data.ownerUid] : []);
+      // §Hybrid Admin Role Model — role(authoritative) already এই একই
+      // transaction-এ পড়া member doc-এ আছে, তাই নতুন get() লাগে না। নতুন
+      // uid যদি নতুন যোগ হয়(duplicate না) এবং member আগে থেকেই
+      // role:"admin" হয়, তাহলে একই transaction-এ family.adminUids-এও
+      // conditionally sync — role field কখনো touch হয় না(শুধু index-sync)।
+      const isAdminRole = data.role === "admin";
       if (currentOwners.includes(uid)) {
         // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify stamp।
         tx.update(memberRef, {
@@ -4165,6 +4233,16 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         updatedAt: Date.now(),
         claimKeyHashAttempt: hash
       });
+      if (isAdminRole) {
+        // lastAdminClaimMemberId — শুধু Rules-verification-এর জন্য(getAfter()
+        // দিয়ে সঠিক member path বানাতে, কারণ family-root rule-এ memberId
+        // path-variable হিসেবে available না)। কোনো audit/UI feature না।
+        tx.update(famRef, {
+          adminUids: firebase.firestore.FieldValue.arrayUnion(uid),
+          updatedAt: Date.now(),
+          lastAdminClaimMemberId: memberId
+        });
+      }
     });
     if (limitReached) {
       return { ok: false, reason: "limit" };
@@ -5875,10 +5953,20 @@ function App() {
     const ok = window.confirm(`"${m.name}"-কে এডমিন করতে চান? এডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
     if (!ok) return;
     try {
-      await db.collection("families").doc(getFamilyId()).update({
+      // §Hybrid Admin Role Model — role(authoritative) ও adminUids(derived
+      // index) একই atomic batch-এ sync।
+      const famRef = db.collection("families").doc(getFamilyId());
+      const memberRef = famRef.collection("members").doc(m.id);
+      const batch = db.batch();
+      batch.update(famRef, {
         adminUids: firebase.firestore.FieldValue.arrayUnion(...m.ownerUids),
         updatedAt: Date.now()
       });
+      batch.update(memberRef, {
+        role: "admin",
+        updatedAt: Date.now()
+      });
+      await batch.commit();
       setAdminUidsList(prev => Array.from(new Set([...prev, ...m.ownerUids])));
       // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
       // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
@@ -5920,10 +6008,19 @@ function App() {
     const ok = window.confirm(`"${m.name}"-কে এডমিন পদ থেকে বাদ দিতে চান?`);
     if (!ok) return;
     try {
-      await db.collection("families").doc(getFamilyId()).update({
+      // §Hybrid Admin Role Model — role ও adminUids একই atomic batch-এ sync।
+      const famRef = db.collection("families").doc(getFamilyId());
+      const memberRef = famRef.collection("members").doc(m.id);
+      const batch = db.batch();
+      batch.update(famRef, {
         adminUids: firebase.firestore.FieldValue.arrayRemove(...m.ownerUids),
         updatedAt: Date.now()
       });
+      batch.update(memberRef, {
+        role: "member",
+        updatedAt: Date.now()
+      });
+      await batch.commit();
       setAdminUidsList(prev => prev.filter(u => !m.ownerUids.includes(u)));
     } catch (err) {
       alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
@@ -5942,10 +6039,24 @@ function App() {
     const ok = window.confirm("আপনি কি নিশ্চিত নিজের এডমিন পদ ছাড়তে চান?");
     if (!ok) return;
     try {
-      await db.collection("families").doc(getFamilyId()).update({
+      // §Hybrid Admin Role Model — role ও adminUids একই atomic batch-এ sync।
+      // নিজের ownerUids-এ myUid থাকা member খুঁজে বের করা হচ্ছে(role
+      // authoritative source, না মিললে role sync বাদ যায় — adminUids
+      // sync তবুও হবে, যাতে lockout না হয়)।
+      const myMember = (members || []).find(x => x.ownerUids && x.ownerUids.includes(myUid));
+      const famRef = db.collection("families").doc(getFamilyId());
+      const batch = db.batch();
+      batch.update(famRef, {
         adminUids: firebase.firestore.FieldValue.arrayRemove(myUid),
         updatedAt: Date.now()
       });
+      if (myMember) {
+        batch.update(famRef.collection("members").doc(myMember.id), {
+          role: "member",
+          updatedAt: Date.now()
+        });
+      }
+      await batch.commit();
       setAdminUidsList(prev => prev.filter(u => u !== myUid));
       setIsAdmin(false);
       setShowProfileDropdown(false);
@@ -8663,8 +8774,15 @@ function OnboardingBridge({
           setBusy(true);
           setError(null);
           const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          // §Hybrid Admin Role Model — এই "addMember" ধাপ শুধু flow==="newFamily"
+          // -এ ঘটে(creator নিজের member তৈরি করছেন), এবং creator ইতিমধ্যে
+          // family creation-এ adminUids/firstAdminUid হিসেবে সেট(isAdmin prop
+          // reload-পরবর্তী boot থেকে true)। role:"admin" এখানে না সেট করলে
+          // এই member(creator নিজে) role/adminUids consistency-বহির্ভূত থেকে
+          // যেত — নতুন ডিভাইসে পরে Member Key claim করলে admin auto-sync হতো না।
           const newMember = {
             id, name: name.trim(), gender, ownerUids: [myUid],
+            ...(isAdmin ? { role: "admin" } : {}),
             createdAt: Date.now(), updatedAt: Date.now()
           };
           try {
