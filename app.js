@@ -6387,6 +6387,30 @@ function App() {
     color: "var(--theme-primary)",
     size: 32
   }));
+  // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
+  // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
+  // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
+  // হলেই(সফল Google/Member-Password/approved onboarding) onbStep null
+  // হয়ে স্বাভাবিক Dashboard render হবে।
+  if (onbStep) return /*#__PURE__*/React.createElement(OnboardingBridge, {
+    flow: onbFlow,
+    step: onbStep,
+    onAdvance: onbAdvance,
+    isAdmin: isAdmin,
+    myUid: auth.currentUser ? auth.currentUser.uid : null,
+    familyCode: getFamilyCode(),
+    members: members,
+    setMembers: setMembers,
+    setSelectedId: setSelectedId,
+    showGoogleAccountModal: showGoogleAccountModal,
+    setShowGoogleAccountModal: setShowGoogleAccountModal,
+    showBecomeMemberModal: showBecomeMemberModal,
+    setShowBecomeMemberModal: setShowBecomeMemberModal,
+    showClaimKeyModal: showClaimKeyModal,
+    setClaimKeyTarget: setClaimKeyTarget,
+    setShowClaimKeyModal: setShowClaimKeyModal,
+    myMemberRequestStatus: myMemberRequestStatus
+  });
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -7952,23 +7976,6 @@ function App() {
   }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
     onLinked: checkDriveBackupAfterLink
-  }), onbStep && /*#__PURE__*/React.createElement(OnboardingBridge, {
-    flow: onbFlow,
-    step: onbStep,
-    onAdvance: onbAdvance,
-    isAdmin: isAdmin,
-    myUid: auth.currentUser ? auth.currentUser.uid : null,
-    familyCode: getFamilyCode(),
-    members: members,
-    setMembers: setMembers,
-    setSelectedId: setSelectedId,
-    showGoogleAccountModal: showGoogleAccountModal,
-    setShowGoogleAccountModal: setShowGoogleAccountModal,
-    showBecomeMemberModal: showBecomeMemberModal,
-    setShowBecomeMemberModal: setShowBecomeMemberModal,
-    showClaimKeyModal: showClaimKeyModal,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setShowClaimKeyModal: setShowClaimKeyModal
   }),
 
   // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
@@ -8898,7 +8905,8 @@ function OnboardingBridge({
   members, setMembers, setSelectedId,
   showGoogleAccountModal, setShowGoogleAccountModal,
   showBecomeMemberModal, setShowBecomeMemberModal,
-  showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal
+  showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal,
+  myMemberRequestStatus
 }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState("male");
@@ -8931,14 +8939,20 @@ function OnboardingBridge({
     prevGoogleOpen.current = showGoogleAccountModal;
   }, [showGoogleAccountModal]);
 
-  // "সদস্য হোন" মোডাল বন্ধ হলে onboarding সম্পূর্ণ — pending status
-  // existing myMemberRequestStatus UI নিজে থেকেই দেখাবে।
+  // "সদস্য হোন" মোডাল বন্ধ হলে — সফল submit(myMemberRequestStatus:
+  // "pending" হয়ে গেছে) হলেই onboarding সম্পূর্ণ ধরে gate clear হবে;
+  // Cancel/X(status এখনো set হয়নি) হলে gate clear না করে "choose"-এ
+  // ফিরিয়ে দেওয়া হয় — authentication ছাড়া Dashboard entry রোধ করতে।
   useEffect(() => {
     if (prevBecomeOpen.current && !showBecomeMemberModal && step === "becomeMember") {
-      onAdvance(null);
+      if (myMemberRequestStatus === "pending") {
+        onAdvance(null);
+      } else {
+        onAdvance("choose");
+      }
     }
     prevBecomeOpen.current = showBecomeMemberModal;
-  }, [showBecomeMemberModal]);
+  }, [showBecomeMemberModal, myMemberRequestStatus]);
 
   // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
   useEffect(() => {
@@ -9135,12 +9149,7 @@ function OnboardingBridge({
         key: "become",
         onClick: () => onAdvance("becomeMember"),
         className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
-      }, "পরিবারের নতুন সদস্য হিসেবে যোগ দিন"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "skip",
-        onClick: () => onAdvance(null),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "স্কিপ করুন")
+      }, "পরিবারের নতুন সদস্য হিসেবে যোগ দিন")
     ]);
   }
 
@@ -9167,12 +9176,7 @@ function OnboardingBridge({
         key: "become",
         onClick: () => onAdvance("becomeMember"),
         className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
-      }, "তালিকায় নেই, নতুন সদস্য হিসেবে যোগ দিন"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "done",
-        onClick: () => onAdvance(null),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "পরে করব")
+      }, "তালিকায় নেই, নতুন সদস্য হিসেবে যোগ দিন")
     ]);
   }
 
