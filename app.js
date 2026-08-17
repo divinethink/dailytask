@@ -3952,7 +3952,7 @@ async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid
   }, {
     merge: true
   });
-  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
   await batch.commit();
 }
 // --- Legacy (v1) member storage — single "members" doc holding a JSON array.
@@ -4015,10 +4015,24 @@ function resolvePathContext(migrationState, familyCode, familyId) {
 // ফিল্ডে কাজ করে। এটা existing `updatedAt` (conflict-resolution/backup-merge
 // semantics)-কে স্পর্শ করে না — সম্পূর্ণ আলাদা, dedicated ফিল্ড।
 // memberRef/familyId যেকোনো একটি null দিলে সেই অংশ স্কিপ হয়।
-function stampLastActive(batch, memberRef, familyId) {
+// uid(optional, ১৭ আগস্ট ২০২৬): দিলে memberRef-এর ownerActivity.<uid>-ও একই
+// merge-এ stamp হয় (FIFO Member-Claim device-limit fix-এর জন্য per-uid
+// recency ট্র্যাক) — deep-merge(nested map, একটাই key touch, বাকি
+// ownerActivity entries অক্ষুণ্ণ থাকে)।
+function stampLastActive(batch, memberRef, familyId, uid) {
   const ts = firebase.firestore.Timestamp.now();
-  if (memberRef) batch.set(memberRef, { lastActiveAt: ts }, { merge: true });
+  if (memberRef) {
+    const payload = { lastActiveAt: ts };
+    if (uid) payload.ownerActivity = { [uid]: ts };
+    batch.set(memberRef, payload, { merge: true });
+  }
   if (familyId) batch.set(db.collection("families").doc(familyId), { lastActiveAt: ts }, { merge: true });
+}
+// Firestore Timestamp বা raw millis দুটোই handle করে — ownerActivity map
+// read করার সময় ব্যবহার হয় (transaction snapshot-এ Timestamp আসে)।
+function tsToMillis(v) {
+  if (!v) return 0;
+  return typeof v.toMillis === "function" ? v.toMillis() : v;
 }
 // --- Device-Claim member storage (v2) — one real Firestore document per
 // member (doc id: "member:<id>") with plain top-level fields, so Firestore
@@ -4122,6 +4136,7 @@ async function releaseMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   await ctx.membersRef.doc(ctx.memberDocId(id)).update({
     ownerUids: [],
+    ownerActivity: {},
     updatedAt: Date.now()
   });
 }
@@ -4238,7 +4253,13 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
   try {
     const hash = await sha256Hex(trimmed);
     let limitReached = false;
+    let wasReplaced = false;
     await db.runTransaction(async tx => {
+      // transaction contention হলে callback retry হতে পারে — প্রতি
+      // attempt-এ flag reset জরুরি, নাহলে আগের ব্যর্থ attempt-এর stale
+      // মান থেকে যেতে পারে।
+      limitReached = false;
+      wasReplaced = false;
       const snap = await tx.get(memberRef);
       const data = snap.exists ? snap.data() : {};
       // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
@@ -4252,38 +4273,71 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
       // conditionally sync — role field কখনো touch হয় না(শুধু index-sync)।
       const isAdminRole = data.role === "admin";
       if (currentOwners.includes(uid)) {
-        // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify stamp।
+        // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify + activity stamp।
         tx.update(memberRef, {
           ownerUids: currentOwners,
           updatedAt: Date.now(),
-          claimKeyHashAttempt: hash
+          claimKeyHashAttempt: hash,
+          [`ownerActivity.${uid}`]: firebase.firestore.Timestamp.now()
         });
         return;
       }
-      if (currentOwners.length >= 3) {
+      // FIFO replace(১৭ আগস্ট ২০২৬, ownerActivity-ভিত্তিক আপডেট): password
+      // সঠিক প্রমাণিত হলে ৩টি পূর্ণ থাকা অবস্থায়ও সবচেয়ে stale uid বাদ
+      // দিয়ে বর্তমান uid যোগ করা হয় — শুধু non-admin member-এর ক্ষেত্রে।
+      // "stale" এখন ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো
+      // entry থেকে নির্ণয় করা হয় (ownerUids[0] শুধু "প্রথমে claim করা"
+      // বোঝাত, real recency না — আগে এটাই ভুল ভিত্তি ছিল)। ownerActivity-তে
+      // entry না থাকা uid সবচেয়ে stale ধরা হয় (timestamp 0)। admin
+      // member(role:"admin")-এর জন্য FIFO প্রযোজ্য না, কারণ family.adminUids
+      // থেকে single-uid অপসারণ কোনো existing rule-clause সমর্থন করে না —
+      // জোর করে চেষ্টা করলে rules পুরো transaction reject করে দিত। তাই
+      // admin পূর্ণ(৩) থাকলে আগের মতোই reject, admin নিজে Force-Release করবেন।
+      if (currentOwners.length >= 3 && isAdminRole) {
         limitReached = true;
-        return; // কোনো write হবে না
+        return; // কোনো write হবে না — admin-এর জন্য FIFO প্রযোজ্য না
       }
-      tx.update(memberRef, {
-        ownerUids: [...currentOwners, uid],
+      let revoked = false;
+      let nextOwners = [...currentOwners, uid];
+      let evictedUid = null;
+      if (currentOwners.length >= 3) {
+        const ownerActivity = data.ownerActivity || {};
+        let staleUid = currentOwners[0];
+        let staleTs = tsToMillis(ownerActivity[staleUid]);
+        for (const ou of currentOwners) {
+          const ts = tsToMillis(ownerActivity[ou]);
+          if (ts < staleTs) { staleTs = ts; staleUid = ou; }
+        }
+        nextOwners = currentOwners.filter(u => u !== staleUid).concat([uid]);
+        revoked = true;
+        evictedUid = staleUid;
+      }
+      const updatePayload = {
+        ownerUids: nextOwners,
         updatedAt: Date.now(),
-        claimKeyHashAttempt: hash
-      });
+        claimKeyHashAttempt: hash,
+        [`ownerActivity.${uid}`]: firebase.firestore.Timestamp.now()
+      };
+      // evicted uid-এর ownerActivity entry একই transaction-এ মুছে ফেলা হয়
+      // (ownerUids ও ownerActivity সবসময় consistent রাখতে — stale key জমবে না)।
+      if (evictedUid) updatePayload[`ownerActivity.${evictedUid}`] = firebase.firestore.FieldValue.delete();
+      tx.update(memberRef, updatePayload);
       if (isAdminRole) {
-        // lastAdminClaimMemberId — শুধু Rules-verification-এর জন্য(getAfter()
-        // দিয়ে সঠিক member path বানাতে, কারণ family-root rule-এ memberId
-        // path-variable হিসেবে available না)। কোনো audit/UI feature না।
+        // isAdminRole হলে revoked সবসময় false(উপরের early-return দিয়ে
+        // নিশ্চিত) — তাই এখানে শুধু plain additive arrayUnion, যা
+        // family-root self-claim rule(hasAll+size+1)-এর সাথে মেলে।
         tx.update(famRef, {
           adminUids: firebase.firestore.FieldValue.arrayUnion(uid),
           updatedAt: Date.now(),
           lastAdminClaimMemberId: memberId
         });
       }
+      if (revoked) wasReplaced = true;
     });
     if (limitReached) {
       return { ok: false, reason: "limit" };
     }
-    return { ok: true };
+    return { ok: true, revoked: wasReplaced };
   } catch (err) {
     // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক।
     return { ok: false, reason: "denied", error: err.message };
@@ -4355,7 +4409,7 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   }, {
     merge: true
   });
-  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId());
+  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
   await batch.commit();
 }
 function entryDocId(memberId, key) {
@@ -6131,7 +6185,8 @@ function App() {
   async function handleFullLogout() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     const amAdmin = !!(myUid && adminUidsList.includes(myUid));
-    if (amAdmin && !isGoogleLinked()) {
+    const wasGoogleLinked = isGoogleLinked();
+    if (amAdmin && !wasGoogleLinked) {
       const warnOk = window.confirm("⚠️ আপনি এই পরিবারের এডমিন এবং আপনার Google অ্যাকাউন্ট সংযুক্ত নেই। লগআউট করলে নতুন ডিভাইস/session থেকে আবার এডমিন অ্যাক্সেস ফিরে পেতে সমস্যা হতে পারে। আগে Google অ্যাকাউন্ট সংযুক্ত করার পরামর্শ দেওয়া হচ্ছে (Recovery Key দিয়েও ফিরে পাওয়া যাবে)। তারপরও কি লগআউট করতে চান?");
       if (!warnOk) return;
       const confirmAgainOk = window.confirm("আপনি নিশ্চিত? এডমিন হিসেবে Google-link ছাড়া লগআউট করলে re-access জটিল হতে পারে। চূড়ান্তভাবে আগাতে চান?");
@@ -6140,8 +6195,24 @@ function App() {
     const ok = window.confirm("আপনি লগআউট করলে এই ডিভাইস থেকে family code ও Google session — দুটোই মুছে যাবে। আবার প্রবেশ করতে Family Code লাগবে। আগান?");
     if (!ok) return;
     try {
-      await signOutToFreshAnonymous();
+      if (wasGoogleLinked) {
+        // Google-linked অবস্থায় fresh anonymous uid তৈরি করলে পুরনো
+        // uid-এর সাথে ownership/admin-role সম্পর্ক ছিন্ন হয়ে যায়(lockout
+        // risk)। তাই এখানে শুধু sign-out করা হচ্ছে, নতুন anonymous uid
+        // তৈরি করা হচ্ছে না — একটি flag রেখে দেওয়া হচ্ছে যাতে পরের বুটে
+        // Google re-auth gate দেখানো হয়(signInWithPopup একই পুরনো uid
+        // ফিরিয়ে দেবে, continuity বজায় থাকবে)।
+        try {
+          localStorage.setItem("dt_pending_google_reauth", "1");
+        } catch {}
+        await auth.signOut();
+      } else {
+        await signOutToFreshAnonymous();
+      }
     } catch (err) {
+      try {
+        localStorage.removeItem("dt_pending_google_reauth");
+      } catch {}
       alert("লগআউট করতে সমস্যা হয়েছে: " + err.message);
       return;
     }
@@ -7996,17 +8067,26 @@ function App() {
       try {
         const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
         if (res.ok) {
-          setMembers(prev => prev.map(x => x.id === claimKeyTarget.id ? {
-            ...x,
-            ownerUids: Array.isArray(x.ownerUids)
-              ? (x.ownerUids.includes(uid) ? x.ownerUids : [...x.ownerUids, uid])
-              : (x.ownerUid && x.ownerUid !== uid ? [x.ownerUid, uid] : [uid])
-          } : x));
+          setMembers(prev => prev.map(x => {
+            if (x.id !== claimKeyTarget.id) return x;
+            const owners = Array.isArray(x.ownerUids)
+              ? x.ownerUids
+              : (x.ownerUid ? [x.ownerUid] : []);
+            const nextOwners = owners.includes(uid)
+              ? owners
+              : (res.revoked ? [...owners.slice(1), uid] : [...owners, uid]);
+            return { ...x, ownerUids: nextOwners };
+          }));
           setShowClaimKeyModal(false);
           setClaimKeyInput("");
           setClaimKeyTarget(null);
+          if (res.revoked) {
+            // FIFO replace(১৭ আগস্ট ২০২৬): পুরনো device স্বয়ংক্রিয়ভাবে
+            // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
+            alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
+          }
         } else if (res.reason === "limit") {
-          alert("ইতোমধ্যে এই আইডি ৩টি ডিভাইসে লগইন অবস্থায় আছে, অনুগ্রহ করে আগে যেকোনো একটি থেকে লগআউট করুন।");
+          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে — নিরাপত্তার কারণে এডমিনের ক্ষেত্রে স্বয়ংক্রিয় পরিবর্তন হয় না। অনুগ্রহ করে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
         } else {
           alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
         }
@@ -8650,9 +8730,44 @@ function GoogleAccountModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  // chain-popup bug fix: আগে fallback popup automatic (promise .catch()
+  // এর ভেতর থেকে) খোলা হতো — সেটা click-gesture থেকে বিচ্ছিন্ন থাকায়
+  // ব্রাউজার প্রায়ই দ্বিতীয় popup ব্লক করত (auth/popup-blocked) বা PC-তে
+  // দুইটা popup window একসাথে খুলে যেত। এখন প্রথম চেষ্টা ব্যর্থ হলে শুধু
+  // pendingRecovery set করে ব্যবহারকারীকে আবার বাটনে ক্লিক করতে বলা হয়;
+  // দ্বিতীয় ক্লিক নিজেই একটি fresh user-gesture, তাই তখনকার single
+  // signInWithPopup()/signInWithCredential() নিরাপদে চলে।
+  const [pendingRecovery, setPendingRecovery] = useState(null); // null | {type:'credential', credential} | {type:'email'}
   async function handleLink() {
     setBusy(true);
     setNotice(null);
+    if (pendingRecovery) {
+      try {
+        if (pendingRecovery.type === "credential") {
+          await auth.signInWithCredential(pendingRecovery.credential);
+        } else {
+          await auth.signInWithPopup(googleProvider);
+        }
+        try {
+          localStorage.setItem("dt_check_drive_after_reload", "1");
+        } catch {}
+        onClose();
+        window.location.reload();
+        return;
+      } catch (recoverErr) {
+        setBusy(false);
+        // pendingRecovery ইচ্ছাকৃতভাবে reset করা হচ্ছে না — cancel/fail হলেও
+        // পরের ক্লিক সরাসরি একই recovery action (single popup) retry করবে,
+        // প্রথম linkGoogleAccount()-এ ফিরে গিয়ে বাড়তি round-trip এড়াতে।
+        if (!(recoverErr && recoverErr.code === "auth/popup-closed-by-user")) {
+          setNotice({
+            type: "error",
+            text: "সাইন ইন করতে সমস্যা হয়েছে: " + (recoverErr && (recoverErr.message || recoverErr.code))
+          });
+        }
+      }
+      return;
+    }
     try {
       await linkGoogleAccount();
       // এই Google অ্যাকাউন্টে আগে থেকে সংরক্ষিত familyCode থাকলে (অন্য
@@ -8684,51 +8799,33 @@ function GoogleAccountModal({
         // হওয়া) সেশনের সাথে লিংক করা আছে — নতুন anonymous সেশনে আবার লিংক
         // করা যাবে না। এক্ষেত্রে লিংক না করে সরাসরি সেই পুরনো Google-লিংকড
         // অ্যাকাউন্টেই সাইন ইন করাই সঠিক "রিকভারি" পদ্ধতি — err.credential-এ
-        // Firebase নিজেই সেই ক্রেডেনশিয়াল দিয়ে দেয়।
-        try {
-          await auth.signInWithCredential(err.credential);
-          // এই path-এ window.location.reload()-এর কারণে onLinked() কল করার
-          // সুযোগ থাকে না (পুরো অ্যাপ রিলোড হয়ে যায়, React state হারিয়ে
-          // যায়) — তাই একটি localStorage flag রেখে দেওয়া হচ্ছে, রিলোডের
-          // পর অ্যাপ বুট হওয়ার সময় এটি দেখে Drive ব্যাকআপ চেক করা হবে।
-          // এটাই আগে "Incognito-তে সাইন ইন করার পর Auto Restore Popup
-          // আসছে না" বাগটির মূল কারণ ছিল।
-          try {
-            localStorage.setItem("dt_check_drive_after_reload", "1");
-          } catch {}
-          onClose();
-          window.location.reload();
-          return;
-        } catch (signInErr) {
-          setNotice({
-            type: "error",
-            text: "সাইন ইন করতে সমস্যা হয়েছে: " + (signInErr && (signInErr.message || signInErr.code))
-          });
-        }
+        // Firebase নিজেই সেই ক্রেডেনশিয়াল দিয়ে দেয়। এখানেই আগে ব্যর্থ প্রথম
+        // popup-এর ধারাবাহিকতায় স্বয়ংক্রিয় দ্বিতীয় popup/sign-in চেষ্টা হতো —
+        // এখন শুধু pendingRecovery set করে ব্যবহারকারীকে আবার ক্লিক করতে
+        // বলা হচ্ছে (দ্বিতীয় ক্লিক-ই fresh user-gesture হিসেবে কাজ করবে)।
+        setPendingRecovery({
+          type: "credential",
+          credential: err.credential
+        });
+        setNotice({
+          type: "error",
+          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+        });
       } else if (err && err.code === "auth/email-already-in-use") {
         // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি সেশনের সাথে লিংক করা
         // আছে, কিন্তু এক্ষেত্রে Firebase err.credential দেয় না (তাই উপরের
         // credential-already-in-use path কাজ করে না)। রিকভারি হিসেবে
         // সরাসরি signInWithPopup দিয়ে (link না করে) সেই পুরনো Google-লিংকড
-        // অ্যাকাউন্টে fresh sign-in করানো হচ্ছে।
-        try {
-          await auth.signInWithPopup(googleProvider);
-          try {
-            localStorage.setItem("dt_check_drive_after_reload", "1");
-          } catch {}
-          onClose();
-          window.location.reload();
-          return;
-        } catch (signInErr) {
-          if (signInErr && signInErr.code === "auth/popup-closed-by-user") {
-            // ব্যবহারকারী নিজেই পপআপ বন্ধ করেছেন — বার্তা দরকার নেই
-          } else {
-            setNotice({
-              type: "error",
-              text: "সাইন ইন করতে সমস্যা হয়েছে: " + (signInErr && (signInErr.message || signInErr.code))
-            });
-          }
-        }
+        // অ্যাকাউন্টে fresh sign-in করাতে হবে — কিন্তু এখানেই আগে স্বয়ংক্রিয়
+        // দ্বিতীয় popup খোলা হতো বলে ব্রাউজার প্রায়ই ব্লক করত। এখন শুধু
+        // pendingRecovery set করে বাটনে আবার ক্লিক করতে বলা হচ্ছে।
+        setPendingRecovery({
+          type: "email"
+        });
+        setNotice({
+          type: "error",
+          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+        });
       } else {
         setNotice({
           type: "error",
@@ -9035,6 +9132,11 @@ function OnboardingBridge({
         style: { background: "#0E4B43" }
       }, "Member Password দিয়ে Sign-in করুন"),
       /*#__PURE__*/React.createElement("button", {
+        key: "become",
+        onClick: () => onAdvance("becomeMember"),
+        className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
+      }, "পরিবারের নতুন সদস্য হিসেবে যোগ দিন"),
+      /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
@@ -9272,15 +9374,93 @@ function bootOnce() {
 // which is exactly the "picked my Google account, it came back looking
 // like before" symptom. Now we only sign in anonymously if, after
 // Firebase reports its true state, there is genuinely no user yet.
+// Google-linked Full Logout একটি "pending re-auth" flag রেখে যায়(uid
+// continuity রক্ষার জন্য fresh anonymous sign-in ইচ্ছাকৃতভাবে skip করা
+// হয়েছে ওই flow-এ)। সেই flag থাকলে auto-anonymous sign-in না করে একটি
+// ছোট gate দেখানো হয় — কারণ signInWithPopup() ব্যবহারকারীর click ছাড়া
+// (page-load-এ automatic) ব্রাউজার popup-blocker আটকে দেয়। Gate-এ ব্যর্থ/
+// বাতিল হলে "Family Code দিয়ে চালিয়ে যান" বাটন স্বাভাবিক anonymous flow-এ
+// পড়ে — কোনো loop নেই, non-Google flow সম্পূর্ণ অপরিবর্তিত।
+function renderPendingGoogleReauthGate() {
+  const container = document.getElementById("root");
+  const root = ReactDOM.createRoot(container);
+  function GoogleReauthGate() {
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState(null);
+    function proceedAnonymous() {
+      setBusy(true);
+      auth.signInAnonymously().catch(e => {
+        console.error("Anonymous sign-in failed:", e);
+      }).finally(() => {
+        // mountApp() নিজে আবার এই একই #root container-এ createRoot()
+        // করবে — তার আগে এই gate-এর root unmount করা জরুরি, নাহলে React
+        // "already has a root" warning দেয়(duplicate root)।
+        root.unmount();
+        bootOnce();
+      });
+    }
+    function handleGoogleClick() {
+      setBusy(true);
+      setErr(null);
+      auth.signInWithPopup(googleProvider).then(() => {
+        root.unmount();
+        bootOnce();
+      }).catch(e => {
+        setBusy(false);
+        if (!(e && e.code === "auth/popup-closed-by-user")) {
+          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Code দিয়ে চালিয়ে যান।");
+        }
+      });
+    }
+    function handleFallbackClick() {
+      proceedAnonymous();
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        padding: "24px",
+        textAlign: "center",
+        fontFamily: "sans-serif"
+      }
+    }, /*#__PURE__*/React.createElement("p", null, "আপনার আগের সেশনে ফিরতে Google দিয়ে সাইন-ইন করুন।"), err && /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: "#b91c1c"
+      }
+    }, err), /*#__PURE__*/React.createElement("button", {
+      onClick: handleGoogleClick,
+      disabled: busy
+    }, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
+      onClick: handleFallbackClick,
+      disabled: busy
+    }, "Family Code দিয়ে চালিয়ে যান"));
+  }
+  root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
+}
 const unsubscribeAuth = auth.onAuthStateChanged(user => {
   unsubscribeAuth();
   if (user) {
     bootOnce();
   } else {
-    auth.signInAnonymously().catch(err => {
-      console.error("Anonymous sign-in failed:", err);
-    }).finally(() => {
-      bootOnce(); // don't leave the user stuck on a blank screen
-    });
+    let pendingGoogleReauth = false;
+    try {
+      pendingGoogleReauth = localStorage.getItem("dt_pending_google_reauth") === "1";
+    } catch {}
+    if (pendingGoogleReauth) {
+      try {
+        localStorage.removeItem("dt_pending_google_reauth");
+      } catch {}
+      renderPendingGoogleReauthGate();
+    } else {
+      auth.signInAnonymously().catch(err => {
+        console.error("Anonymous sign-in failed:", err);
+      }).finally(() => {
+        bootOnce(); // don't leave the user stuck on a blank screen
+      });
+    }
   }
 });
