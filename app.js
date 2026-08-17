@@ -6192,7 +6192,7 @@ function App() {
       const confirmAgainOk = window.confirm("আপনি নিশ্চিত? এডমিন হিসেবে Google-link ছাড়া লগআউট করলে re-access জটিল হতে পারে। চূড়ান্তভাবে আগাতে চান?");
       if (!confirmAgainOk) return;
     }
-    const ok = window.confirm("আপনি লগআউট করলে এই ডিভাইস থেকে family code ও Google session — দুটোই মুছে যাবে। আবার প্রবেশ করতে Family Code লাগবে। আগান?");
+    const ok = window.confirm("লগ আউট করবেন নিশ্চিত?");
     if (!ok) return;
     try {
       if (wasGoogleLinked) {
@@ -7092,12 +7092,12 @@ function App() {
       className: "px-4 py-2 space-y-1 text-slate-500"
     }, sinceText && /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
+    }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-700 font-normal"
     }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
+    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-700 font-normal"
     }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
@@ -9131,7 +9131,7 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight",
-        style: { color: "#C89B3C", fontFamily: "'Noto Serif Bengali', serif" }
+        style: { color: "#111827", fontFamily: "'Noto Serif Bengali', serif" }
       }, "সাইন ইন করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "google",
@@ -9148,7 +9148,8 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("button", {
         key: "become",
         onClick: () => onAdvance("becomeMember"),
-        className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
+        className: "w-full h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform",
+        style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
       }, "পরিবারের নতুন সদস্য হিসেবে যোগ দিন")
     ]);
   }
@@ -9271,8 +9272,7 @@ function Onboarding() {
       }, "আসসালামু আলাইকুম"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
-        className: "text-sm max-w-xs leading-relaxed",
-        style: { color: "#C89B3C" }
+        className: "text-sm max-w-xs leading-relaxed text-slate-700"
       }, "Daily Task (Daily Amal & Family Tracker)-এ স্বাগতম।"),
       /*#__PURE__*/React.createElement("button", {
         key: "new",
@@ -9323,8 +9323,7 @@ function Onboarding() {
       }, "আপনার পরিবারের Family Code দিন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
-        className: "text-sm max-w-xs leading-relaxed",
-        style: { color: "#C89B3C" }
+        className: "text-sm max-w-xs leading-relaxed text-slate-700"
       }, "কোড দেওয়ার পর Google Sign-in বা Member Key দিয়ে আপনার নিজের পরিচয় ফিরে পাওয়া যাবে।"),
       React.cloneElement(codeInput, { key: "input" }),
       errorBox,
@@ -9420,27 +9419,20 @@ function renderPendingGoogleReauthGate() {
       proceedAnonymous();
     }
     return /*#__PURE__*/React.createElement("div", {
-      style: {
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "12px",
-        padding: "24px",
-        textAlign: "center",
-        fontFamily: "sans-serif"
-      }
-    }, /*#__PURE__*/React.createElement("p", null, "আপনার আগের সেশনে ফিরতে Google দিয়ে সাইন-ইন করুন।"), err && /*#__PURE__*/React.createElement("p", {
-      style: {
-        color: "#b91c1c"
-      }
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
+    }, "আবার প্রবেশ করতে Google দিয়ে সাইন-ইন করুন।"), err && /*#__PURE__*/React.createElement("p", {
+      className: "text-sm font-medium text-red-600 max-w-xs"
     }, err), /*#__PURE__*/React.createElement("button", {
       onClick: handleGoogleClick,
-      disabled: busy
-    }, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
+      disabled: busy,
+      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60",
+      style: { borderColor: "#1D7A68", color: "#1D7A68" }
+    }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
       onClick: handleFallbackClick,
-      disabled: busy
+      disabled: busy,
+      className: "text-sm font-semibold text-slate-500 underline underline-offset-2 disabled:opacity-60"
     }, "Family Code দিয়ে চালিয়ে যান"));
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
