@@ -6890,43 +6890,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium text-emerald-800"
   }, /*#__PURE__*/React.createElement(MessageSquare, {
     size: 14
-  }), " আমাদের জানান (পরামর্শ)"), isGoogleLinked() ? /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => {
-      e.stopPropagation();
-      setShowAccountMenu(v => !v);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-2 font-semibold text-emerald-900 truncate max-w-[160px]"
-  }, /*#__PURE__*/React.createElement(User, {
-    size: 14
-  }), " ", (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "Google ব্যবহারকারী"), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1.5 shrink-0"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2 h-2 rounded-full bg-emerald-500"
-  }), /*#__PURE__*/React.createElement(ChevronDown, {
-    size: 12,
-    className: `transition-transform duration-200 ${showAccountMenu ? "rotate-180" : ""}`
-  }))), showAccountMenu && /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 bg-slate-50/60"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleChangeGmail,
-    className: "w-full text-left pl-9 pr-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-slate-700 text-xs"
-  }, /*#__PURE__*/React.createElement(LogOutIcon, {
-    size: 13
-  }), " জিমেইল পরিবর্তন করুন"))) : /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowGoogleAccountModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-amber-50 flex items-center gap-2 text-amber-800 font-semibold"
-  }, /*#__PURE__*/React.createElement(InfoIcon, {
-    size: 14,
-    color: "#C89B3C"
-  }), " Google অ্যাকাউন্ট (রিকমন্ডেড)")))))), /*#__PURE__*/React.createElement("div", {
+  }), " আমাদের জানান (পরামর্শ)")))))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
@@ -6963,20 +6927,28 @@ function App() {
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       className: "px-4 py-2 border-b border-slate-100"
     }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-1.5 flex-wrap"
+    }, /*#__PURE__*/React.createElement("span", {
       className: "font-bold text-emerald-900 text-sm"
     }, ownMember ? ownMember.name : (selectedMember ? selectedMember.name : "প্রোফাইল")), /*#__PURE__*/React.createElement("span", {
+      className: "text-[11px] text-slate-500 flex items-center gap-0.5"
+    }, "🔥 ", /*#__PURE__*/React.createElement("b", {
+      className: "text-slate-700 font-semibold"
+    }, "ধারাবাহিকতার ", toBn(streak), " দিন"))), /*#__PURE__*/React.createElement("span", {
       className: `inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
-    }, amAdmin ? (myUid && firstAdminUid && myUid === firstAdminUid ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য")), /*#__PURE__*/React.createElement("div", {
+    }, amAdmin ? (myUid && firstAdminUid && myUid === firstAdminUid ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য"), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
+      className: "mt-1"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleSelfDemote(),
+      className: "text-left text-red-600 text-xs font-semibold hover:underline"
+    }, "এডমিন পদ হতে অব্যাহতি নিন"))), /*#__PURE__*/React.createElement("div", {
       className: "px-4 py-2 space-y-1 text-slate-500"
     }, sinceText && /*#__PURE__*/React.createElement("div", null, "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
-    }, sinceText)), /*#__PURE__*/React.createElement("div", null, "ধারাবাহিক: ", /*#__PURE__*/React.createElement("b", {
+    }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", null, "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
-    }, toBn(streak), " দিন")), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", null, "এই আইডি বর্তমানে লগইন রয়েছে: ", /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
-    }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
-    }, isGoogleLinked() ? ((auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "Google ব্যবহারকারী") : "গুগলে সাইন ইন করুন"))), ownMember && /*#__PURE__*/React.createElement("div", {
+    }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -6992,13 +6964,46 @@ function App() {
           .catch(() => { setMemberKeyValue(null); setMemberKeyLoading(false); });
       },
       className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold"
-    }, "আপনার Member Password দেখুন")), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
+    }, "আপনার Member Password দেখুন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
+    }, isGoogleLinked() ? /*#__PURE__*/React.createElement("div", {
+      className: "relative"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: () => handleSelfDemote(),
-      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
-    }, "এডমিন পদ হতে অব্যাহতি নিন")), /*#__PURE__*/React.createElement("div", {
+      onClick: e => {
+        e.stopPropagation();
+        setShowAccountMenu(v => !v);
+      },
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-slate-50 flex items-center justify-between text-slate-700"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "flex items-center gap-2 font-semibold text-emerald-900 text-xs truncate max-w-[160px]"
+    }, /*#__PURE__*/React.createElement(User, {
+      size: 13
+    }), " ", (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "Google ব্যবহারকারী"), /*#__PURE__*/React.createElement("span", {
+      className: "flex items-center gap-1.5 shrink-0"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "w-2 h-2 rounded-full bg-emerald-500"
+    }), /*#__PURE__*/React.createElement(ChevronDown, {
+      size: 12,
+      className: `transition-transform duration-200 ${showAccountMenu ? "rotate-180" : ""}`
+    }))), showAccountMenu && /*#__PURE__*/React.createElement("div", {
+      className: "border-t border-slate-100 bg-slate-50/60"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: handleChangeGmail,
+      className: "w-full text-left pl-9 pr-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-slate-700 text-xs"
+    }, /*#__PURE__*/React.createElement(LogOutIcon, {
+      size: 13
+    }), " জিমেইল পরিবর্তন করুন"))) : /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        setShowGoogleAccountModal(true);
+        setShowProfileDropdown(false);
+      },
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-amber-50 flex items-center gap-2 text-amber-800 font-semibold text-xs"
+    }, /*#__PURE__*/React.createElement(InfoIcon, {
+      size: 14,
+      color: "#C89B3C"
+    }), " গুগলে সাইন ইন করুন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 mt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -9104,18 +9109,18 @@ function Onboarding() {
       }, "আসসালামু আলাইকুম"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
-        className: "text-base text-slate-600 max-w-xs leading-relaxed"
+        className: "text-sm text-slate-600 max-w-xs leading-relaxed"
       }, "Daily Task (Daily Amal & Family Tracker)-এ স্বাগতম।"),
       /*#__PURE__*/React.createElement("button", {
         key: "new",
         onClick: () => setStep("newFamily"),
-        className: "w-full max-w-xs h-12 rounded-2xl border-2 text-sm font-bold active:scale-[0.98] transition-transform",
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform",
         style: { borderColor: "#1D7A68", color: "#1D7A68" }
       }, "নতুন Family তৈরি করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "existing",
         onClick: () => setStep("existingFamily"),
-        className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl text-white text-sm font-bold flex items-center justify-center shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
         style: { background: "#0E4B43" }
       }, "বিদ্যমান Family-এর সদস্য হলে Sign-in করুন")
     ]);
@@ -9150,7 +9155,7 @@ function Onboarding() {
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-xl font-bold tracking-tight",
-        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+        style: { color: "#C89B3C", fontFamily: "'Noto Serif Bengali', serif" }
       }, "আপনার পরিবারের Family Code দিন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
@@ -9162,8 +9167,8 @@ function Onboarding() {
         key: "submit",
         onClick: handleJoinExisting,
         disabled: busy || !code.trim(),
-        className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
-        style: { background: "#0E4B43" }
+        className: "w-full max-w-xs h-12 rounded-2xl text-[#0E4B43] text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
+        style: { background: "#C89B3C" }
       }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
       backButton
     ]);
