@@ -2958,6 +2958,42 @@ function LogOutIcon({
     y2: "12"
   }));
 }
+function KeyIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
+  }));
+}
+function SmartphoneIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "5",
+    y: "2",
+    width: "14",
+    height: "20",
+    rx: "2",
+    ry: "2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "18",
+    x2: "12.01",
+    y2: "18"
+  }));
+}
 function MenuIcon({
   size,
   color,
@@ -6935,18 +6971,22 @@ function App() {
     }, "🔥 ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700 font-semibold"
     }, "ধারাবাহিকতার ", toBn(streak), " দিন"))), /*#__PURE__*/React.createElement("span", {
-      className: `inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
+      className: `inline-block mt-1 text-[9px] font-bold px-1 py-[1px] rounded border ${amAdmin ? "bg-[#C89B3C]/20 text-[#8a6a1f] border-[#C89B3C]/40" : "bg-slate-100 text-slate-500 border-slate-200"}`
     }, amAdmin ? (myUid && firstAdminUid && myUid === firstAdminUid ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য"), amAdmin && adminUidsList.length > 1 && /*#__PURE__*/React.createElement("div", {
       className: "mt-1"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => handleSelfDemote(),
-      className: "text-left text-red-600 text-xs font-semibold hover:underline"
+      className: "text-left text-red-500 text-[9px] font-medium hover:underline"
     }, "এডমিন পদ হতে অব্যাহতি নিন"))), /*#__PURE__*/React.createElement("div", {
       className: "px-4 py-2 space-y-1 text-slate-500"
-    }, sinceText && /*#__PURE__*/React.createElement("div", null, "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
+    }, sinceText && /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-1.5"
+    }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
-    }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", null, "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("b", {
+    }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-1.5"
+    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("b", {
       className: "text-slate-700"
     }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
@@ -6963,8 +7003,8 @@ function App() {
           .then(v => { setMemberKeyValue(v); setMemberKeyLoading(false); })
           .catch(() => { setMemberKeyValue(null); setMemberKeyLoading(false); });
       },
-      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold"
-    }, "আপনার Member Password দেখুন")), /*#__PURE__*/React.createElement("div", {
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5"
+    }, /*#__PURE__*/React.createElement(KeyIcon, { size: 13 }), "আপনার Member Password দেখুন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, isGoogleLinked() ? /*#__PURE__*/React.createElement("div", {
       className: "relative"
@@ -7008,8 +7048,8 @@ function App() {
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => handleFullLogout(),
-      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold"
-    }, "লগআউট")));
+      className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center gap-1.5"
+    }, /*#__PURE__*/React.createElement(LogOutIcon, { size: 13 }), "লগআউট")));
   })()))), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
@@ -8964,18 +9004,18 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight",
-        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+        style: { color: "#C89B3C", fontFamily: "'Noto Serif Bengali', serif" }
       }, "সাইন ইন করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "google",
         onClick: () => onAdvance("google"),
-        className: "w-full h-12 rounded-2xl border-2 text-sm font-bold active:scale-[0.98] transition-transform",
+        className: "w-full h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform",
         style: { borderColor: "#1D7A68", color: "#1D7A68" }
       }, "Google Account দিয়ে Sign-in করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "key",
         onClick: () => onAdvance("keyClaim"),
-        className: "w-full h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
+        className: "w-full h-12 px-4 rounded-2xl text-white text-sm font-bold flex items-center justify-center shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
         style: { background: "#0E4B43" }
       }, "Member Password দিয়ে Sign-in করুন"),
       /*#__PURE__*/React.createElement("button", {
@@ -9131,7 +9171,7 @@ function Onboarding() {
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-xl font-bold tracking-tight",
-        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+        style: { color: "#C89B3C", fontFamily: "'Noto Serif Bengali', serif" }
       }, "একটি Custom Family Code সেট করুন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
