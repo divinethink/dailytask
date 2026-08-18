@@ -4242,24 +4242,32 @@ async function changeMemberKey(memberId) {
 // hidden memberKeyHash-এর সাথে মিলিয়ে ownerUids বদলানোর অনুমতি দেয়।
 // §Multi-device(v2-only, max 3): single ownerUid overwrite-এর বদলে এখন
 // transaction দিয়ে বর্তমান ownerUids পড়ে, ৩টির কম থাকলে/এই uid ইতিমধ্যে
-// থাকলে(no-op duplicate-prevention) append করা হয়; ৩টি পূর্ণ থাকলে এবং
-// এই uid নতুন হলে নির্ধারিত বার্তা সহ reject(Rules-এও একই limit
-// enforce করা হয়, এটা শুধু ভালো UX-এর জন্য client-side pre-check)।
+// থাকলে(no-op duplicate-prevention) append করা হয়।
+// §Admin FIFO(১৮ আগস্ট ২০২৬): আগে admin পূর্ণ(৩) থাকলে সবসময় hard-reject
+// হতো। এখন non-admin member-এর মতোই stalest ownerActivity বাদ দিয়ে নতুন
+// device যোগ করার চেষ্টা করা হয়(write attempt) — কিন্তু চূড়ান্ত
+// সিদ্ধান্ত সবসময় firestore.rules-এ request.time(server clock) দিয়েই
+// নেওয়া হয়। এই ফাংশন কখনো client Date.now()-কে সেই সিদ্ধান্তের ভিত্তি
+// হিসেবে ব্যবহার করে না — নিচে যেখানেই "৭ দিন" প্রসঙ্গ আসে, সেটা শুধু
+// Rules-এর কাজ, এখানে না। Rules ৭ দিনের কম stale হলে পুরো write reject
+// করবে(permission-denied) — সেক্ষেত্রে ভুল password বনাম এখনো-সক্রিয়
+// device আলাদা করা client-এর পক্ষে সম্ভব না(client সত্যিকারের সময় জানে
+// না, এটা ইচ্ছাকৃত নিরাপত্তা সীমাবদ্ধতা) — তাই নিচে combined বার্তা।
 async function claimMemberWithKey(memberId, enteredKey, uid) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
   const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(memberId);
   const famRef = db.collection("families").doc(getFamilyId());
+  let attemptedAdminEviction = false;
   try {
     const hash = await sha256Hex(trimmed);
-    let limitReached = false;
     let wasReplaced = false;
     await db.runTransaction(async tx => {
       // transaction contention হলে callback retry হতে পারে — প্রতি
       // attempt-এ flag reset জরুরি, নাহলে আগের ব্যর্থ attempt-এর stale
       // মান থেকে যেতে পারে।
-      limitReached = false;
       wasReplaced = false;
+      attemptedAdminEviction = false;
       const snap = await tx.get(memberRef);
       const data = snap.exists ? snap.data() : {};
       // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
@@ -4267,11 +4275,13 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         ? data.ownerUids
         : (data.ownerUid ? [data.ownerUid] : []);
       // §Hybrid Admin Role Model — role(authoritative) already এই একই
-      // transaction-এ পড়া member doc-এ আছে, তাই নতুন get() লাগে না। নতুন
-      // uid যদি নতুন যোগ হয়(duplicate না) এবং member আগে থেকেই
-      // role:"admin" হয়, তাহলে একই transaction-এ family.adminUids-এও
-      // conditionally sync — role field কখনো touch হয় না(শুধু index-sync)।
+      // transaction-এ পড়া member doc-এ আছে, তাই নতুন get() লাগে না।
       const isAdminRole = data.role === "admin";
+      // Firestore transaction rule: সব read অবশ্যই write-এর আগে হতে হবে
+      // — তাই admin হলে family doc(adminUids sync-এর জন্য লাগবে) এখানেই,
+      // কোনো write শুরুর আগেই read করা হচ্ছে।
+      const famSnap = isAdminRole ? await tx.get(famRef) : null;
+
       if (currentOwners.includes(uid)) {
         // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify + activity stamp।
         tx.update(memberRef, {
@@ -4282,21 +4292,14 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         });
         return;
       }
-      // FIFO replace(১৭ আগস্ট ২০২৬, ownerActivity-ভিত্তিক আপডেট): password
-      // সঠিক প্রমাণিত হলে ৩টি পূর্ণ থাকা অবস্থায়ও সবচেয়ে stale uid বাদ
-      // দিয়ে বর্তমান uid যোগ করা হয় — শুধু non-admin member-এর ক্ষেত্রে।
-      // "stale" এখন ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো
-      // entry থেকে নির্ণয় করা হয় (ownerUids[0] শুধু "প্রথমে claim করা"
-      // বোঝাত, real recency না — আগে এটাই ভুল ভিত্তি ছিল)। ownerActivity-তে
-      // entry না থাকা uid সবচেয়ে stale ধরা হয় (timestamp 0)। admin
-      // member(role:"admin")-এর জন্য FIFO প্রযোজ্য না, কারণ family.adminUids
-      // থেকে single-uid অপসারণ কোনো existing rule-clause সমর্থন করে না —
-      // জোর করে চেষ্টা করলে rules পুরো transaction reject করে দিত। তাই
-      // admin পূর্ণ(৩) থাকলে আগের মতোই reject, admin নিজে Force-Release করবেন।
-      if (currentOwners.length >= 3 && isAdminRole) {
-        limitReached = true;
-        return; // কোনো write হবে না — admin-এর জন্য FIFO প্রযোজ্য না
-      }
+      // FIFO replace(ownerActivity-ভিত্তিক): password সঠিক প্রমাণিত হলে
+      // ৩টি পূর্ণ থাকা অবস্থায়ও সবচেয়ে stale uid বাদ দিয়ে বর্তমান uid
+      // যোগ করা হয় — member ও admin উভয়ের ক্ষেত্রেই একই গণনা(নিচে)।
+      // "stale" ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো entry
+      // থেকে নির্ণয় করা হয়; entry না থাকা uid সবচেয়ে stale ধরা হয়
+      // (timestamp 0)। admin-এর ক্ষেত্রে এই write শেষ পর্যন্ত সফল হবে
+      // কিনা তা firestore.rules-এর ৭-দিন server-side চেক ঠিক করে দেয় —
+      // এই ফাংশন শুধু attempt করে।
       let revoked = false;
       let nextOwners = [...currentOwners, uid];
       let evictedUid = null;
@@ -4311,6 +4314,7 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         nextOwners = currentOwners.filter(u => u !== staleUid).concat([uid]);
         revoked = true;
         evictedUid = staleUid;
+        if (isAdminRole) attemptedAdminEviction = true;
       }
       const updatePayload = {
         ownerUids: nextOwners,
@@ -4323,24 +4327,31 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
       if (evictedUid) updatePayload[`ownerActivity.${evictedUid}`] = firebase.firestore.FieldValue.delete();
       tx.update(memberRef, updatePayload);
       if (isAdminRole) {
-        // isAdminRole হলে revoked সবসময় false(উপরের early-return দিয়ে
-        // নিশ্চিত) — তাই এখানে শুধু plain additive arrayUnion, যা
-        // family-root self-claim rule(hasAll+size+1)-এর সাথে মেলে।
+        // family.adminUids index — এখানে explicit পুরো array লেখা হচ্ছে
+        // (arrayUnion+arrayRemove একই field-এ একই write-এ combine করা
+        // যায় না বলে)। evictedUid থাকলে(swap) সেটা বাদ দিয়ে caller uid
+        // যোগ; না থাকলে(plain add, ৩-এর কম owners ছিল) শুধু যোগ।
+        const currentAdminUids = Array.isArray(famSnap && famSnap.data() && famSnap.data().adminUids)
+          ? famSnap.data().adminUids
+          : [];
+        let nextAdminUids = evictedUid
+          ? currentAdminUids.filter(u => u !== evictedUid)
+          : currentAdminUids;
+        if (!nextAdminUids.includes(uid)) nextAdminUids = [...nextAdminUids, uid];
         tx.update(famRef, {
-          adminUids: firebase.firestore.FieldValue.arrayUnion(uid),
+          adminUids: nextAdminUids,
           updatedAt: Date.now(),
           lastAdminClaimMemberId: memberId
         });
       }
       if (revoked) wasReplaced = true;
     });
-    if (limitReached) {
-      return { ok: false, reason: "limit" };
-    }
     return { ok: true, revoked: wasReplaced };
   } catch (err) {
-    // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক।
-    return { ok: false, reason: "denied", error: err.message };
+    // ভুল key হলে, অথবা admin-eviction attempt হলেও ৭ দিন পার না হলে —
+    // দুটোতেই Rules একইভাবে reject করে(permission-denied), client
+    // এখানে আলাদা করতে পারে না(client clock ব্যবহার করা হয়নি বলেই)।
+    return { ok: false, reason: "denied", error: err.message, adminEvictionAttempt: attemptedAdminEviction };
   }
 }
 // One-time migration: if no v2 (member:*) docs exist yet but a legacy v1
@@ -6441,8 +6452,12 @@ function App() {
             // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
             alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
           }
-        } else if (res.reason === "limit") {
-          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে — নিরাপত্তার কারণে এডমিনের ক্ষেত্রে স্বয়ংক্রিয় পরিবর্তন হয় না। অনুগ্রহ করে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
+        } else if (res.reason === "denied" && res.adminEvictionAttempt) {
+          // §Admin FIFO(১৮ আগস্ট ২০২৬): এই আইডি(এডমিন) ইতোমধ্যে ৩টি
+          // ডিভাইসে আছে এবং write reject হয়েছে — কারণ ভুল Password অথবা
+          // কোনো ডিভাইস এখনো ৭ দিনের মধ্যে সক্রিয়(client এই দুইয়ের মধ্যে
+          // পার্থক্য করতে পারে না, ইচ্ছাকৃতভাবে — দেখুন claimMemberWithKey)।
+          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে। Password ভুল হতে পারে, অথবা ডিভাইসগুলো এখনও সাম্প্রতিক সক্রিয়(৭ দিনের মধ্যে ব্যবহৃত) থাকায় স্বয়ংক্রিয় পরিবর্তন হয়নি। কোনো ডিভাইস ৭ দিনের বেশি অব্যবহৃত হলে সঠিক Password দিলে স্বয়ংক্রিয়ভাবে পরিবর্তন হয়ে যাবে; জরুরি হলে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
         } else {
           alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
         }
