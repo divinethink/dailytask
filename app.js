@@ -6387,12 +6387,83 @@ function App() {
     color: "var(--theme-primary)",
     size: 32
   }));
+  // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
+  // মোডাল আগে শুধু Dashboard-এর মূল JSX-এর ভিতরে বাঁধা ছিল, তাই early-
+  // return branch-এ(নিচে) কখনো render হতো না — ফলে Google Sign-in ধাপে
+  // সাদা পেজ এবং keyClaim ধাপে নাম ক্লিক করলে কিছু হতো না। এখন একবার
+  // variable-এ বের করে দুই জায়গাতেই(early-return branch + নিচের আগের
+  // অবস্থান) reuse করা হচ্ছে — কোনো নতুন logic/state/collection নেই।
+  const googleAccountModalNode = showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
+    onClose: () => setShowGoogleAccountModal(false),
+    onLinked: checkDriveBackupAfterLink
+  });
+  const claimKeyModalNode = showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডাটা/পরিচয় ফিরে আসবে।"),
+  /*#__PURE__*/React.createElement("input", {
+    value: claimKeyInput,
+    onChange: e => setClaimKeyInput(e.target.value),
+    placeholder: "Member Password",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: claimKeyBusy || !claimKeyInput.trim(),
+    onClick: async () => {
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      if (!uid) return;
+      setClaimKeyBusy(true);
+      try {
+        const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
+        if (res.ok) {
+          setMembers(prev => prev.map(x => {
+            if (x.id !== claimKeyTarget.id) return x;
+            const owners = Array.isArray(x.ownerUids)
+              ? x.ownerUids
+              : (x.ownerUid ? [x.ownerUid] : []);
+            const nextOwners = owners.includes(uid)
+              ? owners
+              : (res.revoked ? [...owners.slice(1), uid] : [...owners, uid]);
+            return { ...x, ownerUids: nextOwners };
+          }));
+          setShowClaimKeyModal(false);
+          setClaimKeyInput("");
+          setClaimKeyTarget(null);
+          if (res.revoked) {
+            // FIFO replace(১৭ আগস্ট ২০২৬): পুরনো device স্বয়ংক্রিয়ভাবে
+            // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
+            alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
+          }
+        } else if (res.reason === "limit") {
+          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে — নিরাপত্তার কারণে এডমিনের ক্ষেত্রে স্বয়ংক্রিয় পরিবর্তন হয় না। অনুগ্রহ করে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
+        } else {
+          alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
+        }
+      } finally {
+        setClaimKeyBusy(false);
+      }
+    },
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowClaimKeyModal(false);
+      setClaimKeyInput("");
+    },
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল"))));
   // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
   // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
   // হলেই(সফল Google/Member-Password/approved onboarding) onbStep null
   // হয়ে স্বাভাবিক Dashboard render হবে।
-  if (onbStep) return /*#__PURE__*/React.createElement(OnboardingBridge, {
+  if (onbStep) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
     flow: onbFlow,
     step: onbStep,
     onAdvance: onbAdvance,
@@ -6410,7 +6481,7 @@ function App() {
     setClaimKeyTarget: setClaimKeyTarget,
     setShowClaimKeyModal: setShowClaimKeyModal,
     myMemberRequestStatus: myMemberRequestStatus
-  });
+  }), googleAccountModalNode, claimKeyModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -7973,10 +8044,7 @@ function App() {
   }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => decideAccessRequest(r.id, "denied"),
     className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
-    onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
-  }),
+  }, "প্রত্যাখ্যান"))))))), googleAccountModalNode,
 
   // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
   // default, click করলে reveal, Family Code masking-এর মতো একই প্যাটার্ন)।
@@ -8048,67 +8116,7 @@ function App() {
 
   // --- §Member Key claim("দায়িত্ব নিন") মোডাল — সব member-এর জন্য প্রযোজ্য
   // (claimed/unclaimed নির্বিশেষে), সঠিক key দিলেই ownerUid বদলায়।
-  showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-emerald-900 mb-1"
-  }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
-  }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডাটা/পরিচয় ফিরে আসবে।"),
-  /*#__PURE__*/React.createElement("input", {
-    value: claimKeyInput,
-    onChange: e => setClaimKeyInput(e.target.value),
-    placeholder: "Member Password",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    disabled: claimKeyBusy || !claimKeyInput.trim(),
-    onClick: async () => {
-      const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!uid) return;
-      setClaimKeyBusy(true);
-      try {
-        const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
-        if (res.ok) {
-          setMembers(prev => prev.map(x => {
-            if (x.id !== claimKeyTarget.id) return x;
-            const owners = Array.isArray(x.ownerUids)
-              ? x.ownerUids
-              : (x.ownerUid ? [x.ownerUid] : []);
-            const nextOwners = owners.includes(uid)
-              ? owners
-              : (res.revoked ? [...owners.slice(1), uid] : [...owners, uid]);
-            return { ...x, ownerUids: nextOwners };
-          }));
-          setShowClaimKeyModal(false);
-          setClaimKeyInput("");
-          setClaimKeyTarget(null);
-          if (res.revoked) {
-            // FIFO replace(১৭ আগস্ট ২০২৬): পুরনো device স্বয়ংক্রিয়ভাবে
-            // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
-            alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
-          }
-        } else if (res.reason === "limit") {
-          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে — নিরাপত্তার কারণে এডমিনের ক্ষেত্রে স্বয়ংক্রিয় পরিবর্তন হয় না। অনুগ্রহ করে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
-        } else {
-          alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
-        }
-      } finally {
-        setClaimKeyBusy(false);
-      }
-    },
-    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
-  }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowClaimKeyModal(false);
-      setClaimKeyInput("");
-    },
-    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল")))),
+  claimKeyModalNode,
 
   // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
   // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
