@@ -6458,6 +6458,75 @@ function App() {
     },
     className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
   }, "বাতিল"))));
+  // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
+  // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
+  // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
+  // "becomeMember" অবস্থায় early-return branch-এ এটি render হতো না এবং
+  // সাদা পেজ দেখাতো। এখন একই pattern-এ variable-এ বের করে দুই জায়গাতেই
+  // reuse করা হচ্ছে — কোনো নতুন logic/state নেই।
+  const becomeMemberModalNode = showBecomeMemberModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800"
+  }, "সদস্য হোন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBecomeMemberModal(false)
+  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
+  /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "আপনার নাম দিন — এডমিন অনুমোদন করলে আপনি এই পরিবারের একজন সদস্য হিসেবে যুক্ত হবেন।"),
+  /*#__PURE__*/React.createElement("input", {
+    value: becomeMemberName,
+    onChange: e => setBecomeMemberName(e.target.value),
+    placeholder: "আপনার নাম...",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-2"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: becomeMemberGender,
+    onChange: e => setBecomeMemberGender(e.target.value),
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3"
+  }, /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"), /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")),
+  /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: becomeMemberBusy || !becomeMemberName.trim(),
+    onClick: async () => {
+      const name = becomeMemberName.trim();
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      if (!name || !uid) return;
+      setBecomeMemberBusy(true);
+      try {
+        await db.collection("families").doc(getFamilyId())
+          .collection("memberRequests").doc(uid)
+          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now() });
+        setMyMemberRequestStatus("pending");
+        setShowBecomeMemberModal(false);
+        setBecomeMemberName("");
+        try {
+          await Promise.all((adminUidsList || []).map(adminUid =>
+            db.collection("families").doc(getFamilyId())
+              .collection("notifications").add({
+                targetUid: adminUid,
+                type: "member_request",
+                message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
+                createdAt: Date.now(),
+                read: false
+              }).catch(() => {})
+          ));
+        } catch {}
+      } catch (err) {
+        alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
+      } finally {
+        setBecomeMemberBusy(false);
+      }
+    },
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, becomeMemberBusy ? "পাঠানো হচ্ছে..." : "অনুরোধ পাঠান"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBecomeMemberModal(false),
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল"))));
   // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
   // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
@@ -6481,7 +6550,7 @@ function App() {
     setClaimKeyTarget: setClaimKeyTarget,
     setShowClaimKeyModal: setShowClaimKeyModal,
     myMemberRequestStatus: myMemberRequestStatus
-  }), googleAccountModalNode, claimKeyModalNode);
+  }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -8120,72 +8189,7 @@ function App() {
 
   // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
   // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
-  showBecomeMemberModal && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800"
-  }, "সদস্য হোন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowBecomeMemberModal(false)
-  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
-  /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
-  }, "আপনার নাম দিন — এডমিন অনুমোদন করলে আপনি এই পরিবারের একজন সদস্য হিসেবে যুক্ত হবেন।"),
-  /*#__PURE__*/React.createElement("input", {
-    value: becomeMemberName,
-    onChange: e => setBecomeMemberName(e.target.value),
-    placeholder: "আপনার নাম...",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-2"
-  }), /*#__PURE__*/React.createElement("select", {
-    value: becomeMemberGender,
-    onChange: e => setBecomeMemberGender(e.target.value),
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3"
-  }, /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"), /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")),
-  /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    disabled: becomeMemberBusy || !becomeMemberName.trim(),
-    onClick: async () => {
-      const name = becomeMemberName.trim();
-      const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!name || !uid) return;
-      setBecomeMemberBusy(true);
-      try {
-        await db.collection("families").doc(getFamilyId())
-          .collection("memberRequests").doc(uid)
-          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now() });
-        setMyMemberRequestStatus("pending");
-        setShowBecomeMemberModal(false);
-        setBecomeMemberName("");
-        // §Notification System — সব admin-কে জানানো(device_joined-এর
-        // একই pattern) যাতে refresh ছাড়াই badge/panel-এ দেখা যায়।
-        // Best-effort — ব্যর্থ হলেও মূল request আগেই সফল।
-        try {
-          await Promise.all((adminUidsList || []).map(adminUid =>
-            db.collection("families").doc(getFamilyId())
-              .collection("notifications").add({
-                targetUid: adminUid,
-                type: "member_request",
-                message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
-                createdAt: Date.now(),
-                read: false
-              }).catch(() => {})
-          ));
-        } catch {}
-      } catch (err) {
-        alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
-      } finally {
-        setBecomeMemberBusy(false);
-      }
-    },
-    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
-  }, becomeMemberBusy ? "পাঠানো হচ্ছে..." : "অনুরোধ পাঠান"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowBecomeMemberModal(false),
-    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল")))),
+  becomeMemberModalNode,
 
   // --- §"সদস্য অনুরোধ" — Admin-only অনুমোদন প্যানেল(accessRequests
   // মোডালের একই ডিজাইন-প্যাটার্ন)। অনুমোদনে member+key একসাথে তৈরি হয়।
