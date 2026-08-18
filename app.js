@@ -9184,12 +9184,7 @@ function OnboardingBridge({
         key: m.id,
         onClick: () => { setClaimKeyTarget(m); setShowClaimKeyModal(true); },
         className: "w-full h-11 rounded-2xl border-2 border-slate-200 text-base font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-      }, m.name))),
-      /*#__PURE__*/React.createElement("button", {
-        key: "become",
-        onClick: () => onAdvance("becomeMember"),
-        className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
-      }, "তালিকায় নেই, নতুন সদস্য হিসেবে যোগ দিন")
+      }, m.name)))
     ]);
   }
 
