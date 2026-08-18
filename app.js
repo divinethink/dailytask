@@ -6528,7 +6528,7 @@ function App() {
                 message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
                 createdAt: Date.now(),
                 read: false
-              }).catch(() => {})
+              }).catch(e => alert("DIAGNOSTIC — notif fail for " + adminUid + ": " + e.message))
           ));
         } catch {}
       } catch (err) {
