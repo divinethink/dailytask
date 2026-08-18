@@ -9184,7 +9184,13 @@ function OnboardingBridge({
         key: m.id,
         onClick: () => { setClaimKeyTarget(m); setShowClaimKeyModal(true); },
         className: "w-full h-11 rounded-2xl border-2 border-slate-200 text-base font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-      }, m.name)))
+      }, m.name))),
+      /*#__PURE__*/React.createElement("button", {
+        key: "back",
+        type: "button",
+        onClick: () => onAdvance("choose"),
+        className: "self-start text-sm font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-1"
+      }, "← ফিরে যান")
     ]);
   }
 
@@ -9429,7 +9435,7 @@ function renderPendingGoogleReauthGate() {
       className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
-    }, "আবার প্রবেশ করতে Google দিয়ে সাইন-ইন করুন।"), err && /*#__PURE__*/React.createElement("p", {
+    }, "আপনি লগ আউট হয়েছেন"), err && /*#__PURE__*/React.createElement("p", {
       className: "text-sm font-medium text-red-600 max-w-xs"
     }, err), /*#__PURE__*/React.createElement("button", {
       onClick: handleGoogleClick,
@@ -9439,8 +9445,9 @@ function renderPendingGoogleReauthGate() {
     }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
       onClick: handleFallbackClick,
       disabled: busy,
-      className: "text-sm font-semibold text-slate-500 underline underline-offset-2 disabled:opacity-60"
-    }, "Family Code দিয়ে চালিয়ে যান"));
+      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
+      style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
+    }, "প্রথম পেজে ফিরে আসুন"));
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
 }
