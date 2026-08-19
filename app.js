@@ -4201,8 +4201,22 @@ async function createMemberWithKey(member) {
   const key = generateMemberKeyPlain();
   const hash = await sha256Hex(key);
   const batch = db.batch();
+  // Admin FIFO ownerActivity missing-key fix(১৯ আগস্ট ২০২৬): ownerUids-সহ
+  // তৈরি হওয়া member(approved memberRequest/first admin)-এর owner uid-এর
+  // জন্য সাথে সাথে ownerActivity stamp করা হয় — নাহলে সেই uid নিজে entry
+  // save/re-claim না করা পর্যন্ত ownerActivity-তে entry থাকে না, ফলে FIFO
+  // eviction Rules-এ missing-key error/deny দেয়(auto-eviction silently fail)।
+  // ownerUids:[](unclaimed member, handleAddMember path) অপরিবর্তিত—claim
+  // সময়ে আগে থেকেই stamp হয়।
+  const initialOwnerActivity = {};
+  if (Array.isArray(fields.ownerUids)) {
+    fields.ownerUids.forEach(u => {
+      initialOwnerActivity[u] = firebase.firestore.Timestamp.now();
+    });
+  }
   batch.set(memberRef, {
     ...fields,
+    ...(Object.keys(initialOwnerActivity).length ? { ownerActivity: initialOwnerActivity } : {}),
     updatedAt: Date.now(),
     lastActiveAt: firebase.firestore.Timestamp.now()
   }, { merge: true });
@@ -4259,12 +4273,14 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
   try {
     const hash = await sha256Hex(trimmed);
     let wasReplaced = false;
+    let outerEvictedUid = null;
     await db.runTransaction(async tx => {
       // transaction contention হলে callback retry হতে পারে — প্রতি
       // attempt-এ flag reset জরুরি, নাহলে আগের ব্যর্থ attempt-এর stale
       // মান থেকে যেতে পারে।
       wasReplaced = false;
       attemptedAdminEviction = false;
+      outerEvictedUid = null;
       const snap = await tx.get(memberRef);
       const data = snap.exists ? snap.data() : {};
       // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
@@ -4349,8 +4365,9 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         });
       }
       if (revoked) wasReplaced = true;
+      outerEvictedUid = evictedUid;
     });
-    return { ok: true, revoked: wasReplaced };
+    return { ok: true, revoked: wasReplaced, evictedUid: outerEvictedUid };
   } catch (err) {
     // ভুল Member Password হলে Rules permission-denied ছোঁড়ে(reject)।
     // adminEvictionAttempt flag এখনো ফেরত দেওয়া হয়(future-diagnostic/
@@ -6003,6 +6020,15 @@ function App() {
   // অনুমতি দেয় (isAdminOfFamily শাখা) — তাই কোনো Rules পরিবর্তন লাগেনি,
   // শুধু existing releaseMemberDoc() reuse করা হচ্ছে admin path থেকে।
   async function handleAdminForceRelease(m) {
+    // §First Admin Protection(Force-Release, ১৯ আগস্ট ২০২৬) — client-side
+    // pre-check(UX-এর জন্য, Rules-level protection এখনো ব্যাকলগে)। প্রথম
+    // Admin-কে অন্য কোনো admin force-release করতে পারবেন না, শুধু তিনি
+    // নিজে(Self-demote/নিজ ডিভাইস থেকে normal release দিয়ে) পারবেন।
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (firstAdminUid && m.ownerUids && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
+      alert("প্রথম এডমিনের দায়িত্ব অন্য কোনো এডমিন জোরপূর্বক মুক্ত করতে পারবেন না — শুধু তিনি নিজেই তার ডিভাইস থেকে ছাড়তে পারেন।");
+      return;
+    }
     if (isLockedForSwitch) {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
@@ -6199,15 +6225,7 @@ function App() {
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
   // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
   async function handleFullLogout() {
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    const amAdmin = !!(myUid && adminUidsList.includes(myUid));
     const wasGoogleLinked = isGoogleLinked();
-    if (amAdmin && !wasGoogleLinked) {
-      const warnOk = window.confirm("⚠️ আপনি এই পরিবারের এডমিন এবং আপনার Google অ্যাকাউন্ট সংযুক্ত নেই। লগআউট করলে নতুন ডিভাইস/session থেকে আবার এডমিন অ্যাক্সেস ফিরে পেতে সমস্যা হতে পারে। আগে Google অ্যাকাউন্ট সংযুক্ত করার পরামর্শ দেওয়া হচ্ছে (Recovery Key দিয়েও ফিরে পাওয়া যাবে)। তারপরও কি লগআউট করতে চান?");
-      if (!warnOk) return;
-      const confirmAgainOk = window.confirm("আপনি নিশ্চিত? এডমিন হিসেবে Google-link ছাড়া লগআউট করলে re-access জটিল হতে পারে। চূড়ান্তভাবে আগাতে চান?");
-      if (!confirmAgainOk) return;
-    }
     const ok = window.confirm("লগ আউট করবেন নিশ্চিত?");
     if (!ok) return;
     try {
@@ -6443,7 +6461,7 @@ function App() {
               : (x.ownerUid ? [x.ownerUid] : []);
             const nextOwners = owners.includes(uid)
               ? owners
-              : (res.revoked ? [...owners.slice(1), uid] : [...owners, uid]);
+              : (res.revoked ? [...owners.filter(o => o !== res.evictedUid), uid] : [...owners, uid]);
             return { ...x, ownerUids: nextOwners };
           }));
           setShowClaimKeyModal(false);
