@@ -311,48 +311,64 @@ if (typeof window !== "undefined") {
 // accessDenied/self-request হ্যান্ডলিং (migrateMembersIfNeeded catch ব্লক)
 // নিজে থেকেই pending accessRequest তৈরি করবে অথবা আগে থেকে approved থাকলে
 // সরাসরি ঢুকিয়ে দেবে — এখানে নতুন করে সেই লজিক ডুপ্লিকেট করা হয়নি।
+// §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — joinExistingFamily()-এর
+// family-lookup+validate অংশ আলাদা reusable helper-এ বের করা হয়েছে(কোনো
+// localStorage write/reload নেই, শুধু resolve+validate)। joinExistingFamily()
+// নিজে নিচে এটাই ব্যবহার করে — আচরণ/log/reason সব অপরিবর্তিত, শুধু delegate।
+async function resolveFamilyIdFromCode(code) {
+  const normalized = (code || "").trim();
+  if (!normalized) return { ok: false, reason: "empty" };
+  try {
+    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    if (!codeSnap.exists) {
+      return { ok: false, reason: "not-found" };
+    }
+    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
+    if (!targetFamilyId) {
+      return { ok: false, reason: "not-found" };
+    }
+    // পুরনো unapproved/নতুন ডিভাইস থেকে এই family-র উপর এখনো approval নেই,
+    // তাই families/{familyId} read rules (isApprovedMember) block করতে
+    // পারে — সেক্ষেত্রে pre-check skip করে এগিয়ে যাওয়া হয়, বুট-ফ্লো নিজেই
+    // migrationState নিরাপদে resolve করবে (একই fallback pattern যা
+    // বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
+    try {
+      const famSnap = await db.collection("families").doc(targetFamilyId).get();
+      if (!famSnap.exists) {
+        return { ok: false, reason: "not-found" };
+      }
+      const migrationState = famSnap.data().migrationState || "legacy";
+      if (migrationState !== "v2") {
+        return { ok: false, reason: "not-v2" };
+      }
+    } catch (preCheckErr) {
+      console.warn("[resolveFamilyIdFromCode] pre-check read blocked (সম্ভবত unapproved), চালিয়ে যাওয়া হচ্ছে:", preCheckErr.message);
+    }
+    return { ok: true, familyId: targetFamilyId, code: normalized };
+  } catch (err) {
+    console.error("[resolveFamilyIdFromCode] ব্যর্থ:", err.message);
+    return { ok: false, reason: "error", error: err.message };
+  }
+}
 async function joinExistingFamily(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   if (normalized === getFamilyCode()) {
     return { aborted: true, reason: "same-family" };
   }
-  try {
-    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
-    if (!codeSnap.exists) {
-      return { aborted: true, reason: "not-found" };
+  const resolved = await resolveFamilyIdFromCode(normalized);
+  if (!resolved.ok) {
+    if (resolved.reason === "error") {
+      console.error("[Join Family] ব্যর্থ:", resolved.error);
     }
-    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
-    if (!targetFamilyId) {
-      return { aborted: true, reason: "not-found" };
-    }
-    // পুরনো unapproved/নতুন ডিভাইস থেকে এই family-র উপর এখনো approval নেই,
-    // তাই families/{familyId} read rules (isApprovedMember) block করতে
-    // পারে — সেক্ষেত্রে pre-check skip করে switch+reload-এ এগিয়ে যাওয়া হয়,
-    // বুট-ফ্লো নিজেই migrationState নিরাপদে resolve করবে (একই fallback
-    // pattern যা বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
-    try {
-      const famSnap = await db.collection("families").doc(targetFamilyId).get();
-      if (!famSnap.exists) {
-        return { aborted: true, reason: "not-found" };
-      }
-      const migrationState = famSnap.data().migrationState || "legacy";
-      if (migrationState !== "v2") {
-        return { aborted: true, reason: "not-v2" };
-      }
-    } catch (preCheckErr) {
-      console.warn("[Join Family] pre-check read blocked (সম্ভবত unapproved), switch চালিয়ে যাওয়া হচ্ছে:", preCheckErr.message);
-    }
-    console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${targetFamilyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
-    localStorage.setItem("family_id", targetFamilyId);
-    localStorage.setItem("family_code", normalized);
-    localStorage.setItem("family_code_is_custom", "1");
-    window.location.reload();
-    return { success: true };
-  } catch (err) {
-    console.error("[Join Family] ব্যর্থ:", err.message);
-    return { aborted: true, reason: "error", error: err.message };
+    return { aborted: true, reason: resolved.reason, error: resolved.error };
   }
+  console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${resolved.familyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+  localStorage.setItem("family_id", resolved.familyId);
+  localStorage.setItem("family_code", normalized);
+  localStorage.setItem("family_code_is_custom", "1");
+  window.location.reload();
+  return { success: true };
 }
 if (typeof window !== "undefined") {
   window.joinExistingFamily = joinExistingFamily;
@@ -1869,18 +1885,35 @@ async function loadUserFamilyCode(uid) {
     return null;
   }
 }
-async function saveUserFamilyCode(uid, code) {
+async function saveUserFamilyCode(uid, code, memberId) {
   // ফাংশনের নিজের ভেতরেই guard — caller ভুলে খালি/অবৈধ code পাঠালেও
   // users/{uid}-এ কখনো ফাঁকা familyCode লেখা হবে না।
   if (!uid || !code || !code.trim()) return;
   try {
-    await db.collection("users").doc(uid).set({
+    const payload = {
       familyCode: code.trim(),
       updatedAt: Date.now()
-    }, {
+    };
+    // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 3) — optional
+    // memberId, existing call site-গুলো(৩টি) এই param পাস করে না বলে
+    // অপরিবর্তিত থাকে।
+    if (memberId) payload.memberId = memberId;
+    await db.collection("users").doc(uid).set(payload, {
       merge: true
     });
   } catch {}
+}
+// Google One-click Sign-in(touch-point 6)-এর জন্য — loadUserFamilyCode()
+// (existing, শুধু string ফেরত দেয়)-এর contract না ভেঙে আলাদা ফাংশন।
+async function loadUserFamilyMapping(uid) {
+  try {
+    const doc = await db.collection("users").doc(uid).get();
+    if (!doc.exists) return null;
+    const d = doc.data() || {};
+    return { familyCode: d.familyCode || null, memberId: d.memberId || null };
+  } catch {
+    return null;
+  }
 }
 // Google দিয়ে sign-in করা থাকলে কল হয়। users/{uid}-এ আগে থেকে সংরক্ষিত
 // familyCode থাকলে (অন্য ডিভাইস থেকে link করা) সেটাই এই ডিভাইসে local-এ
@@ -4225,6 +4258,12 @@ async function createMemberWithKey(member) {
     memberKeyHash: hash,
     updatedAt: Date.now()
   });
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — routing-only ইনডেক্স,
+  // কোনো authorization field না। firestore.rules-এ ইতিমধ্যে implement করা
+  // আছে(cross-member injection-protected, duplicate-hash auto-block)।
+  batch.set(db.collection("families").doc(getFamilyId()).collection("keyIndex").doc(hash), {
+    memberId: id
+  });
   stampLastActive(batch, null, getFamilyId());
   await batch.commit();
   return key;
@@ -4240,15 +4279,36 @@ async function fetchMemberKey(memberId) {
 async function changeMemberKey(memberId) {
   const key = generateMemberKeyPlain();
   const hash = await sha256Hex(key);
-  // set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর আগে
-  // তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
-  // "No document to update" error দিত)। merge:true দিয়ে create ও
-  // overwrite দুই ক্ষেত্রেই কাজ করবে।
-  await memberPrivateKeyRef(memberId).set({
-    memberKey: key,
-    memberKeyHash: hash,
-    updatedAt: Date.now()
-  }, { merge: true });
+  const privateRef = memberPrivateKeyRef(memberId);
+  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
+  const newIndexRef = keyIndexColl.doc(hash);
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 2) — transaction:
+  // পুরনো keyIndex delete → key update → নতুন keyIndex create(duplicate-hash
+  // check সহ)। set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর
+  // আগে তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
+  // "No document to update" error দিত)। merge:true দিয়ে create ও overwrite
+  // দুই ক্ষেত্রেই কাজ করবে।
+  await db.runTransaction(async tx => {
+    const oldSnap = await tx.get(privateRef);
+    const oldHash = oldSnap.exists ? oldSnap.data().memberKeyHash : null;
+    // নতুন hash আগের hash-এর সমান না হলে(সাধারণ ক্ষেত্র) duplicate-check —
+    // hash collision(অন্য member-এর keyIndex দখল) এড়াতে read করা হচ্ছে।
+    if (oldHash !== hash) {
+      const dupSnap = await tx.get(newIndexRef);
+      if (dupSnap.exists) {
+        throw new Error("key-collision");
+      }
+    }
+    tx.set(privateRef, {
+      memberKey: key,
+      memberKeyHash: hash,
+      updatedAt: Date.now()
+    }, { merge: true });
+    tx.set(newIndexRef, { memberId });
+    if (oldHash && oldHash !== hash) {
+      tx.delete(keyIndexColl.doc(oldHash));
+    }
+  });
   return key;
 }
 // Member Key দিয়ে claim(existing member-এর ownership ফিরে পাওয়া) —
@@ -4264,11 +4324,12 @@ async function changeMemberKey(memberId) {
 // নতুন device যোগ হয়। ব্যতিক্রম শুধু firstAdminUid — নিচের stale-uid
 // নির্বাচনের সময় candidate থেকে বাদ রাখা হয়, ফলে সে কখনো evict-attempt
 // হয় না(rules-এর family-root swap clause-ও আলাদাভাবে একই সুরক্ষা দেয়)।
-async function claimMemberWithKey(memberId, enteredKey, uid) {
+async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
-  const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(memberId);
-  const famRef = db.collection("families").doc(getFamilyId());
+  const targetFamilyId = familyIdOverride || getFamilyId();
+  const memberRef = db.collection("families").doc(targetFamilyId).collection("members").doc(memberId);
+  const famRef = db.collection("families").doc(targetFamilyId);
   let attemptedAdminEviction = false;
   try {
     const hash = await sha256Hex(trimmed);
@@ -4375,6 +4436,46 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
     // করে না(১৯ আগস্ট ২০২৬, ৭-দিন gate সরানোর পর generic বার্তাই যথেষ্ট)।
     return { ok: false, reason: "denied", error: err.message, adminEvictionAttempt: attemptedAdminEviction };
   }
+}
+// §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — Family Code + Member
+// Password একসাথে দিয়ে সরাসরি login(member নাম বেছে নেওয়ার প্রয়োজন নেই)।
+// পুরো ফাংশন non-committing পর্যন্ত claim সফল না হয়: family resolve ও
+// keyIndex lookup কোনোটাই localStorage/reload স্পর্শ করে না। শুধু
+// keyIndex hit + claimMemberWithKey() সফল হলেই family state
+// commit(localStorage)+reload হয় — miss বা ভুল password হলে কলার একই
+// screen-এ থেকে generic error দেখাবে, বিদ্যমান family/session অক্ষত থাকে।
+async function directIdentifyLogin(code, password) {
+  const normalizedCode = (code || "").trim();
+  const pw = (password || "").trim();
+  if (!normalizedCode || !pw) return { ok: false, reason: "empty" };
+  const resolved = await resolveFamilyIdFromCode(normalizedCode);
+  if (!resolved.ok) return { ok: false, reason: "invalid" }; // generic — নির্দিষ্ট family-lookup কারণ UI-তে leak করা হয় না
+  let memberId = null;
+  try {
+    const hash = await sha256Hex(pw);
+    const idxSnap = await db.collection("families").doc(resolved.familyId)
+      .collection("keyIndex").doc(hash).get();
+    if (idxSnap.exists) memberId = idxSnap.data() ? idxSnap.data().memberId : null;
+  } catch {
+    memberId = null; // permission-denied/network — miss হিসেবেই treat, কোনো commit না
+  }
+  if (!memberId) return { ok: false, reason: "invalid" };
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  if (!uid) return { ok: false, reason: "invalid" };
+  const claimResult = await claimMemberWithKey(memberId, pw, uid, resolved.familyId);
+  if (!claimResult || !claimResult.ok) return { ok: false, reason: "invalid" };
+  // সফল claim — এখনই family state commit + reload।
+  localStorage.setItem("family_id", resolved.familyId);
+  localStorage.setItem("family_code", normalizedCode);
+  localStorage.setItem("family_code_is_custom", "1");
+  if (isGoogleLinked()) {
+    try { await saveUserFamilyCode(uid, normalizedCode, memberId); } catch {}
+  }
+  window.location.reload();
+  return { ok: true };
+}
+if (typeof window !== "undefined") {
+  window.directIdentifyLogin = directIdentifyLogin;
 }
 // One-time migration: if no v2 (member:*) docs exist yet but a legacy v1
 // array-doc has members, copy each into its own v2 doc as "unclaimed"
@@ -6470,6 +6571,12 @@ function App() {
           // FIFO replace(admin বা non-admin) হলেও(res.revoked) আলাদা
           // alert দেখানো হয় না(owner-সিদ্ধান্ত, ১৯ আগস্ট ২০২৬) — সফল
           // claim silent থাকে।
+          // §Member Key Direct-Identify(touch-point 3) — Google-linked হলে
+          // পরবর্তী one-click Google sign-in-এর জন্য memberId mapping save
+          // (best-effort, non-blocking)।
+          if (isGoogleLinked()) {
+            saveUserFamilyCode(uid, getFamilyCode(), claimKeyTarget.id).catch(() => {});
+          }
         } else {
           alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
         }
@@ -9258,6 +9365,7 @@ function OnboardingBridge({
 function Onboarding() {
   const [step, setStep] = useState("welcome"); // welcome | newFamily | existingFamily
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -9312,6 +9420,67 @@ function Onboarding() {
     // success হলে joinExistingFamily() নিজেই reload করে
   }
 
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — Family Code + Member
+  // Password একসাথে দিয়ে সরাসরি login। ব্যর্থ হলে(keyIndex miss/ভুল
+  // password) কোনো family switch/reload হয় না — generic error দেখিয়ে
+  // একই screen-এ থাকা হয়, existing session অক্ষত থাকে।
+  async function handleDirectLogin() {
+    setBusy(true);
+    setError(null);
+    const res = await directIdentifyLogin(code, password);
+    if (!res || !res.ok) {
+      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      setBusy(false);
+    }
+    // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
+  }
+
+  // §Google One-click Sign-in(touch-point 6) — Family Code ছাড়াই।
+  // users/{uid}-এ আগে থেকে সংরক্ষিত familyCode/memberId থাকলে সরাসরি সেই
+  // family-তে switch(memberId থাকলে dashboard পর্যন্ত সরাসরি, না থাকলে
+  // choose-স্টেপে); না থাকলে(নতুন Google অ্যাকাউন্ট) Family Code দিয়ে
+  // যোগ দিতে বলা হয় — existing join/becomeMember flow-ই fallback।
+  async function handleGoogleOneClick() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!isGoogleLinked()) {
+        try {
+          await linkGoogleAccount();
+        } catch (linkErr) {
+          if (linkErr && linkErr.code === "auth/popup-closed-by-user") {
+            setBusy(false);
+            return;
+          }
+          if (linkErr && linkErr.code === "auth/credential-already-in-use" && linkErr.credential) {
+            await auth.signInWithCredential(linkErr.credential);
+          } else {
+            throw linkErr;
+          }
+        }
+      }
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      const mapping = uid ? await loadUserFamilyMapping(uid) : null;
+      if (mapping && mapping.familyCode) {
+        localStorage.setItem("family_code", mapping.familyCode);
+        localStorage.setItem("family_code_is_custom", "1");
+        if (!mapping.memberId) {
+          // familyCode আছে কিন্তু memberId নেই(পুরনো/আগের link) — choose
+          // স্টেপে(Google/Member-Key/সদস্য হোন) নামানো হচ্ছে, existing
+          // OnboardingBridge flow-ই বাকিটা সামলাবে।
+          try { sessionStorage.setItem("dt_onboarding_flow", "existingFamily"); } catch {}
+        }
+        window.location.reload();
+        return;
+      }
+      setError("এই Google অ্যাকাউন্টের সাথে কোনো পরিবার যুক্ত পাওয়া যায়নি। উপরে Family Code দিয়ে যোগ দিন।");
+      setBusy(false);
+    } catch (err) {
+      setError("Google সাইন-ইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      setBusy(false);
+    }
+  }
+
   const shell = (children) => /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
   }, children);
@@ -9334,6 +9503,19 @@ function Onboarding() {
     placeholder: "Family Code লিখুন",
     disabled: busy,
     className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors"
+  });
+
+  const passwordInput = /*#__PURE__*/React.createElement("input", {
+    key: "password-input",
+    type: "password",
+    name: "member-password",
+    autoComplete: "current-password",
+    value: password,
+    onChange: e => setPassword(e.target.value),
+    placeholder: "Member Password (ঐচ্ছিক)",
+    disabled: busy,
+    className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
   });
 
   const errorBox = error && /*#__PURE__*/React.createElement("p", {
@@ -9369,7 +9551,7 @@ function Onboarding() {
         onClick: () => setStep("existingFamily"),
         className: "w-full max-w-xs h-12 px-4 rounded-2xl text-white text-sm font-bold flex items-center justify-center shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
         style: { background: "#0E4B43" }
-      }, "বিদ্যমান Family-এর সদস্য হলে Sign-in করুন")
+      }, "বিদ্যমান Family-তে প্রবেশ করুন")
     ]);
   }
 
@@ -9399,27 +9581,50 @@ function Onboarding() {
   }
 
   if (step === "existingFamily") {
-    return formShell([
+    return /*#__PURE__*/React.createElement("form", {
+      onSubmit: e => {
+        e.preventDefault();
+        if (!busy && code.trim() && password.trim()) handleDirectLogin();
+      },
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-3"
+    }, [
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-xl font-bold tracking-tight",
         style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
-      }, "আপনার পরিবারের Family Code দিন"),
+      }, "বিদ্যমান Family-এ Sign-in করুন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
         className: "text-sm max-w-xs leading-relaxed text-slate-700"
-      }, "কোড দেওয়ার পর Google Sign-in বা Member Key দিয়ে আপনার নিজের পরিচয় ফিরে পাওয়া যাবে।"),
+      }, "Family Code + Member Password দিয়ে সরাসরি, অথবা নিচের অপশন ব্যবহার করুন।"),
       React.cloneElement(codeInput, { key: "input" }),
+      passwordInput,
       errorBox,
       /*#__PURE__*/React.createElement("button", {
-        key: "submit",
+        key: "login",
         type: "submit",
-        disabled: busy || !code.trim(),
+        disabled: busy || !code.trim() || !password.trim(),
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
-      }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
+      }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Login"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "google",
+        type: "button",
+        onClick: handleGoogleOneClick,
+        disabled: busy,
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60",
+        style: { borderColor: "#1D7A68", color: "#1D7A68" }
+      }, "Google দিয়ে Sign-in"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "become",
+        type: "button",
+        onClick: handleJoinExisting,
+        disabled: busy || !code.trim(),
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60",
+        style: { background: "#FBF3E1", color: "#8A6D2F" }
+      }, "পরিবারের সদস্য হিসেবে যোগ দিন"),
       backButton
-    ], handleJoinExisting);
+    ]);
   }
 
   return null;
