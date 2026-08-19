@@ -9719,8 +9719,9 @@ function Onboarding() {
         className: "w-full flex flex-col items-center",
         style: codeShakeKey ? { animation: "dtCodeShake 0.4s" } : undefined
       }, React.cloneElement(codeInput, { key: "input" })),
+      (error === "প্রথমে Family Code দিন।") ? errorBox : null,
       passwordInput,
-      errorBox,
+      (error === "প্রথমে Family Code দিন।") ? null : errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "login",
         type: "submit",
