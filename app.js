@@ -3004,6 +3004,43 @@ function KeyIcon({
     d: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
   }));
 }
+function EyeIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "3"
+  }));
+}
+function EyeOffIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14.12 14.12a3 3 0 1 1-4.24-4.24"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "1",
+    y1: "1",
+    x2: "23",
+    y2: "23"
+  }));
+}
 function SmartphoneIcon({
   size,
   color,
@@ -9366,6 +9403,7 @@ function Onboarding() {
   const [step, setStep] = useState("welcome"); // welcome | newFamily | existingFamily
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -9462,6 +9500,19 @@ function Onboarding() {
       const uid = auth.currentUser ? auth.currentUser.uid : null;
       const mapping = uid ? await loadUserFamilyMapping(uid) : null;
       if (mapping && mapping.familyCode) {
+        // বাগ-ফিক্স(২০ আগস্ট ২০২৬): আগে শুধু family_code সেভ হতো,
+        // family_id হতো না — App বুট hasExistingSession চেক করে
+        // family_id + family_code দুটোই লাগে, ফলে reload-এর পর আবার
+        // page-1(welcome)-এ ফেরত যেত। directIdentifyLogin()-এর মতোই
+        // resolveFamilyIdFromCode() দিয়ে familyId বের করে family_id-ও
+        // commit করা হচ্ছে।
+        const resolved = await resolveFamilyIdFromCode(mapping.familyCode);
+        if (!resolved.ok) {
+          setError("এই Google অ্যাকাউন্টের family তথ্য মেলাতে সমস্যা হয়েছে। Family Code দিয়ে চেষ্টা করুন।");
+          setBusy(false);
+          return;
+        }
+        localStorage.setItem("family_id", resolved.familyId);
         localStorage.setItem("family_code", mapping.familyCode);
         localStorage.setItem("family_code_is_custom", "1");
         if (!mapping.memberId) {
@@ -9505,18 +9556,28 @@ function Onboarding() {
     className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors"
   });
 
-  const passwordInput = /*#__PURE__*/React.createElement("input", {
+  const passwordInput = /*#__PURE__*/React.createElement("div", {
+    key: "password-input-wrap",
+    className: "relative w-full max-w-xs"
+  }, /*#__PURE__*/React.createElement("input", {
     key: "password-input",
-    type: "password",
+    type: showPassword ? "text" : "password",
     name: "member-password",
     autoComplete: "current-password",
     value: password,
     onChange: e => setPassword(e.target.value),
-    placeholder: "Member Password (ঐচ্ছিক)",
+    placeholder: "Member Password",
     disabled: busy,
-    className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors",
+    className: "w-full h-12 pl-4 pr-11 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
-  });
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowPassword(s => !s),
+    tabIndex: -1,
+    disabled: busy,
+    "aria-label": showPassword ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন",
+    className: "absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+  }, showPassword ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 18 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 18 })));
 
   const errorBox = error && /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-medium text-red-600 max-w-xs"
@@ -9592,11 +9653,23 @@ function Onboarding() {
         key: "title",
         className: "text-xl font-bold tracking-tight",
         style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
-      }, "বিদ্যমান Family-এ Sign-in করুন"),
+      }, "বিদ্যমান Family-তে প্রবেশ করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "google",
+        type: "button",
+        onClick: handleGoogleOneClick,
+        disabled: busy,
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 bg-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+      }, /*#__PURE__*/React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 48 48" }, [
+          /*#__PURE__*/React.createElement("path", { key: "1", fill: "#FFC107", d: "M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" }),
+          /*#__PURE__*/React.createElement("path", { key: "2", fill: "#FF3D00", d: "M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" }),
+          /*#__PURE__*/React.createElement("path", { key: "3", fill: "#4CAF50", d: "M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.6 34.7 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5.1C9.6 39.6 16.3 44 24 44z" }),
+          /*#__PURE__*/React.createElement("path", { key: "4", fill: "#1976D2", d: "M43.6 20.5H42V20H24v8h11.3c-0.8 2.3-2.3 4.2-4.2 5.6l6.6 5.6C41.5 36.5 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z" })
+        ]), "Google দিয়ে Sign-in"),
       /*#__PURE__*/React.createElement("p", {
-        key: "sub",
-        className: "text-sm max-w-xs leading-relaxed text-slate-700"
-      }, "Family Code + Member Password দিয়ে সরাসরি, অথবা নিচের অপশন ব্যবহার করুন।"),
+        key: "or1",
+        className: "text-xs font-semibold text-slate-400"
+      }, "অথবা"),
       React.cloneElement(codeInput, { key: "input" }),
       passwordInput,
       errorBox,
@@ -9607,14 +9680,10 @@ function Onboarding() {
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
       }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Login"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "google",
-        type: "button",
-        onClick: handleGoogleOneClick,
-        disabled: busy,
-        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60",
-        style: { borderColor: "#1D7A68", color: "#1D7A68" }
-      }, "Google দিয়ে Sign-in"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "or2",
+        className: "text-xs font-semibold text-slate-400"
+      }, "অথবা"),
       /*#__PURE__*/React.createElement("button", {
         key: "become",
         type: "button",
@@ -9622,7 +9691,7 @@ function Onboarding() {
         disabled: busy || !code.trim(),
         className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60",
         style: { background: "#FBF3E1", color: "#8A6D2F" }
-      }, "পরিবারের সদস্য হিসেবে যোগ দিন"),
+      }, "পরিবারে নতুন সদস্য হিসেবে যোগ দিন"),
       backButton
     ]);
   }
