@@ -4340,7 +4340,7 @@ async function changeMemberKey(memberId, customKey) {
       memberKey: key,
       memberKeyHash: hash,
       updatedAt: Date.now()
-    }, { merge: true });
+    });
     tx.set(newIndexRef, { memberId });
     if (oldHash && oldHash !== hash) {
       tx.delete(keyIndexColl.doc(oldHash));
@@ -4888,6 +4888,7 @@ function App() {
   // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
   // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
   const [manualKeyInput, setManualKeyInput] = useState("");
+  const [oldKeyInput, setOldKeyInput] = useState("");
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
   const [claimKeyInput, setClaimKeyInput] = useState("");
@@ -7453,6 +7454,7 @@ function App() {
         setMemberKeyLoading(true);
         setMemberKeyRevealed(false);
         setManualKeyInput("");
+        setOldKeyInput("");
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
         fetchMemberKey(ownMember.id)
@@ -8348,34 +8350,30 @@ function App() {
   }, /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 18, color: "var(--theme-primary)" })) : memberKeyValue == null ? /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3"
   }, "এই সদস্যের জন্য এখনো কোনো Key তৈরি হয়নি। নিচের বাটনে ট্যাপ করে একটি তৈরি করুন।") : /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-2",
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "পূর্বের Password দিন"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: oldKeyInput,
+    onChange: e => setOldKeyInput(e.target.value),
+    disabled: memberKeyBusy || memberKeyLoading,
+    placeholder: "পূর্বের Password দিন",
+    className: "w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-bold text-emerald-900 tracking-wider select-all cursor-pointer",
-    onClick: () => setMemberKeyRevealed(v => !v),
-    title: "দেখতে ট্যাপ করুন"
-  }, memberKeyRevealed ? memberKeyValue : "•".repeat(memberKeyValue.length)),
-  /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      navigator.clipboard.writeText(memberKeyValue || "");
-      setCopiedMemberKey(true);
-      setTimeout(() => setCopiedMemberKey(false), 2000);
-    },
-    className: "shrink-0 p-1.5 rounded-lg hover:bg-slate-200 text-slate-500",
-    title: "কপি করুন"
-  }, copiedMemberKey ? /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] font-bold text-emerald-600"
-  }, "কপি হয়েছে!") : /*#__PURE__*/React.createElement(CopyIcon, { size: 14 }))),
+  })),
   /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 mb-1.5"
   }, "(কমপক্ষে ৯ ক্যারেক্টারের অক্ষর, সংখ্যা ও চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "নতুন Password দিন"),
   /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: manualKeyInput,
     onChange: e => setManualKeyInput(e.target.value),
     disabled: memberKeyBusy || memberKeyLoading,
-    placeholder: "Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)",
+    placeholder: "নতুন Password দিন (কমপক্ষে ৯ ক্যারেক্টার)",
     className: "w-full h-10 px-3 mb-2 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }),
@@ -8384,7 +8382,7 @@ function App() {
     onClick: async () => {
       const manual = manualKeyInput.trim();
       if (!manual) {
-        alert("Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)।");
+        alert("নতুন Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)।");
         return;
       }
       if (manual.length < 9) {
@@ -8392,6 +8390,10 @@ function App() {
         return;
       }
       if (memberKeyValue != null) {
+        if (oldKeyInput.trim() !== memberKeyValue) {
+          alert("পূর্বের Password মেলেনি।");
+          return;
+        }
         const ok = window.confirm("Member Password পরিবর্তন করতে চান?");
         if (!ok) return;
       }
@@ -8401,6 +8403,7 @@ function App() {
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
         setManualKeyInput("");
+        setOldKeyInput("");
       } catch (err) {
         alert("Password তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
       } finally {
