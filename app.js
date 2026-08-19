@@ -9161,14 +9161,23 @@ function OnboardingBridge({
 
   // "সদস্য হোন" মোডাল বন্ধ হলে — সফল submit(myMemberRequestStatus:
   // "pending" হয়ে গেছে) হলেই onboarding সম্পূর্ণ ধরে gate clear হবে;
-  // Cancel/X(status এখনো set হয়নি) হলে gate clear না করে "choose"-এ
-  // ফিরিয়ে দেওয়া হয় — authentication ছাড়া Dashboard entry রোধ করতে।
+  // Cancel/X(status এখনো set হয়নি) হলে পুরনো deprecated "choose"
+  // পেজ(page-2 redesign-এর পর অপ্রচলিত) না দেখিয়ে family-context
+  // পুরোপুরি undo করে page-1/2(Onboarding())-এ ফেরত পাঠানো হয়(২০ আগস্ট
+  // ২০২৬ bug fix) — authentication ছাড়া Dashboard entry-ও রোধ থাকে।
   useEffect(() => {
     if (prevBecomeOpen.current && !showBecomeMemberModal && step === "becomeMember") {
       if (myMemberRequestStatus === "pending") {
         onAdvance(null);
       } else {
-        onAdvance("choose");
+        try {
+          sessionStorage.removeItem("dt_onboarding_flow");
+          sessionStorage.removeItem("dt_onboarding_step");
+          localStorage.removeItem("family_id");
+          localStorage.removeItem("family_code");
+          localStorage.removeItem("family_code_is_custom");
+        } catch {}
+        window.location.reload();
       }
     }
     prevBecomeOpen.current = showBecomeMemberModal;
