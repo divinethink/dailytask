@@ -6464,7 +6464,7 @@ function App() {
     type: "text",
     name: "username",
     autoComplete: "username",
-    value: claimKeyTarget.id,
+    value: getFamilyCode(),
     readOnly: true,
     tabIndex: -1,
     "aria-hidden": "true",
