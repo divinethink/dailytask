@@ -4918,7 +4918,12 @@ function App() {
   }
   useEffect(() => {
     if (onbFlow && !onbStep) {
-      onbAdvance(onbFlow === "newFamily" ? "addMember" : "choose");
+      // বাগ-ফিক্স(২০ আগস্ট ২০২৬): নতুন page-2(Onboarding()) নিজেই
+      // Google/Login/Join-এর choice দেয় বলে "choose"(পুরনো ৩য় পেজ) আর
+      // দরকার নেই — "existingFamily" flow(join-as-new-member ও Google
+      // fallback উভয়ই) সরাসরি "becomeMember"-এ যায়। "choose" definition
+      // এখনো আছে শুধু becomeMember-cancel fallback-এর safety-net হিসেবে(নিচে)।
+      onbAdvance(onbFlow === "newFamily" ? "addMember" : "becomeMember");
     }
   }, [onbFlow]);
   const [showMemberRequestsModal, setShowMemberRequestsModal] = useState(false);
@@ -9689,8 +9694,8 @@ function Onboarding() {
         type: "button",
         onClick: handleJoinExisting,
         disabled: busy || !code.trim(),
-        className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60",
-        style: { background: "#FBF3E1", color: "#8A6D2F" }
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60 border-2",
+        style: { background: "#F5E6C0", borderColor: "#C89B3C", color: "#7A5A1F" }
       }, "পরিবারে নতুন সদস্য হিসেবে যোগ দিন"),
       backButton
     ]);
