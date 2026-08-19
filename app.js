@@ -4243,16 +4243,13 @@ async function changeMemberKey(memberId) {
 // §Multi-device(v2-only, max 3): single ownerUid overwrite-এর বদলে এখন
 // transaction দিয়ে বর্তমান ownerUids পড়ে, ৩টির কম থাকলে/এই uid ইতিমধ্যে
 // থাকলে(no-op duplicate-prevention) append করা হয়।
-// §Admin FIFO(১৮ আগস্ট ২০২৬): আগে admin পূর্ণ(৩) থাকলে সবসময় hard-reject
-// হতো। এখন non-admin member-এর মতোই stalest ownerActivity বাদ দিয়ে নতুন
-// device যোগ করার চেষ্টা করা হয়(write attempt) — কিন্তু চূড়ান্ত
-// সিদ্ধান্ত সবসময় firestore.rules-এ request.time(server clock) দিয়েই
-// নেওয়া হয়। এই ফাংশন কখনো client Date.now()-কে সেই সিদ্ধান্তের ভিত্তি
-// হিসেবে ব্যবহার করে না — নিচে যেখানেই "৭ দিন" প্রসঙ্গ আসে, সেটা শুধু
-// Rules-এর কাজ, এখানে না। Rules ৭ দিনের কম stale হলে পুরো write reject
-// করবে(permission-denied) — সেক্ষেত্রে ভুল password বনাম এখনো-সক্রিয়
-// device আলাদা করা client-এর পক্ষে সম্ভব না(client সত্যিকারের সময় জানে
-// না, এটা ইচ্ছাকৃত নিরাপত্তা সীমাবদ্ধতা) — তাই নিচে combined বার্তা।
+// §Admin FIFO(১৯ আগস্ট ২০২৬, ৭-দিন threshold তুলে দেওয়া হয়েছে): আগে
+// admin পূর্ণ(৩) থাকলে সবসময় hard-reject হতো, তারপর ৭-দিন-stale gate
+// যোগ হয়েছিল — এখন সেই সময়-শর্ত সম্পূর্ণ সরানো হয়েছে(owner-সিদ্ধান্ত)।
+// non-admin-এর মতোই unconditional FIFO: stalest ownerActivity বাদ দিয়ে
+// নতুন device যোগ হয়। ব্যতিক্রম শুধু firstAdminUid — নিচের stale-uid
+// নির্বাচনের সময় candidate থেকে বাদ রাখা হয়, ফলে সে কখনো evict-attempt
+// হয় না(rules-এর family-root swap clause-ও আলাদাভাবে একই সুরক্ষা দেয়)।
 async function claimMemberWithKey(memberId, enteredKey, uid) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
@@ -4297,17 +4294,24 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
       // যোগ করা হয় — member ও admin উভয়ের ক্ষেত্রেই একই গণনা(নিচে)।
       // "stale" ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো entry
       // থেকে নির্ণয় করা হয়; entry না থাকা uid সবচেয়ে stale ধরা হয়
-      // (timestamp 0)। admin-এর ক্ষেত্রে এই write শেষ পর্যন্ত সফল হবে
-      // কিনা তা firestore.rules-এর ৭-দিন server-side চেক ঠিক করে দেয় —
-      // এই ফাংশন শুধু attempt করে।
+      // (timestamp 0)। admin-এর ক্ষেত্রে firstAdminUid(§First Admin
+      // Protection, ১৯ আগস্ট ২০২৬)-কে candidate থেকে বাদ রাখা হয়, যাতে
+      // সে কখনো evict-attempt না হয়(rules-এর family-root swap clause-ও
+      // আলাদাভাবে একই সুরক্ষা দেয় — এটি defense-in-depth, single-source
+      // নয়)। firstAdminUid ছাড়া বাকি সব uid-ই এখন non-admin-এর মতো
+      // unconditional FIFO eligible(কোনো সময়-শর্ত নেই)।
       let revoked = false;
       let nextOwners = [...currentOwners, uid];
       let evictedUid = null;
       if (currentOwners.length >= 3) {
         const ownerActivity = data.ownerActivity || {};
-        let staleUid = currentOwners[0];
+        const firstAdminUid = isAdminRole && famSnap && famSnap.data() ? famSnap.data().firstAdminUid : null;
+        const evictionCandidates = (isAdminRole && firstAdminUid)
+          ? currentOwners.filter(u => u !== firstAdminUid)
+          : currentOwners;
+        let staleUid = evictionCandidates[0];
         let staleTs = tsToMillis(ownerActivity[staleUid]);
-        for (const ou of currentOwners) {
+        for (const ou of evictionCandidates) {
           const ts = tsToMillis(ownerActivity[ou]);
           if (ts < staleTs) { staleTs = ts; staleUid = ou; }
         }
@@ -4348,9 +4352,10 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
     });
     return { ok: true, revoked: wasReplaced };
   } catch (err) {
-    // ভুল key হলে, অথবা admin-eviction attempt হলেও ৭ দিন পার না হলে —
-    // দুটোতেই Rules একইভাবে reject করে(permission-denied), client
-    // এখানে আলাদা করতে পারে না(client clock ব্যবহার করা হয়নি বলেই)।
+    // ভুল Member Password হলে Rules permission-denied ছোঁড়ে(reject)।
+    // adminEvictionAttempt flag এখনো ফেরত দেওয়া হয়(future-diagnostic/
+    // debugging-এ কাজে লাগতে পারে) কিন্তু UI আর এটি আলাদাভাবে ব্যবহার
+    // করে না(১৯ আগস্ট ২০২৬, ৭-দিন gate সরানোর পর generic বার্তাই যথেষ্ট)।
     return { ok: false, reason: "denied", error: err.message, adminEvictionAttempt: attemptedAdminEviction };
   }
 }
@@ -6417,19 +6422,16 @@ function App() {
   }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডাটা/পরিচয় ফিরে আসবে।"),
-  /*#__PURE__*/React.createElement("input", {
-    value: claimKeyInput,
-    onChange: e => setClaimKeyInput(e.target.value),
-    placeholder: "Member Password",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    disabled: claimKeyBusy || !claimKeyInput.trim(),
-    onClick: async () => {
+  /*#__PURE__*/React.createElement("form", {
+    // §Notification simplification + Password Autofill(১৯ আগস্ট ২০২৬):
+    // (১) FIFO/admin-eviction alert বাদ(owner-সিদ্ধান্ত, নিচে দ্রষ্টব্য)।
+    // (২) <form onSubmit> ব্যবহার করা হচ্ছে যাতে browser-এর native
+    // password manager submit event দেখে save-prompt দেখাতে পারে(custom
+    // storage/localStorage নেই — শুধু standard form+autocomplete)।
+    onSubmit: async e => {
+      e.preventDefault();
       const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!uid) return;
+      if (!uid || claimKeyBusy || !claimKeyInput.trim()) return;
       setClaimKeyBusy(true);
       try {
         const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
@@ -6447,32 +6449,50 @@ function App() {
           setShowClaimKeyModal(false);
           setClaimKeyInput("");
           setClaimKeyTarget(null);
-          if (res.revoked) {
-            // FIFO replace(১৭ আগস্ট ২০২৬): পুরনো device স্বয়ংক্রিয়ভাবে
-            // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
-            alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
-          }
-        } else if (res.reason === "denied" && res.adminEvictionAttempt) {
-          // §Admin FIFO(১৮ আগস্ট ২০২৬): এই আইডি(এডমিন) ইতোমধ্যে ৩টি
-          // ডিভাইসে আছে এবং write reject হয়েছে — কারণ ভুল Password অথবা
-          // কোনো ডিভাইস এখনো ৭ দিনের মধ্যে সক্রিয়(client এই দুইয়ের মধ্যে
-          // পার্থক্য করতে পারে না, ইচ্ছাকৃতভাবে — দেখুন claimMemberWithKey)।
-          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে। Password ভুল হতে পারে, অথবা ডিভাইসগুলো এখনও সাম্প্রতিক সক্রিয়(৭ দিনের মধ্যে ব্যবহৃত) থাকায় স্বয়ংক্রিয় পরিবর্তন হয়নি। কোনো ডিভাইস ৭ দিনের বেশি অব্যবহৃত হলে সঠিক Password দিলে স্বয়ংক্রিয়ভাবে পরিবর্তন হয়ে যাবে; জরুরি হলে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
+          // FIFO replace(admin বা non-admin) হলেও(res.revoked) আলাদা
+          // alert দেখানো হয় না(owner-সিদ্ধান্ত, ১৯ আগস্ট ২০২৬) — সফল
+          // claim silent থাকে।
         } else {
           alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
         }
       } finally {
         setClaimKeyBusy(false);
       }
-    },
+    }
+  },
+  /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    name: "username",
+    autoComplete: "username",
+    value: claimKeyTarget.id,
+    readOnly: true,
+    tabIndex: -1,
+    "aria-hidden": "true",
+    style: { position: "absolute", width: "1px", height: "1px", padding: 0, margin: "-1px", overflow: "hidden", clip: "rect(0,0,0,0)", border: 0 }
+  }),
+  /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    name: "current-password",
+    autoComplete: "current-password",
+    value: claimKeyInput,
+    onChange: e => setClaimKeyInput(e.target.value),
+    placeholder: "Member Password",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: claimKeyBusy || !claimKeyInput.trim(),
     className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
   }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => {
       setShowClaimKeyModal(false);
       setClaimKeyInput("");
     },
     className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল"))));
+  }, "বাতিল")))));
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
   // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
   // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
@@ -6528,7 +6548,7 @@ function App() {
                 message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
                 createdAt: Date.now(),
                 read: false
-              }).catch(e => alert("DIAGNOSTIC — notif fail for " + adminUid + ": " + e.message))
+              }).catch(() => {})
           ));
         } catch {}
       } catch (err) {
@@ -8016,6 +8036,8 @@ function App() {
   }, "নতুন ফ্যামিলি কোড তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: newFamCodeInput,
     onChange: e => setNewFamCodeInput(e.target.value),
     placeholder: "যেমন: Fam-Khan-2026",
@@ -8044,6 +8066,8 @@ function App() {
   }, "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: joinFamCodeInput,
     onChange: e => setJoinFamCodeInput(e.target.value),
     placeholder: "যেমন: FAM-XXXXXXXXX",
@@ -8072,6 +8096,8 @@ function App() {
   }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
     placeholder: "নতুন কোড লিখুন",
@@ -9272,8 +9298,19 @@ function Onboarding() {
     className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
   }, children);
 
+  // Family Code autofill(replace-not-add): শুধু newFamily/existingFamily
+  // স্টেপে <form> wrap করা হয় (welcome স্টেপে না) যাতে browser native
+  // save/autofill prompt দেখাতে পারে। Submit শুধুমাত্র !busy && code.trim()
+  // থাকলেই ট্রিগার হয় — এটা button-এর disabled শর্তের সাথে সামঞ্জস্যপূর্ণ।
+  const formShell = (children, onSubmit) => /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => { e.preventDefault(); if (!busy && code.trim()) onSubmit(); },
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+  }, children);
+
   const codeInput = /*#__PURE__*/React.createElement("input", {
     type: "text",
+    name: "family-code",
+    autoComplete: "username",
     value: code,
     onChange: e => setCode(e.target.value),
     placeholder: "Family Code লিখুন",
@@ -9286,6 +9323,7 @@ function Onboarding() {
   }, error);
 
   const backButton = /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => { setStep("welcome"); setError(null); setCode(""); },
     disabled: busy,
     className: "w-full max-w-xs text-left text-xs font-semibold text-slate-500 underline underline-offset-2"
@@ -9318,7 +9356,7 @@ function Onboarding() {
   }
 
   if (step === "newFamily") {
-    return shell([
+    return formShell([
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight whitespace-nowrap",
@@ -9333,17 +9371,17 @@ function Onboarding() {
       errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "submit",
-        onClick: handleCreateNew,
+        type: "submit",
         disabled: busy || !code.trim(),
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
       }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
       backButton
-    ]);
+    ], handleCreateNew);
   }
 
   if (step === "existingFamily") {
-    return shell([
+    return formShell([
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-xl font-bold tracking-tight",
@@ -9357,13 +9395,13 @@ function Onboarding() {
       errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "submit",
-        onClick: handleJoinExisting,
+        type: "submit",
         disabled: busy || !code.trim(),
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
       }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
       backButton
-    ]);
+    ], handleJoinExisting);
   }
 
   return null;
