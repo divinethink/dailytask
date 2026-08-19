@@ -4313,8 +4313,8 @@ async function fetchMemberKey(memberId) {
 }
 // Key পরিবর্তন(owner অথবা admin) — নতুন key generate করে plaintext+hash
 // দুটোই আপডেট, পুরনো key নিষ্ক্রিয় হয়ে যায়।
-async function changeMemberKey(memberId) {
-  const key = generateMemberKeyPlain();
+async function changeMemberKey(memberId, customKey) {
+  const key = (customKey && customKey.trim()) ? customKey.trim() : generateMemberKeyPlain();
   const hash = await sha256Hex(key);
   const privateRef = memberPrivateKeyRef(memberId);
   const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
@@ -4885,6 +4885,9 @@ function App() {
   const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
   const [memberKeyBusy, setMemberKeyBusy] = useState(false);
   const [copiedMemberKey, setCopiedMemberKey] = useState(false);
+  // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
+  // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
+  const [manualKeyInput, setManualKeyInput] = useState("");
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
   const [claimKeyInput, setClaimKeyInput] = useState("");
@@ -7449,6 +7452,7 @@ function App() {
         setMemberKeyValue(null);
         setMemberKeyLoading(true);
         setMemberKeyRevealed(false);
+        setManualKeyInput("");
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
         fetchMemberKey(ownMember.id)
@@ -8366,18 +8370,33 @@ function App() {
   /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 mb-1.5"
   }, "(কমপক্ষে ৯ ক্যারেক্টারের অক্ষর, সংখ্যা ও চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: manualKeyInput,
+    onChange: e => setManualKeyInput(e.target.value),
+    disabled: memberKeyBusy || memberKeyLoading,
+    placeholder: "নিজে Password লিখুন (ঐচ্ছিক, ৯+ ক্যারেক্টার)",
+    className: "w-full h-10 px-3 mb-2 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }),
   /*#__PURE__*/React.createElement("button", {
     disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
+      const manual = manualKeyInput.trim();
+      if (manual && manual.length < 9) {
+        alert("Password কমপক্ষে ৯ ক্যারেক্টারের হতে হবে।");
+        return;
+      }
       if (memberKeyValue != null) {
         const ok = window.confirm("Member Password পরিবর্তন করতে চান? পুরনো password আর কাজ করবে না।");
         if (!ok) return;
       }
       setMemberKeyBusy(true);
       try {
-        const key = await changeMemberKey(memberKeyTarget.id);
+        const key = await changeMemberKey(memberKeyTarget.id, manual || undefined);
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
+        setManualKeyInput("");
       } catch (err) {
         alert("Password তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
       } finally {
@@ -9420,6 +9439,10 @@ function Onboarding() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // §Family Code shake-hint(২০ আগস্ট ২০২৬) — খালি Family Code দিয়ে
+  // "নতুন সদস্য" বাটনে ক্লিক করলে ফিল্ড শেক করে বোঝানো, disabled রাখার
+  // বদলে। key বদলালেই wrapper div remount হয়ে animation নতুন করে চলে।
+  const [codeShakeKey, setCodeShakeKey] = useState(0);
 
   const errorText = reason => ({
     empty: "একটি Family Code দিন।",
@@ -9684,7 +9707,14 @@ function Onboarding() {
         key: "or1",
         className: "text-xs font-semibold text-slate-400"
       }, "অথবা"),
-      React.cloneElement(codeInput, { key: "input" }),
+      /*#__PURE__*/React.createElement("style", {
+        key: "shake-style"
+      }, "@keyframes dtCodeShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}"),
+      /*#__PURE__*/React.createElement("div", {
+        key: `code-wrap-${codeShakeKey}`,
+        className: "w-full flex flex-col items-center",
+        style: codeShakeKey ? { animation: "dtCodeShake 0.4s" } : undefined
+      }, React.cloneElement(codeInput, { key: "input" })),
       passwordInput,
       errorBox,
       /*#__PURE__*/React.createElement("button", {
@@ -9701,8 +9731,15 @@ function Onboarding() {
       /*#__PURE__*/React.createElement("button", {
         key: "become",
         type: "button",
-        onClick: handleJoinExisting,
-        disabled: busy || !code.trim(),
+        onClick: () => {
+          if (!code.trim()) {
+            setError("প্রথমে Family Code দিন।");
+            setCodeShakeKey(k => k + 1);
+            return;
+          }
+          handleJoinExisting();
+        },
+        disabled: busy,
         className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60 border-2",
         style: { background: "#F5E6C0", borderColor: "#C89B3C", color: "#7A5A1F" }
       }, "পরিবারে নতুন সদস্য হিসেবে যোগ দিন"),
