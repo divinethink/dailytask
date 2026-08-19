@@ -8375,7 +8375,7 @@ function App() {
     value: manualKeyInput,
     onChange: e => setManualKeyInput(e.target.value),
     disabled: memberKeyBusy || memberKeyLoading,
-    placeholder: "নিজে Password লিখুন (ঐচ্ছিক, ৯+ ক্যারেক্টার)",
+    placeholder: "Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)",
     className: "w-full h-10 px-3 mb-2 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }),
@@ -8383,17 +8383,21 @@ function App() {
     disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
       const manual = manualKeyInput.trim();
-      if (manual && manual.length < 9) {
+      if (!manual) {
+        alert("Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)।");
+        return;
+      }
+      if (manual.length < 9) {
         alert("Password কমপক্ষে ৯ ক্যারেক্টারের হতে হবে।");
         return;
       }
       if (memberKeyValue != null) {
-        const ok = window.confirm("Member Password পরিবর্তন করতে চান? পুরনো password আর কাজ করবে না।");
+        const ok = window.confirm("Member Password পরিবর্তন করতে চান?");
         if (!ok) return;
       }
       setMemberKeyBusy(true);
       try {
-        const key = await changeMemberKey(memberKeyTarget.id, manual || undefined);
+        const key = await changeMemberKey(memberKeyTarget.id, manual);
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
         setManualKeyInput("");
