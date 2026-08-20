@@ -8363,17 +8363,24 @@ function App() {
     className: "mb-3"
   }, /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
-  }, "বর্তমান Password"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
+  }, "বর্তমান Password"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: memberKeyRevealed ? "text" : "password",
     value: memberKeyValue || "",
     readOnly: true,
     disabled: true,
-    className: "w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
-    style: { fontFamily: "'IBM Plex Mono', monospace", WebkitTextSecurity: "disc" }
-  })),
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMemberKeyRevealed(v => !v),
+    "aria-label": memberKeyRevealed ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন",
+    className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+  }, memberKeyRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 16 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 16 })))),
   /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 mb-1.5"
-  }, "(কমপক্ষে ৯ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  }, "(কমপক্ষে ৬ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
   /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
   }, "নতুন Password দিন"),
@@ -8384,7 +8391,7 @@ function App() {
     value: manualKeyInput,
     onChange: e => setManualKeyInput(e.target.value),
     disabled: memberKeyBusy || memberKeyLoading,
-    placeholder: "নতুন Password দিন (কমপক্ষে ৯ ক্যারেক্টার)",
+    placeholder: "নতুন Password দিন (কমপক্ষে ৬ ক্যারেক্টার)",
     className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }), manualKeyInput && confirmKeyInput && /*#__PURE__*/React.createElement("div", {
@@ -8416,15 +8423,11 @@ function App() {
       const manual = manualKeyInput.trim();
       const confirmVal = confirmKeyInput.trim();
       if (!manual) {
-        alert("নতুন Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)।");
+        alert("নতুন Password লিখুন (কমপক্ষে ৬ ক্যারেক্টার)।");
         return;
       }
-      if (manual.length < 9) {
-        alert("Password কমপক্ষে ৯ ক্যারেক্টারের হতে হবে।");
-        return;
-      }
-      if (!/^[A-Za-z0-9!@#$%&*+_-]{9,64}$/.test(manual)) {
-        alert("Password-এ শুধু ইংরেজি অক্ষর, সংখ্যা এবং ! @ # $ % & * + _ - এই চিহ্নগুলো ব্যবহার করা যাবে।");
+      if (manual.length < 6) {
+        alert("Password কমপক্ষে ৬ ক্যারেক্টারের হতে হবে।");
         return;
       }
       if (manual !== confirmVal) {
