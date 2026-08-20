@@ -9546,11 +9546,7 @@ function Onboarding() {
     setError(null);
     const res = await directIdentifyLogin(code, password);
     if (!res || !res.ok) {
-      // §Diagnostic(২০ আগস্ট ২০২৬, temporary): debugTag থাকলে bracket-এ
-      // দেখানো হচ্ছে যাতে root cause সরাসরি screen থেকেই বোঝা যায় —
-      // root cause পাওয়ার পর এই bracket-অংশ সরিয়ে ফেলা হবে(cleanup pending)।
-      const tag = res && res.debugTag ? ` [${res.debugTag}]` : "";
-      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।" + tag);
+      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।");
       setBusy(false);
     }
     // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
