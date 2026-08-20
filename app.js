@@ -4486,21 +4486,27 @@ async function directIdentifyLogin(code, password) {
   const pw = (password || "").trim();
   if (!normalizedCode || !pw) return { ok: false, reason: "empty" };
   const resolved = await resolveFamilyIdFromCode(normalizedCode);
-  if (!resolved.ok) return { ok: false, reason: "invalid" }; // generic — নির্দিষ্ট family-lookup কারণ UI-তে leak করা হয় না
+  // §Diagnostic(২০ আগস্ট ২০২৬, temporary): আগে সব ব্যর্থতা generic "invalid"-এ
+  // চাপা পড়ত, ফলে keyIndex-miss vs claim-denied vs family-not-found আলাদা
+  // করা UI থেকে অসম্ভব ছিল — এখন প্রতিটি ব্যর্থতার নির্দিষ্ট debugTag পাঠানো
+  // হচ্ছে(শুধু onboarding error-এ দেখানোর জন্য, kill/production sensitive না)।
+  if (!resolved.ok) return { ok: false, reason: "invalid", debugTag: "family:" + resolved.reason };
   let memberId = null;
+  let keyIndexErr = null;
   try {
     const hash = await sha256Hex(pw);
     const idxSnap = await db.collection("families").doc(resolved.familyId)
       .collection("keyIndex").doc(hash).get();
     if (idxSnap.exists) memberId = idxSnap.data() ? idxSnap.data().memberId : null;
-  } catch {
+  } catch (e) {
     memberId = null; // permission-denied/network — miss হিসেবেই treat, কোনো commit না
+    keyIndexErr = e && e.message;
   }
-  if (!memberId) return { ok: false, reason: "invalid" };
+  if (!memberId) return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss" };
   const uid = auth.currentUser ? auth.currentUser.uid : null;
-  if (!uid) return { ok: false, reason: "invalid" };
+  if (!uid) return { ok: false, reason: "invalid", debugTag: "no-uid" };
   const claimResult = await claimMemberWithKey(memberId, pw, uid, resolved.familyId);
-  if (!claimResult || !claimResult.ok) return { ok: false, reason: "invalid" };
+  if (!claimResult || !claimResult.ok) return { ok: false, reason: "invalid", debugTag: "claim:" + ((claimResult && claimResult.error) || "unknown") };
   // সফল claim — এখনই family state commit + reload।
   localStorage.setItem("family_id", resolved.familyId);
   localStorage.setItem("family_code", normalizedCode);
@@ -4888,7 +4894,11 @@ function App() {
   // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
   // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
   const [manualKeyInput, setManualKeyInput] = useState("");
-  const [oldKeyInput, setOldKeyInput] = useState("");
+  // §Password UI revamp(২০ আগস্ট ২০২৬): oldKeyInput এখন "পূর্বের Password
+  // verify" এর বদলে confirm-password ঘর হিসেবে reuse হচ্ছে — পূর্বের
+  // password শুধু masked display(readonly), যাচাই করার প্রয়োজন নেই(owner
+  // নিজে ঠিক করেছেন — এই অ্যাপ শুধু daily-amal ট্র্যাকার, risk গ্রহণযোগ্য)।
+  const [confirmKeyInput, setConfirmKeyInput] = useState("");
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
   const [claimKeyInput, setClaimKeyInput] = useState("");
@@ -7454,7 +7464,7 @@ function App() {
         setMemberKeyLoading(true);
         setMemberKeyRevealed(false);
         setManualKeyInput("");
-        setOldKeyInput("");
+        setConfirmKeyInput("");
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
         fetchMemberKey(ownMember.id)
@@ -8353,34 +8363,58 @@ function App() {
     className: "mb-3"
   }, /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
-  }, "পূর্বের Password দিন"), /*#__PURE__*/React.createElement("input", {
+  }, "বর্তমান Password"), /*#__PURE__*/React.createElement("input", {
     type: "text",
-    value: oldKeyInput,
-    onChange: e => setOldKeyInput(e.target.value),
-    disabled: memberKeyBusy || memberKeyLoading,
-    placeholder: "পূর্বের Password দিন",
-    className: "w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
+    value: memberKeyValue || "",
+    readOnly: true,
+    disabled: true,
+    className: "w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
+    style: { fontFamily: "'IBM Plex Mono', monospace", WebkitTextSecurity: "disc" }
   })),
   /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 mb-1.5"
-  }, "(কমপক্ষে ৯ ক্যারেক্টারের অক্ষর, সংখ্যা ও চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  }, "(কমপক্ষে ৯ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
   /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
   }, "নতুন Password দিন"),
-  /*#__PURE__*/React.createElement("input", {
+  /*#__PURE__*/React.createElement("div", {
+    className: "relative mb-2"
+  }, /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: manualKeyInput,
     onChange: e => setManualKeyInput(e.target.value),
     disabled: memberKeyBusy || memberKeyLoading,
     placeholder: "নতুন Password দিন (কমপক্ষে ৯ ক্যারেক্টার)",
-    className: "w-full h-10 px-3 mb-2 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }),
+  }), manualKeyInput && confirmKeyInput && /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-2 top-1/2 -translate-y-1/2"
+  }, manualKeyInput === confirmKeyInput
+    ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
+    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
+  /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "Password কনফার্ম করুন"),
+  /*#__PURE__*/React.createElement("div", {
+    className: "relative mb-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: confirmKeyInput,
+    onChange: e => setConfirmKeyInput(e.target.value),
+    disabled: memberKeyBusy || memberKeyLoading,
+    placeholder: "একই Password আবার দিন",
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), manualKeyInput && confirmKeyInput && /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-2 top-1/2 -translate-y-1/2"
+  }, manualKeyInput === confirmKeyInput
+    ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
+    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
   /*#__PURE__*/React.createElement("button", {
     disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
       const manual = manualKeyInput.trim();
+      const confirmVal = confirmKeyInput.trim();
       if (!manual) {
         alert("নতুন Password লিখুন (কমপক্ষে ৯ ক্যারেক্টার)।");
         return;
@@ -8389,13 +8423,13 @@ function App() {
         alert("Password কমপক্ষে ৯ ক্যারেক্টারের হতে হবে।");
         return;
       }
-      if (memberKeyValue != null) {
-        if (oldKeyInput.trim() !== memberKeyValue) {
-          alert("পূর্বের Password মেলেনি।");
-          return;
-        }
-        const ok = window.confirm("Member Password পরিবর্তন করতে চান?");
-        if (!ok) return;
+      if (!/^[A-Za-z0-9!@#$%&*+_-]{9,64}$/.test(manual)) {
+        alert("Password-এ শুধু ইংরেজি অক্ষর, সংখ্যা এবং ! @ # $ % & * + _ - এই চিহ্নগুলো ব্যবহার করা যাবে।");
+        return;
+      }
+      if (manual !== confirmVal) {
+        alert("দুই Password মেলেনি। আবার চেষ্টা করুন।");
+        return;
       }
       setMemberKeyBusy(true);
       try {
@@ -8403,7 +8437,8 @@ function App() {
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
         setManualKeyInput("");
-        setOldKeyInput("");
+        setConfirmKeyInput("");
+        alert("সফলভাবে পাসওয়ার্ড পরিবর্তন হয়েছে।");
       } catch (err) {
         alert("Password তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
       } finally {
@@ -9511,7 +9546,11 @@ function Onboarding() {
     setError(null);
     const res = await directIdentifyLogin(code, password);
     if (!res || !res.ok) {
-      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      // §Diagnostic(২০ আগস্ট ২০২৬, temporary): debugTag থাকলে bracket-এ
+      // দেখানো হচ্ছে যাতে root cause সরাসরি screen থেকেই বোঝা যায় —
+      // root cause পাওয়ার পর এই bracket-অংশ সরিয়ে ফেলা হবে(cleanup pending)।
+      const tag = res && res.debugTag ? ` [${res.debugTag}]` : "";
+      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।" + tag);
       setBusy(false);
     }
     // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
