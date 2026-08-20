@@ -2700,18 +2700,27 @@ async function writeFsaBackupFile(baseDirHandle, fileName, jsonStr) {
   } catch {}
 }
 
+// Auto-update(fresh-load-only, one-time): controllerchange শুধু page-load-এর
+// প্রথম ৮ সেকেন্ডের "arm window"-এ শোনা হয়(fresh-open-এ আগে থেকে pending
+// update থাকলে সেটাই ধরার জন্য)। Window পার হলে listener remove — mid-session
+// background SW update কখনো এই পথে reload trigger করবে না। `reloaded` flag
+// দিয়ে one-time guard(reload-loop প্রতিরোধ)। প্রকৃত reload dt-sw-updated
+// event dispatch করে App()-এর ভেতরের dirty-state-aware handler করে(নিচে)।
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").then(reg => {
-      reg.addEventListener("updatefound", () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener("statechange", () => {
-          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            window.dispatchEvent(new CustomEvent("dt-update-available"));
-          }
-        });
-      });
+      let reloaded = false;
+      const ARM_MS = 8000;
+      const onControllerChange = () => {
+        if (reloaded) return;
+        reloaded = true;
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+        window.dispatchEvent(new CustomEvent("dt-sw-updated"));
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+      setTimeout(() => {
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      }, ARM_MS);
     }).catch(() => {});
   });
 }
@@ -4889,6 +4898,7 @@ function App() {
   // তৈরি member) — এই অবস্থাকে "এখনো লোড হচ্ছে"(null) থেকে আলাদা করতে।
   const [memberKeyLoading, setMemberKeyLoading] = useState(false);
   const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
+  const [showChangeKeyForm, setShowChangeKeyForm] = useState(false);
   const [memberKeyBusy, setMemberKeyBusy] = useState(false);
   const [copiedMemberKey, setCopiedMemberKey] = useState(false);
   // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
@@ -4990,6 +5000,19 @@ function App() {
   // discarding them — mirrors the existing meetingDirtyRef pattern.
   const entryDirtyRef = useRef(false);
   const weeklyDirtyRef = useRef(false);
+  // Auto-update reload(fresh-load-only, dt-sw-updated event — dispatch হয়
+  // top-level SW-registration কোড থেকে, দেখুন ফাইলের শুরুর দিকে)। Unsaved
+  // entry/weekly/meeting থাকলে reload skip করা হয়(data-loss এড়াতে); পরের
+  // স্বাভাবিক নেভিগেশন/reload-এ আপডেট এমনিতেই প্রযোজ্য হয়ে যাবে।
+  useEffect(() => {
+    const handler = () => {
+      const hasUnsaved = entryDirtyRef.current || weeklyDirtyRef.current || meetingDirtyRef.current;
+      if (hasUnsaved) return;
+      window.location.reload();
+    };
+    window.addEventListener("dt-sw-updated", handler);
+    return () => window.removeEventListener("dt-sw-updated", handler);
+  }, []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -5309,14 +5332,8 @@ function App() {
     };
   }, []);
   const [recoveryMessage, setRecoveryMessage] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [weeklyReminderBanner, setWeeklyReminderBanner] = useState(false);
   const [monthlyReminderBanner, setMonthlyReminderBanner] = useState(false);
-  useEffect(() => {
-    const handler = () => setUpdateAvailable(true);
-    window.addEventListener("dt-update-available", handler);
-    return () => window.removeEventListener("dt-update-available", handler);
-  }, []);
   useEffect(() => {
     const lastActive = localStorage.getItem("last_active_date");
     const todayKey = dateKey(new Date());
@@ -7465,6 +7482,7 @@ function App() {
         setMemberKeyRevealed(false);
         setManualKeyInput("");
         setConfirmKeyInput("");
+        setShowChangeKeyForm(false);
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
         fetchMemberKey(ownMember.id)
@@ -7620,22 +7638,7 @@ function App() {
     size: 16
   }))))), /*#__PURE__*/React.createElement("div", {
     className: "max-w-2xl mx-auto"
-  }, updateAvailable && /*#__PURE__*/React.createElement("div", {
-    className: "px-5 mt-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-[#C89B3C] rounded-2xl p-3.5 flex items-center gap-3 shadow-sm"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-lg"
-  }, "🔔"), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-[#16302B]"
-  }, "নতুন আপডেট এসেছে!"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] text-[#16302B]/80 mt-0.5"
-  }, "নতুন ফিচার যুক্ত হয়েছে — রিফ্রেশ করে দেখুন")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => window.location.reload(),
-    className: "bg-[#16302B] text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shrink-0"
-  }, "রিফ্রেশ করুন"))), recoveryMessage && /*#__PURE__*/React.createElement("div", {
+  }, recoveryMessage && /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-br from-[#0E4B43] to-[#153f39] rounded-2xl p-4 flex items-start gap-3 shadow-sm"
@@ -8378,14 +8381,12 @@ function App() {
     "aria-label": memberKeyRevealed ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন",
     className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
   }, memberKeyRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 16 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 16 })))),
-  /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] text-slate-400 mb-1.5"
-  }, "(কমপক্ষে ৬ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  (showChangeKeyForm || memberKeyValue == null) && /*#__PURE__*/React.createElement(React.Fragment, null,
   /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
   }, "নতুন Password দিন"),
   /*#__PURE__*/React.createElement("div", {
-    className: "relative mb-2"
+    className: "relative mb-1"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: manualKeyInput,
@@ -8399,6 +8400,9 @@ function App() {
   }, manualKeyInput === confirmKeyInput
     ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
     : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
+  /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-slate-400 mb-1.5"
+  }, "(কমপক্ষে ৬ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
   /*#__PURE__*/React.createElement("label", {
     className: "text-[10px] text-slate-400 mb-1 block"
   }, "Password কনফার্ম করুন"),
@@ -8416,10 +8420,15 @@ function App() {
     className: "absolute right-2 top-1/2 -translate-y-1/2"
   }, manualKeyInput === confirmKeyInput
     ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
-    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
+    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" })))
+  ),
   /*#__PURE__*/React.createElement("button", {
     disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
+      if (!(showChangeKeyForm || memberKeyValue == null)) {
+        setShowChangeKeyForm(true);
+        return;
+      }
       const manual = manualKeyInput.trim();
       const confirmVal = confirmKeyInput.trim();
       if (!manual) {
@@ -8441,6 +8450,7 @@ function App() {
         setMemberKeyRevealed(true);
         setManualKeyInput("");
         setConfirmKeyInput("");
+        setShowChangeKeyForm(false);
         alert("সফলভাবে পাসওয়ার্ড পরিবর্তন হয়েছে।");
       } catch (err) {
         alert("Password তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
@@ -8448,11 +8458,11 @@ function App() {
         setMemberKeyBusy(false);
       }
     },
-    className: "w-full py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600 mb-2 disabled:opacity-50"
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-700 text-white mb-2 disabled:opacity-50"
   }, memberKeyBusy ? "তৈরি হচ্ছে..." : (memberKeyValue == null ? "Password তৈরি করুন" : "Member Password পরিবর্তন করুন")),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMemberKeyModal(false),
-    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-[#C89B3C] text-[#16302B]"
   }, "বন্ধ করুন"))),
 
   // --- §Member Key claim("দায়িত্ব নিন") মোডাল — সব member-এর জন্য প্রযোজ্য
