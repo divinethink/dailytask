@@ -8988,7 +8988,7 @@ function App() {
     className: "text-slate-400 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
-  })))));
+  }))));
 }
 function FieldGroup({
   title,
