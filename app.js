@@ -5089,6 +5089,7 @@ function App() {
   // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
   // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
   // EditIcon → দুই-অপশনের choice পপআপে merge করা হয়েছে (নিচে দেখুন)।
+  const [showFamilyCodeChoiceModal, setShowFamilyCodeChoiceModal] = useState(false);
   const [showCreateNewFamilyModal, setShowCreateNewFamilyModal] = useState(false);
   const [newFamCodeInput, setNewFamCodeInput] = useState("");
   const [newFamCodeBusy, setNewFamCodeBusy] = useState(false);
@@ -5131,11 +5132,6 @@ function App() {
   const [showRenameFamilyCodeModal, setShowRenameFamilyCodeModal] = useState(false);
   const [renameFamCodeInput, setRenameFamCodeInput] = useState("");
   const [renameFamCodeBusy, setRenameFamCodeBusy] = useState(false);
-  // Member Password modal-এর mask/reveal + expand/submit প্যাটার্ন reuse —
-  // choice-modal ধাপ বাদ দিয়ে সরাসরি এই modal-এই বর্তমান ইউজারনেম দেখানো
-  // (mask/reveal) ও নতুন ইউজারনেম দেওয়ার ফর্ম একসাথে।
-  const [showRenameExpandForm, setShowRenameExpandForm] = useState(false);
-  const [renameModalRevealed, setRenameModalRevealed] = useState(false);
   // Family Code auto-propagate + notify: Admin কোড পরিবর্তন করলে বাকি
   // সদস্যদের ডিভাইসে পরের বুটেই (families/{id} listener থেকে) নতুন কোড
   // অটো বসে যায় ও রিলোডের পর একবার এই নোটিশ ব্যানার দেখানো হয় —
@@ -7240,7 +7236,17 @@ function App() {
     className: "px-4 py-2 border-b border-slate-100 bg-slate-50/70"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, /*#__PURE__*/React.createElement("span", null, "ফ্যামিলি ইউজারনেম")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "ফ্যামিলি কাস্টম কোড"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setShowFamilyCodeInfoModal(true);
+    },
+    className: "text-slate-400 hover:text-emerald-700",
+    title: "তথ্য"
+  }, /*#__PURE__*/React.createElement(InfoIcon, {
+    size: 12
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "font-bold text-emerald-900 text-sm flex items-center justify-between mt-1"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => isCustomFamilyCode && setCodeRevealed(v => !v),
@@ -7249,7 +7255,7 @@ function App() {
   }, /*#__PURE__*/React.createElement("span", {
     className: "tracking-wide select-none"
   }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-3.5 shrink-0 ml-2"
+    className: "flex items-center gap-2 shrink-0 ml-2"
   }, copiedCode && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] text-emerald-600 font-bold shrink-0"
   }, "কপি হয়েছে!"), isCustomFamilyCode && /*#__PURE__*/React.createElement("button", {
@@ -7273,10 +7279,7 @@ function App() {
   })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
-      if (!isAdmin) return;
-      setRenameFamCodeInput("");
-      setShowRenameExpandForm(false);
-      setShowRenameFamilyCodeModal(true);
+      setShowFamilyCodeChoiceModal(true);
       setIsMenuOpen(false);
     },
     className: "text-slate-500 hover:text-emerald-800 shrink-0",
@@ -7432,7 +7435,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium text-emerald-800"
   }, /*#__PURE__*/React.createElement(MessageSquare, {
     size: 14
-  }), " সমস্যা বা পরামর্শ থাকলে আমাদের জানান")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
+  }), " আমাদের জানান (পরামর্শ)")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
@@ -8194,7 +8197,28 @@ function App() {
   }, "দেখুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowArchiveModal(false),
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
+  }, "বাতিল")))), showFamilyCodeChoiceModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm mb-3 text-slate-800"
+  }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, isAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowFamilyCodeChoiceModal(false);
+      setRenameFamCodeInput("");
+      setShowRenameFamilyCodeModal(true);
+    },
+    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
+  }, /*#__PURE__*/React.createElement(EditIcon, {
+    size: 13
+  }), " বিদ্যমান ফ্যামিলি ইউজারনেম পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowFamilyCodeChoiceModal(false),
+    className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
+  }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -8258,64 +8282,33 @@ function App() {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800"
-  }, "ফ্যামিলি ইউজারনেম পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowRenameFamilyCodeModal(false)
-  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
-  /*#__PURE__*/React.createElement("div", {
-    className: "mb-3"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "text-[10px] text-slate-400 mb-1 block"
-  }, "বর্তমান ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: renameModalRevealed ? "text" : "password",
-    value: getFamilyCode(),
-    readOnly: true,
-    disabled: true,
-    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setRenameModalRevealed(v => !v),
-    "aria-label": renameModalRevealed ? "লুকান" : "দেখুন",
-    className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
-  }, renameModalRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 16 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 16 })))),
-  showRenameExpandForm && /*#__PURE__*/React.createElement(React.Fragment, null,
-  /*#__PURE__*/React.createElement("label", {
-    className: "text-[10px] text-slate-400 mb-1 block"
-  }, "নতুন ইউজারনেম দিন"),
-  /*#__PURE__*/React.createElement("input", {
+    className: "font-bold text-sm mb-1 text-slate-800"
+  }, "নিজের ফ্যামিলি ইউজারনেম পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "ইউজারনেম কমপক্ষে ৬ ক্যারেক্টারের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও হাইফেন ব্যবহার করে ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
     autoComplete: "username",
-    type: "text",
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
     placeholder: "নতুন ইউজারনেম লিখুন",
     maxLength: 30,
     disabled: renameFamCodeBusy,
-    className: "w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors mb-1.5",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] text-slate-400 mb-3"
-  }, "(কমপক্ষে ৬ ডিজিটের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও জটিল চিহ্ন ব্যবহার করা যাবে।)")),
-  /*#__PURE__*/React.createElement("button", {
+    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleRenameFamilyCode,
     disabled: renameFamCodeBusy,
-    onClick: () => {
-      if (!showRenameExpandForm) {
-        setShowRenameExpandForm(true);
-        return;
-      }
-      handleRenameFamilyCode();
-    },
-    className: "w-full h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
   }, renameFamCodeBusy ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
-  }) : "ইউজারনেম পরিবর্তন করুন"))), showAccessRequestsModal && /*#__PURE__*/React.createElement("div", {
+  }) : "কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowRenameFamilyCodeModal(false),
+    disabled: renameFamCodeBusy,
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+  }, "বাতিল")))), showAccessRequestsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -9417,34 +9410,6 @@ function OnboardingBridge({
         style: { background: "#0E4B43" }
       }, "পরিবার বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
       /*#__PURE__*/React.createElement("button", {
-        key: "google-connect",
-        type: "button",
-        disabled: busy,
-        onClick: async () => {
-          setBusy(true);
-          try {
-            if (!isGoogleLinked()) {
-              await linkGoogleAccount();
-            }
-            await syncFamilyCodeWithAccount();
-          } catch (err) {
-            if (!(err && err.code === "auth/popup-closed-by-user")) {
-              alert("Google-এ যুক্ত করতে সমস্যা হয়েছে। পরে মেনু থেকে আবার চেষ্টা করতে পারবেন।");
-            }
-            setBusy(false);
-            return;
-          }
-          setBusy(false);
-          onAdvance(null);
-        },
-        className: "w-full h-12 px-4 rounded-2xl border-2 border-slate-200 bg-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
-      }, /*#__PURE__*/React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 48 48" }, [
-          /*#__PURE__*/React.createElement("path", { key: "1", fill: "#FFC107", d: "M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" }),
-          /*#__PURE__*/React.createElement("path", { key: "2", fill: "#FF3D00", d: "M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" }),
-          /*#__PURE__*/React.createElement("path", { key: "3", fill: "#4CAF50", d: "M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.6 34.7 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5.1C9.6 39.6 16.3 44 24 44z" }),
-          /*#__PURE__*/React.createElement("path", { key: "4", fill: "#1976D2", d: "M43.6 20.5H42V20H24v8h11.3c-0.8 2.3-2.3 4.2-4.2 5.6l6.6 5.6C41.5 36.5 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z" })
-        ]), "Google এ যুক্ত হোন"),
-      /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
@@ -9763,14 +9728,10 @@ function Onboarding() {
       }, "একটি Custom Family Username সেট করুন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
-        className: "text-xs max-w-xs leading-relaxed whitespace-nowrap",
+        className: "text-sm max-w-xs leading-relaxed",
         style: { color: "#C89B3C" }
-      }, "এই ইউজারনেম দিয়ে নতুন সদস্য যোগ দিতে পারবেন"),
+      }, "এই কোড দিয়েই পরবর্তীতে পরিবারের সদস্যরা যোগ দিতে পারবেন।"),
       React.cloneElement(codeInput, { key: "input" }),
-      /*#__PURE__*/React.createElement("p", {
-        key: "input-help",
-        className: "text-[10px] text-slate-400 max-w-xs leading-relaxed -mt-2"
-      }, "(ইউজারনেম কমপক্ষে ৬ ডিজিটের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও জটিল চিহ্ন ব্যবহার করা যাবে। যেমন: Hasan-Family)"),
       errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "submit",
