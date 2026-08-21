@@ -123,7 +123,7 @@ function getFamilyCode() {
   }
   return code;
 }
-const FAMILY_CODE_MIN_LENGTH = 9;
+const FAMILY_CODE_MIN_LENGTH = 6;
 const FAMILY_CODE_MAX_LENGTH = 30;
 // শুধু যেসব ক্যারেক্টার Firestore-এর path/collection নাম ভাঙতে পারে বা কপি-পেস্টে সমস্যা করে,
 // সেগুলোই বাদ: space, / (path separator), \ , ' এবং " (quoting সমস্যা এড়াতে)।
@@ -5995,7 +5995,7 @@ function App() {
         body: JSON.stringify({
           access_key: WEB3FORMS_ACCESS_KEY,
           subject: "Daily Task App — নতুন পরামর্শ",
-          message: feedbackMsg
+          message: `${feedbackMsg}\n\nFamily Code: ${getFamilyCode()}`
         })
       });
       const result = await res.json();
@@ -7376,16 +7376,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
   }, /*#__PURE__*/React.createElement(UploadIcon, {
     size: 14
-  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("input", {
-    ref: importFileInputRef,
-    type: "file",
-    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
-    onChange: e => {
-      handleImportData(e);
-      setShowImportOptionsModal(false);
-    },
-    className: "hidden"
-  }), /*#__PURE__*/React.createElement("button", {
+  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setArchiveYear(monthCursor.year);
       setArchiveMonth0(monthCursor.month0);
@@ -8258,7 +8249,7 @@ function App() {
     className: "font-bold text-sm mb-1 text-slate-800"
   }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডেটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
+  }, "কোড কমপক্ষে ৬ ডিজিটের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও জটিল চিহ্ন ব্যবহার করে ফ্যামিলি কোড তৈরি করুন।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
     autoComplete: "username",
     value: renameFamCodeInput,
@@ -8532,7 +8523,16 @@ function App() {
   }), "Google Drive ও আপনার ডিভাইস — উভয় জায়গায় ব্যাকআপ রাখুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowBackupOptionsModal(false),
     className: "w-full h-9 mt-4 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-  }, "বন্ধ করুন"))), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
+  }, "বন্ধ করুন"))), /*#__PURE__*/React.createElement("input", {
+    ref: importFileInputRef,
+    type: "file",
+    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
+    onChange: e => {
+      handleImportData(e);
+      setShowImportOptionsModal(false);
+    },
+    className: "hidden"
+  }), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -8787,7 +8787,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "আপনার মতামত বা পরামর্শ লিখুন। এটি সরাসরি Daily Task Team-এর কাছে চলে যাবে।"), /*#__PURE__*/React.createElement("textarea", {
+  }, "কোনো সমস্যা বা পরামর্শ আমাদের জানান।"), /*#__PURE__*/React.createElement("textarea", {
     value: feedbackMsg,
     onChange: e => setFeedbackMsg(e.target.value),
     rows: 4,
@@ -9351,11 +9351,11 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("p", {
         key: "text",
         className: "text-base text-slate-600 leading-relaxed"
-      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। পরিবার বা দ্বীনি সার্কেল যুক্ত করে পরিবার গঠণ করতে পারেন।"),
+      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। কিংবা পরিবার বা দ্বীনি সার্কেল যুক্ত করে পরিবার গঠণ করতে পারেন।"),
       /*#__PURE__*/React.createElement("button", {
         key: "share",
         onClick: async () => {
-          const text = `আপনাকে Daily Task app-এ পরিবারের সদস্য হিসেবে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হচ্ছে। Family Code: ${familyCode}`;
+          const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি কোড লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Code: ${familyCode}`;
           try {
             if (navigator.share) {
               await navigator.share({ title: "Daily Task", text });
