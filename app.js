@@ -3167,28 +3167,6 @@ function ShareIcon({
     className: className
   }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }), /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
 }
-function HelpCircle({
-  size,
-  color,
-  className
-}) {
-  return /*#__PURE__*/React.createElement(Icon, {
-    size: size,
-    color: color,
-    className: className
-  }, /*#__PURE__*/React.createElement("circle", {
-    cx: "12",
-    cy: "12",
-    r: "10"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "12",
-    y1: "17",
-    x2: "12.01",
-    y2: "17"
-  }));
-}
 function MessageSquare({
   size,
   color,
@@ -4067,9 +4045,6 @@ function getWeekRanges(totalDays) {
   }
   return ranges;
 }
-function weeklyKey(memberId, year, month0) {
-  return `weekly:${memberId}:${monthPrefix(year, month0)}`;
-}
 function meetingKey(year, month0) {
   return `meeting_rows_v2:${monthPrefix(year, month0)}`;
 }
@@ -4714,20 +4689,6 @@ async function fetchEntryHistory(migrationState, memberId, key) {
 // Note: month entries are no longer fetched with a one-off list+get batch
 // (loadMonthEntries) — the live onSnapshot subscription in App's
 // monthEntries effect replaced it, so that unused function was removed.
-function StarMark({
-  size = 18,
-  color = "#C89B3C"
-}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 1L14.6 8.2L22 8.5L16.2 13.3L18.2 21L12 16.8L5.8 21L7.8 13.3L2 8.5L9.4 8.2L12 1Z",
-    fill: color
-  }));
-}
 // একই logo asset(logo.png, root-এ deploy করা) reusable component হিসেবে
 // ব্যবহার হয় — Main Dashboard header ও Onboarding welcome page, দুই
 // জায়গাতেই। ভবিষ্যতে লোগো বদলাতে হলে শুধু logo.png ফাইল replace করলেই
@@ -5143,7 +5104,6 @@ function App() {
       return false;
     }
   });
-  const [showFamilyCodeInfoModal, setShowFamilyCodeInfoModal] = useState(false);
   const [showMemberInfoModal, setShowMemberInfoModal] = useState(false);
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
@@ -8759,38 +8719,7 @@ function App() {
   }, "বাতিল"), /*#__PURE__*/React.createElement("button", {
     onClick: handleDeleteGoogleAccount,
     className: "flex-1 h-9 bg-red-600 text-white rounded-xl text-xs font-bold"
-  }, "হ্যাঁ, ডিলিট করুন")))), showFamilyCodeInfoModal && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800 flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement(InfoIcon, {
-    size: 16,
-    color: "var(--theme-primary)"
-  }), " ফ্যামিলি কাস্টম কোড"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowFamilyCodeInfoModal(false)
-  }, /*#__PURE__*/React.createElement(X, {
-    size: 18,
-    className: "text-slate-400"
-  }))), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 leading-relaxed mb-3"
-  }, "একটি ইউনিক ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)। পরিবারের সবাই একই ইউজারনেম ব্যবহার করলে সবার ডেটা স্বয়ংক্রিয়ভাবে সিংক হবে।"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-slate-800 mb-1.5"
-  }, "নিয়ম:"), /*#__PURE__*/React.createElement("ul", {
-    className: "text-xs text-slate-600 leading-relaxed mb-3 space-y-1 list-disc pl-4"
-  }, /*#__PURE__*/React.createElement("li", null, "কোড কমপক্ষে ৯ অক্ষরের হতে হবে।"), /*#__PURE__*/React.createElement("li", null, "ইংরেজি বড়/ছোট হাতের অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে।"), /*#__PURE__*/React.createElement("li", null, "Space, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ) এবং ' \" (কোটেশন চিহ্ন) ব্যবহার করা যাবে না।"), /*#__PURE__*/React.createElement("li", null, "কোডটি স্বয়ংক্রিয়ভাবে masked (••••) থাকবে — দেখতে চাইলে ডটের ওপর ট্যাপ করুন।")), /*#__PURE__*/React.createElement("div", {
-    className: "bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-amber-900 mb-1"
-  }, "বিশেষ দ্রষ্টব্য:"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-amber-900/90 leading-relaxed"
-  }, "ডেটা সিংক হওয়ার পর \"সদস্যবৃন্দ\" তালিকায় আপনার নাম দেখা যাবে — সেখানে আপনার নামের পাশে \"দায়িত্ব নিন\" বাটনে ট্যাপ করুন।")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowFamilyCodeInfoModal(false),
-    className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-  }, "বুঝেছি"))), showMemberInfoModal && /*#__PURE__*/React.createElement("div", {
+  }, "হ্যাঁ, ডিলিট করুন")))), showMemberInfoModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
