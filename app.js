@@ -123,7 +123,7 @@ function getFamilyCode() {
   }
   return code;
 }
-const FAMILY_CODE_MIN_LENGTH = 9;
+const FAMILY_CODE_MIN_LENGTH = 6;
 const FAMILY_CODE_MAX_LENGTH = 30;
 // শুধু যেসব ক্যারেক্টার Firestore-এর path/collection নাম ভাঙতে পারে বা কপি-পেস্টে সমস্যা করে,
 // সেগুলোই বাদ: space, / (path separator), \ , ' এবং " (quoting সমস্যা এড়াতে)।
@@ -132,15 +132,21 @@ const FAMILY_CODE_CHARSET_PATTERN = /^(?!\.+$)(?!__.*__$)[^\s/\\'"]+$/;
 function isFamilyCodeCharsetValid(code) {
   return FAMILY_CODE_CHARSET_PATTERN.test(code);
 }
+// §Family Username case-insensitive uniqueness — শুধু familyCodes lookup/
+// uniqueness-key তৈরির জন্য (lowercase)। Display value (family.familyCode,
+// dataCollectionName ইত্যাদি) user-typed আসল casing-ই রাখে, এখানে ছোঁয়া হয় না।
+function normalizeFamilyKey(code) {
+  return (code || "").trim().toLowerCase();
+}
 function setFamilyCode(code) {
   if (!code || !code.trim()) return;
   const normalized = code.trim();
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    alert(`ফ্যামিলি কোড ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    alert(`ফ্যামিলি ইউজারনেম ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
     return;
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+    alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
     return;
   }
   localStorage.setItem("family_code", normalized);
@@ -191,7 +197,8 @@ async function changeFamilyCodeForExistingFamily(newCode) {
         throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
       }
       oldCode = fam.familyCode || null;
-      const newCodeRef = db.collection("familyCodes").doc(normalized);
+      const newKey = normalizeFamilyKey(normalized);
+      const newCodeRef = db.collection("familyCodes").doc(newKey);
       const newCodeSnap = await tx.get(newCodeRef);
       if (newCodeSnap.exists && newCodeSnap.data().familyId !== familyId) {
         throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
@@ -202,8 +209,18 @@ async function changeFamilyCodeForExistingFamily(newCode) {
       // নিশ্চিত করেছেন এই ছোট family-তে ডাটা-হারানোর ঝুঁকি নেই) —
       // dataCollectionName অপরিবর্তিত থাকায় আসল ডাটা কোনোভাবেই touched
       // হয় না, শুধু code→familyId lookup-এর পুরনো এন্ট্রি সরানো হচ্ছে।
-      if (oldCode && oldCode !== normalized) {
-        tx.delete(db.collection("familyCodes").doc(oldCode));
+      // §Case-insensitive fix — পুরনো কোড normalize করার আগের scheme-এ
+      // raw(uppercase) doc-id হিসেবে সেভ থাকতে পারে, তাই normalized-key ও
+      // raw oldCode উভয় doc-id-তে delete try করা হচ্ছে যাতে stale mapping
+      // orphan না থেকে যায় (নতুন key-এর সাথে সংঘর্ষ হলে skip)।
+      if (oldCode) {
+        const oldKey = normalizeFamilyKey(oldCode);
+        if (oldKey !== newKey) {
+          tx.delete(db.collection("familyCodes").doc(oldKey));
+        }
+        if (oldCode !== oldKey && oldCode !== newKey) {
+          tx.delete(db.collection("familyCodes").doc(oldCode));
+        }
       }
     });
     console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
@@ -247,13 +264,20 @@ async function createNewFamily(newCode) {
   }
   const newFamilyId = generateSecureCode(20);
   try {
-    const codeRef = db.collection("familyCodes").doc(normalized);
-    const codeSnap = await codeRef.get();
-    if (codeSnap.exists) {
-      console.error("[New Family] এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে।");
-      return { aborted: true, reason: "code-taken" };
-    }
-    await codeRef.set({ familyId: newFamilyId, createdAt: Date.now() });
+    // §Race-fix(atomic uniqueness) — আগে get()+set() আলাদা কল ছিল, যা
+    // দুই ইউজার একই মুহূর্তে একই কোড দাবি করলে TOCTOU race তৈরি করতে
+    // পারত (উভয়ের get() "available" দেখে, পরে একজনের mapping অন্যজন
+    // overwrite)। changeFamilyCodeForExistingFamily()-এর একই প্যাটার্নে
+    // get+set একই transaction-এ এনে atomic করা হলো — lookup key/flow
+    // অপরিবর্তিত, শুধু atomicity যোগ হয়েছে।
+    const codeRef = db.collection("familyCodes").doc(normalizeFamilyKey(normalized));
+    await db.runTransaction(async tx => {
+      const codeSnap = await tx.get(codeRef);
+      if (codeSnap.exists) {
+        throw new Error("code-taken");
+      }
+      tx.set(codeRef, { familyId: newFamilyId, createdAt: Date.now() });
+    });
     await db.collection("families").doc(newFamilyId).set({
       familyId: newFamilyId,
       familyCode: normalized,
@@ -297,6 +321,9 @@ async function createNewFamily(newCode) {
     return { success: true, familyId: newFamilyId };
   } catch (err) {
     console.error("[New Family] ব্যর্থ:", err.message);
+    if (err.message === "code-taken") {
+      return { aborted: true, reason: "code-taken" };
+    }
     return { aborted: true, reason: "error", error: err.message };
   }
 }
@@ -319,7 +346,14 @@ async function resolveFamilyIdFromCode(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { ok: false, reason: "empty" };
   try {
-    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    // §Case-insensitive fix — নতুন scheme lowercase key-তে সেভ হয়, কিন্তু
+    // বিদ্যমান সব production family raw(uppercase, auto-generated) doc-id-তে
+    // আছে — তাই normalized-key প্রথমে try, miss হলে raw-code fallback।
+    // এতে কোনো migration ছাড়াই existing lookup আচরণ অক্ষুণ্ণ থাকে।
+    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
+    if (!codeSnap.exists) {
+      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    }
     if (!codeSnap.exists) {
       return { ok: false, reason: "not-found" };
     }
@@ -382,7 +416,10 @@ async function checkFamilyCodeExists(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { exists: false, reason: "empty" };
   try {
-    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
+    if (!codeSnap.exists) {
+      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    }
     if (!codeSnap.exists) return { exists: false, reason: "not-found" };
     const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
     if (!targetFamilyId) return { exists: false, reason: "not-found" };
@@ -2397,7 +2434,7 @@ async function backupToGoogleDrive(migrationState) {
   const existing = await findDriveBackupFile();
   const currentFamilyCode = getFamilyCode();
   if (existing && existing.appProperties && existing.appProperties.familyCode && existing.appProperties.familyCode !== currentFamilyCode) {
-    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি কোডের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
+    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি ইউজারনেমের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
     if (!proceed) return { skipped: true };
   }
   const payload = await buildDriveBackupPayload(migrationState);
@@ -4691,6 +4728,28 @@ function StarMark({
     fill: color
   }));
 }
+// একই logo asset(logo.png, root-এ deploy করা) reusable component হিসেবে
+// ব্যবহার হয় — Main Dashboard header ও Onboarding welcome page, দুই
+// জায়গাতেই। ভবিষ্যতে লোগো বদলাতে হলে শুধু logo.png ফাইল replace করলেই
+// দুই জায়গায় আপডেট হয়ে যাবে।
+function AppLogo({
+  size = 32,
+  className = ""
+}) {
+  return /*#__PURE__*/React.createElement("img", {
+    src: "logo.png",
+    alt: "Daily Task",
+    width: size,
+    height: size,
+    className: className,
+    style: {
+      width: size,
+      height: size,
+      objectFit: "contain",
+      flexShrink: 0
+    }
+  });
+}
 function BoolToggle({
   value,
   onChange,
@@ -5295,7 +5354,7 @@ function App() {
                       .collection("notifications").add({
                         targetUid: adminUid,
                         type: "device_joined",
-                        message: "একটি নতুন ডিভাইস Family Code দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
+                        message: "একটি নতুন ডিভাইস Family Username দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
                         createdAt: Date.now(),
                         read: false
                       }).catch(() => {})
@@ -5883,11 +5942,11 @@ function App() {
     const code = newFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
     if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
@@ -5943,11 +6002,11 @@ function App() {
     const code = renameFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
     if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডেটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
@@ -5995,7 +6054,7 @@ function App() {
         body: JSON.stringify({
           access_key: WEB3FORMS_ACCESS_KEY,
           subject: "Daily Task App — নতুন পরামর্শ",
-          message: feedbackMsg
+          message: `${feedbackMsg}\n\nFamily Username: ${getFamilyCode()}`
         })
       });
       const result = await res.json();
@@ -7167,8 +7226,8 @@ function App() {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2.5"
-  }, /*#__PURE__*/React.createElement(StarMark, {
-    size: 22
+  }, /*#__PURE__*/React.createElement(AppLogo, {
+    size: 34
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
     className: "text-xl font-bold tracking-tight",
     style: {
@@ -7246,7 +7305,7 @@ function App() {
       setIsMenuOpen(false);
     },
     className: "text-slate-500 hover:text-emerald-800 shrink-0",
-    title: "ফ্যামিলি কোড পরিবর্তন করুন"
+    title: "ফ্যামিলি ইউজারনেম পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
   }))))), /*#__PURE__*/React.createElement("div", {
@@ -7342,7 +7401,7 @@ function App() {
   })))))), null), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
-      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি কোড লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Code: ${getFamilyCode()}`;
+      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${getFamilyCode()}`;
       try {
         if (navigator.share) {
           await navigator.share({ title: "Daily Task", text });
@@ -7376,16 +7435,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
   }, /*#__PURE__*/React.createElement(UploadIcon, {
     size: 14
-  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("input", {
-    ref: importFileInputRef,
-    type: "file",
-    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
-    onChange: e => {
-      handleImportData(e);
-      setShowImportOptionsModal(false);
-    },
-    className: "hidden"
-  }), /*#__PURE__*/React.createElement("button", {
+  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setArchiveYear(monthCursor.year);
       setArchiveMonth0(monthCursor.month0);
@@ -7699,7 +7749,7 @@ function App() {
     className: "flex-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
-  }, "আপনাদের ফ্যামিলি কোড এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
+  }, "আপনাদের ফ্যামিলি ইউজারনেম এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
   }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
     onClick: () => setCodeChangeNotice(null),
@@ -8175,7 +8225,7 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-3 text-slate-800"
-  }, "ফ্যামিলি কোড"), /*#__PURE__*/React.createElement("div", {
+  }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col gap-2"
   }, isAdmin && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -8187,7 +8237,7 @@ function App() {
     className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
+  }), " বিদ্যমান ফ্যামিলি ইউজারনেম পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeChoiceModal(false),
     className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
   }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
@@ -8196,7 +8246,7 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "নতুন ফ্যামিলি কোড তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নতুন ফ্যামিলি ইউজারনেম তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
@@ -8226,7 +8276,7 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
+  }, "বিদ্যমান ফ্যামিলি ইউজারনেম দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
   }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
@@ -8256,14 +8306,14 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নিজের ফ্যামিলি ইউজারনেম পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডেটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
+  }, "ইউজারনেম কমপক্ষে ৬ ক্যারেক্টারের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও হাইফেন ব্যবহার করে ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
     autoComplete: "username",
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
-    placeholder: "নতুন কোড লিখুন",
+    placeholder: "নতুন ইউজারনেম লিখুন",
     maxLength: 30,
     disabled: renameFamCodeBusy,
     className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
@@ -8532,7 +8582,16 @@ function App() {
   }), "Google Drive ও আপনার ডিভাইস — উভয় জায়গায় ব্যাকআপ রাখুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowBackupOptionsModal(false),
     className: "w-full h-9 mt-4 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-  }, "বন্ধ করুন"))), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
+  }, "বন্ধ করুন"))), /*#__PURE__*/React.createElement("input", {
+    ref: importFileInputRef,
+    type: "file",
+    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
+    onChange: e => {
+      handleImportData(e);
+      setShowImportOptionsModal(false);
+    },
+    className: "hidden"
+  }), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -8584,7 +8643,7 @@ function App() {
     className: "font-bold text-sm text-slate-800"
   }, "Google Drive-এ ব্যাকআপ পাওয়া গেছে")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "ফ্যামিলি কোড: ", /*#__PURE__*/React.createElement("b", null, (driveRestoreCandidate.appProperties && driveRestoreCandidate.appProperties.familyCode) || "অজানা"), driveRestoreCandidate.modifiedTime ? " · সর্বশেষ পরিবর্তন: " + new Date(driveRestoreCandidate.modifiedTime).toLocaleString("bn-BD") : ""), /*#__PURE__*/React.createElement("p", {
+  }, "ফ্যামিলি ইউজারনেম: ", /*#__PURE__*/React.createElement("b", null, (driveRestoreCandidate.appProperties && driveRestoreCandidate.appProperties.familyCode) || "অজানা"), driveRestoreCandidate.modifiedTime ? " · সর্বশেষ পরিবর্তন: " + new Date(driveRestoreCandidate.modifiedTime).toLocaleString("bn-BD") : ""), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
   }, "এই ব্যাকআপ থেকে ডেটা রিস্টোর (মার্জ) করবেন? বর্তমান ডিভাইসের ডেটার সাথে merge হবে — কোনো ডেটা হারাবে না; দুই জায়গায় একই এন্ট্রি থাকলে যেটি বেশি সাম্প্রতিক (updatedAt) সেটি রাখা হবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
@@ -8637,7 +8696,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-3"
-  }, "একটি ইউনিক ফ্যামিলি কোড তৈরি করুন (যেমন: Fam-Khan@2026)। পরিবারের সবাই একই কোড ব্যবহার করলে সবার ডেটা স্বয়ংক্রিয়ভাবে সিংক হবে।"), /*#__PURE__*/React.createElement("p", {
+  }, "একটি ইউনিক ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)। পরিবারের সবাই একই ইউজারনেম ব্যবহার করলে সবার ডেটা স্বয়ংক্রিয়ভাবে সিংক হবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-bold text-slate-800 mb-1.5"
   }, "নিয়ম:"), /*#__PURE__*/React.createElement("ul", {
     className: "text-xs text-slate-600 leading-relaxed mb-3 space-y-1 list-disc pl-4"
@@ -8787,7 +8846,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "আপনার মতামত বা পরামর্শ লিখুন। এটি সরাসরি Daily Task Team-এর কাছে চলে যাবে।"), /*#__PURE__*/React.createElement("textarea", {
+  }, "কোনো সমস্যা বা পরামর্শ আমাদের জানান।"), /*#__PURE__*/React.createElement("textarea", {
     value: feedbackMsg,
     onChange: e => setFeedbackMsg(e.target.value),
     rows: 4,
@@ -9355,7 +9414,7 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("button", {
         key: "share",
         onClick: async () => {
-          const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি কোড লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Code: ${familyCode}`;
+          const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${familyCode}`;
           try {
             if (navigator.share) {
               await navigator.share({ title: "Daily Task", text });
@@ -9455,11 +9514,11 @@ function Onboarding() {
   const [usageNotesOpen, setUsageNotesOpen] = useState(false);
 
   const errorText = reason => ({
-    empty: "একটি Family Code দিন।",
-    length: `Family Code ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-    charset: "Family Code-এ স্পেস, / , \\ , বা কোটেশন চিহ্ন ব্যবহার করা যাবে না।",
-    "code-taken": "এই Family Code ইতিমধ্যে ব্যবহৃত হচ্ছে। অন্য একটি কোড দিন।",
-    "not-found": "এই Family Code খুঁজে পাওয়া যায়নি। বানান যাচাই করে আবার চেষ্টা করুন।",
+    empty: "একটি Family Username দিন।",
+    length: `Family Username ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+    charset: "Family Username-এ স্পেস, / , \\ , বা কোটেশন চিহ্ন ব্যবহার করা যাবে না।",
+    "code-taken": "এই Family Username ইতিমধ্যে ব্যবহৃত হচ্ছে। অন্য একটি কোড দিন।",
+    "not-found": "এই Family Username খুঁজে পাওয়া যায়নি। বানান যাচাই করে আবার চেষ্টা করুন।",
     "same-family": "আপনি ইতিমধ্যে এই Family-তে আছেন।",
     "not-v2": "এই Family এখনো এই ফিচারের জন্য প্রস্তুত নয়।",
     error: "একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।"
@@ -9514,7 +9573,7 @@ function Onboarding() {
     setError(null);
     const res = await directIdentifyLogin(code, password);
     if (!res || !res.ok) {
-      setError("Family Code বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
       setBusy(false);
     }
     // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
@@ -9555,7 +9614,7 @@ function Onboarding() {
         // commit করা হচ্ছে।
         const resolved = await resolveFamilyIdFromCode(mapping.familyCode);
         if (!resolved.ok) {
-          setError("এই Google অ্যাকাউন্টের family তথ্য মেলাতে সমস্যা হয়েছে। Family Code দিয়ে চেষ্টা করুন।");
+          setError("এই Google অ্যাকাউন্টের family তথ্য মেলাতে সমস্যা হয়েছে। Family Username দিয়ে চেষ্টা করুন।");
           setBusy(false);
           return;
         }
@@ -9571,7 +9630,7 @@ function Onboarding() {
         window.location.reload();
         return;
       }
-      setError("এই Google অ্যাকাউন্টের সাথে কোনো পরিবার যুক্ত পাওয়া যায়নি। উপরে Family Code দিয়ে যোগ দিন।");
+      setError("এই Google অ্যাকাউন্টের সাথে কোনো পরিবার যুক্ত পাওয়া যায়নি। উপরে Family Username দিয়ে যোগ দিন।");
       setBusy(false);
     } catch (err) {
       setError("Google সাইন-ইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
@@ -9598,7 +9657,7 @@ function Onboarding() {
     autoComplete: "username",
     value: code,
     onChange: e => setCode(e.target.value),
-    placeholder: "Family Code লিখুন",
+    placeholder: "Family Username লিখুন",
     disabled: busy,
     className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors"
   });
@@ -9639,6 +9698,10 @@ function Onboarding() {
 
   if (step === "welcome") {
     return shell([
+      /*#__PURE__*/React.createElement(AppLogo, {
+        key: "logo",
+        size: 72
+      }),
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-2xl font-bold tracking-tight",
@@ -9675,7 +9738,7 @@ function Onboarding() {
         className: "font-bold text-sm text-slate-800 mb-3 text-center"
       }, "অ্যাপ ব্যবহারের নির্দেশনাবলী"), /*#__PURE__*/React.createElement("div", {
         className: "text-xs text-slate-600 space-y-2.5 leading-relaxed font-medium"
-      }, /*#__PURE__*/React.createElement("p", null, "১. নিজের ও পরিবারের সদস্যদের দৈনন্দিন আমল রেকর্ড রাখা ও মূল্যায়ন করার জন্য এই অ্যাপটি ব্যবহার করুন। নিয়মিত আমলের অগ্রগতি দেখুন এবং পরিবারকে নিয়ে প্রোডাক্টিভ অভ্যাস গড়ে তুলুন।"), /*#__PURE__*/React.createElement("p", null, "২. আপনি যদি আপনার ও পরিবারের সদস্যদের দৈনিক আমল ট্র্যাক করতে আগ্রহী হন, তাহলে \"নতুন Family তৈরি করুন\" বাটনে ক্লিক করে আপনার Family তৈরি করুন এবং সদস্যদের যুক্ত করুন।"), /*#__PURE__*/React.createElement("p", null, "৩. আপনি যদি কোনো বিদ্যমান Family-এর নতুন সদস্য হতে চান, তাহলে \"বিদ্যমান Family-তে প্রবেশ করুন\" বাটনে ক্লিক করে Family Code লিখুন এবং নতুন সদস্য হিসেবে যুক্ত হওয়ার প্রক্রিয়া সম্পন্ন করুন।"), /*#__PURE__*/React.createElement("p", null, "৪. মাসের শেষে দৈনিক রেকর্ড, সাপ্তাহিক রিফ্লেকশন এবং পারিবারিক সভার কার্যবিবরণী- সবকিছু একসাথে ২ পৃষ্ঠার PDF হিসেবে প্রিন্ট বা সংরক্ষণ করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৫. আপনার ডেটা নিরাপদ রাখতে মেনু থেকে \"ডেটা ব্যাকআপ রাখুন\" অপশন ব্যবহার করে Google Drive এবং ডিভাইসে ব্যাকআপ রাখতে পারবেন। প্রয়োজনে সেই ব্যাকআপ থেকে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৬. ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর Google অ্যাকাউন্ট অথবা মেম্বার পাসওয়ার্ড দিয়ে সাইন ইন করে আপনার রেকর্ড ফিরে পাওয়া যাবে। তাই ডেটা হারানোর ভয় নেই।"), /*#__PURE__*/React.createElement("p", null, "৭. সদস্য হবার পর অ্যাপের বিভিন্ন ফিচার সঠিকভাবে বুঝতে পাশে থাকা ⓘ (ইনফো) আইকনে চাপ দিয়ে নির্দেশনাগুলো দেখে নিন।")), /*#__PURE__*/React.createElement("button", {
+      }, /*#__PURE__*/React.createElement("p", null, "১. নিজের ও পরিবারের সদস্যদের দৈনন্দিন আমল রেকর্ড রাখা ও মূল্যায়ন করার জন্য এই অ্যাপটি ব্যবহার করুন। নিয়মিত আমলের অগ্রগতি দেখুন এবং পরিবারকে নিয়ে প্রোডাক্টিভ অভ্যাস গড়ে তুলুন।"), /*#__PURE__*/React.createElement("p", null, "২. আপনি যদি আপনার ও পরিবারের সদস্যদের দৈনিক আমল ট্র্যাক করতে আগ্রহী হন, তাহলে \"নতুন Family তৈরি করুন\" বাটনে ক্লিক করে আপনার Family তৈরি করুন এবং সদস্যদের যুক্ত করুন।"), /*#__PURE__*/React.createElement("p", null, "৩. আপনি যদি কোনো বিদ্যমান Family-এর নতুন সদস্য হতে চান, তাহলে \"বিদ্যমান Family-তে প্রবেশ করুন\" বাটনে ক্লিক করে Family Username লিখুন এবং নতুন সদস্য হিসেবে যুক্ত হওয়ার প্রক্রিয়া সম্পন্ন করুন।"), /*#__PURE__*/React.createElement("p", null, "৪. মাসের শেষে দৈনিক রেকর্ড, সাপ্তাহিক রিফ্লেকশন এবং পারিবারিক সভার কার্যবিবরণী- সবকিছু একসাথে ২ পৃষ্ঠার PDF হিসেবে প্রিন্ট বা সংরক্ষণ করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৫. আপনার ডেটা নিরাপদ রাখতে মেনু থেকে \"ডেটা ব্যাকআপ রাখুন\" অপশন ব্যবহার করে Google Drive এবং ডিভাইসে ব্যাকআপ রাখতে পারবেন। প্রয়োজনে সেই ব্যাকআপ থেকে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৬. ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর Google অ্যাকাউন্ট অথবা মেম্বার পাসওয়ার্ড দিয়ে সাইন ইন করে আপনার রেকর্ড ফিরে পাওয়া যাবে। তাই ডেটা হারানোর ভয় নেই।"), /*#__PURE__*/React.createElement("p", null, "৭. সদস্য হবার পর অ্যাপের বিভিন্ন ফিচার সঠিকভাবে বুঝতে পাশে থাকা ⓘ (ইনফো) আইকনে চাপ দিয়ে নির্দেশনাগুলো দেখে নিন।")), /*#__PURE__*/React.createElement("button", {
         onClick: () => setUsageNotesOpen(false),
         className: "w-full mt-4 h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
       }, "বুঝেছি")))
@@ -9688,7 +9751,7 @@ function Onboarding() {
         key: "title",
         className: "text-lg font-bold tracking-tight whitespace-nowrap",
         style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
-      }, "একটি Custom Family Code সেট করুন"),
+      }, "একটি Custom Family Username সেট করুন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
         className: "text-sm max-w-xs leading-relaxed",
@@ -9744,9 +9807,9 @@ function Onboarding() {
         className: "w-full flex flex-col items-center",
         style: codeShakeKey ? { animation: "dtCodeShake 0.4s" } : undefined
       }, React.cloneElement(codeInput, { key: "input" })),
-      (error === "প্রথমে Family Code দিন।") ? errorBox : null,
+      (error === "প্রথমে Family Username দিন।") ? errorBox : null,
       passwordInput,
-      (error === "প্রথমে Family Code দিন।") ? null : errorBox,
+      (error === "প্রথমে Family Username দিন।") ? null : errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "login",
         type: "submit",
@@ -9763,7 +9826,7 @@ function Onboarding() {
         type: "button",
         onClick: () => {
           if (!code.trim()) {
-            setError("প্রথমে Family Code দিন।");
+            setError("প্রথমে Family Username দিন।");
             setCodeShakeKey(k => k + 1);
             return;
           }
@@ -9850,7 +9913,7 @@ function renderPendingGoogleReauthGate() {
       }).catch(e => {
         setBusy(false);
         if (!(e && e.code === "auth/popup-closed-by-user")) {
-          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Code দিয়ে চালিয়ে যান।");
+          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Username দিয়ে চালিয়ে যান।");
         }
       });
     }
