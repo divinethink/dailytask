@@ -123,7 +123,7 @@ function getFamilyCode() {
   }
   return code;
 }
-const FAMILY_CODE_MIN_LENGTH = 9;
+const FAMILY_CODE_MIN_LENGTH = 6;
 const FAMILY_CODE_MAX_LENGTH = 30;
 // শুধু যেসব ক্যারেক্টার Firestore-এর path/collection নাম ভাঙতে পারে বা কপি-পেস্টে সমস্যা করে,
 // সেগুলোই বাদ: space, / (path separator), \ , ' এবং " (quoting সমস্যা এড়াতে)।
@@ -132,15 +132,21 @@ const FAMILY_CODE_CHARSET_PATTERN = /^(?!\.+$)(?!__.*__$)[^\s/\\'"]+$/;
 function isFamilyCodeCharsetValid(code) {
   return FAMILY_CODE_CHARSET_PATTERN.test(code);
 }
+// §Family Username case-insensitive uniqueness — শুধু familyCodes lookup/
+// uniqueness-key তৈরির জন্য (lowercase)। Display value (family.familyCode,
+// dataCollectionName ইত্যাদি) user-typed আসল casing-ই রাখে, এখানে ছোঁয়া হয় না।
+function normalizeFamilyKey(code) {
+  return (code || "").trim().toLowerCase();
+}
 function setFamilyCode(code) {
   if (!code || !code.trim()) return;
   const normalized = code.trim();
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    alert(`ফ্যামিলি কোড ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    alert(`ফ্যামিলি ইউজারনেম ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
     return;
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+    alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
     return;
   }
   localStorage.setItem("family_code", normalized);
@@ -191,7 +197,8 @@ async function changeFamilyCodeForExistingFamily(newCode) {
         throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
       }
       oldCode = fam.familyCode || null;
-      const newCodeRef = db.collection("familyCodes").doc(normalized);
+      const newKey = normalizeFamilyKey(normalized);
+      const newCodeRef = db.collection("familyCodes").doc(newKey);
       const newCodeSnap = await tx.get(newCodeRef);
       if (newCodeSnap.exists && newCodeSnap.data().familyId !== familyId) {
         throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
@@ -202,8 +209,18 @@ async function changeFamilyCodeForExistingFamily(newCode) {
       // নিশ্চিত করেছেন এই ছোট family-তে ডাটা-হারানোর ঝুঁকি নেই) —
       // dataCollectionName অপরিবর্তিত থাকায় আসল ডাটা কোনোভাবেই touched
       // হয় না, শুধু code→familyId lookup-এর পুরনো এন্ট্রি সরানো হচ্ছে।
-      if (oldCode && oldCode !== normalized) {
-        tx.delete(db.collection("familyCodes").doc(oldCode));
+      // §Case-insensitive fix — পুরনো কোড normalize করার আগের scheme-এ
+      // raw(uppercase) doc-id হিসেবে সেভ থাকতে পারে, তাই normalized-key ও
+      // raw oldCode উভয় doc-id-তে delete try করা হচ্ছে যাতে stale mapping
+      // orphan না থেকে যায় (নতুন key-এর সাথে সংঘর্ষ হলে skip)।
+      if (oldCode) {
+        const oldKey = normalizeFamilyKey(oldCode);
+        if (oldKey !== newKey) {
+          tx.delete(db.collection("familyCodes").doc(oldKey));
+        }
+        if (oldCode !== oldKey && oldCode !== newKey) {
+          tx.delete(db.collection("familyCodes").doc(oldCode));
+        }
       }
     });
     console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
@@ -247,13 +264,20 @@ async function createNewFamily(newCode) {
   }
   const newFamilyId = generateSecureCode(20);
   try {
-    const codeRef = db.collection("familyCodes").doc(normalized);
-    const codeSnap = await codeRef.get();
-    if (codeSnap.exists) {
-      console.error("[New Family] এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে।");
-      return { aborted: true, reason: "code-taken" };
-    }
-    await codeRef.set({ familyId: newFamilyId, createdAt: Date.now() });
+    // §Race-fix(atomic uniqueness) — আগে get()+set() আলাদা কল ছিল, যা
+    // দুই ইউজার একই মুহূর্তে একই কোড দাবি করলে TOCTOU race তৈরি করতে
+    // পারত (উভয়ের get() "available" দেখে, পরে একজনের mapping অন্যজন
+    // overwrite)। changeFamilyCodeForExistingFamily()-এর একই প্যাটার্নে
+    // get+set একই transaction-এ এনে atomic করা হলো — lookup key/flow
+    // অপরিবর্তিত, শুধু atomicity যোগ হয়েছে।
+    const codeRef = db.collection("familyCodes").doc(normalizeFamilyKey(normalized));
+    await db.runTransaction(async tx => {
+      const codeSnap = await tx.get(codeRef);
+      if (codeSnap.exists) {
+        throw new Error("code-taken");
+      }
+      tx.set(codeRef, { familyId: newFamilyId, createdAt: Date.now() });
+    });
     await db.collection("families").doc(newFamilyId).set({
       familyId: newFamilyId,
       familyCode: normalized,
@@ -297,6 +321,9 @@ async function createNewFamily(newCode) {
     return { success: true, familyId: newFamilyId };
   } catch (err) {
     console.error("[New Family] ব্যর্থ:", err.message);
+    if (err.message === "code-taken") {
+      return { aborted: true, reason: "code-taken" };
+    }
     return { aborted: true, reason: "error", error: err.message };
   }
 }
@@ -311,48 +338,71 @@ if (typeof window !== "undefined") {
 // accessDenied/self-request হ্যান্ডলিং (migrateMembersIfNeeded catch ব্লক)
 // নিজে থেকেই pending accessRequest তৈরি করবে অথবা আগে থেকে approved থাকলে
 // সরাসরি ঢুকিয়ে দেবে — এখানে নতুন করে সেই লজিক ডুপ্লিকেট করা হয়নি।
+// §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — joinExistingFamily()-এর
+// family-lookup+validate অংশ আলাদা reusable helper-এ বের করা হয়েছে(কোনো
+// localStorage write/reload নেই, শুধু resolve+validate)। joinExistingFamily()
+// নিজে নিচে এটাই ব্যবহার করে — আচরণ/log/reason সব অপরিবর্তিত, শুধু delegate।
+async function resolveFamilyIdFromCode(code) {
+  const normalized = (code || "").trim();
+  if (!normalized) return { ok: false, reason: "empty" };
+  try {
+    // §Case-insensitive fix — নতুন scheme lowercase key-তে সেভ হয়, কিন্তু
+    // বিদ্যমান সব production family raw(uppercase, auto-generated) doc-id-তে
+    // আছে — তাই normalized-key প্রথমে try, miss হলে raw-code fallback।
+    // এতে কোনো migration ছাড়াই existing lookup আচরণ অক্ষুণ্ণ থাকে।
+    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
+    if (!codeSnap.exists) {
+      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    }
+    if (!codeSnap.exists) {
+      return { ok: false, reason: "not-found" };
+    }
+    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
+    if (!targetFamilyId) {
+      return { ok: false, reason: "not-found" };
+    }
+    // পুরনো unapproved/নতুন ডিভাইস থেকে এই family-র উপর এখনো approval নেই,
+    // তাই families/{familyId} read rules (isApprovedMember) block করতে
+    // পারে — সেক্ষেত্রে pre-check skip করে এগিয়ে যাওয়া হয়, বুট-ফ্লো নিজেই
+    // migrationState নিরাপদে resolve করবে (একই fallback pattern যা
+    // বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
+    try {
+      const famSnap = await db.collection("families").doc(targetFamilyId).get();
+      if (!famSnap.exists) {
+        return { ok: false, reason: "not-found" };
+      }
+      const migrationState = famSnap.data().migrationState || "legacy";
+      if (migrationState !== "v2") {
+        return { ok: false, reason: "not-v2" };
+      }
+    } catch (preCheckErr) {
+      console.warn("[resolveFamilyIdFromCode] pre-check read blocked (সম্ভবত unapproved), চালিয়ে যাওয়া হচ্ছে:", preCheckErr.message);
+    }
+    return { ok: true, familyId: targetFamilyId, code: normalized };
+  } catch (err) {
+    console.error("[resolveFamilyIdFromCode] ব্যর্থ:", err.message);
+    return { ok: false, reason: "error", error: err.message };
+  }
+}
 async function joinExistingFamily(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   if (normalized === getFamilyCode()) {
     return { aborted: true, reason: "same-family" };
   }
-  try {
-    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
-    if (!codeSnap.exists) {
-      return { aborted: true, reason: "not-found" };
+  const resolved = await resolveFamilyIdFromCode(normalized);
+  if (!resolved.ok) {
+    if (resolved.reason === "error") {
+      console.error("[Join Family] ব্যর্থ:", resolved.error);
     }
-    const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
-    if (!targetFamilyId) {
-      return { aborted: true, reason: "not-found" };
-    }
-    // পুরনো unapproved/নতুন ডিভাইস থেকে এই family-র উপর এখনো approval নেই,
-    // তাই families/{familyId} read rules (isApprovedMember) block করতে
-    // পারে — সেক্ষেত্রে pre-check skip করে switch+reload-এ এগিয়ে যাওয়া হয়,
-    // বুট-ফ্লো নিজেই migrationState নিরাপদে resolve করবে (একই fallback
-    // pattern যা বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
-    try {
-      const famSnap = await db.collection("families").doc(targetFamilyId).get();
-      if (!famSnap.exists) {
-        return { aborted: true, reason: "not-found" };
-      }
-      const migrationState = famSnap.data().migrationState || "legacy";
-      if (migrationState !== "v2") {
-        return { aborted: true, reason: "not-v2" };
-      }
-    } catch (preCheckErr) {
-      console.warn("[Join Family] pre-check read blocked (সম্ভবত unapproved), switch চালিয়ে যাওয়া হচ্ছে:", preCheckErr.message);
-    }
-    console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${targetFamilyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
-    localStorage.setItem("family_id", targetFamilyId);
-    localStorage.setItem("family_code", normalized);
-    localStorage.setItem("family_code_is_custom", "1");
-    window.location.reload();
-    return { success: true };
-  } catch (err) {
-    console.error("[Join Family] ব্যর্থ:", err.message);
-    return { aborted: true, reason: "error", error: err.message };
+    return { aborted: true, reason: resolved.reason, error: resolved.error };
   }
+  console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${resolved.familyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+  localStorage.setItem("family_id", resolved.familyId);
+  localStorage.setItem("family_code", normalized);
+  localStorage.setItem("family_code_is_custom", "1");
+  window.location.reload();
+  return { success: true };
 }
 if (typeof window !== "undefined") {
   window.joinExistingFamily = joinExistingFamily;
@@ -366,7 +416,10 @@ async function checkFamilyCodeExists(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { exists: false, reason: "empty" };
   try {
-    const codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
+    if (!codeSnap.exists) {
+      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    }
     if (!codeSnap.exists) return { exists: false, reason: "not-found" };
     const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
     if (!targetFamilyId) return { exists: false, reason: "not-found" };
@@ -1869,18 +1922,35 @@ async function loadUserFamilyCode(uid) {
     return null;
   }
 }
-async function saveUserFamilyCode(uid, code) {
+async function saveUserFamilyCode(uid, code, memberId) {
   // ফাংশনের নিজের ভেতরেই guard — caller ভুলে খালি/অবৈধ code পাঠালেও
   // users/{uid}-এ কখনো ফাঁকা familyCode লেখা হবে না।
   if (!uid || !code || !code.trim()) return;
   try {
-    await db.collection("users").doc(uid).set({
+    const payload = {
       familyCode: code.trim(),
       updatedAt: Date.now()
-    }, {
+    };
+    // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 3) — optional
+    // memberId, existing call site-গুলো(৩টি) এই param পাস করে না বলে
+    // অপরিবর্তিত থাকে।
+    if (memberId) payload.memberId = memberId;
+    await db.collection("users").doc(uid).set(payload, {
       merge: true
     });
   } catch {}
+}
+// Google One-click Sign-in(touch-point 6)-এর জন্য — loadUserFamilyCode()
+// (existing, শুধু string ফেরত দেয়)-এর contract না ভেঙে আলাদা ফাংশন।
+async function loadUserFamilyMapping(uid) {
+  try {
+    const doc = await db.collection("users").doc(uid).get();
+    if (!doc.exists) return null;
+    const d = doc.data() || {};
+    return { familyCode: d.familyCode || null, memberId: d.memberId || null };
+  } catch {
+    return null;
+  }
 }
 // Google দিয়ে sign-in করা থাকলে কল হয়। users/{uid}-এ আগে থেকে সংরক্ষিত
 // familyCode থাকলে (অন্য ডিভাইস থেকে link করা) সেটাই এই ডিভাইসে local-এ
@@ -2364,7 +2434,7 @@ async function backupToGoogleDrive(migrationState) {
   const existing = await findDriveBackupFile();
   const currentFamilyCode = getFamilyCode();
   if (existing && existing.appProperties && existing.appProperties.familyCode && existing.appProperties.familyCode !== currentFamilyCode) {
-    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি কোডের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
+    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি ইউজারনেমের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
     if (!proceed) return { skipped: true };
   }
   const payload = await buildDriveBackupPayload(migrationState);
@@ -2667,18 +2737,27 @@ async function writeFsaBackupFile(baseDirHandle, fileName, jsonStr) {
   } catch {}
 }
 
+// Auto-update(fresh-load-only, one-time): controllerchange শুধু page-load-এর
+// প্রথম ৮ সেকেন্ডের "arm window"-এ শোনা হয়(fresh-open-এ আগে থেকে pending
+// update থাকলে সেটাই ধরার জন্য)। Window পার হলে listener remove — mid-session
+// background SW update কখনো এই পথে reload trigger করবে না। `reloaded` flag
+// দিয়ে one-time guard(reload-loop প্রতিরোধ)। প্রকৃত reload dt-sw-updated
+// event dispatch করে App()-এর ভেতরের dirty-state-aware handler করে(নিচে)।
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").then(reg => {
-      reg.addEventListener("updatefound", () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener("statechange", () => {
-          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            window.dispatchEvent(new CustomEvent("dt-update-available"));
-          }
-        });
-      });
+      let reloaded = false;
+      const ARM_MS = 8000;
+      const onControllerChange = () => {
+        if (reloaded) return;
+        reloaded = true;
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+        window.dispatchEvent(new CustomEvent("dt-sw-updated"));
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+      setTimeout(() => {
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      }, ARM_MS);
     }).catch(() => {});
   });
 }
@@ -2971,6 +3050,43 @@ function KeyIcon({
     d: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
   }));
 }
+function EyeIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "3"
+  }));
+}
+function EyeOffIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14.12 14.12a3 3 0 1 1-4.24-4.24"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "1",
+    y1: "1",
+    x2: "23",
+    y2: "23"
+  }));
+}
 function SmartphoneIcon({
   size,
   color,
@@ -3039,6 +3155,17 @@ function CopyIcon({
   }), /*#__PURE__*/React.createElement("path", {
     d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
   }));
+}
+function ShareIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }), /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
 }
 function HelpCircle({
   size,
@@ -3151,6 +3278,29 @@ function InfoIcon({
     y1: "8",
     x2: "12.01",
     y2: "8"
+  }));
+}
+function GoogleIcon({
+  size = 14,
+  className
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    fill: "#4285F4",
+    d: "M23.49 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.54-5.17 3.54-8.82z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#34A853",
+    d: "M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.1A12 12 0 0 0 12 24z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#FBBC05",
+    d: "M5.27 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.27a12 12 0 0 0 0 10.78l4-3.1z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#EA4335",
+    d: "M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.61l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"
   }));
 }
 function RefreshIcon({
@@ -4201,8 +4351,22 @@ async function createMemberWithKey(member) {
   const key = generateMemberKeyPlain();
   const hash = await sha256Hex(key);
   const batch = db.batch();
+  // Admin FIFO ownerActivity missing-key fix(১৯ আগস্ট ২০২৬): ownerUids-সহ
+  // তৈরি হওয়া member(approved memberRequest/first admin)-এর owner uid-এর
+  // জন্য সাথে সাথে ownerActivity stamp করা হয় — নাহলে সেই uid নিজে entry
+  // save/re-claim না করা পর্যন্ত ownerActivity-তে entry থাকে না, ফলে FIFO
+  // eviction Rules-এ missing-key error/deny দেয়(auto-eviction silently fail)।
+  // ownerUids:[](unclaimed member, handleAddMember path) অপরিবর্তিত—claim
+  // সময়ে আগে থেকেই stamp হয়।
+  const initialOwnerActivity = {};
+  if (Array.isArray(fields.ownerUids)) {
+    fields.ownerUids.forEach(u => {
+      initialOwnerActivity[u] = firebase.firestore.Timestamp.now();
+    });
+  }
   batch.set(memberRef, {
     ...fields,
+    ...(Object.keys(initialOwnerActivity).length ? { ownerActivity: initialOwnerActivity } : {}),
     updatedAt: Date.now(),
     lastActiveAt: firebase.firestore.Timestamp.now()
   }, { merge: true });
@@ -4210,6 +4374,12 @@ async function createMemberWithKey(member) {
     memberKey: key,
     memberKeyHash: hash,
     updatedAt: Date.now()
+  });
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — routing-only ইনডেক্স,
+  // কোনো authorization field না। firestore.rules-এ ইতিমধ্যে implement করা
+  // আছে(cross-member injection-protected, duplicate-hash auto-block)।
+  batch.set(db.collection("families").doc(getFamilyId()).collection("keyIndex").doc(hash), {
+    memberId: id
   });
   stampLastActive(batch, null, getFamilyId());
   await batch.commit();
@@ -4223,18 +4393,39 @@ async function fetchMemberKey(memberId) {
 }
 // Key পরিবর্তন(owner অথবা admin) — নতুন key generate করে plaintext+hash
 // দুটোই আপডেট, পুরনো key নিষ্ক্রিয় হয়ে যায়।
-async function changeMemberKey(memberId) {
-  const key = generateMemberKeyPlain();
+async function changeMemberKey(memberId, customKey) {
+  const key = (customKey && customKey.trim()) ? customKey.trim() : generateMemberKeyPlain();
   const hash = await sha256Hex(key);
-  // set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর আগে
-  // তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
-  // "No document to update" error দিত)। merge:true দিয়ে create ও
-  // overwrite দুই ক্ষেত্রেই কাজ করবে।
-  await memberPrivateKeyRef(memberId).set({
-    memberKey: key,
-    memberKeyHash: hash,
-    updatedAt: Date.now()
-  }, { merge: true });
+  const privateRef = memberPrivateKeyRef(memberId);
+  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
+  const newIndexRef = keyIndexColl.doc(hash);
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 2) — transaction:
+  // পুরনো keyIndex delete → key update → নতুন keyIndex create(duplicate-hash
+  // check সহ)। set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর
+  // আগে তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
+  // "No document to update" error দিত)। merge:true দিয়ে create ও overwrite
+  // দুই ক্ষেত্রেই কাজ করবে।
+  await db.runTransaction(async tx => {
+    const oldSnap = await tx.get(privateRef);
+    const oldHash = oldSnap.exists ? oldSnap.data().memberKeyHash : null;
+    // নতুন hash আগের hash-এর সমান না হলে(সাধারণ ক্ষেত্র) duplicate-check —
+    // hash collision(অন্য member-এর keyIndex দখল) এড়াতে read করা হচ্ছে।
+    if (oldHash !== hash) {
+      const dupSnap = await tx.get(newIndexRef);
+      if (dupSnap.exists) {
+        throw new Error("key-collision");
+      }
+    }
+    tx.set(privateRef, {
+      memberKey: key,
+      memberKeyHash: hash,
+      updatedAt: Date.now()
+    });
+    tx.set(newIndexRef, { memberId });
+    if (oldHash && oldHash !== hash) {
+      tx.delete(keyIndexColl.doc(oldHash));
+    }
+  });
   return key;
 }
 // Member Key দিয়ে claim(existing member-এর ownership ফিরে পাওয়া) —
@@ -4242,24 +4433,32 @@ async function changeMemberKey(memberId) {
 // hidden memberKeyHash-এর সাথে মিলিয়ে ownerUids বদলানোর অনুমতি দেয়।
 // §Multi-device(v2-only, max 3): single ownerUid overwrite-এর বদলে এখন
 // transaction দিয়ে বর্তমান ownerUids পড়ে, ৩টির কম থাকলে/এই uid ইতিমধ্যে
-// থাকলে(no-op duplicate-prevention) append করা হয়; ৩টি পূর্ণ থাকলে এবং
-// এই uid নতুন হলে নির্ধারিত বার্তা সহ reject(Rules-এও একই limit
-// enforce করা হয়, এটা শুধু ভালো UX-এর জন্য client-side pre-check)।
-async function claimMemberWithKey(memberId, enteredKey, uid) {
+// থাকলে(no-op duplicate-prevention) append করা হয়।
+// §Admin FIFO(১৯ আগস্ট ২০২৬, ৭-দিন threshold তুলে দেওয়া হয়েছে): আগে
+// admin পূর্ণ(৩) থাকলে সবসময় hard-reject হতো, তারপর ৭-দিন-stale gate
+// যোগ হয়েছিল — এখন সেই সময়-শর্ত সম্পূর্ণ সরানো হয়েছে(owner-সিদ্ধান্ত)।
+// non-admin-এর মতোই unconditional FIFO: stalest ownerActivity বাদ দিয়ে
+// নতুন device যোগ হয়। ব্যতিক্রম শুধু firstAdminUid — নিচের stale-uid
+// নির্বাচনের সময় candidate থেকে বাদ রাখা হয়, ফলে সে কখনো evict-attempt
+// হয় না(rules-এর family-root swap clause-ও আলাদাভাবে একই সুরক্ষা দেয়)।
+async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
-  const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(memberId);
-  const famRef = db.collection("families").doc(getFamilyId());
+  const targetFamilyId = familyIdOverride || getFamilyId();
+  const memberRef = db.collection("families").doc(targetFamilyId).collection("members").doc(memberId);
+  const famRef = db.collection("families").doc(targetFamilyId);
+  let attemptedAdminEviction = false;
   try {
     const hash = await sha256Hex(trimmed);
-    let limitReached = false;
     let wasReplaced = false;
+    let outerEvictedUid = null;
     await db.runTransaction(async tx => {
       // transaction contention হলে callback retry হতে পারে — প্রতি
       // attempt-এ flag reset জরুরি, নাহলে আগের ব্যর্থ attempt-এর stale
       // মান থেকে যেতে পারে।
-      limitReached = false;
       wasReplaced = false;
+      attemptedAdminEviction = false;
+      outerEvictedUid = null;
       const snap = await tx.get(memberRef);
       const data = snap.exists ? snap.data() : {};
       // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
@@ -4267,11 +4466,13 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         ? data.ownerUids
         : (data.ownerUid ? [data.ownerUid] : []);
       // §Hybrid Admin Role Model — role(authoritative) already এই একই
-      // transaction-এ পড়া member doc-এ আছে, তাই নতুন get() লাগে না। নতুন
-      // uid যদি নতুন যোগ হয়(duplicate না) এবং member আগে থেকেই
-      // role:"admin" হয়, তাহলে একই transaction-এ family.adminUids-এও
-      // conditionally sync — role field কখনো touch হয় না(শুধু index-sync)।
+      // transaction-এ পড়া member doc-এ আছে, তাই নতুন get() লাগে না।
       const isAdminRole = data.role === "admin";
+      // Firestore transaction rule: সব read অবশ্যই write-এর আগে হতে হবে
+      // — তাই admin হলে family doc(adminUids sync-এর জন্য লাগবে) এখানেই,
+      // কোনো write শুরুর আগেই read করা হচ্ছে।
+      const famSnap = isAdminRole ? await tx.get(famRef) : null;
+
       if (currentOwners.includes(uid)) {
         // এই uid ইতিমধ্যে owner — duplicate নয়, শুধু key-verify + activity stamp।
         tx.update(memberRef, {
@@ -4282,35 +4483,36 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
         });
         return;
       }
-      // FIFO replace(১৭ আগস্ট ২০২৬, ownerActivity-ভিত্তিক আপডেট): password
-      // সঠিক প্রমাণিত হলে ৩টি পূর্ণ থাকা অবস্থায়ও সবচেয়ে stale uid বাদ
-      // দিয়ে বর্তমান uid যোগ করা হয় — শুধু non-admin member-এর ক্ষেত্রে।
-      // "stale" এখন ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো
-      // entry থেকে নির্ণয় করা হয় (ownerUids[0] শুধু "প্রথমে claim করা"
-      // বোঝাত, real recency না — আগে এটাই ভুল ভিত্তি ছিল)। ownerActivity-তে
-      // entry না থাকা uid সবচেয়ে stale ধরা হয় (timestamp 0)। admin
-      // member(role:"admin")-এর জন্য FIFO প্রযোজ্য না, কারণ family.adminUids
-      // থেকে single-uid অপসারণ কোনো existing rule-clause সমর্থন করে না —
-      // জোর করে চেষ্টা করলে rules পুরো transaction reject করে দিত। তাই
-      // admin পূর্ণ(৩) থাকলে আগের মতোই reject, admin নিজে Force-Release করবেন।
-      if (currentOwners.length >= 3 && isAdminRole) {
-        limitReached = true;
-        return; // কোনো write হবে না — admin-এর জন্য FIFO প্রযোজ্য না
-      }
+      // FIFO replace(ownerActivity-ভিত্তিক): password সঠিক প্রমাণিত হলে
+      // ৩টি পূর্ণ থাকা অবস্থায়ও সবচেয়ে stale uid বাদ দিয়ে বর্তমান uid
+      // যোগ করা হয় — member ও admin উভয়ের ক্ষেত্রেই একই গণনা(নিচে)।
+      // "stale" ownerActivity map(uid→timestamp)-এর সবচেয়ে পুরনো entry
+      // থেকে নির্ণয় করা হয়; entry না থাকা uid সবচেয়ে stale ধরা হয়
+      // (timestamp 0)। admin-এর ক্ষেত্রে firstAdminUid(§First Admin
+      // Protection, ১৯ আগস্ট ২০২৬)-কে candidate থেকে বাদ রাখা হয়, যাতে
+      // সে কখনো evict-attempt না হয়(rules-এর family-root swap clause-ও
+      // আলাদাভাবে একই সুরক্ষা দেয় — এটি defense-in-depth, single-source
+      // নয়)। firstAdminUid ছাড়া বাকি সব uid-ই এখন non-admin-এর মতো
+      // unconditional FIFO eligible(কোনো সময়-শর্ত নেই)।
       let revoked = false;
       let nextOwners = [...currentOwners, uid];
       let evictedUid = null;
       if (currentOwners.length >= 3) {
         const ownerActivity = data.ownerActivity || {};
-        let staleUid = currentOwners[0];
+        const firstAdminUid = isAdminRole && famSnap && famSnap.data() ? famSnap.data().firstAdminUid : null;
+        const evictionCandidates = (isAdminRole && firstAdminUid)
+          ? currentOwners.filter(u => u !== firstAdminUid)
+          : currentOwners;
+        let staleUid = evictionCandidates[0];
         let staleTs = tsToMillis(ownerActivity[staleUid]);
-        for (const ou of currentOwners) {
+        for (const ou of evictionCandidates) {
           const ts = tsToMillis(ownerActivity[ou]);
           if (ts < staleTs) { staleTs = ts; staleUid = ou; }
         }
         nextOwners = currentOwners.filter(u => u !== staleUid).concat([uid]);
         revoked = true;
         evictedUid = staleUid;
+        if (isAdminRole) attemptedAdminEviction = true;
       }
       const updatePayload = {
         ownerUids: nextOwners,
@@ -4323,25 +4525,80 @@ async function claimMemberWithKey(memberId, enteredKey, uid) {
       if (evictedUid) updatePayload[`ownerActivity.${evictedUid}`] = firebase.firestore.FieldValue.delete();
       tx.update(memberRef, updatePayload);
       if (isAdminRole) {
-        // isAdminRole হলে revoked সবসময় false(উপরের early-return দিয়ে
-        // নিশ্চিত) — তাই এখানে শুধু plain additive arrayUnion, যা
-        // family-root self-claim rule(hasAll+size+1)-এর সাথে মেলে।
+        // family.adminUids index — এখানে explicit পুরো array লেখা হচ্ছে
+        // (arrayUnion+arrayRemove একই field-এ একই write-এ combine করা
+        // যায় না বলে)। evictedUid থাকলে(swap) সেটা বাদ দিয়ে caller uid
+        // যোগ; না থাকলে(plain add, ৩-এর কম owners ছিল) শুধু যোগ।
+        const currentAdminUids = Array.isArray(famSnap && famSnap.data() && famSnap.data().adminUids)
+          ? famSnap.data().adminUids
+          : [];
+        let nextAdminUids = evictedUid
+          ? currentAdminUids.filter(u => u !== evictedUid)
+          : currentAdminUids;
+        if (!nextAdminUids.includes(uid)) nextAdminUids = [...nextAdminUids, uid];
         tx.update(famRef, {
-          adminUids: firebase.firestore.FieldValue.arrayUnion(uid),
+          adminUids: nextAdminUids,
           updatedAt: Date.now(),
           lastAdminClaimMemberId: memberId
         });
       }
       if (revoked) wasReplaced = true;
+      outerEvictedUid = evictedUid;
     });
-    if (limitReached) {
-      return { ok: false, reason: "limit" };
-    }
-    return { ok: true, revoked: wasReplaced };
+    return { ok: true, revoked: wasReplaced, evictedUid: outerEvictedUid };
   } catch (err) {
-    // ভুল key হলে Rules reject করবে(permission-denied) — এটাই স্বাভাবিক।
-    return { ok: false, reason: "denied", error: err.message };
+    // ভুল Member Password হলে Rules permission-denied ছোঁড়ে(reject)।
+    // adminEvictionAttempt flag এখনো ফেরত দেওয়া হয়(future-diagnostic/
+    // debugging-এ কাজে লাগতে পারে) কিন্তু UI আর এটি আলাদাভাবে ব্যবহার
+    // করে না(১৯ আগস্ট ২০২৬, ৭-দিন gate সরানোর পর generic বার্তাই যথেষ্ট)।
+    return { ok: false, reason: "denied", error: err.message, adminEvictionAttempt: attemptedAdminEviction };
   }
+}
+// §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — Family Code + Member
+// Password একসাথে দিয়ে সরাসরি login(member নাম বেছে নেওয়ার প্রয়োজন নেই)।
+// পুরো ফাংশন non-committing পর্যন্ত claim সফল না হয়: family resolve ও
+// keyIndex lookup কোনোটাই localStorage/reload স্পর্শ করে না। শুধু
+// keyIndex hit + claimMemberWithKey() সফল হলেই family state
+// commit(localStorage)+reload হয় — miss বা ভুল password হলে কলার একই
+// screen-এ থেকে generic error দেখাবে, বিদ্যমান family/session অক্ষত থাকে।
+async function directIdentifyLogin(code, password) {
+  const normalizedCode = (code || "").trim();
+  const pw = (password || "").trim();
+  if (!normalizedCode || !pw) return { ok: false, reason: "empty" };
+  const resolved = await resolveFamilyIdFromCode(normalizedCode);
+  // §Diagnostic(২০ আগস্ট ২০২৬, temporary): আগে সব ব্যর্থতা generic "invalid"-এ
+  // চাপা পড়ত, ফলে keyIndex-miss vs claim-denied vs family-not-found আলাদা
+  // করা UI থেকে অসম্ভব ছিল — এখন প্রতিটি ব্যর্থতার নির্দিষ্ট debugTag পাঠানো
+  // হচ্ছে(শুধু onboarding error-এ দেখানোর জন্য, kill/production sensitive না)।
+  if (!resolved.ok) return { ok: false, reason: "invalid", debugTag: "family:" + resolved.reason };
+  let memberId = null;
+  let keyIndexErr = null;
+  try {
+    const hash = await sha256Hex(pw);
+    const idxSnap = await db.collection("families").doc(resolved.familyId)
+      .collection("keyIndex").doc(hash).get();
+    if (idxSnap.exists) memberId = idxSnap.data() ? idxSnap.data().memberId : null;
+  } catch (e) {
+    memberId = null; // permission-denied/network — miss হিসেবেই treat, কোনো commit না
+    keyIndexErr = e && e.message;
+  }
+  if (!memberId) return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss" };
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  if (!uid) return { ok: false, reason: "invalid", debugTag: "no-uid" };
+  const claimResult = await claimMemberWithKey(memberId, pw, uid, resolved.familyId);
+  if (!claimResult || !claimResult.ok) return { ok: false, reason: "invalid", debugTag: "claim:" + ((claimResult && claimResult.error) || "unknown") };
+  // সফল claim — এখনই family state commit + reload।
+  localStorage.setItem("family_id", resolved.familyId);
+  localStorage.setItem("family_code", normalizedCode);
+  localStorage.setItem("family_code_is_custom", "1");
+  if (isGoogleLinked()) {
+    try { await saveUserFamilyCode(uid, normalizedCode, memberId); } catch {}
+  }
+  window.location.reload();
+  return { ok: true };
+}
+if (typeof window !== "undefined") {
+  window.directIdentifyLogin = directIdentifyLogin;
 }
 // One-time migration: if no v2 (member:*) docs exist yet but a legacy v1
 // array-doc has members, copy each into its own v2 doc as "unclaimed"
@@ -4470,6 +4727,28 @@ function StarMark({
     d: "M12 1L14.6 8.2L22 8.5L16.2 13.3L18.2 21L12 16.8L5.8 21L7.8 13.3L2 8.5L9.4 8.2L12 1Z",
     fill: color
   }));
+}
+// একই logo asset(logo.png, root-এ deploy করা) reusable component হিসেবে
+// ব্যবহার হয় — Main Dashboard header ও Onboarding welcome page, দুই
+// জায়গাতেই। ভবিষ্যতে লোগো বদলাতে হলে শুধু logo.png ফাইল replace করলেই
+// দুই জায়গায় আপডেট হয়ে যাবে।
+function AppLogo({
+  size = 32,
+  className = ""
+}) {
+  return /*#__PURE__*/React.createElement("img", {
+    src: "logo.png",
+    alt: "Daily Task",
+    width: size,
+    height: size,
+    className: className,
+    style: {
+      width: size,
+      height: size,
+      objectFit: "contain",
+      flexShrink: 0
+    }
+  });
 }
 function BoolToggle({
   value,
@@ -4712,8 +4991,17 @@ function App() {
   // তৈরি member) — এই অবস্থাকে "এখনো লোড হচ্ছে"(null) থেকে আলাদা করতে।
   const [memberKeyLoading, setMemberKeyLoading] = useState(false);
   const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
+  const [showChangeKeyForm, setShowChangeKeyForm] = useState(false);
   const [memberKeyBusy, setMemberKeyBusy] = useState(false);
   const [copiedMemberKey, setCopiedMemberKey] = useState(false);
+  // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
+  // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
+  const [manualKeyInput, setManualKeyInput] = useState("");
+  // §Password UI revamp(২০ আগস্ট ২০২৬): oldKeyInput এখন "পূর্বের Password
+  // verify" এর বদলে confirm-password ঘর হিসেবে reuse হচ্ছে — পূর্বের
+  // password শুধু masked display(readonly), যাচাই করার প্রয়োজন নেই(owner
+  // নিজে ঠিক করেছেন — এই অ্যাপ শুধু daily-amal ট্র্যাকার, risk গ্রহণযোগ্য)।
+  const [confirmKeyInput, setConfirmKeyInput] = useState("");
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
   const [claimKeyInput, setClaimKeyInput] = useState("");
@@ -4747,7 +5035,12 @@ function App() {
   }
   useEffect(() => {
     if (onbFlow && !onbStep) {
-      onbAdvance(onbFlow === "newFamily" ? "addMember" : "choose");
+      // বাগ-ফিক্স(২০ আগস্ট ২০২৬): নতুন page-2(Onboarding()) নিজেই
+      // Google/Login/Join-এর choice দেয় বলে "choose"(পুরনো ৩য় পেজ) আর
+      // দরকার নেই — "existingFamily" flow(join-as-new-member ও Google
+      // fallback উভয়ই) সরাসরি "becomeMember"-এ যায়। "choose" definition
+      // এখনো আছে শুধু becomeMember-cancel fallback-এর safety-net হিসেবে(নিচে)।
+      onbAdvance(onbFlow === "newFamily" ? "addMember" : "becomeMember");
     }
   }, [onbFlow]);
   const [showMemberRequestsModal, setShowMemberRequestsModal] = useState(false);
@@ -4800,8 +5093,20 @@ function App() {
   // discarding them — mirrors the existing meetingDirtyRef pattern.
   const entryDirtyRef = useRef(false);
   const weeklyDirtyRef = useRef(false);
+  // Auto-update reload(fresh-load-only, dt-sw-updated event — dispatch হয়
+  // top-level SW-registration কোড থেকে, দেখুন ফাইলের শুরুর দিকে)। Unsaved
+  // entry/weekly/meeting থাকলে reload skip করা হয়(data-loss এড়াতে); পরের
+  // স্বাভাবিক নেভিগেশন/reload-এ আপডেট এমনিতেই প্রযোজ্য হয়ে যাবে।
+  useEffect(() => {
+    const handler = () => {
+      const hasUnsaved = entryDirtyRef.current || weeklyDirtyRef.current || meetingDirtyRef.current;
+      if (hasUnsaved) return;
+      window.location.reload();
+    };
+    window.addEventListener("dt-sw-updated", handler);
+    return () => window.removeEventListener("dt-sw-updated", handler);
+  }, []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
   // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
@@ -5049,7 +5354,7 @@ function App() {
                       .collection("notifications").add({
                         targetUid: adminUid,
                         type: "device_joined",
-                        message: "একটি নতুন ডিভাইস Family Code দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
+                        message: "একটি নতুন ডিভাইস Family Username দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
                         createdAt: Date.now(),
                         read: false
                       }).catch(() => {})
@@ -5119,14 +5424,8 @@ function App() {
     };
   }, []);
   const [recoveryMessage, setRecoveryMessage] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [weeklyReminderBanner, setWeeklyReminderBanner] = useState(false);
   const [monthlyReminderBanner, setMonthlyReminderBanner] = useState(false);
-  useEffect(() => {
-    const handler = () => setUpdateAvailable(true);
-    window.addEventListener("dt-update-available", handler);
-    return () => window.removeEventListener("dt-update-available", handler);
-  }, []);
   useEffect(() => {
     const lastActive = localStorage.getItem("last_active_date");
     const todayKey = dateKey(new Date());
@@ -5382,7 +5681,7 @@ function App() {
           await navigator.share({
             files: [file],
             title: "Daily Task ব্যাকআপ",
-            text: `Daily Task ডাটা ব্যাকআপ — ${fileName}`
+            text: `Daily Task ডেটা ব্যাকআপ — ${fileName}`
           });
           return;
         }
@@ -5400,7 +5699,7 @@ function App() {
       downloadAnchor.click();
       downloadAnchor.remove();
     } catch (err) {
-      alert("ডাটা এক্সপোর্ট করতে সমস্যা হয়েছে: " + err.message);
+      alert("ডেটা এক্সপোর্ট করতে সমস্যা হয়েছে: " + err.message);
     }
   }
   // --- Google Drive Backup/Restore UI handlers ---
@@ -5505,7 +5804,7 @@ function App() {
     setDriveRestoreBusy(true);
     try {
       await restoreFromGoogleDrive(driveRestoreCandidate.id, migrationState);
-      window.alert("Google Drive থেকে ডাটা সফলভাবে রিস্টোর (মার্জ) করা হয়েছে।");
+      window.alert("Google Drive থেকে ডেটা সফলভাবে রিস্টোর (মার্জ) করা হয়েছে।");
       window.location.reload();
     } catch (err) {
       alert("রিস্টোর করতে সমস্যা হয়েছে: " + err.message);
@@ -5548,9 +5847,9 @@ function App() {
           // (mergeBackupData()-এর ভেতরেই)।
           const result = await mergeBackupData(migrationState, parsed.data, { compareUpdatedAt: false });
           if (result.skippedKeys.length) {
-            alert(`ডাটা ইম্পোর্ট হয়েছে। তবে ${result.skippedKeys.length}টি এন্ট্রি স্কিপ করা হয়েছে, কারণ সেগুলো অন্য ডিভাইসের দায়িত্বে থাকা সদস্যের — সেগুলো সেই সদস্যের নিজের ডিভাইস থেকে ইম্পোর্ট করতে হবে।`);
+            alert(`ডেটা ইম্পোর্ট হয়েছে। তবে ${result.skippedKeys.length}টি এন্ট্রি স্কিপ করা হয়েছে, কারণ সেগুলো অন্য ডিভাইসের দায়িত্বে থাকা সদস্যের — সেগুলো সেই সদস্যের নিজের ডিভাইস থেকে ইম্পোর্ট করতে হবে।`);
           } else {
-            alert("ডাটা সফলভাবে ইম্পোর্ট করা হয়েছে!");
+            alert("ডেটা সফলভাবে ইম্পোর্ট করা হয়েছে!");
           }
           window.location.reload();
         } catch (err) {
@@ -5643,14 +5942,14 @@ function App() {
     const code = newFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
-    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
     setNewFamCodeBusy(true);
     try {
       const result = await createNewFamily(code);
@@ -5677,7 +5976,7 @@ function App() {
   async function handleJoinExistingFamily() {
     const code = joinFamCodeInput.trim();
     if (!code) return;
-    if (!window.confirm(`"${code}" কোড দিয়ে সেই ফ্যামিলিতে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সেই ফ্যামিলিতে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
     setJoinFamCodeBusy(true);
     try {
       const result = await joinExistingFamily(code);
@@ -5703,14 +6002,14 @@ function App() {
     const code = renameFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি কোড কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি কোডে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
       return;
     }
-    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডাটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
+    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডেটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
     setRenameFamCodeBusy(true);
     try {
       const result = await changeFamilyCodeForExistingFamily(code);
@@ -5755,7 +6054,7 @@ function App() {
         body: JSON.stringify({
           access_key: WEB3FORMS_ACCESS_KEY,
           subject: "Daily Task App — নতুন পরামর্শ",
-          message: feedbackMsg
+          message: `${feedbackMsg}\n\nFamily Username: ${getFamilyCode()}`
         })
       });
       const result = await res.json();
@@ -5942,7 +6241,7 @@ function App() {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
     }
-    const ok = window.confirm(`আপনি কি নিশ্চিত "${m.name}" কে সদস্য তালিকা থেকে বাদ দিতে চান? এই সদস্যের নাম আর দেখা যাবে না, তবে পূর্বের সেভ করা ডাটা মুছে যাবে না।`);
+    const ok = window.confirm(`আপনি কি নিশ্চিত "${m.name}" কে সদস্য তালিকা থেকে বাদ দিতে চান? এই সদস্যের নাম আর দেখা যাবে না, তবে পূর্বের সেভ করা ডেটা মুছে যাবে না।`);
     if (!ok) return;
     const next = (members || []).filter(x => x.id !== m.id);
     setMembers(next);
@@ -5987,6 +6286,15 @@ function App() {
   // অনুমতি দেয় (isAdminOfFamily শাখা) — তাই কোনো Rules পরিবর্তন লাগেনি,
   // শুধু existing releaseMemberDoc() reuse করা হচ্ছে admin path থেকে।
   async function handleAdminForceRelease(m) {
+    // §First Admin Protection(Force-Release, ১৯ আগস্ট ২০২৬) — client-side
+    // pre-check(UX-এর জন্য, Rules-level protection এখনো ব্যাকলগে)। প্রথম
+    // Admin-কে অন্য কোনো admin force-release করতে পারবেন না, শুধু তিনি
+    // নিজে(Self-demote/নিজ ডিভাইস থেকে normal release দিয়ে) পারবেন।
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (firstAdminUid && m.ownerUids && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
+      alert("প্রথম এডমিনের দায়িত্ব অন্য কোনো এডমিন জোরপূর্বক মুক্ত করতে পারবেন না — শুধু তিনি নিজেই তার ডিভাইস থেকে ছাড়তে পারেন।");
+      return;
+    }
     if (isLockedForSwitch) {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
@@ -6183,16 +6491,8 @@ function App() {
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
   // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
   async function handleFullLogout() {
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    const amAdmin = !!(myUid && adminUidsList.includes(myUid));
     const wasGoogleLinked = isGoogleLinked();
-    if (amAdmin && !wasGoogleLinked) {
-      const warnOk = window.confirm("⚠️ আপনি এই পরিবারের এডমিন এবং আপনার Google অ্যাকাউন্ট সংযুক্ত নেই। লগআউট করলে নতুন ডিভাইস/session থেকে আবার এডমিন অ্যাক্সেস ফিরে পেতে সমস্যা হতে পারে। আগে Google অ্যাকাউন্ট সংযুক্ত করার পরামর্শ দেওয়া হচ্ছে (Recovery Key দিয়েও ফিরে পাওয়া যাবে)। তারপরও কি লগআউট করতে চান?");
-      if (!warnOk) return;
-      const confirmAgainOk = window.confirm("আপনি নিশ্চিত? এডমিন হিসেবে Google-link ছাড়া লগআউট করলে re-access জটিল হতে পারে। চূড়ান্তভাবে আগাতে চান?");
-      if (!confirmAgainOk) return;
-    }
-    const ok = window.confirm("আপনি লগআউট করলে এই ডিভাইস থেকে family code ও Google session — দুটোই মুছে যাবে। আবার প্রবেশ করতে Family Code লাগবে। আগান?");
+    const ok = window.confirm("লগ আউট করবেন নিশ্চিত?");
     if (!ok) return;
     try {
       if (wasGoogleLinked) {
@@ -6271,7 +6571,7 @@ function App() {
       // বজায় রাখে, তাই সদস্যদের এডিট-অধিকার অক্ষুণ্ণ থাকে।
       await unlinkGoogleAccount();
       setShowDeleteAccountWarning(false);
-      window.alert("গুগল অ্যাকাউন্ট সফলভাবে রিমুভ করা হয়েছে এবং সাইন আউট সম্পন্ন হয়েছে। আপনার অ্যাপের সম্পূর্ণ ডাটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত আছে।");
+      window.alert("গুগল অ্যাকাউন্ট সফলভাবে রিমুভ করা হয়েছে এবং সাইন আউট সম্পন্ন হয়েছে। আপনার অ্যাপের সম্পূর্ণ ডেটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত আছে।");
       window.location.reload();
     } catch (err) {
       window.alert("একাউন্ট ডিলিট করতে সমস্যা হয়েছে: " + (err && err.message));
@@ -6324,7 +6624,7 @@ function App() {
       setSavedTick(true);
       setTimeout(() => setSavedTick(false), 1600);
     } catch (err) {
-      alert("ডাটা সেভ করতে সমস্যা হয়েছে: " + err.message);
+      alert("ডেটা সেভ করতে সমস্যা হয়েছে: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -6387,6 +6687,195 @@ function App() {
     color: "var(--theme-primary)",
     size: 32
   }));
+  // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
+  // মোডাল আগে শুধু Dashboard-এর মূল JSX-এর ভিতরে বাঁধা ছিল, তাই early-
+  // return branch-এ(নিচে) কখনো render হতো না — ফলে Google Sign-in ধাপে
+  // সাদা পেজ এবং keyClaim ধাপে নাম ক্লিক করলে কিছু হতো না। এখন একবার
+  // variable-এ বের করে দুই জায়গাতেই(early-return branch + নিচের আগের
+  // অবস্থান) reuse করা হচ্ছে — কোনো নতুন logic/state/collection নেই।
+  const googleAccountModalNode = showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
+    onClose: () => setShowGoogleAccountModal(false),
+    onLinked: checkDriveBackupAfterLink
+  });
+  const claimKeyModalNode = showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-emerald-900 mb-1"
+  }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডেটা/পরিচয় ফিরে আসবে।"),
+  /*#__PURE__*/React.createElement("form", {
+    // §Notification simplification + Password Autofill(১৯ আগস্ট ২০২৬):
+    // (১) FIFO/admin-eviction alert বাদ(owner-সিদ্ধান্ত, নিচে দ্রষ্টব্য)।
+    // (২) <form onSubmit> ব্যবহার করা হচ্ছে যাতে browser-এর native
+    // password manager submit event দেখে save-prompt দেখাতে পারে(custom
+    // storage/localStorage নেই — শুধু standard form+autocomplete)।
+    onSubmit: async e => {
+      e.preventDefault();
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      if (!uid || claimKeyBusy || !claimKeyInput.trim()) return;
+      setClaimKeyBusy(true);
+      try {
+        const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
+        if (res.ok) {
+          setMembers(prev => prev.map(x => {
+            if (x.id !== claimKeyTarget.id) return x;
+            const owners = Array.isArray(x.ownerUids)
+              ? x.ownerUids
+              : (x.ownerUid ? [x.ownerUid] : []);
+            const nextOwners = owners.includes(uid)
+              ? owners
+              : (res.revoked ? [...owners.filter(o => o !== res.evictedUid), uid] : [...owners, uid]);
+            return { ...x, ownerUids: nextOwners };
+          }));
+          setShowClaimKeyModal(false);
+          setClaimKeyInput("");
+          setClaimKeyTarget(null);
+          // FIFO replace(admin বা non-admin) হলেও(res.revoked) আলাদা
+          // alert দেখানো হয় না(owner-সিদ্ধান্ত, ১৯ আগস্ট ২০২৬) — সফল
+          // claim silent থাকে।
+          // §Member Key Direct-Identify(touch-point 3) — Google-linked হলে
+          // পরবর্তী one-click Google sign-in-এর জন্য memberId mapping save
+          // (best-effort, non-blocking)।
+          if (isGoogleLinked()) {
+            saveUserFamilyCode(uid, getFamilyCode(), claimKeyTarget.id).catch(() => {});
+          }
+        } else {
+          alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
+        }
+      } finally {
+        setClaimKeyBusy(false);
+      }
+    }
+  },
+  /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    name: "username",
+    autoComplete: "username",
+    value: getFamilyCode(),
+    readOnly: true,
+    tabIndex: -1,
+    "aria-hidden": "true",
+    style: { position: "absolute", width: "1px", height: "1px", padding: 0, margin: "-1px", overflow: "hidden", clip: "rect(0,0,0,0)", border: 0 }
+  }),
+  /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    name: "current-password",
+    autoComplete: "current-password",
+    value: claimKeyInput,
+    onChange: e => setClaimKeyInput(e.target.value),
+    placeholder: "Member Password",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: claimKeyBusy || !claimKeyInput.trim(),
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowClaimKeyModal(false);
+      setClaimKeyInput("");
+    },
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল")))));
+  // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
+  // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
+  // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
+  // "becomeMember" অবস্থায় early-return branch-এ এটি render হতো না এবং
+  // সাদা পেজ দেখাতো। এখন একই pattern-এ variable-এ বের করে দুই জায়গাতেই
+  // reuse করা হচ্ছে — কোনো নতুন logic/state নেই।
+  const becomeMemberModalNode = showBecomeMemberModal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800"
+  }, "সদস্য হোন"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBecomeMemberModal(false)
+  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
+  /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 mb-3"
+  }, "আপনার নাম দিন — এডমিন অনুমোদন করলে আপনি এই পরিবারের একজন সদস্য হিসেবে যুক্ত হবেন।"),
+  /*#__PURE__*/React.createElement("input", {
+    value: becomeMemberName,
+    onChange: e => setBecomeMemberName(e.target.value),
+    placeholder: "আপনার নাম...",
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-2"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: becomeMemberGender,
+    onChange: e => setBecomeMemberGender(e.target.value),
+    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3"
+  }, /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"), /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")),
+  /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: becomeMemberBusy || !becomeMemberName.trim(),
+    onClick: async () => {
+      const name = becomeMemberName.trim();
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      if (!name || !uid) return;
+      setBecomeMemberBusy(true);
+      try {
+        await db.collection("families").doc(getFamilyId())
+          .collection("memberRequests").doc(uid)
+          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now() });
+        setMyMemberRequestStatus("pending");
+        setShowBecomeMemberModal(false);
+        setBecomeMemberName("");
+        try {
+          await Promise.all((adminUidsList || []).map(adminUid =>
+            db.collection("families").doc(getFamilyId())
+              .collection("notifications").add({
+                targetUid: adminUid,
+                type: "member_request",
+                message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
+                createdAt: Date.now(),
+                read: false
+              }).catch(() => {})
+          ));
+        } catch {}
+      } catch (err) {
+        alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
+      } finally {
+        setBecomeMemberBusy(false);
+      }
+    },
+    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
+  }, becomeMemberBusy ? "পাঠানো হচ্ছে..." : "অনুরোধ পাঠান"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBecomeMemberModal(false),
+    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
+  }, "বাতিল"))));
+  // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
+  // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
+  // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
+  // হলেই(সফল Google/Member-Password/approved onboarding) onbStep null
+  // হয়ে স্বাভাবিক Dashboard render হবে।
+  if (onbStep) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
+    flow: onbFlow,
+    step: onbStep,
+    onAdvance: onbAdvance,
+    isAdmin: isAdmin,
+    myUid: auth.currentUser ? auth.currentUser.uid : null,
+    familyCode: getFamilyCode(),
+    members: members,
+    setMembers: setMembers,
+    setSelectedId: setSelectedId,
+    showGoogleAccountModal: showGoogleAccountModal,
+    setShowGoogleAccountModal: setShowGoogleAccountModal,
+    showBecomeMemberModal: showBecomeMemberModal,
+    setShowBecomeMemberModal: setShowBecomeMemberModal,
+    showClaimKeyModal: showClaimKeyModal,
+    setClaimKeyTarget: setClaimKeyTarget,
+    setShowClaimKeyModal: setShowClaimKeyModal,
+    myMemberRequestStatus: myMemberRequestStatus
+  }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -6397,7 +6886,7 @@ function App() {
     style: { color: "var(--theme-primary)", fontFamily: "'Noto Serif Bengali', serif" }
   }, "অনুমোদনের অপেক্ষায়"), /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-gray-600 max-w-xs"
-  }, "এই পরিবারের ডাটা দেখতে এডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
+  }, "এই পরিবারের ডেটা দেখতে এডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
     className: "px-4 py-2 rounded-2xl border shadow-sm bg-white",
     style: { color: "var(--theme-primary)" },
     onClick: () => window.location.reload()
@@ -6737,8 +7226,8 @@ function App() {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2.5"
-  }, /*#__PURE__*/React.createElement(StarMark, {
-    size: 22
+  }, /*#__PURE__*/React.createElement(AppLogo, {
+    size: 34
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
     className: "text-xl font-bold tracking-tight",
     style: {
@@ -6787,17 +7276,39 @@ function App() {
     title: isCustomFamilyCode ? codeRevealed ? "লুকাতে ট্যাপ করুন" : "দেখতে ট্যাপ করুন" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     className: "tracking-wide select-none"
-  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("button", {
+  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-2 shrink-0 ml-2"
+  }, copiedCode && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] text-emerald-600 font-bold shrink-0"
+  }, "কপি হয়েছে!"), isCustomFamilyCode && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setCodeRevealed(v => !v);
+    },
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
+    title: codeRevealed ? "লুকান" : "দেখুন"
+  }, codeRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 13 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 13 })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      handleCopyCode();
+    },
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
+    title: "কপি করুন"
+  }, /*#__PURE__*/React.createElement(CopyIcon, {
+    size: 13
+  })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
       setShowFamilyCodeChoiceModal(true);
       setIsMenuOpen(false);
     },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0 ml-2",
-    title: "ফ্যামিলি কোড পরিবর্তন করুন"
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
+    title: "ফ্যামিলি ইউজারনেম পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
@@ -6887,48 +7398,10 @@ function App() {
     title: "সদস্য বাদ দিন"
   }, /*#__PURE__*/React.createElement(Trash, {
     size: 12
-  })))))), !addingMember ? (() => {
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    const iAlreadyHaveMember = !!(myUid && (members || []).some(x => x.ownerUids?.includes(myUid)));
-    // §Member Key সেশন: শুধু Admin সরাসরি member যোগ করতে পারবেন(v2)।
-    // Non-admin ইতিমধ্যে নিজের member থাকলে বাটন দরকার নেই; pending
-    // request থাকলে status দেখানো হবে; নাহলে "সদস্য হোন" দিয়ে অনুরোধ।
-    const canDirectAdd = isAdmin || migrationState !== "v2";
-    return /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-1 mt-1"
-    }, canDirectAdd ? /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setAddingMember(true);
-        setIsMenuOpen(false);
-      },
-      className: "flex-1 text-left px-4 py-1.5 text-emerald-800 font-bold hover:bg-slate-50 flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(Plus, {
-      size: 14
-    }), " নতুন সদস্য যোগ করুন") : iAlreadyHaveMember ? null : myMemberRequestStatus === "pending" ? /*#__PURE__*/React.createElement("span", {
-      className: "flex-1 px-4 py-1.5 text-[11px] text-amber-700 font-semibold"
-    }, "আপনার অনুরোধ এডমিনের অনুমোদনের অপেক্ষায়") : /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setShowBecomeMemberModal(true);
-        setIsMenuOpen(false);
-      },
-      className: "flex-1 text-left px-4 py-1.5 text-emerald-800 font-bold hover:bg-slate-50 flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(Plus, {
-      size: 14
-    }), " সদস্য হোন"), /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => {
-        e.stopPropagation();
-        setShowMemberInfoModal(true);
-      },
-      className: "text-slate-400 hover:text-emerald-700 pr-3 shrink-0",
-      title: "তথ্য"
-    }, /*#__PURE__*/React.createElement(InfoIcon, {
-      size: 14
-    })));
-  })() : null), /*#__PURE__*/React.createElement("button", {
+  })))))), null), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
-      const text = `আপনাকে Daily Task app-এ পরিবারের সদস্য হিসেবে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হচ্ছে। Family Code: ${getFamilyCode()}`;
+      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${getFamilyCode()}`;
       try {
         if (navigator.share) {
           await navigator.share({ title: "Daily Task", text });
@@ -6939,24 +7412,13 @@ function App() {
       } catch {}
     },
     className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
-  }, /*#__PURE__*/React.createElement(Plus, { size: 12 }), "পরিবারের সদস্য হওয়ার জন্য আমন্ত্রণ জানান"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "নতুন সদস্য হতে আমন্ত্রণ জানান"), /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 my-1"
   }), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "ডাটা ম্যানেজমেন্ট"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      handleCopyCode();
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement(CopyIcon, {
-    size: 14
-  }), " ফ্যামিলি কোড কপি করুন"), copiedCode && /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-emerald-600 font-bold"
-  }, "কপি হয়েছে!")), /*#__PURE__*/React.createElement("button", {
+  }, "ডেটা ম্যানেজমেন্ট"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setDriveBackupStatus(null);
       setShowBackupOptionsModal(true);
@@ -6965,7 +7427,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
   }, /*#__PURE__*/React.createElement(DownloadIcon, {
     size: 14
-  }), " ডাটা ব্যাকআপ রাখুন"), /*#__PURE__*/React.createElement("button", {
+  }), " ডেটা ব্যাকআপ রাখুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setShowImportOptionsModal(true);
       setIsMenuOpen(false);
@@ -6973,16 +7435,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
   }, /*#__PURE__*/React.createElement(UploadIcon, {
     size: 14
-  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("input", {
-    ref: importFileInputRef,
-    type: "file",
-    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
-    onChange: e => {
-      handleImportData(e);
-      setShowImportOptionsModal(false);
-    },
-    className: "hidden"
-  }), /*#__PURE__*/React.createElement("button", {
+  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setArchiveYear(monthCursor.year);
       setArchiveMonth0(monthCursor.month0);
@@ -6997,14 +7450,6 @@ function App() {
   }), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowHelpModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-  }, /*#__PURE__*/React.createElement(HelpCircle, {
-    size: 14
-  }), " ব্যবহারের নিয়মাবলী"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setShowFeedbackModal(true);
       setIsMenuOpen(false);
@@ -7068,12 +7513,12 @@ function App() {
       className: "px-4 py-2 space-y-1 text-slate-500"
     }, sinceText && /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
+    }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-700 font-normal"
     }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("b", {
-      className: "text-slate-700"
+    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-700 font-normal"
     }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
@@ -7083,6 +7528,9 @@ function App() {
         setMemberKeyValue(null);
         setMemberKeyLoading(true);
         setMemberKeyRevealed(false);
+        setManualKeyInput("");
+        setConfirmKeyInput("");
+        setShowChangeKeyForm(false);
         setShowMemberKeyModal(true);
         setShowProfileDropdown(false);
         fetchMemberKey(ownMember.id)
@@ -7126,10 +7574,9 @@ function App() {
         setShowProfileDropdown(false);
       },
       className: "inline-flex items-center gap-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 text-amber-800 border-slate-200 hover:bg-amber-50"
-    }, /*#__PURE__*/React.createElement(InfoIcon, {
-      size: 10,
-      color: "#C89B3C"
-    }), " গুগলে সাইন ইন করুন")), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(GoogleIcon, {
+      size: 10
+    }), " Google এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 mt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -7238,22 +7685,7 @@ function App() {
     size: 16
   }))))), /*#__PURE__*/React.createElement("div", {
     className: "max-w-2xl mx-auto"
-  }, updateAvailable && /*#__PURE__*/React.createElement("div", {
-    className: "px-5 mt-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-[#C89B3C] rounded-2xl p-3.5 flex items-center gap-3 shadow-sm"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-lg"
-  }, "🔔"), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-[#16302B]"
-  }, "নতুন আপডেট এসেছে!"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] text-[#16302B]/80 mt-0.5"
-  }, "নতুন ফিচার যুক্ত হয়েছে — রিফ্রেশ করে দেখুন")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => window.location.reload(),
-    className: "bg-[#16302B] text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shrink-0"
-  }, "রিফ্রেশ করুন"))), recoveryMessage && /*#__PURE__*/React.createElement("div", {
+  }, recoveryMessage && /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-br from-[#0E4B43] to-[#153f39] rounded-2xl p-4 flex items-start gap-3 shadow-sm"
@@ -7302,7 +7734,7 @@ function App() {
     className: "text-sm font-bold text-white"
   }, "আজ মাসিক পারিবারিক পর্যালোচনার দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
-  }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডাটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
+  }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডেটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissMonthlyReminder,
     className: "text-white/70 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
@@ -7317,7 +7749,7 @@ function App() {
     className: "flex-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
-  }, "আপনাদের ফ্যামিলি কোড এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
+  }, "আপনাদের ফ্যামিলি ইউজারনেম এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
   }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
     onClick: () => setCodeChangeNotice(null),
@@ -7472,7 +7904,7 @@ function App() {
   }, saving ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 18
-  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডাটা সেভ করুন")), /*#__PURE__*/React.createElement("div", {
+  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডেটা সেভ করুন")), /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
@@ -7761,7 +8193,7 @@ function App() {
     className: "font-bold text-sm mb-1 text-slate-800"
   }, "আর্কাইভ দেখুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "যে মাস ও সালের ডাটা দেখতে চান তা বেছে নিন — সাথে সাথে সেই মাসের দৈনিক এন্ট্রি, মাসিক ওভারভিউ ও সভার তথ্য দেখা যাবে।"), /*#__PURE__*/React.createElement("div", {
+  }, "যে মাস ও সালের ডেটা দেখতে চান তা বেছে নিন — সাথে সাথে সেই মাসের দৈনিক এন্ট্রি, মাসিক ওভারভিউ ও সভার তথ্য দেখা যাবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2 mb-4"
   }, /*#__PURE__*/React.createElement("select", {
     value: archiveMonth0,
@@ -7793,19 +8225,9 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-3 text-slate-800"
-  }, "ফ্যামিলি কোড"), /*#__PURE__*/React.createElement("div", {
+  }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowFamilyCodeChoiceModal(false);
-      setNewFamCodeInput("");
-      setShowCreateNewFamilyModal(true);
-    },
-    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }), " নতুন ফ্যামিলি কোড তৈরি করুন"), isAdmin && /*#__PURE__*/React.createElement("button", {
+  }, isAdmin && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
       setShowFamilyCodeChoiceModal(false);
@@ -7815,17 +8237,7 @@ function App() {
     className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowFamilyCodeChoiceModal(false);
-      setJoinFamCodeInput("");
-      setShowJoinFamilyModal(true);
-    },
-    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন")), /*#__PURE__*/React.createElement("button", {
+  }), " বিদ্যমান ফ্যামিলি ইউজারনেম পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeChoiceModal(false),
     className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
   }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
@@ -7834,9 +8246,11 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "নতুন ফ্যামিলি কোড তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নতুন ফ্যামিলি ইউজারনেম তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+  }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: newFamCodeInput,
     onChange: e => setNewFamCodeInput(e.target.value),
     placeholder: "যেমন: Fam-Khan-2026",
@@ -7862,9 +8276,11 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
+  }, "বিদ্যমান ফ্যামিলি ইউজারনেম দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডাটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+  }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: joinFamCodeInput,
     onChange: e => setJoinFamCodeInput(e.target.value),
     placeholder: "যেমন: FAM-XXXXXXXXX",
@@ -7890,12 +8306,14 @@ function App() {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm mb-1 text-slate-800"
-  }, "নিজের ফ্যামিলির কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
+  }, "নিজের ফ্যামিলি ইউজারনেম পরিবর্তন করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "শুধু পরিবারের পরিচিতি-কোড বদলাবে — আপনার পরিবারের সব ডাটা (সদস্য, দৈনিক এন্ট্রি, সাপ্তাহিক রিফ্লেকশন) সম্পূর্ণ অক্ষত থাকবে, কোনো কপি বা লস হবে না। পরিবর্তনের পর বাকি সদস্যদের ডিভাইসে অ্যাপ খোলার সাথে সাথেই নতুন কোড অটো বসে যাবে এবং একটি নোটিশ দেখাবে — আলাদাভাবে জানানোর দরকার নেই।"), /*#__PURE__*/React.createElement("input", {
+  }, "ইউজারনেম কমপক্ষে ৬ ক্যারেক্টারের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও হাইফেন ব্যবহার করে ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)।"), /*#__PURE__*/React.createElement("input", {
+    name: "family-code",
+    autoComplete: "username",
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
-    placeholder: "নতুন কোড লিখুন",
+    placeholder: "নতুন ইউজারনেম লিখুন",
     maxLength: 30,
     disabled: renameFamCodeBusy,
     className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-bold text-emerald-900 focus:border-emerald-800"
@@ -7949,27 +8367,7 @@ function App() {
   }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => decideAccessRequest(r.id, "denied"),
     className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান"))))))), showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
-    onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
-  }), onbStep && /*#__PURE__*/React.createElement(OnboardingBridge, {
-    flow: onbFlow,
-    step: onbStep,
-    onAdvance: onbAdvance,
-    isAdmin: isAdmin,
-    myUid: auth.currentUser ? auth.currentUser.uid : null,
-    familyCode: getFamilyCode(),
-    members: members,
-    setMembers: setMembers,
-    setSelectedId: setSelectedId,
-    showGoogleAccountModal: showGoogleAccountModal,
-    setShowGoogleAccountModal: setShowGoogleAccountModal,
-    showBecomeMemberModal: showBecomeMemberModal,
-    setShowBecomeMemberModal: setShowBecomeMemberModal,
-    showClaimKeyModal: showClaimKeyModal,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setShowClaimKeyModal: setShowClaimKeyModal
-  }),
+  }, "প্রত্যাখ্যান"))))))), googleAccountModalNode,
 
   // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
   // default, click করলে reveal, Family Code masking-এর মতো একই প্যাটার্ন)।
@@ -7992,185 +8390,115 @@ function App() {
   }, /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 18, color: "var(--theme-primary)" })) : memberKeyValue == null ? /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3"
   }, "এই সদস্যের জন্য এখনো কোনো Key তৈরি হয়নি। নিচের বাটনে ট্যাপ করে একটি তৈরি করুন।") : /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-2",
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "বর্তমান Password"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: memberKeyRevealed ? "text" : "password",
+    value: memberKeyValue || "",
+    readOnly: true,
+    disabled: true,
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-bold text-emerald-900 tracking-wider select-all cursor-pointer",
-    onClick: () => setMemberKeyRevealed(v => !v),
-    title: "দেখতে ট্যাপ করুন"
-  }, memberKeyRevealed ? memberKeyValue : "•".repeat(memberKeyValue.length)),
-  /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => {
-      navigator.clipboard.writeText(memberKeyValue || "");
-      setCopiedMemberKey(true);
-      setTimeout(() => setCopiedMemberKey(false), 2000);
-    },
-    className: "shrink-0 p-1.5 rounded-lg hover:bg-slate-200 text-slate-500",
-    title: "কপি করুন"
-  }, copiedMemberKey ? /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] font-bold text-emerald-600"
-  }, "কপি হয়েছে!") : /*#__PURE__*/React.createElement(CopyIcon, { size: 14 }))),
+    onClick: () => setMemberKeyRevealed(v => !v),
+    "aria-label": memberKeyRevealed ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন",
+    className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+  }, memberKeyRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 16 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 16 })))),
+  (showChangeKeyForm || memberKeyValue == null) && /*#__PURE__*/React.createElement(React.Fragment, null,
+  /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "নতুন Password দিন"),
+  /*#__PURE__*/React.createElement("div", {
+    className: "relative mb-1"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: manualKeyInput,
+    onChange: e => setManualKeyInput(e.target.value),
+    disabled: memberKeyBusy || memberKeyLoading,
+    placeholder: "নতুন Password দিন (কমপক্ষে ৬ ক্যারেক্টার)",
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), manualKeyInput && confirmKeyInput && /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-2 top-1/2 -translate-y-1/2"
+  }, manualKeyInput === confirmKeyInput
+    ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
+    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
   /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 mb-1.5"
-  }, "(কমপক্ষে ৯ ক্যারেক্টারের অক্ষর, সংখ্যা ও চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  }, "(কমপক্ষে ৬ ক্যারেক্টার — ইংরেজি অক্ষর, সংখ্যা ও ! @ # $ % & * + _ - চিহ্ন ব্যবহার করে জটিল Password তৈরি করুন।)"),
+  /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] text-slate-400 mb-1 block"
+  }, "Password কনফার্ম করুন"),
+  /*#__PURE__*/React.createElement("div", {
+    className: "relative mb-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: confirmKeyInput,
+    onChange: e => setConfirmKeyInput(e.target.value),
+    disabled: memberKeyBusy || memberKeyLoading,
+    placeholder: "একই Password আবার দিন",
+    className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), manualKeyInput && confirmKeyInput && /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-2 top-1/2 -translate-y-1/2"
+  }, manualKeyInput === confirmKeyInput
+    ? /*#__PURE__*/React.createElement(Check, { size: 16, className: "text-emerald-600" })
+    : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" })))
+  ),
   /*#__PURE__*/React.createElement("button", {
     disabled: memberKeyBusy || memberKeyLoading,
     onClick: async () => {
-      if (memberKeyValue != null) {
-        const ok = window.confirm("Member Password পরিবর্তন করতে চান? পুরনো password আর কাজ করবে না।");
-        if (!ok) return;
+      if (!(showChangeKeyForm || memberKeyValue == null)) {
+        setShowChangeKeyForm(true);
+        return;
+      }
+      const manual = manualKeyInput.trim();
+      const confirmVal = confirmKeyInput.trim();
+      if (!manual) {
+        alert("নতুন Password লিখুন (কমপক্ষে ৬ ক্যারেক্টার)।");
+        return;
+      }
+      if (manual.length < 6) {
+        alert("Password কমপক্ষে ৬ ক্যারেক্টারের হতে হবে।");
+        return;
+      }
+      if (manual !== confirmVal) {
+        alert("দুই Password মেলেনি। আবার চেষ্টা করুন।");
+        return;
       }
       setMemberKeyBusy(true);
       try {
-        const key = await changeMemberKey(memberKeyTarget.id);
+        const key = await changeMemberKey(memberKeyTarget.id, manual);
         setMemberKeyValue(key);
         setMemberKeyRevealed(true);
+        setManualKeyInput("");
+        setConfirmKeyInput("");
+        setShowChangeKeyForm(false);
+        alert("সফলভাবে পাসওয়ার্ড পরিবর্তন হয়েছে।");
       } catch (err) {
         alert("Password তৈরি/পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
       } finally {
         setMemberKeyBusy(false);
       }
     },
-    className: "w-full py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600 mb-2 disabled:opacity-50"
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-700 text-white mb-2 disabled:opacity-50"
   }, memberKeyBusy ? "তৈরি হচ্ছে..." : (memberKeyValue == null ? "Password তৈরি করুন" : "Member Password পরিবর্তন করুন")),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMemberKeyModal(false),
-    className: "w-full py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white"
+    className: "w-full py-2 rounded-xl text-xs font-bold bg-[#C89B3C] text-[#16302B]"
   }, "বন্ধ করুন"))),
 
   // --- §Member Key claim("দায়িত্ব নিন") মোডাল — সব member-এর জন্য প্রযোজ্য
   // (claimed/unclaimed নির্বিশেষে), সঠিক key দিলেই ownerUid বদলায়।
-  showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-emerald-900 mb-1"
-  }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
-  }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডাটা/পরিচয় ফিরে আসবে।"),
-  /*#__PURE__*/React.createElement("input", {
-    value: claimKeyInput,
-    onChange: e => setClaimKeyInput(e.target.value),
-    placeholder: "Member Password",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    disabled: claimKeyBusy || !claimKeyInput.trim(),
-    onClick: async () => {
-      const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!uid) return;
-      setClaimKeyBusy(true);
-      try {
-        const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
-        if (res.ok) {
-          setMembers(prev => prev.map(x => {
-            if (x.id !== claimKeyTarget.id) return x;
-            const owners = Array.isArray(x.ownerUids)
-              ? x.ownerUids
-              : (x.ownerUid ? [x.ownerUid] : []);
-            const nextOwners = owners.includes(uid)
-              ? owners
-              : (res.revoked ? [...owners.slice(1), uid] : [...owners, uid]);
-            return { ...x, ownerUids: nextOwners };
-          }));
-          setShowClaimKeyModal(false);
-          setClaimKeyInput("");
-          setClaimKeyTarget(null);
-          if (res.revoked) {
-            // FIFO replace(১৭ আগস্ট ২০২৬): পুরনো device স্বয়ংক্রিয়ভাবে
-            // revoke হয়েছে, hard reject হয়নি — সংক্ষিপ্ত জানান দেওয়া।
-            alert("এই আইডি সর্বোচ্চ ডিভাইস-সীমায় ছিল, তাই সবচেয়ে পুরনো ডিভাইসের প্রবেশাধিকার সরিয়ে এই ডিভাইসে লগইন করা হয়েছে।");
-          }
-        } else if (res.reason === "limit") {
-          alert("এই আইডি(এডমিন) ইতোমধ্যে ৩টি ডিভাইসে লগইন অবস্থায় আছে — নিরাপত্তার কারণে এডমিনের ক্ষেত্রে স্বয়ংক্রিয় পরিবর্তন হয় না। অনুগ্রহ করে অন্য কোনো এডমিন ডিভাইস থেকে 'মুক্ত করুন'(Force-Release) ব্যবহার করুন।");
-        } else {
-          alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
-        }
-      } finally {
-        setClaimKeyBusy(false);
-      }
-    },
-    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
-  }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowClaimKeyModal(false);
-      setClaimKeyInput("");
-    },
-    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল")))),
+  claimKeyModalNode,
 
   // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
   // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
-  showBecomeMemberModal && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800"
-  }, "সদস্য হোন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowBecomeMemberModal(false)
-  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
-  /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
-  }, "আপনার নাম দিন — এডমিন অনুমোদন করলে আপনি এই পরিবারের একজন সদস্য হিসেবে যুক্ত হবেন।"),
-  /*#__PURE__*/React.createElement("input", {
-    value: becomeMemberName,
-    onChange: e => setBecomeMemberName(e.target.value),
-    placeholder: "আপনার নাম...",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-2"
-  }), /*#__PURE__*/React.createElement("select", {
-    value: becomeMemberGender,
-    onChange: e => setBecomeMemberGender(e.target.value),
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3"
-  }, /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"), /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")),
-  /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    disabled: becomeMemberBusy || !becomeMemberName.trim(),
-    onClick: async () => {
-      const name = becomeMemberName.trim();
-      const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!name || !uid) return;
-      setBecomeMemberBusy(true);
-      try {
-        await db.collection("families").doc(getFamilyId())
-          .collection("memberRequests").doc(uid)
-          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now() });
-        setMyMemberRequestStatus("pending");
-        setShowBecomeMemberModal(false);
-        setBecomeMemberName("");
-        // §Notification System — সব admin-কে জানানো(device_joined-এর
-        // একই pattern) যাতে refresh ছাড়াই badge/panel-এ দেখা যায়।
-        // Best-effort — ব্যর্থ হলেও মূল request আগেই সফল।
-        try {
-          await Promise.all((adminUidsList || []).map(adminUid =>
-            db.collection("families").doc(getFamilyId())
-              .collection("notifications").add({
-                targetUid: adminUid,
-                type: "member_request",
-                message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
-                createdAt: Date.now(),
-                read: false
-              }).catch(() => {})
-          ));
-        } catch {}
-      } catch (err) {
-        alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
-      } finally {
-        setBecomeMemberBusy(false);
-      }
-    },
-    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
-  }, becomeMemberBusy ? "পাঠানো হচ্ছে..." : "অনুরোধ পাঠান"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowBecomeMemberModal(false),
-    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল")))),
+  becomeMemberModalNode,
 
   // --- §"সদস্য অনুরোধ" — Admin-only অনুমোদন প্যানেল(accessRequests
   // মোডালের একই ডিজাইন-প্যাটার্ন)। অনুমোদনে member+key একসাথে তৈরি হয়।
@@ -8217,7 +8545,7 @@ function App() {
   }, /*#__PURE__*/React.createElement(DownloadIcon, {
     size: 16,
     color: "var(--theme-primary)"
-  }), " ডাটা ব্যাকআপ রাখুন"), /*#__PURE__*/React.createElement("button", {
+  }), " ডেটা ব্যাকআপ রাখুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowBackupOptionsModal(false)
   }, /*#__PURE__*/React.createElement(X, {
     size: 18,
@@ -8254,7 +8582,16 @@ function App() {
   }), "Google Drive ও আপনার ডিভাইস — উভয় জায়গায় ব্যাকআপ রাখুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowBackupOptionsModal(false),
     className: "w-full h-9 mt-4 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-  }, "বন্ধ করুন"))), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
+  }, "বন্ধ করুন"))), /*#__PURE__*/React.createElement("input", {
+    ref: importFileInputRef,
+    type: "file",
+    accept: ".json,application/json,text/plain,text/json,application/octet-stream",
+    onChange: e => {
+      handleImportData(e);
+      setShowImportOptionsModal(false);
+    },
+    className: "hidden"
+  }), showImportOptionsModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -8306,9 +8643,9 @@ function App() {
     className: "font-bold text-sm text-slate-800"
   }, "Google Drive-এ ব্যাকআপ পাওয়া গেছে")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "ফ্যামিলি কোড: ", /*#__PURE__*/React.createElement("b", null, (driveRestoreCandidate.appProperties && driveRestoreCandidate.appProperties.familyCode) || "অজানা"), driveRestoreCandidate.modifiedTime ? " · সর্বশেষ পরিবর্তন: " + new Date(driveRestoreCandidate.modifiedTime).toLocaleString("bn-BD") : ""), /*#__PURE__*/React.createElement("p", {
+  }, "ফ্যামিলি ইউজারনেম: ", /*#__PURE__*/React.createElement("b", null, (driveRestoreCandidate.appProperties && driveRestoreCandidate.appProperties.familyCode) || "অজানা"), driveRestoreCandidate.modifiedTime ? " · সর্বশেষ পরিবর্তন: " + new Date(driveRestoreCandidate.modifiedTime).toLocaleString("bn-BD") : ""), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "এই ব্যাকআপ থেকে ডাটা রিস্টোর (মার্জ) করবেন? বর্তমান ডিভাইসের ডাটার সাথে merge হবে — কোনো ডাটা হারাবে না; দুই জায়গায় একই এন্ট্রি থাকলে যেটি বেশি সাম্প্রতিক (updatedAt) সেটি রাখা হবে।"), /*#__PURE__*/React.createElement("div", {
+  }, "এই ব্যাকআপ থেকে ডেটা রিস্টোর (মার্জ) করবেন? বর্তমান ডিভাইসের ডেটার সাথে merge হবে — কোনো ডেটা হারাবে না; দুই জায়গায় একই এন্ট্রি থাকলে যেটি বেশি সাম্প্রতিক (updatedAt) সেটি রাখা হবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDriveRestoreModal(false),
@@ -8333,7 +8670,7 @@ function App() {
     className: "font-bold text-sm text-slate-800"
   }, "গুগল একাউন্ট ডিলিট নিশ্চিত করুন")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "এটি আপনার ডিভাইস থেকে গুগল অ্যাকাউন্ট সরিয়ে ফেলবে এবং সাইন আউট করে দেবে। তবে এতে আপনার অ্যাপের মূল ডাটার কোনো ক্ষতি হবে না — আপনার সম্পূর্ণ ডাটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত থাকবে।"), /*#__PURE__*/React.createElement("div", {
+  }, "এটি আপনার ডিভাইস থেকে গুগল অ্যাকাউন্ট সরিয়ে ফেলবে এবং সাইন আউট করে দেবে। তবে এতে আপনার অ্যাপের মূল ডেটার কোনো ক্ষতি হবে না — আপনার সম্পূর্ণ ডেটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত থাকবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDeleteAccountWarning(false),
@@ -8359,7 +8696,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-3"
-  }, "একটি ইউনিক ফ্যামিলি কোড তৈরি করুন (যেমন: Fam-Khan@2026)। পরিবারের সবাই একই কোড ব্যবহার করলে সবার ডাটা স্বয়ংক্রিয়ভাবে সিংক হবে।"), /*#__PURE__*/React.createElement("p", {
+  }, "একটি ইউনিক ফ্যামিলি ইউজারনেম তৈরি করুন (যেমন: Hasan-Family)। পরিবারের সবাই একই ইউজারনেম ব্যবহার করলে সবার ডেটা স্বয়ংক্রিয়ভাবে সিংক হবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-bold text-slate-800 mb-1.5"
   }, "নিয়ম:"), /*#__PURE__*/React.createElement("ul", {
     className: "text-xs text-slate-600 leading-relaxed mb-3 space-y-1 list-disc pl-4"
@@ -8369,7 +8706,7 @@ function App() {
     className: "text-xs font-bold text-amber-900 mb-1"
   }, "বিশেষ দ্রষ্টব্য:"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-amber-900/90 leading-relaxed"
-  }, "ডাটা সিংক হওয়ার পর \"সদস্যবৃন্দ\" তালিকায় আপনার নাম দেখা যাবে — সেখানে আপনার নামের পাশে \"দায়িত্ব নিন\" বাটনে ট্যাপ করুন।")), /*#__PURE__*/React.createElement("button", {
+  }, "ডেটা সিংক হওয়ার পর \"সদস্যবৃন্দ\" তালিকায় আপনার নাম দেখা যাবে — সেখানে আপনার নামের পাশে \"দায়িত্ব নিন\" বাটনে ট্যাপ করুন।")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeInfoModal(false),
     className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
   }, "বুঝেছি"))), showMemberInfoModal && /*#__PURE__*/React.createElement("div", {
@@ -8465,7 +8802,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "মাস শেষে পরিবারের সবাইকে নিয়ে বসুন এবং বিগত মাসের অগ্রগতি মূল্যায়ন করুন। নতুন বিষয় বা সিদ্ধান্ত যোগ করতে \"+ সারি যোগ করুন\" বোতামে ক্লিক করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হবে। সভায় আলোচিত গুরুত্বপূর্ণ বিষয় ও সিদ্ধান্তগুলো লিখুন এবং সভা শেষে চাইলে পিডিএফ ফাইল ডাউনলোড এবং ডাটা ব্যাকআপ করে রাখতে পারেন।"), /*#__PURE__*/React.createElement("button", {
+  }, "মাস শেষে পরিবারের সবাইকে নিয়ে বসুন এবং বিগত মাসের অগ্রগতি মূল্যায়ন করুন। নতুন বিষয় বা সিদ্ধান্ত যোগ করতে \"+ সারি যোগ করুন\" বোতামে ক্লিক করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হবে। সভায় আলোচিত গুরুত্বপূর্ণ বিষয় ও সিদ্ধান্তগুলো লিখুন এবং সভা শেষে চাইলে পিডিএফ ফাইল ডাউনলোড এবং ডেটা ব্যাকআপ করে রাখতে পারেন।"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMeetingInfoModal(false),
     className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
   }, "বুঝেছি"))), showAddCustom && /*#__PURE__*/React.createElement("div", {
@@ -8488,28 +8825,7 @@ function App() {
   }, "যোগ করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowAddCustom(false),
     className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল")))), showHelpModal && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-md shadow-xl border border-slate-100 max-h-[80vh] overflow-y-auto custom-scrollbar"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3 border-b pb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800 flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement(HelpCircle, {
-    size: 16,
-    color: "var(--theme-primary)"
-  }), " ব্যবহারের নিয়মাবলী"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowHelpModal(false)
-  }, /*#__PURE__*/React.createElement(X, {
-    size: 18,
-    className: "text-slate-400"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-600 space-y-2.5 leading-relaxed font-medium"
-  }, /*#__PURE__*/React.createElement("p", null, "১. কাস্টম ফ্যামিলি কোড তৈরি করে পরিবারের সকল সদস্যের ডিভাইসে একই কোড বসিয়ে ডাটা রিয়েল-টাইমে সিংক করুন।"), /*#__PURE__*/React.createElement("p", null, "২. মাসের শেষে দৈনিক রিপোর্ট, সাপ্তাহিক রিফ্লেকশন এবং পারিবারিক সভার কার্যপরিধি — সবকিছু একসাথে ২ পৃষ্ঠার PDF ফাইল হিসেবে প্রিন্ট/সেভ দেওয়া যাবে।"), /*#__PURE__*/React.createElement("p", null, "৩. প্রিন্ট কপির বাম পাশে পাঞ্চ মার্জিন রাখা হয়েছে যা ফাইলে বাইন্ডিং করার উপযুক্ত।"), /*#__PURE__*/React.createElement("p", null, "৪. মেনু থেকে \"ডাটা ব্যাকআপ রাখুন\"-এ ক্লিক করে Google Drive ও ডিভাইসে আপনার ডাটা ব্যাকআপ রাখুন।"), /*#__PURE__*/React.createElement("p", null, "৫. অ্যাপটির সকল ফিচার সঠিকভাবে ব্যবহার করতে বিভিন্ন অপশনের পাশে থাকা ⓘ (ইনফো) আইকনে ট্যাপ করে নির্দেশনাগুলো পড়ে নিন।")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowHelpModal(false),
-    className: "w-full mt-5 h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-  }, "বুঝেছি"))), showFeedbackModal && /*#__PURE__*/React.createElement("div", {
+  }, "বাতিল")))), showFeedbackModal && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
@@ -8530,7 +8846,7 @@ function App() {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-slate-500 mb-3"
-  }, "আপনার মতামত বা পরামর্শ লিখুন। এটি সরাসরি Daily Task Team-এর কাছে চলে যাবে।"), /*#__PURE__*/React.createElement("textarea", {
+  }, "কোনো সমস্যা বা পরামর্শ আমাদের জানান।"), /*#__PURE__*/React.createElement("textarea", {
     value: feedbackMsg,
     onChange: e => setFeedbackMsg(e.target.value),
     rows: 4,
@@ -8862,7 +9178,7 @@ function GoogleAccountModal({
     className: "text-xs text-slate-600 leading-relaxed mb-2"
   }, "☁️ Google Drive-এ নিরাপদে ব্যাকআপ রাখা এবং প্রয়োজনে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "📱 ফোন পরিবর্তন, ডাটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন ইন করে সহজেই সব ডাটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"), /*#__PURE__*/React.createElement("p", {
+  }, "📱 ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন ইন করে সহজেই সব ডেটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
   }, "💻 একই Google অ্যাকাউন্ট দিয়ে একাধিক ডিভাইস থেকে নিরাপদে অ্যাপ ব্যবহার করা যাবে।"), /*#__PURE__*/React.createElement("button", {
     onClick: handleLink,
@@ -8898,7 +9214,8 @@ function OnboardingBridge({
   members, setMembers, setSelectedId,
   showGoogleAccountModal, setShowGoogleAccountModal,
   showBecomeMemberModal, setShowBecomeMemberModal,
-  showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal
+  showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal,
+  myMemberRequestStatus
 }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState("male");
@@ -8931,14 +9248,29 @@ function OnboardingBridge({
     prevGoogleOpen.current = showGoogleAccountModal;
   }, [showGoogleAccountModal]);
 
-  // "সদস্য হোন" মোডাল বন্ধ হলে onboarding সম্পূর্ণ — pending status
-  // existing myMemberRequestStatus UI নিজে থেকেই দেখাবে।
+  // "সদস্য হোন" মোডাল বন্ধ হলে — সফল submit(myMemberRequestStatus:
+  // "pending" হয়ে গেছে) হলেই onboarding সম্পূর্ণ ধরে gate clear হবে;
+  // Cancel/X(status এখনো set হয়নি) হলে পুরনো deprecated "choose"
+  // পেজ(page-2 redesign-এর পর অপ্রচলিত) না দেখিয়ে family-context
+  // পুরোপুরি undo করে page-1/2(Onboarding())-এ ফেরত পাঠানো হয়(২০ আগস্ট
+  // ২০২৬ bug fix) — authentication ছাড়া Dashboard entry-ও রোধ থাকে।
   useEffect(() => {
     if (prevBecomeOpen.current && !showBecomeMemberModal && step === "becomeMember") {
-      onAdvance(null);
+      if (myMemberRequestStatus === "pending") {
+        onAdvance(null);
+      } else {
+        try {
+          sessionStorage.removeItem("dt_onboarding_flow");
+          sessionStorage.removeItem("dt_onboarding_step");
+          localStorage.removeItem("family_id");
+          localStorage.removeItem("family_code");
+          localStorage.removeItem("family_code_is_custom");
+        } catch {}
+        window.location.reload();
+      }
     }
     prevBecomeOpen.current = showBecomeMemberModal;
-  }, [showBecomeMemberModal]);
+  }, [showBecomeMemberModal, myMemberRequestStatus]);
 
   // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
   useEffect(() => {
@@ -9078,11 +9410,11 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("p", {
         key: "text",
         className: "text-base text-slate-600 leading-relaxed"
-      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। আবার Family Code শেয়ার করে আপনার পরিবার বা দ্বীনি সার্কেলের সঙ্গে Daily Task sync করতে পারেন।"),
+      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। কিংবা পরিবার বা দ্বীনি সার্কেল যুক্ত করে পরিবার গঠণ করতে পারেন।"),
       /*#__PURE__*/React.createElement("button", {
         key: "share",
         onClick: async () => {
-          const text = `আপনাকে Daily Task app-এ পরিবারের সদস্য হিসেবে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হচ্ছে। Family Code: ${familyCode}`;
+          const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${familyCode}`;
           try {
             if (navigator.share) {
               await navigator.share({ title: "Daily Task", text });
@@ -9096,19 +9428,14 @@ function OnboardingBridge({
           }
           onAdvance(null);
         },
-        className: "w-full h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
+        className: "w-full h-12 rounded-2xl text-white text-sm font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform whitespace-nowrap",
         style: { background: "#0E4B43" }
-      }, "পরিবারের সদস্য বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
+      }, "পরিবার বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "Skip করুন"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "back",
-        onClick: () => onAdvance("keyReveal"),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "← ফিরে যান")
+      }, "পরে করবো")
     ]);
   }
 
@@ -9117,7 +9444,7 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight",
-        style: { color: "#C89B3C", fontFamily: "'Noto Serif Bengali', serif" }
+        style: { color: "#111827", fontFamily: "'Noto Serif Bengali', serif" }
       }, "সাইন ইন করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "google",
@@ -9132,10 +9459,11 @@ function OnboardingBridge({
         style: { background: "#0E4B43" }
       }, "Member Password দিয়ে Sign-in করুন"),
       /*#__PURE__*/React.createElement("button", {
-        key: "skip",
-        onClick: () => onAdvance(null),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "স্কিপ করুন")
+        key: "become",
+        onClick: () => onAdvance("becomeMember"),
+        className: "w-full h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform",
+        style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
+      }, "পরিবারের নতুন সদস্য হিসেবে যোগ দিন")
     ]);
   }
 
@@ -9159,15 +9487,11 @@ function OnboardingBridge({
         className: "w-full h-11 rounded-2xl border-2 border-slate-200 text-base font-bold text-slate-700 hover:bg-slate-50 transition-colors"
       }, m.name))),
       /*#__PURE__*/React.createElement("button", {
-        key: "become",
-        onClick: () => onAdvance("becomeMember"),
-        className: "text-sm font-semibold text-emerald-800 underline underline-offset-2"
-      }, "তালিকায় নেই, নতুন সদস্য হিসেবে যোগ দিন"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "done",
-        onClick: () => onAdvance(null),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "পরে করব")
+        key: "back",
+        type: "button",
+        onClick: () => onAdvance("choose"),
+        className: "self-start text-sm font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-1"
+      }, "← ফিরে যান")
     ]);
   }
 
@@ -9176,15 +9500,25 @@ function OnboardingBridge({
 function Onboarding() {
   const [step, setStep] = useState("welcome"); // welcome | newFamily | existingFamily
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // §Family Code shake-hint(২০ আগস্ট ২০২৬) — খালি Family Code দিয়ে
+  // "নতুন সদস্য" বাটনে ক্লিক করলে ফিল্ড শেক করে বোঝানো, disabled রাখার
+  // বদলে। key বদলালেই wrapper div remount হয়ে animation নতুন করে চলে।
+  const [codeShakeKey, setCodeShakeKey] = useState(0);
+  // §Item ৫(২১ আগস্ট ২০২৬): "ব্যবহারের নিয়মাবলী" dashboard-dropdown modal
+  // থেকে সরিয়ে welcome স্টেপের নিচে স্থানান্তরিত(collapsible card, ডিফল্ট
+  // collapsed)। হেডারে ক্লিক করলে expand হয়; "বুঝেছি"-তে আবার collapse হয়।
+  const [usageNotesOpen, setUsageNotesOpen] = useState(false);
 
   const errorText = reason => ({
-    empty: "একটি Family Code দিন।",
-    length: `Family Code ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-    charset: "Family Code-এ স্পেস, / , \\ , বা কোটেশন চিহ্ন ব্যবহার করা যাবে না।",
-    "code-taken": "এই Family Code ইতিমধ্যে ব্যবহৃত হচ্ছে। অন্য একটি কোড দিন।",
-    "not-found": "এই Family Code খুঁজে পাওয়া যায়নি। বানান যাচাই করে আবার চেষ্টা করুন।",
+    empty: "একটি Family Username দিন।",
+    length: `Family Username ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
+    charset: "Family Username-এ স্পেস, / , \\ , বা কোটেশন চিহ্ন ব্যবহার করা যাবে না।",
+    "code-taken": "এই Family Username ইতিমধ্যে ব্যবহৃত হচ্ছে। অন্য একটি কোড দিন।",
+    "not-found": "এই Family Username খুঁজে পাওয়া যায়নি। বানান যাচাই করে আবার চেষ্টা করুন।",
     "same-family": "আপনি ইতিমধ্যে এই Family-তে আছেন।",
     "not-v2": "এই Family এখনো এই ফিচারের জন্য প্রস্তুত নয়।",
     error: "একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।"
@@ -9230,24 +9564,133 @@ function Onboarding() {
     // success হলে joinExistingFamily() নিজেই reload করে
   }
 
+  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — Family Code + Member
+  // Password একসাথে দিয়ে সরাসরি login। ব্যর্থ হলে(keyIndex miss/ভুল
+  // password) কোনো family switch/reload হয় না — generic error দেখিয়ে
+  // একই screen-এ থাকা হয়, existing session অক্ষত থাকে।
+  async function handleDirectLogin() {
+    setBusy(true);
+    setError(null);
+    const res = await directIdentifyLogin(code, password);
+    if (!res || !res.ok) {
+      setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      setBusy(false);
+    }
+    // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
+  }
+
+  // §Google One-click Sign-in(touch-point 6) — Family Code ছাড়াই।
+  // users/{uid}-এ আগে থেকে সংরক্ষিত familyCode/memberId থাকলে সরাসরি সেই
+  // family-তে switch(memberId থাকলে dashboard পর্যন্ত সরাসরি, না থাকলে
+  // choose-স্টেপে); না থাকলে(নতুন Google অ্যাকাউন্ট) Family Code দিয়ে
+  // যোগ দিতে বলা হয় — existing join/becomeMember flow-ই fallback।
+  async function handleGoogleOneClick() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!isGoogleLinked()) {
+        try {
+          await linkGoogleAccount();
+        } catch (linkErr) {
+          if (linkErr && linkErr.code === "auth/popup-closed-by-user") {
+            setBusy(false);
+            return;
+          }
+          if (linkErr && linkErr.code === "auth/credential-already-in-use" && linkErr.credential) {
+            await auth.signInWithCredential(linkErr.credential);
+          } else {
+            throw linkErr;
+          }
+        }
+      }
+      const uid = auth.currentUser ? auth.currentUser.uid : null;
+      const mapping = uid ? await loadUserFamilyMapping(uid) : null;
+      if (mapping && mapping.familyCode) {
+        // বাগ-ফিক্স(২০ আগস্ট ২০২৬): আগে শুধু family_code সেভ হতো,
+        // family_id হতো না — App বুট hasExistingSession চেক করে
+        // family_id + family_code দুটোই লাগে, ফলে reload-এর পর আবার
+        // page-1(welcome)-এ ফেরত যেত। directIdentifyLogin()-এর মতোই
+        // resolveFamilyIdFromCode() দিয়ে familyId বের করে family_id-ও
+        // commit করা হচ্ছে।
+        const resolved = await resolveFamilyIdFromCode(mapping.familyCode);
+        if (!resolved.ok) {
+          setError("এই Google অ্যাকাউন্টের family তথ্য মেলাতে সমস্যা হয়েছে। Family Username দিয়ে চেষ্টা করুন।");
+          setBusy(false);
+          return;
+        }
+        localStorage.setItem("family_id", resolved.familyId);
+        localStorage.setItem("family_code", mapping.familyCode);
+        localStorage.setItem("family_code_is_custom", "1");
+        if (!mapping.memberId) {
+          // familyCode আছে কিন্তু memberId নেই(পুরনো/আগের link) — choose
+          // স্টেপে(Google/Member-Key/সদস্য হোন) নামানো হচ্ছে, existing
+          // OnboardingBridge flow-ই বাকিটা সামলাবে।
+          try { sessionStorage.setItem("dt_onboarding_flow", "existingFamily"); } catch {}
+        }
+        window.location.reload();
+        return;
+      }
+      setError("এই Google অ্যাকাউন্টের সাথে কোনো পরিবার যুক্ত পাওয়া যায়নি। উপরে Family Username দিয়ে যোগ দিন।");
+      setBusy(false);
+    } catch (err) {
+      setError("Google সাইন-ইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      setBusy(false);
+    }
+  }
+
   const shell = (children) => /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+  }, children);
+
+  // Family Code autofill(replace-not-add): শুধু newFamily/existingFamily
+  // স্টেপে <form> wrap করা হয় (welcome স্টেপে না) যাতে browser native
+  // save/autofill prompt দেখাতে পারে। Submit শুধুমাত্র !busy && code.trim()
+  // থাকলেই ট্রিগার হয় — এটা button-এর disabled শর্তের সাথে সামঞ্জস্যপূর্ণ।
+  const formShell = (children, onSubmit) => /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => { e.preventDefault(); if (!busy && code.trim()) onSubmit(); },
     className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
   }, children);
 
   const codeInput = /*#__PURE__*/React.createElement("input", {
     type: "text",
+    name: "family-code",
+    autoComplete: "username",
     value: code,
     onChange: e => setCode(e.target.value),
-    placeholder: "Family Code লিখুন",
+    placeholder: "Family Username লিখুন",
     disabled: busy,
     className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors"
   });
+
+  const passwordInput = /*#__PURE__*/React.createElement("div", {
+    key: "password-input-wrap",
+    className: "relative w-full max-w-xs"
+  }, /*#__PURE__*/React.createElement("input", {
+    key: "password-input",
+    type: showPassword ? "text" : "password",
+    name: "member-password",
+    autoComplete: "current-password",
+    value: password,
+    onChange: e => setPassword(e.target.value),
+    placeholder: "Member Password",
+    disabled: busy,
+    className: "w-full h-12 pl-4 pr-11 rounded-2xl border-2 border-slate-200 text-base font-medium text-center outline-none focus:border-[#0E4B43] transition-colors",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowPassword(s => !s),
+    tabIndex: -1,
+    disabled: busy,
+    "aria-label": showPassword ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন",
+    className: "absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+  }, showPassword ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 18 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 18 })));
 
   const errorBox = error && /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-medium text-red-600 max-w-xs"
   }, error);
 
   const backButton = /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => { setStep("welcome"); setError(null); setCode(""); },
     disabled: busy,
     className: "w-full max-w-xs text-left text-xs font-semibold text-slate-500 underline underline-offset-2"
@@ -9255,6 +9698,10 @@ function Onboarding() {
 
   if (step === "welcome") {
     return shell([
+      /*#__PURE__*/React.createElement(AppLogo, {
+        key: "logo",
+        size: 72
+      }),
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-2xl font-bold tracking-tight",
@@ -9262,8 +9709,7 @@ function Onboarding() {
       }, "আসসালামু আলাইকুম"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
-        className: "text-sm max-w-xs leading-relaxed",
-        style: { color: "#C89B3C" }
+        className: "text-sm max-w-xs leading-relaxed text-slate-700"
       }, "Daily Task (Daily Amal & Family Tracker)-এ স্বাগতম।"),
       /*#__PURE__*/React.createElement("button", {
         key: "new",
@@ -9276,17 +9722,36 @@ function Onboarding() {
         onClick: () => setStep("existingFamily"),
         className: "w-full max-w-xs h-12 px-4 rounded-2xl text-white text-sm font-bold flex items-center justify-center shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
         style: { background: "#0E4B43" }
-      }, "বিদ্যমান Family-এর সদস্য হলে Sign-in করুন")
+      }, "বিদ্যমান Family-তে প্রবেশ করুন"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "usage-notes-btn",
+        type: "button",
+        onClick: () => setUsageNotesOpen(true),
+        className: "w-full max-w-xs bg-white rounded-2xl py-3 px-4 text-center shadow-sm border border-slate-100 mt-2 font-bold text-sm text-slate-800"
+      }, "অ্যাপ ব্যবহারের নির্দেশনাবলী"),
+      usageNotesOpen && /*#__PURE__*/React.createElement("div", {
+        key: "usage-notes-modal",
+        className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100 max-h-[80vh] overflow-y-auto"
+      }, /*#__PURE__*/React.createElement("h3", {
+        className: "font-bold text-sm text-slate-800 mb-3 text-center"
+      }, "অ্যাপ ব্যবহারের নির্দেশনাবলী"), /*#__PURE__*/React.createElement("div", {
+        className: "text-xs text-slate-600 space-y-2.5 leading-relaxed font-medium"
+      }, /*#__PURE__*/React.createElement("p", null, "১. নিজের ও পরিবারের সদস্যদের দৈনন্দিন আমল রেকর্ড রাখা ও মূল্যায়ন করার জন্য এই অ্যাপটি ব্যবহার করুন। নিয়মিত আমলের অগ্রগতি দেখুন এবং পরিবারকে নিয়ে প্রোডাক্টিভ অভ্যাস গড়ে তুলুন।"), /*#__PURE__*/React.createElement("p", null, "২. আপনি যদি আপনার ও পরিবারের সদস্যদের দৈনিক আমল ট্র্যাক করতে আগ্রহী হন, তাহলে \"নতুন Family তৈরি করুন\" বাটনে ক্লিক করে আপনার Family তৈরি করুন এবং সদস্যদের যুক্ত করুন।"), /*#__PURE__*/React.createElement("p", null, "৩. আপনি যদি কোনো বিদ্যমান Family-এর নতুন সদস্য হতে চান, তাহলে \"বিদ্যমান Family-তে প্রবেশ করুন\" বাটনে ক্লিক করে Family Username লিখুন এবং নতুন সদস্য হিসেবে যুক্ত হওয়ার প্রক্রিয়া সম্পন্ন করুন।"), /*#__PURE__*/React.createElement("p", null, "৪. মাসের শেষে দৈনিক রেকর্ড, সাপ্তাহিক রিফ্লেকশন এবং পারিবারিক সভার কার্যবিবরণী- সবকিছু একসাথে ২ পৃষ্ঠার PDF হিসেবে প্রিন্ট বা সংরক্ষণ করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৫. আপনার ডেটা নিরাপদ রাখতে মেনু থেকে \"ডেটা ব্যাকআপ রাখুন\" অপশন ব্যবহার করে Google Drive এবং ডিভাইসে ব্যাকআপ রাখতে পারবেন। প্রয়োজনে সেই ব্যাকআপ থেকে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৬. ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর Google অ্যাকাউন্ট অথবা মেম্বার পাসওয়ার্ড দিয়ে সাইন ইন করে আপনার রেকর্ড ফিরে পাওয়া যাবে। তাই ডেটা হারানোর ভয় নেই।"), /*#__PURE__*/React.createElement("p", null, "৭. সদস্য হবার পর অ্যাপের বিভিন্ন ফিচার সঠিকভাবে বুঝতে পাশে থাকা ⓘ (ইনফো) আইকনে চাপ দিয়ে নির্দেশনাগুলো দেখে নিন।")), /*#__PURE__*/React.createElement("button", {
+        onClick: () => setUsageNotesOpen(false),
+        className: "w-full mt-4 h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+      }, "বুঝেছি")))
     ]);
   }
 
   if (step === "newFamily") {
-    return shell([
+    return formShell([
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight whitespace-nowrap",
         style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
-      }, "একটি Custom Family Code সেট করুন"),
+      }, "একটি Custom Family Username সেট করুন"),
       /*#__PURE__*/React.createElement("p", {
         key: "sub",
         className: "text-sm max-w-xs leading-relaxed",
@@ -9296,36 +9761,81 @@ function Onboarding() {
       errorBox,
       /*#__PURE__*/React.createElement("button", {
         key: "submit",
-        onClick: handleCreateNew,
+        type: "submit",
         disabled: busy || !code.trim(),
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
       }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
       backButton
-    ]);
+    ], handleCreateNew);
   }
 
   if (step === "existingFamily") {
-    return shell([
+    return /*#__PURE__*/React.createElement("form", {
+      onSubmit: e => {
+        e.preventDefault();
+        if (!busy && code.trim() && password.trim()) handleDirectLogin();
+      },
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-3"
+    }, [
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-xl font-bold tracking-tight",
         style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
-      }, "আপনার পরিবারের Family Code দিন"),
-      /*#__PURE__*/React.createElement("p", {
-        key: "sub",
-        className: "text-sm max-w-xs leading-relaxed",
-        style: { color: "#C89B3C" }
-      }, "কোড দেওয়ার পর Google Sign-in বা Member Key দিয়ে আপনার নিজের পরিচয় ফিরে পাওয়া যাবে।"),
-      React.cloneElement(codeInput, { key: "input" }),
-      errorBox,
+      }, "বিদ্যমান Family-তে প্রবেশ করুন"),
       /*#__PURE__*/React.createElement("button", {
-        key: "submit",
-        onClick: handleJoinExisting,
-        disabled: busy || !code.trim(),
+        key: "google",
+        type: "button",
+        onClick: handleGoogleOneClick,
+        disabled: busy,
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 border-slate-200 bg-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+      }, /*#__PURE__*/React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 48 48" }, [
+          /*#__PURE__*/React.createElement("path", { key: "1", fill: "#FFC107", d: "M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" }),
+          /*#__PURE__*/React.createElement("path", { key: "2", fill: "#FF3D00", d: "M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" }),
+          /*#__PURE__*/React.createElement("path", { key: "3", fill: "#4CAF50", d: "M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.6 34.7 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5.1C9.6 39.6 16.3 44 24 44z" }),
+          /*#__PURE__*/React.createElement("path", { key: "4", fill: "#1976D2", d: "M43.6 20.5H42V20H24v8h11.3c-0.8 2.3-2.3 4.2-4.2 5.6l6.6 5.6C41.5 36.5 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z" })
+        ]), "Google দিয়ে Sign-in"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "or1",
+        className: "text-xs font-semibold text-slate-400"
+      }, "অথবা"),
+      /*#__PURE__*/React.createElement("style", {
+        key: "shake-style"
+      }, "@keyframes dtCodeShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}"),
+      /*#__PURE__*/React.createElement("div", {
+        key: `code-wrap-${codeShakeKey}`,
+        className: "w-full flex flex-col items-center",
+        style: codeShakeKey ? { animation: "dtCodeShake 0.4s" } : undefined
+      }, React.cloneElement(codeInput, { key: "input" })),
+      (error === "প্রথমে Family Username দিন।") ? errorBox : null,
+      passwordInput,
+      (error === "প্রথমে Family Username দিন।") ? null : errorBox,
+      /*#__PURE__*/React.createElement("button", {
+        key: "login",
+        type: "submit",
+        disabled: busy || !code.trim() || !password.trim(),
         className: "w-full max-w-xs h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 disabled:opacity-60 active:scale-[0.98] transition-transform flex items-center justify-center gap-2",
         style: { background: "#0E4B43" }
-      }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "এগিয়ে যান"),
+      }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Login"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "or2",
+        className: "text-xs font-semibold text-slate-400"
+      }, "অথবা"),
+      /*#__PURE__*/React.createElement("button", {
+        key: "become",
+        type: "button",
+        onClick: () => {
+          if (!code.trim()) {
+            setError("প্রথমে Family Username দিন।");
+            setCodeShakeKey(k => k + 1);
+            return;
+          }
+          handleJoinExisting();
+        },
+        disabled: busy,
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl text-sm font-bold flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-60 border-2",
+        style: { background: "#F5E6C0", borderColor: "#C89B3C", color: "#7A5A1F" }
+      }, "পরিবারে নতুন সদস্য হিসেবে যোগ দিন"),
       backButton
     ]);
   }
@@ -9403,7 +9913,7 @@ function renderPendingGoogleReauthGate() {
       }).catch(e => {
         setBusy(false);
         if (!(e && e.code === "auth/popup-closed-by-user")) {
-          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Code দিয়ে চালিয়ে যান।");
+          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Username দিয়ে চালিয়ে যান।");
         }
       });
     }
@@ -9411,28 +9921,22 @@ function renderPendingGoogleReauthGate() {
       proceedAnonymous();
     }
     return /*#__PURE__*/React.createElement("div", {
-      style: {
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "12px",
-        padding: "24px",
-        textAlign: "center",
-        fontFamily: "sans-serif"
-      }
-    }, /*#__PURE__*/React.createElement("p", null, "আপনার আগের সেশনে ফিরতে Google দিয়ে সাইন-ইন করুন।"), err && /*#__PURE__*/React.createElement("p", {
-      style: {
-        color: "#b91c1c"
-      }
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
+    }, "আপনি লগ আউট হয়েছেন"), err && /*#__PURE__*/React.createElement("p", {
+      className: "text-sm font-medium text-red-600 max-w-xs"
     }, err), /*#__PURE__*/React.createElement("button", {
       onClick: handleGoogleClick,
-      disabled: busy
-    }, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
+      disabled: busy,
+      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60",
+      style: { borderColor: "#1D7A68", color: "#1D7A68" }
+    }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
       onClick: handleFallbackClick,
-      disabled: busy
-    }, "Family Code দিয়ে চালিয়ে যান"));
+      disabled: busy,
+      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
+      style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
+    }, "প্রথম পেজে ফিরে আসুন"));
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
 }
