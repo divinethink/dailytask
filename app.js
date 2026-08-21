@@ -3243,6 +3243,29 @@ function InfoIcon({
     y2: "8"
   }));
 }
+function GoogleIcon({
+  size = 14,
+  className
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    className: className
+  }, /*#__PURE__*/React.createElement("path", {
+    fill: "#4285F4",
+    d: "M23.49 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.54-5.17 3.54-8.82z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#34A853",
+    d: "M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.1A12 12 0 0 0 12 24z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#FBBC05",
+    d: "M5.27 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.27a12 12 0 0 0 0 10.78l4-3.1z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#EA4335",
+    d: "M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.61l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"
+  }));
+}
 function RefreshIcon({
   size,
   color,
@@ -7194,15 +7217,25 @@ function App() {
     title: isCustomFamilyCode ? codeRevealed ? "লুকাতে ট্যাপ করুন" : "দেখতে ট্যাপ করুন" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     className: "tracking-wide select-none"
-  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), copiedCode && /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] text-emerald-600 font-bold shrink-0 ml-1"
-  }, "কপি হয়েছে!"), /*#__PURE__*/React.createElement("button", {
+  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-2 shrink-0 ml-2"
+  }, copiedCode && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] text-emerald-600 font-bold shrink-0"
+  }, "কপি হয়েছে!"), isCustomFamilyCode && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      setCodeRevealed(v => !v);
+    },
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
+    title: codeRevealed ? "লুকান" : "দেখুন"
+  }, codeRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 13 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 13 })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => {
       e.stopPropagation();
       handleCopyCode();
     },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0 ml-2",
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
     title: "কপি করুন"
   }, /*#__PURE__*/React.createElement(CopyIcon, {
     size: 13
@@ -7212,11 +7245,11 @@ function App() {
       setShowFamilyCodeChoiceModal(true);
       setIsMenuOpen(false);
     },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0 ml-2",
+    className: "text-slate-500 hover:text-emerald-800 shrink-0",
     title: "ফ্যামিলি কোড পরিবর্তন করুন"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
@@ -7491,10 +7524,9 @@ function App() {
         setShowProfileDropdown(false);
       },
       className: "inline-flex items-center gap-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 text-amber-800 border-slate-200 hover:bg-amber-50"
-    }, /*#__PURE__*/React.createElement(InfoIcon, {
-      size: 10,
-      color: "#C89B3C"
-    }), " গুগলে সাইন ইন করুন")), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(GoogleIcon, {
+      size: 10
+    }), " Google এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 mt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -8145,17 +8177,7 @@ function App() {
     className: "font-bold text-sm mb-3 text-slate-800"
   }, "ফ্যামিলি কোড"), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowFamilyCodeChoiceModal(false);
-      setNewFamCodeInput("");
-      setShowCreateNewFamilyModal(true);
-    },
-    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }), " নতুন ফ্যামিলি কোড তৈরি করুন"), isAdmin && /*#__PURE__*/React.createElement("button", {
+  }, isAdmin && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
       setShowFamilyCodeChoiceModal(false);
@@ -8165,17 +8187,7 @@ function App() {
     className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
   }, /*#__PURE__*/React.createElement(EditIcon, {
     size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowFamilyCodeChoiceModal(false);
-      setJoinFamCodeInput("");
-      setShowJoinFamilyModal(true);
-    },
-    className: "w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 flex items-center gap-2 text-emerald-800 text-xs font-semibold border border-slate-100"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }), " বিদ্যমান ফ্যামিলি কোড দিয়ে যোগ দিন")), /*#__PURE__*/React.createElement("button", {
+  }), " বিদ্যমান ফ্যামিলি কোড পরিবর্তন করুন")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFamilyCodeChoiceModal(false),
     className: "w-full h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold mt-3"
   }, "বাতিল"))), showCreateNewFamilyModal && /*#__PURE__*/React.createElement("div", {
@@ -9339,7 +9351,7 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("p", {
         key: "text",
         className: "text-base text-slate-600 leading-relaxed"
-      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। আবার Family Code শেয়ার করে আপনার পরিবার বা দ্বীনি সার্কেলের সঙ্গে Daily Task sync করতে পারেন।"),
+      }, "আপনি এই অ্যাপ একাই ব্যবহার করতে পারেন। পরিবার বা দ্বীনি সার্কেল যুক্ত করে পরিবার গঠণ করতে পারেন।"),
       /*#__PURE__*/React.createElement("button", {
         key: "share",
         onClick: async () => {
@@ -9357,19 +9369,14 @@ function OnboardingBridge({
           }
           onAdvance(null);
         },
-        className: "w-full h-12 rounded-2xl text-white text-base font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
+        className: "w-full h-12 rounded-2xl text-white text-sm font-bold shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform whitespace-nowrap",
         style: { background: "#0E4B43" }
-      }, "পরিবারের সদস্য বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
+      }, "পরিবার বা দ্বীনি সার্কেলের সঙ্গে শেয়ার করুন"),
       /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
         className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "Skip করুন"),
-      /*#__PURE__*/React.createElement("button", {
-        key: "back",
-        onClick: () => onAdvance("keyReveal"),
-        className: "text-sm font-semibold text-slate-500 underline underline-offset-2"
-      }, "← ফিরে যান")
+      }, "পরে করবো")
     ]);
   }
 
@@ -9653,17 +9660,21 @@ function Onboarding() {
         className: "w-full max-w-xs h-12 px-4 rounded-2xl text-white text-sm font-bold flex items-center justify-center shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-transform",
         style: { background: "#0E4B43" }
       }, "বিদ্যমান Family-তে প্রবেশ করুন"),
-      /*#__PURE__*/React.createElement("div", {
-        key: "usage-notes",
-        className: "w-full max-w-xs bg-white rounded-2xl p-4 text-left shadow-sm border border-slate-100 mt-2"
+      /*#__PURE__*/React.createElement("button", {
+        key: "usage-notes-btn",
+        type: "button",
+        onClick: () => setUsageNotesOpen(true),
+        className: "w-full max-w-xs bg-white rounded-2xl py-3 px-4 text-center shadow-sm border border-slate-100 mt-2 font-bold text-sm text-slate-800"
+      }, "অ্যাপ ব্যবহারের নির্দেশনাবলী"),
+      usageNotesOpen && /*#__PURE__*/React.createElement("div", {
+        key: "usage-notes-modal",
+        className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100 max-h-[80vh] overflow-y-auto"
       }, /*#__PURE__*/React.createElement("h3", {
-        onClick: () => setUsageNotesOpen(v => !v),
-        className: "font-bold text-sm text-slate-800 flex items-center justify-between cursor-pointer select-none"
-      }, "অ্যাপ ব্যবহারের নির্দেশনাবলী:", /*#__PURE__*/React.createElement(ChevronDown, {
-        size: 16,
-        className: `shrink-0 transition-transform duration-200 ${usageNotesOpen ? "rotate-180" : ""}`
-      })), usageNotesOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-        className: "text-xs text-slate-600 space-y-2.5 leading-relaxed font-medium mt-2"
+        className: "font-bold text-sm text-slate-800 mb-3 text-center"
+      }, "অ্যাপ ব্যবহারের নির্দেশনাবলী"), /*#__PURE__*/React.createElement("div", {
+        className: "text-xs text-slate-600 space-y-2.5 leading-relaxed font-medium"
       }, /*#__PURE__*/React.createElement("p", null, "১. নিজের ও পরিবারের সদস্যদের দৈনন্দিন আমল রেকর্ড রাখা ও মূল্যায়ন করার জন্য এই অ্যাপটি ব্যবহার করুন। নিয়মিত আমলের অগ্রগতি দেখুন এবং পরিবারকে নিয়ে প্রোডাক্টিভ অভ্যাস গড়ে তুলুন।"), /*#__PURE__*/React.createElement("p", null, "২. আপনি যদি আপনার ও পরিবারের সদস্যদের দৈনিক আমল ট্র্যাক করতে আগ্রহী হন, তাহলে \"নতুন Family তৈরি করুন\" বাটনে ক্লিক করে আপনার Family তৈরি করুন এবং সদস্যদের যুক্ত করুন।"), /*#__PURE__*/React.createElement("p", null, "৩. আপনি যদি কোনো বিদ্যমান Family-এর নতুন সদস্য হতে চান, তাহলে \"বিদ্যমান Family-তে প্রবেশ করুন\" বাটনে ক্লিক করে Family Code লিখুন এবং নতুন সদস্য হিসেবে যুক্ত হওয়ার প্রক্রিয়া সম্পন্ন করুন।"), /*#__PURE__*/React.createElement("p", null, "৪. মাসের শেষে দৈনিক রেকর্ড, সাপ্তাহিক রিফ্লেকশন এবং পারিবারিক সভার কার্যবিবরণী- সবকিছু একসাথে ২ পৃষ্ঠার PDF হিসেবে প্রিন্ট বা সংরক্ষণ করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৫. আপনার ডেটা নিরাপদ রাখতে মেনু থেকে \"ডেটা ব্যাকআপ রাখুন\" অপশন ব্যবহার করে Google Drive এবং ডিভাইসে ব্যাকআপ রাখতে পারবেন। প্রয়োজনে সেই ব্যাকআপ থেকে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", null, "৬. ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর Google অ্যাকাউন্ট অথবা মেম্বার পাসওয়ার্ড দিয়ে সাইন ইন করে আপনার রেকর্ড ফিরে পাওয়া যাবে। তাই ডেটা হারানোর ভয় নেই।"), /*#__PURE__*/React.createElement("p", null, "৭. সদস্য হবার পর অ্যাপের বিভিন্ন ফিচার সঠিকভাবে বুঝতে পাশে থাকা ⓘ (ইনফো) আইকনে চাপ দিয়ে নির্দেশনাগুলো দেখে নিন।")), /*#__PURE__*/React.createElement("button", {
         onClick: () => setUsageNotesOpen(false),
         className: "w-full mt-4 h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
