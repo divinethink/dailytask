@@ -5167,16 +5167,16 @@ function App() {
       // code দিয়ে local code sync করে নেওয়া হচ্ছে।
       await syncFamilyCodeWithAccount();
       // Phase A prep — non-blocking, best-effort; app boot এর জন্য অপেক্ষা করে না।
-      ensureFamilyCodeMapping();
       ensureFamilyMeta();
       // Switch prep (Step 1): migrationState listener attach করার আগে
-      // ensureFamilyCodeMapping()-কে আলাদাভাবে await করা হচ্ছে (উপরের
-      // fire-and-forget কলটি অপরিবর্তিত রাখা হয়েছে, বিদ্যমান আচরণ ভাঙা
-      // হয়নি) — কারণ local family_id boot-এর প্রথম মুহূর্তে server-এর
-      // সাথে out-of-sync/stale থাকতে পারে (self-heal সম্পন্ন না হওয়া
-      // পর্যন্ত)। getFamilyId() এখানে কল করার আগে সেই self-heal সম্পন্ন
-      // হয়েছে কিনা নিশ্চিত করতে এই দ্বিতীয়, awaited কলটি প্রয়োজন —
-      // ফাংশনটি idempotent/best-effort বলে দ্বিতীয়বার কল করা নিরাপদ।
+      // ensureFamilyCodeMapping() await করা হচ্ছে (Performance Audit fix,
+      // ২২ আগস্ট ২০২৬: আগে এখানে একটি non-blocking fire-and-forget কলও
+      // ছিল — সেটি awaited না হওয়ায় কোনো real ordering guarantee দিত না,
+      // শুধু প্রতি boot-এ একটি অতিরিক্ত duplicate familyCodes read যোগ
+      // করছিল, তাই সরানো হয়েছে) — কারণ local family_id boot-এর প্রথম
+      // মুহূর্তে server-এর সাথে out-of-sync/stale থাকতে পারে (self-heal
+      // সম্পন্ন না হওয়া পর্যন্ত)। getFamilyId() এখানে কল করার আগে সেই
+      // self-heal সম্পন্ন হয়েছে কিনা নিশ্চিত করতে এই awaited কলটি প্রয়োজন।
       await ensureFamilyCodeMapping();
       // §৫ fix: familyId self-heal সম্পন্ন হওয়ার পরই family doc নিশ্চিত
       // (idempotent — আগে থেকে থাকলে no-op) ও dataCollectionName cache
