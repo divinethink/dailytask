@@ -3087,29 +3087,6 @@ function EyeOffIcon({
     y2: "23"
   }));
 }
-function SmartphoneIcon({
-  size,
-  color,
-  className
-}) {
-  return /*#__PURE__*/React.createElement(Icon, {
-    size: size,
-    color: color,
-    className: className
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: "5",
-    y: "2",
-    width: "14",
-    height: "20",
-    rx: "2",
-    ry: "2"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "12",
-    y1: "18",
-    x2: "12.01",
-    y2: "18"
-  }));
-}
 function MenuIcon({
   size,
   color,
@@ -5097,13 +5074,6 @@ function App() {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveYear, setArchiveYear] = useState(() => new Date().getFullYear());
   const [archiveMonth0, setArchiveMonth0] = useState(() => new Date().getMonth());
-  const [isCustomFamilyCode, setIsCustomFamilyCode] = useState(() => {
-    try {
-      return localStorage.getItem("family_code_is_custom") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [showMemberInfoModal, setShowMemberInfoModal] = useState(false);
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
@@ -5135,7 +5105,6 @@ function App() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
   const [copiedCode, setCopiedCode] = useState(false);
-  const [codeRevealed, setCodeRevealed] = useState(false);
   const originalEntryRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyList, setHistoryList] = useState([]);
@@ -5309,20 +5278,6 @@ function App() {
                 // দেখানোর দরকার নেই — সাথে সাথেই approved, তাই একবার
                 // reload করলে migrateMembersIfNeeded() স্বাভাবিকভাবে সফল
                 // হবে(নতুন accessRequest doc এখন approved অবস্থায় আছে)।
-                try {
-                  const famSnapForNotif0 = await db.collection("families").doc(migrationFamilyId).get();
-                  const adminUidsForNotif0 = famSnapForNotif0.exists ? (famSnapForNotif0.data().adminUids || []) : [];
-                  await Promise.all(adminUidsForNotif0.map(adminUid =>
-                    db.collection("families").doc(migrationFamilyId)
-                      .collection("notifications").add({
-                        targetUid: adminUid,
-                        type: "device_joined",
-                        message: "একটি নতুন ডিভাইস Family Username দিয়ে যোগ দিয়েছে এবং স্বয়ংক্রিয়ভাবে অনুমোদিত হয়েছে। পরিচিত না হলে সদস্য তালিকা থেকে পর্যালোচনা করে সরিয়ে দিতে পারেন।",
-                        createdAt: Date.now(),
-                        read: false
-                      }).catch(() => {})
-                  ));
-                } catch {}
                 window.location.reload();
                 return;
               }
@@ -6658,7 +6613,8 @@ function App() {
   // অবস্থান) reuse করা হচ্ছে — কোনো নতুন logic/state/collection নেই।
   const googleAccountModalNode = showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
+    onLinked: checkDriveBackupAfterLink,
+    memberName: selectedMember?.name
   });
   const claimKeyModalNode = showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
@@ -7204,7 +7160,6 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setIsMenuOpen(!isMenuOpen);
-      setCodeRevealed(!isCustomFamilyCode);
     },
     className: "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-white/15 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all shadow-sm active:scale-95"
   }, /*#__PURE__*/React.createElement(MenuIcon, {
@@ -7223,25 +7178,13 @@ function App() {
     className: "flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
   }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
     className: "font-bold text-emerald-900 text-sm flex items-center justify-between mt-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => isCustomFamilyCode && setCodeRevealed(v => !v),
-    className: "inline-block" + (isCustomFamilyCode ? " cursor-pointer" : ""),
-    title: isCustomFamilyCode ? codeRevealed ? "লুকাতে ট্যাপ করুন" : "দেখতে ট্যাপ করুন" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     className: "tracking-wide select-none"
-  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("span", {
+  }, getFamilyCode()), /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-2 shrink-0 ml-2"
   }, copiedCode && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] text-emerald-600 font-bold shrink-0"
-  }, "কপি হয়েছে!"), isCustomFamilyCode && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => {
-      e.stopPropagation();
-      setCodeRevealed(v => !v);
-    },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0",
-    title: codeRevealed ? "লুকান" : "দেখুন"
-  }, codeRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 13 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 13 })), /*#__PURE__*/React.createElement("button", {
+  }, "কপি হয়েছে!"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => {
       e.stopPropagation();
@@ -7410,7 +7353,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium text-emerald-800"
   }, /*#__PURE__*/React.createElement(MessageSquare, {
     size: 14
-  }), " পরামর্শ বা সমস্যা হলে আমাদের জানান")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
+  }), " আমাদের জানান (পরামর্শ বা সমস্যা)")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
@@ -7468,11 +7411,7 @@ function App() {
       className: "flex items-center gap-1.5"
     }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
       className: "text-slate-700 font-normal"
-    }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("span", {
-      className: "text-slate-700 font-normal"
-    }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
+    }, sinceText))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -7529,7 +7468,7 @@ function App() {
       className: "inline-flex items-center gap-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 text-amber-800 border-slate-200 hover:bg-amber-50"
     }, /*#__PURE__*/React.createElement(GoogleIcon, {
       size: 10
-    }), " Google এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
+    }), " Google-এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 mt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -9052,7 +8991,8 @@ function signOutToFreshAnonymous() {
 function GoogleAccountModal({
   onClose,
   onLinked,
-  onFirstAdminClaimed
+  onFirstAdminClaimed,
+  memberName
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -9135,7 +9075,7 @@ function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
         });
       } else if (err && err.code === "auth/email-already-in-use") {
         // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি সেশনের সাথে লিংক করা
@@ -9150,7 +9090,7 @@ function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
         });
       } else {
         setNotice({
@@ -9448,7 +9388,7 @@ function OnboardingBridge({
         className: "w-full h-12 rounded-2xl border-2 border-slate-200 bg-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
       }, /*#__PURE__*/React.createElement(GoogleIcon, {
         size: 18
-      }), "Google এ যুক্ত হোন"),
+      }), "Google-এ যুক্ত হোন"),
       /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
