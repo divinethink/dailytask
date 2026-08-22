@@ -4550,6 +4550,7 @@ async function directIdentifyLogin(code, password) {
   // করা UI থেকে অসম্ভব ছিল — এখন প্রতিটি ব্যর্থতার নির্দিষ্ট debugTag পাঠানো
   // হচ্ছে(শুধু onboarding error-এ দেখানোর জন্য, kill/production sensitive না)।
   if (!resolved.ok) return { ok: false, reason: "invalid", debugTag: "family:" + resolved.reason };
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
   let memberId = null;
   let keyIndexErr = null;
   try {
@@ -4561,8 +4562,25 @@ async function directIdentifyLogin(code, password) {
     memberId = null; // permission-denied/network — miss হিসেবেই treat, কোনো commit না
     keyIndexErr = e && e.message;
   }
-  if (!memberId) return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss" };
-  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  if (!memberId) {
+    // §"সদস্য হোন" login-feedback(২২ আগস্ট ২০২৬): keyIndex-miss সাধারণ ভুল
+    // password ছাড়াও নিজের memberRequest এখনো pending/denied হওয়ার কারণে
+    // হতে পারে(approve না হওয়া পর্যন্ত keyIndex তৈরি হয় না)। নিজের
+    // memberRequests/{uid} doc(self-read Rules-allowed) চেক করে entered
+    // password presetKey-এর সাথে মিললে নির্দিষ্ট reason ফেরত — নাহলে আগের
+    // generic "invalid" আচরণ অপরিবর্তিত।
+    if (uid) {
+      try {
+        const reqSnap = await db.collection("families").doc(resolved.familyId)
+          .collection("memberRequests").doc(uid).get();
+        const reqData = reqSnap.exists ? (reqSnap.data() || {}) : null;
+        if (reqData && reqData.presetKey === pw && (reqData.status === "pending" || reqData.status === "denied")) {
+          return { ok: false, reason: reqData.status };
+        }
+      } catch {}
+    }
+    return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss" };
+  }
   if (!uid) return { ok: false, reason: "invalid", debugTag: "no-uid" };
   const claimResult = await claimMemberWithKey(memberId, pw, uid, resolved.familyId);
   if (!claimResult || !claimResult.ok) return { ok: false, reason: "invalid", debugTag: "claim:" + ((claimResult && claimResult.error) || "unknown") };
@@ -4572,6 +4590,18 @@ async function directIdentifyLogin(code, password) {
   localStorage.setItem("family_code_is_custom", "1");
   if (isGoogleLinked()) {
     try { await saveUserFamilyCode(uid, normalizedCode, memberId); } catch {}
+  } else {
+    // §Google-linking welcome popup(২২ আগস্ট ২০২৬): এই claim "সদস্য হোন"
+    // approve-পরবর্তী প্রথম login কিনা যাচাই — নিজের memberRequests/{uid}
+    // status "approved" হলেই one-time flag সেট, পরের boot-এ App() একবার
+    // welcome popup দেখাবে(existing GoogleAccountModal reuse)।
+    try {
+      const reqSnap2 = await db.collection("families").doc(resolved.familyId)
+        .collection("memberRequests").doc(uid).get();
+      if (reqSnap2.exists && reqSnap2.data() && reqSnap2.data().status === "approved") {
+        localStorage.setItem("dt_member_welcome_google", "1");
+      }
+    } catch {}
   }
   window.location.reload();
   return { ok: true };
@@ -5092,6 +5122,11 @@ function App() {
   const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
   const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
+  // §প্রথম সফল member login-এর পর Google-linking welcome popup(২২ আগস্ট
+  // ২০২৬): directIdentifyLogin()-এ সেট করা one-time flag, শুধু "সদস্য
+  // হোন" approve-পরবর্তী প্রথম claim-এই সেট হয়(existing flag-pattern
+  // reuse, dt_pending_google_reauth-এর মতো)।
+  const [showFirstMemberWelcomeModal, setShowFirstMemberWelcomeModal] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showBackupOptionsModal, setShowBackupOptionsModal] = useState(false);
   const [showImportOptionsModal, setShowImportOptionsModal] = useState(false);
@@ -5458,6 +5493,16 @@ function App() {
       })
       .catch(() => {});
   }, [members, migrationState]);
+  // §Google-linking welcome popup — mount-এ একবার flag চেক(consume করে
+  // সঙ্গে সঙ্গে মুছে ফেলা হয় যাতে reload-এ আবার না দেখায়)।
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("dt_member_welcome_google") === "1") {
+        localStorage.removeItem("dt_member_welcome_google");
+        setShowFirstMemberWelcomeModal(true);
+      }
+    } catch {}
+  }, []);
   useEffect(() => {
     // Guard: on first render selectedId is still null (real value loads async).
     // Skip that null write so it never overwrites the previously saved
@@ -6661,6 +6706,14 @@ function App() {
     onLinked: checkDriveBackupAfterLink,
     memberName: selectedMember?.name
   });
+  // §Google-linking welcome popup(২২ আগস্ট ২০২৬) — একই GoogleAccountModal
+  // reuse(welcomeMode), শুধু ভিন্ন intro-text+দুই-বাটন লেআউট।
+  const firstMemberWelcomeModalNode = showFirstMemberWelcomeModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
+    onClose: () => setShowFirstMemberWelcomeModal(false),
+    onLinked: checkDriveBackupAfterLink,
+    memberName: selectedMember?.name,
+    welcomeMode: true
+  });
   const claimKeyModalNode = showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
@@ -6846,7 +6899,7 @@ function App() {
     setShowClaimKeyModal: setShowClaimKeyModal,
     myMemberRequestStatus: myMemberRequestStatus,
     myMemberRequestKey: myMemberRequestKey
-  }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
+  }), googleAccountModalNode, firstMemberWelcomeModalNode, claimKeyModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -8399,7 +8452,7 @@ function App() {
   }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => decideAccessRequest(r.id, "denied"),
     className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান"))))))), googleAccountModalNode,
+  }, "প্রত্যাখ্যান"))))))), googleAccountModalNode, firstMemberWelcomeModalNode,
 
   // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
   // default, click করলে reveal, Family Code masking-এর মতো একই প্যাটার্ন)।
@@ -9044,7 +9097,8 @@ function GoogleAccountModal({
   onClose,
   onLinked,
   onFirstAdminClaimed,
-  memberName
+  memberName,
+  welcomeMode
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -9165,31 +9219,52 @@ function GoogleAccountModal({
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 16,
     color: "#C89B3C"
-  }), " Google অ্যাকাউন্ট (রিকমন্ডেড)"), /*#__PURE__*/React.createElement("button", {
+  }), welcomeMode ? " আপনি এখন একজন সদস্য" : " Google অ্যাকাউন্ট (রিকমন্ডেড)"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose
   }, /*#__PURE__*/React.createElement(X, {
     size: 18,
     className: "text-slate-400"
   }))), notice && /*#__PURE__*/React.createElement("p", {
     className: "text-xs mb-3 " + (notice.type === "ok" ? "text-emerald-700" : "text-red-600")
-  }, notice.text), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-slate-800 mb-2"
-  }, "Google দিয়ে সাইন ইন করার সুবিধা:"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 leading-relaxed mb-3"
-  }, "Google দিয়ে সাইন ইন বাধ্যতামূলক নয়। তবে সাইন ইন করলে নিম্নোক্ত সুবিধা পাওয়া যাবে —"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "☁️ Google Drive-এ নিরাপদে ব্যাকআপ রাখা এবং প্রয়োজনে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "📱 ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন ইন করে সহজেই সব ডেটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"), /*#__PURE__*/React.createElement("p", {
+  }, notice.text),
+  // §Google-linking welcome popup(২২ আগস্ট ২০২৬): "সদস্য হোন" approve-
+  // পরবর্তী প্রথম login-এ welcomeMode true থাকলে সংক্ষিপ্ত স্বাগত-বার্তা +
+  // দুই বাটন(Google-এ যুক্ত হোন/পরে করবো); handleLink() অপরিবর্তিত reuse।
+  welcomeMode ? /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "💻 একই Google অ্যাকাউন্ট দিয়ে একাধিক ডিভাইস থেকে নিরাপদে অ্যাপ ব্যবহার করা যাবে।"), /*#__PURE__*/React.createElement("button", {
+  }, "আলহামদুলিল্লাহ! আপনি এখন এই পরিবারের একজন সদস্য। আপনার তথ্য Google Drive-এ নিরাপদে ব্যাকআপ রাখতে এবং গুগল দিয়ে লগিন করতে নিচের বাটনে ক্লিক করুন।") : [
+    /*#__PURE__*/React.createElement("p", {
+      key: "b0",
+      className: "text-xs font-bold text-slate-800 mb-2"
+    }, "Google দিয়ে সাইন ইন করার সুবিধা:"),
+    /*#__PURE__*/React.createElement("p", {
+      key: "b1",
+      className: "text-xs text-slate-600 leading-relaxed mb-3"
+    }, "Google দিয়ে সাইন ইন বাধ্যতামূলক নয়। তবে সাইন ইন করলে নিম্নোক্ত সুবিধা পাওয়া যাবে —"),
+    /*#__PURE__*/React.createElement("p", {
+      key: "b2",
+      className: "text-xs text-slate-600 leading-relaxed mb-2"
+    }, "☁️ Google Drive-এ নিরাপদে ব্যাকআপ রাখা এবং প্রয়োজনে Restore করা যাবে।"),
+    /*#__PURE__*/React.createElement("p", {
+      key: "b3",
+      className: "text-xs text-slate-600 leading-relaxed mb-2"
+    }, "📱 ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন ইন করে সহজেই সব ডেটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"),
+    /*#__PURE__*/React.createElement("p", {
+      key: "b4",
+      className: "text-xs text-slate-600 leading-relaxed mb-4"
+    }, "💻 একই Google অ্যাকাউন্ট দিয়ে একাধিক ডিভাইস থেকে নিরাপদে অ্যাপ ব্যবহার করা যাবে।")
+  ], /*#__PURE__*/React.createElement("button", {
     onClick: handleLink,
     disabled: busy,
     className: "w-full h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold disabled:opacity-60 flex items-center justify-center gap-2"
   }, busy ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
-  }) : null, " Google দিয়ে সাইন ইন করুন")));
+  }) : null, welcomeMode ? " Google-এর সঙ্গে যুক্ত হোন" : " Google দিয়ে সাইন ইন করুন"), welcomeMode ? /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    disabled: busy,
+    className: "w-full h-9 mt-2 text-slate-500 text-xs font-bold disabled:opacity-60"
+  }, "পরে করবো") : null));
 }
 // =====================================================================
 // --- Onboarding (নতুন/Incognito device — Analyze→Plan approved, ---
@@ -9641,7 +9716,13 @@ function Onboarding() {
     setError(null);
     const res = await directIdentifyLogin(code, password);
     if (!res || !res.ok) {
-      setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      if (res && res.reason === "pending") {
+        setError("এই সদস্যের অনুরোধটি বর্তমানে এডমিনের অনুমোদনের অপেক্ষায় আছে। অনুগ্রহ করে অপেক্ষা করুন।");
+      } else if (res && res.reason === "denied") {
+        setError("এডমিন আপনার সদস্য হওয়ার অনুরোধটি বাতিল করেছেন। অনুগ্রহ করে আবার সদস্য হওয়ার জন্য অনুরোধ পাঠান।");
+      } else {
+        setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+      }
       setBusy(false);
     }
     // সফল হলে directIdentifyLogin() নিজেই family state commit+reload করে।
