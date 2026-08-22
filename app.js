@@ -4577,9 +4577,17 @@ async function directIdentifyLogin(code, password) {
         if (reqData && reqData.presetKey === pw && (reqData.status === "pending" || reqData.status === "denied")) {
           return { ok: false, reason: reqData.status };
         }
-      } catch {}
+        // §Diagnostic(সাময়িক, ২২ আগস্ট ২০২৬): reason "invalid" হওয়ার আগে
+        // ঠিক কোথায় miss হচ্ছে তা দেখার জন্য।
+        return {
+          ok: false, reason: "invalid",
+          debugTag: "req-miss:" + (reqSnap.exists ? ("status=" + reqData.status + ",keyMatch=" + (reqData.presetKey === pw)) : "no-doc") + ",fid=" + resolved.familyId + ",gid=" + (typeof getFamilyId === "function" ? getFamilyId() : "n/a")
+        };
+      } catch (e2) {
+        return { ok: false, reason: "invalid", debugTag: "req-read-err:" + (e2 && e2.message) };
+      }
     }
-    return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss" };
+    return { ok: false, reason: "invalid", debugTag: keyIndexErr ? "keyIndex-err:" + keyIndexErr : "keyIndex-miss(no-uid)" };
   }
   if (!uid) return { ok: false, reason: "invalid", debugTag: "no-uid" };
   const claimResult = await claimMemberWithKey(memberId, pw, uid, resolved.familyId);
@@ -9721,7 +9729,7 @@ function Onboarding() {
       } else if (res && res.reason === "denied") {
         setError("এডমিন আপনার সদস্য হওয়ার অনুরোধটি বাতিল করেছেন। অনুগ্রহ করে আবার সদস্য হওয়ার জন্য অনুরোধ পাঠান।");
       } else {
-        setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
+        setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।" + (res && res.debugTag ? (" [dbg: " + res.debugTag + "]") : ""));
       }
       setBusy(false);
     }
