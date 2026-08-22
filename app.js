@@ -485,10 +485,17 @@ async function ensureFamilyCodeMapping() {
 function familyDocRef() {
   return db.collection("families").doc(getFamilyId());
 }
-async function ensureFamilyMeta() {
+// §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — এখন একটি optional
+// `preloaded`({exists, data}) parameter নেয়: boot sequence থেকে একবার
+// fetch করা family-doc state এখানে reuse করা যায়, নিজের `.get()` না করে।
+// parameter না দিলে (standalone caller, যেমন custom-code-set/Google-link
+// trigger) আগের মতোই নিজের `.get()` করে — backward-compatible।
+// রিটার্ন: হালনাগাদ {exists, data} state(পরের ধাপে thread করার জন্য) —
+// caller চাইলে ignore করতে পারে(আগের void-return caller-দের কোনো ক্ষতি নেই)।
+async function ensureFamilyMeta(preloaded) {
   try {
     const ref = familyDocRef();
-    const snap = await ref.get();
+    const snap = preloaded || (await ref.get().then(s => ({ exists: s.exists, data: s.exists ? s.data() : null })));
     if (!snap.exists) {
       // §৫ Family Code Lifecycle fix: dataCollectionName এখন থেকেই family
       // তৈরির মুহূর্তে একবার স্থায়ীভাবে সেট হয় — এটাই সেই আসল Firestore
@@ -496,7 +503,7 @@ async function ensureFamilyMeta() {
       // familyCode ভবিষ্যতে যতবারই বদলাক (changeFamilyCodeForExistingFamily),
       // dataCollectionName কখনো বদলাবে না — তাই আসল ডাটা কালেকশন কখনো
       // "হারিয়ে যাবে না" বা code-change-এর সাথে ভেঙে পড়বে না।
-      await ref.set({
+      const payload = {
         familyId: getFamilyId(),
         familyCode: getFamilyCode(),
         isCustomCode: localStorage.getItem("family_code_is_custom") === "1",
@@ -505,10 +512,15 @@ async function ensureFamilyMeta() {
         createdByUid: auth.currentUser ? auth.currentUser.uid : null,
         schemaVersion: 1,
         adminUids: []
-      });
+      };
+      await ref.set(payload);
+      return { exists: true, data: payload };
     }
+    return snap;
   } catch {
-    // Best-effort — future-migration prep।
+    // Best-effort — future-migration prep। ব্যর্থ হলে ইনপুট state (থাকলে)
+    // অপরিবর্তিতই ফেরত, নাহলে "নেই" ধরে নেওয়া — আগের error-swallow আচরণ অক্ষুণ্ণ।
+    return preloaded || { exists: false, data: null };
   }
 }
 // §৫ fix: বিদ্যমান (এই fix-এর আগে তৈরি হওয়া) family-দের dataCollectionName
@@ -519,14 +531,17 @@ async function ensureFamilyMeta() {
 // (network/rules-not-yet-deployed) local cache-এ derived মান বসিয়ে app
 // আগের মতোই কাজ করে — পরের সফল বুটে আবার ব্যাকফিল চেষ্টা হবে (idempotent)।
 let cachedDataCollectionName = null;
-async function ensureDataCollectionName() {
+// §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — ensureFamilyMeta()-এর
+// মতোই optional `preloaded`({exists, data}) parameter; না দিলে আগের মতোই
+// নিজের `.get()` করে(backward-compatible)। রিটার্ন: হালনাগাদ state।
+async function ensureDataCollectionName(preloaded) {
   try {
     const ref = familyDocRef();
-    const snap = await ref.get();
-    const existing = snap.exists ? snap.data().dataCollectionName : null;
+    const snap = preloaded || (await ref.get().then(s => ({ exists: s.exists, data: s.exists ? s.data() : null })));
+    const existing = snap.exists && snap.data ? snap.data.dataCollectionName : null;
     if (existing) {
       cachedDataCollectionName = existing;
-      return;
+      return snap;
     }
     const derived = `data_${getFamilyCode()}`;
     if (snap.exists) {
@@ -538,8 +553,10 @@ async function ensureDataCollectionName() {
       }
     }
     cachedDataCollectionName = derived;
+    return snap.exists ? { exists: true, data: { ...(snap.data || {}), dataCollectionName: derived } } : snap;
   } catch {
     cachedDataCollectionName = null; // getCollectionName() নিচে নিরাপদ fallback করবে
+    return preloaded || { exists: false, data: null };
   }
 }
 // legacyCollectionMap backfill — আগে এই mapping শুধু Phase C copy script
@@ -573,13 +590,19 @@ async function ensureLegacyCollectionMap() {
 // অপেক্ষা না করে। যে uid প্রথমে claim করে, সে-ই প্রথম Admin হবে —
 // "প্রথম-আসা" নিয়মটি Firestore Rules-এ server-side enforced (adminUids
 // ফাঁকা থাকলেই কেবল লেখা গৃহীত হয়), শুধু client-side check নয়।
-async function claimFirstAdminIfEligible() {
+// §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — optional `preloaded`
+// ({exists, data}) parameter; boot থেকে দিলে ensureFamilyMeta()-এর
+// রিটার্ন-করা state-ই reuse হয় (আলাদা `ref.get()` আর লাগে না)। parameter
+// না দিলে (standalone caller, custom-code-set/Google-link trigger) আগের
+// মতোই ensureFamilyMeta() নিজের `.get()` করবে — backward-compatible।
+// রিটার্ন-টাইপ(boolean) অপরিবর্তিত — বিদ্যমান caller-রা(৯০৫৪) কোনো পরিবর্তন
+// ছাড়াই কাজ করবে।
+async function claimFirstAdminIfEligible(preloaded) {
   if (!auth.currentUser) return false;
   try {
-    await ensureFamilyMeta();
+    const metaState = await ensureFamilyMeta(preloaded);
     const ref = familyDocRef();
-    const snap = await ref.get();
-    const current = snap.exists ? snap.data().adminUids || [] : [];
+    const current = metaState && metaState.exists && metaState.data ? (metaState.data.adminUids || []) : [];
     if (current.length === 0) {
       // §First Admin Protection — firstAdminUid একই write-এ, একবারই সেট
       // (Rules-এ enforced — এই clause claim-মুহূর্তে ছাড়া আর কখনো fire
@@ -3087,29 +3110,6 @@ function EyeOffIcon({
     y2: "23"
   }));
 }
-function SmartphoneIcon({
-  size,
-  color,
-  className
-}) {
-  return /*#__PURE__*/React.createElement(Icon, {
-    size: size,
-    color: color,
-    className: className
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: "5",
-    y: "2",
-    width: "14",
-    height: "20",
-    rx: "2",
-    ry: "2"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "12",
-    y1: "18",
-    x2: "12.01",
-    y2: "18"
-  }));
-}
 function MenuIcon({
   size,
   color,
@@ -5097,13 +5097,6 @@ function App() {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveYear, setArchiveYear] = useState(() => new Date().getFullYear());
   const [archiveMonth0, setArchiveMonth0] = useState(() => new Date().getMonth());
-  const [isCustomFamilyCode, setIsCustomFamilyCode] = useState(() => {
-    try {
-      return localStorage.getItem("family_code_is_custom") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [showMemberInfoModal, setShowMemberInfoModal] = useState(false);
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
@@ -5135,7 +5128,6 @@ function App() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
   const [copiedCode, setCopiedCode] = useState(false);
-  const [codeRevealed, setCodeRevealed] = useState(false);
   const originalEntryRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyList, setHistoryList] = useState([]);
@@ -5166,8 +5158,6 @@ function App() {
       // লোড করার আগেই (Google-linked থাকলে) account-এর সংরক্ষিত family
       // code দিয়ে local code sync করে নেওয়া হচ্ছে।
       await syncFamilyCodeWithAccount();
-      // Phase A prep — non-blocking, best-effort; app boot এর জন্য অপেক্ষা করে না।
-      ensureFamilyMeta();
       // Switch prep (Step 1): migrationState listener attach করার আগে
       // ensureFamilyCodeMapping() await করা হচ্ছে (Performance Audit fix,
       // ২২ আগস্ট ২০২৬: আগে এখানে একটি non-blocking fire-and-forget কলও
@@ -5178,13 +5168,25 @@ function App() {
       // সম্পন্ন না হওয়া পর্যন্ত)। getFamilyId() এখানে কল করার আগে সেই
       // self-heal সম্পন্ন হয়েছে কিনা নিশ্চিত করতে এই awaited কলটি প্রয়োজন।
       await ensureFamilyCodeMapping();
+      // §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — families/{id}
+      // এখন এখানে একবারই fetch হয়(self-heal-পরবর্তী, সঠিক familyId দিয়ে);
+      // আগের redundant non-awaited "Phase A prep" fire-and-forget কলটি
+      // (self-heal-এর *আগে* ফায়ার হতো, ভুল/stale familyId-এর ঝুঁকি ছিল)
+      // সম্পূর্ণ সরানো হয়েছে — নিচের awaited ensureFamilyMeta() একই কাজ
+      // idempotent-ভাবে করে, তাই কোনো functional পরিবর্তন নেই। এই একটিমাত্র
+      // read-এর state ensureFamilyMeta→ensureDataCollectionName→
+      // claimFirstAdminIfEligible — তিনটিতেই thread হয় (প্রতিটি write-এর
+      // পর in-memory state আপডেট হয়ে পরের ধাপে যায়), ফলে এই চেইনে আগে
+      // ৫টা আলাদা `.get()` লাগত, এখন ১টা।
+      const initialFamSnap = await familyDocRef().get();
+      let famState = { exists: initialFamSnap.exists, data: initialFamSnap.exists ? initialFamSnap.data() : null };
       // §৫ fix: familyId self-heal সম্পন্ন হওয়ার পরই family doc নিশ্চিত
       // (idempotent — আগে থেকে থাকলে no-op) ও dataCollectionName cache
       // পূরণ করা হচ্ছে — এর পরের যেকোনো read/write (migrateMembersIfNeeded
       // থেকে শুরু করে) getCollectionName()-এর সঠিক, familyCode-independent
       // মান পাবে।
-      await ensureFamilyMeta();
-      await ensureDataCollectionName();
+      famState = await ensureFamilyMeta(famState);
+      famState = await ensureDataCollectionName(famState);
       // Legacy read-rule gate fix: ব্র্যান্ড-নতুন/একা (auto-generated,
       // adminUids:[]) family-তে আগে শুধু "custom code সেট" বা "Google
       // link" trigger-এ admin claim হতো — legacy read-gate deploy হওয়ার
@@ -5194,7 +5196,7 @@ function App() {
       // হলো — বিদ্যমান শেয়ার্ড family-তে (adminUids ইতিমধ্যে অ-খালি)
       // কোনো প্রভাব নেই (ফাংশন internally no-op করে), Rules-এর
       // "প্রথম-আসা" নিয়ম অপরিবর্তিত।
-      await claimFirstAdminIfEligible();
+      await claimFirstAdminIfEligible(famState);
       // [সরানো, Member Key সেশন] Recovery Key modal trigger বাদ।
       // Legacy read-rule gate prep — non-blocking, best-effort; dataCollectionName
       // cache পূরণ হওয়ার পরই কল করা হচ্ছে (getCollectionName()-এর সঠিক মান
@@ -5299,11 +5301,18 @@ function App() {
                 .collection("accessRequests").doc(myUid);
               const reqSnap = await reqRef.get();
               if (!reqSnap.exists) {
-                // Moderation পুনঃস্থাপন(Audit Session-21 HIGH fix, ২২
-                // আগস্ট ২০২৬): নতুন access-request এখন "pending"-এ create
-                // হয়(আগের মতো), admin approve করা পর্যন্ত অপেক্ষা করতে
-                // হবে। Rules-এ self-create-এ শুধু pending allow।
-                await reqRef.set({ status: "pending", requestedAt: Date.now() });
+                // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved):
+                // নতুন access-request এখন সরাসরি "approved"-এ create হয়
+                // (আগে "pending" থাকত, admin approve করা লাগত)। Rules-এ
+                // self-create-এ approved status-ও allow করা হয়েছে।
+                // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
+                await reqRef.set({ status: "approved", requestedAt: Date.now() });
+                // যেহেতু মডারেশন অটো-অন, "অনুমোদনের অপেক্ষায়" স্ক্রিন
+                // দেখানোর দরকার নেই — সাথে সাথেই approved, তাই একবার
+                // reload করলে migrateMembersIfNeeded() স্বাভাবিকভাবে সফল
+                // হবে(নতুন accessRequest doc এখন approved অবস্থায় আছে)।
+                window.location.reload();
+                return;
               }
               // reqSnap আগে থেকেই exists(status যাই হোক — approved/pending/
               // denied legacy leftover) হলে এখানে কিছু করা হচ্ছে না, নিচের
@@ -6637,7 +6646,8 @@ function App() {
   // অবস্থান) reuse করা হচ্ছে — কোনো নতুন logic/state/collection নেই।
   const googleAccountModalNode = showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
-    onLinked: checkDriveBackupAfterLink
+    onLinked: checkDriveBackupAfterLink,
+    memberName: selectedMember?.name
   });
   const claimKeyModalNode = showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
@@ -7183,7 +7193,6 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setIsMenuOpen(!isMenuOpen);
-      setCodeRevealed(!isCustomFamilyCode);
     },
     className: "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-white/15 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all shadow-sm active:scale-95"
   }, /*#__PURE__*/React.createElement(MenuIcon, {
@@ -7202,25 +7211,13 @@ function App() {
     className: "flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
   }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
     className: "font-bold text-emerald-900 text-sm flex items-center justify-between mt-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => isCustomFamilyCode && setCodeRevealed(v => !v),
-    className: "inline-block" + (isCustomFamilyCode ? " cursor-pointer" : ""),
-    title: isCustomFamilyCode ? codeRevealed ? "লুকাতে ট্যাপ করুন" : "দেখতে ট্যাপ করুন" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     className: "tracking-wide select-none"
-  }, isCustomFamilyCode && !codeRevealed ? "••••••••" : getFamilyCode())), /*#__PURE__*/React.createElement("span", {
+  }, getFamilyCode()), /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-2 shrink-0 ml-2"
   }, copiedCode && /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] text-emerald-600 font-bold shrink-0"
-  }, "কপি হয়েছে!"), isCustomFamilyCode && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => {
-      e.stopPropagation();
-      setCodeRevealed(v => !v);
-    },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0",
-    title: codeRevealed ? "লুকান" : "দেখুন"
-  }, codeRevealed ? /*#__PURE__*/React.createElement(EyeOffIcon, { size: 13 }) : /*#__PURE__*/React.createElement(EyeIcon, { size: 13 })), /*#__PURE__*/React.createElement("button", {
+  }, "কপি হয়েছে!"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => {
       e.stopPropagation();
@@ -7389,7 +7386,7 @@ function App() {
     className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium text-emerald-800"
   }, /*#__PURE__*/React.createElement(MessageSquare, {
     size: 14
-  }), " পরামর্শ বা সমস্যা হলে আমাদের জানান")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
+  }), " আমাদের জানান (পরামর্শ বা সমস্যা)")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
@@ -7447,11 +7444,7 @@ function App() {
       className: "flex items-center gap-1.5"
     }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
       className: "text-slate-700 font-normal"
-    }, sinceText)), ownMember && ownMember.ownerUids && /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-1.5"
-    }, /*#__PURE__*/React.createElement(SmartphoneIcon, { size: 12 }), "বর্তমানে লগইন রয়েছেন: ", /*#__PURE__*/React.createElement("span", {
-      className: "text-slate-700 font-normal"
-    }, toBn(ownMember.ownerUids.length), "টি ডিভাইসে"))), ownMember && /*#__PURE__*/React.createElement("div", {
+    }, sinceText))), ownMember && /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -7508,7 +7501,7 @@ function App() {
       className: "inline-flex items-center gap-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 text-amber-800 border-slate-200 hover:bg-amber-50"
     }, /*#__PURE__*/React.createElement(GoogleIcon, {
       size: 10
-    }), " Google এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
+    }), " Google-এ যুক্ত হোন")), /*#__PURE__*/React.createElement("div", {
       className: "px-2 pt-1 mt-1 border-t border-slate-100"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -9031,7 +9024,8 @@ function signOutToFreshAnonymous() {
 function GoogleAccountModal({
   onClose,
   onLinked,
-  onFirstAdminClaimed
+  onFirstAdminClaimed,
+  memberName
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -9114,7 +9108,7 @@ function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
         });
       } else if (err && err.code === "auth/email-already-in-use") {
         // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি সেশনের সাথে লিংক করা
@@ -9129,7 +9123,7 @@ function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: "এই Google অ্যাকাউন্ট আগে থেকে অন্য ডিভাইসে যুক্ত আছে। আবার সাইন ইন করতে নিচের বাটনে একবার ক্লিক করুন।"
+          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
         });
       } else {
         setNotice({
@@ -9427,7 +9421,7 @@ function OnboardingBridge({
         className: "w-full h-12 rounded-2xl border-2 border-slate-200 bg-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
       }, /*#__PURE__*/React.createElement(GoogleIcon, {
         size: 18
-      }), "Google এ যুক্ত হোন"),
+      }), "Google-এ যুক্ত হোন"),
       /*#__PURE__*/React.createElement("button", {
         key: "skip",
         onClick: () => onAdvance(null),
