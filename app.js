@@ -9210,11 +9210,17 @@ function OnboardingBridge({
   const prevBecomeOpen = useRef(false);
   const prevClaimOpen = useRef(false);
 
-  // google/becomeMember ধাপে existing modal auto-open।
+  // google/becomeMember ধাপে existing modal auto-open। myMemberRequestStatus
+  // ইতিমধ্যে "pending" হলে(request সফল submit হয়ে গেছে) modal আর re-open
+  // করা হয় না — নিচের pending-স্ক্রিন render branch তখন দেখানো হয়(bug-fix,
+  // ২২ আগস্ট ২০২৬: আগে এই effect pending অবস্থাতেও বারবার modal খুলে
+  // দিত/ফাঁকি দিত কারণ gate সাথে সাথেই clear হয়ে যেত)।
   useEffect(() => {
     if (step === "google" && !showGoogleAccountModal) setShowGoogleAccountModal(true);
-    if (step === "becomeMember" && !showBecomeMemberModal) setShowBecomeMemberModal(true);
-  }, [step]);
+    if (step === "becomeMember" && !showBecomeMemberModal && myMemberRequestStatus !== "pending") {
+      setShowBecomeMemberModal(true);
+    }
+  }, [step, myMemberRequestStatus]);
 
   // Google modal বন্ধ হলে পরবর্তী ধাপ নির্ধারণ — নতুন Family হলে সরাসরি
   // key-reveal; বিদ্যমান Family হলে UID match করলে done, না করলে
@@ -9232,16 +9238,18 @@ function OnboardingBridge({
   }, [showGoogleAccountModal]);
 
   // "সদস্য হোন" মোডাল বন্ধ হলে — সফল submit(myMemberRequestStatus:
-  // "pending" হয়ে গেছে) হলেই onboarding সম্পূর্ণ ধরে gate clear হবে;
-  // Cancel/X(status এখনো set হয়নি) হলে পুরনো deprecated "choose"
-  // পেজ(page-2 redesign-এর পর অপ্রচলিত) না দেখিয়ে family-context
-  // পুরোপুরি undo করে page-1/2(Onboarding())-এ ফেরত পাঠানো হয়(২০ আগস্ট
-  // ২০২৬ bug fix) — authentication ছাড়া Dashboard entry-ও রোধ থাকে।
+  // "pending" হয়ে গেছে) হলে gate clear না করে "becomeMember" step-এই
+  // থেকে নিচের pending-স্ক্রিন render branch দেখানো হয়(admin approve না
+  // করা পর্যন্ত); bug-fix(২২ আগস্ট ২০২৬) — আগে এখানে সরাসরি onAdvance(null)
+  // কল হতো, ফলে gate সাথে সাথে clear হয়ে "অনুমোদনের অপেক্ষায়" স্ক্রিন
+  // কখনো দেখানো হতো না(request তবুও ঠিকই submit হতো)। Cancel/X(status
+  // এখনো set হয়নি) হলে পুরনো deprecated "choose" পেজ(page-2 redesign-এর
+  // পর অপ্রচলিত) না দেখিয়ে family-context পুরোপুরি undo করে page-1/2
+  // (Onboarding())-এ ফেরত পাঠানো হয়(২০ আগস্ট ২০২৬ bug fix) —
+  // authentication ছাড়া Dashboard entry-ও রোধ থাকে।
   useEffect(() => {
     if (prevBecomeOpen.current && !showBecomeMemberModal && step === "becomeMember") {
-      if (myMemberRequestStatus === "pending") {
-        onAdvance(null);
-      } else {
+      if (myMemberRequestStatus !== "pending") {
         try {
           sessionStorage.removeItem("dt_onboarding_flow");
           sessionStorage.removeItem("dt_onboarding_step");
@@ -9254,6 +9262,18 @@ function OnboardingBridge({
     }
     prevBecomeOpen.current = showBecomeMemberModal;
   }, [showBecomeMemberModal, myMemberRequestStatus]);
+
+  // Admin approve করলে(myMemberRequestStatus:"approved" ও নতুন member
+  // ownerUids-এ myUid যোগ হয়ে members list live-update হয়) "becomeMember"
+  // step থেকে স্বয়ংক্রিয়ভাবে onboarding সম্পূর্ণ ধরে gate clear হবে।
+  // bug-fix(২২ আগস্ট ২০২৬), pending-screen যোগের সাথে সংশ্লিষ্ট —
+  // আগে gate তাৎক্ষণিক clear হতো বলে এই auto-advance আলাদাভাবে দরকার
+  // ছিল না।
+  useEffect(() => {
+    if (step === "becomeMember" && myUid && (members || []).some(m => m.ownerUids?.includes(myUid))) {
+      onAdvance(null);
+    }
+  }, [step, members, myUid]);
 
   // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
   useEffect(() => {
@@ -9271,6 +9291,24 @@ function OnboardingBridge({
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-100 text-center flex flex-col gap-4 items-center"
   }, children));
+
+  // "সদস্য হোন" request pending অবস্থায়(admin এখনো approve করেননি) —
+  // bug-fix(২২ আগস্ট ২০২৬): request সফল submit হয়েছে ঠিকই কিন্তু আগে এই
+  // স্ক্রিন দেখানো হতো না(gate অকালে clear হয়ে যেত)। accessPending
+  // স্ক্রিনের(নিচে, App() মূল tree-তে) একই ডিজাইন প্যাটার্ন reuse।
+  if (step === "becomeMember" && myMemberRequestStatus === "pending") {
+    return shell([
+      /*#__PURE__*/React.createElement("div", {
+        key: "title",
+        className: "text-lg font-bold tracking-tight",
+        style: { color: "#0E4B43", fontFamily: "'Noto Serif Bengali', serif" }
+      }, "অনুমোদনের অপেক্ষায়"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "note",
+        className: "text-sm text-slate-500 leading-relaxed"
+      }, "আপনার \"সদস্য হোন\" অনুরোধ পরিবারের এডমিনের কাছে পাঠানো হয়েছে। এডমিন অনুমোদন করলে স্বয়ংক্রিয়ভাবে পরবর্তী ধাপে যাবেন।")
+    ]);
+  }
 
   if (step === "addMember") {
     return shell([
