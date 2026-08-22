@@ -5004,6 +5004,12 @@ function App() {
   // দেখানোর জন্য — memberRequests/{uid}.presetKey থেকেই আসে(নতুন কোনো
   // persistence-layer না, memberRequest doc-ই single source of truth)।
   const [myMemberRequestKey, setMyMemberRequestKey] = useState(null);
+  // §Onboarding Gate reopen-fix(২৩ আগস্ট ২০২৬): নিচের myMemberRequestStatus
+  // effect সম্পন্ন(success/error/bail — যেকোনোভাবে) হওয়ার আগে বুট-loading গেট
+  // ছাড়া হবে না(নিচে দ্রষ্টব্য), যাতে pending status Firestore থেকে confirm
+  // হওয়ার আগেই Dashboard-এর transient bypass না ঘটে। একবার true হলে পরের
+  // re-run-গুলোতে আর false-এ reset হয় না(normal user-দের জন্য flicker এড়াতে)।
+  const [myMemberRequestChecked, setMyMemberRequestChecked] = useState(false);
   // §Onboarding continuation — Family Code submit-এর পরে reload হওয়া
   // সত্ত্বেও Onboarding() flow ধারাবাহিক রাখতে। sessionStorage flag
   // Onboarding()-এ সেট হয়েছে; এখানে শুধু পড়া+ধাপ-অনুসরণ। কোনো নতুন
@@ -5475,6 +5481,7 @@ function App() {
     if (!myUid || migrationState !== "v2" || !getFamilyId()) {
       setMyMemberRequestStatus(null);
       setMyMemberRequestKey(null);
+      setMyMemberRequestChecked(true);
       return;
     }
     db.collection("families").doc(getFamilyId())
@@ -5483,7 +5490,8 @@ function App() {
         setMyMemberRequestStatus(snap.exists ? snap.data().status : null);
         setMyMemberRequestKey(snap.exists ? (snap.data().presetKey || null) : null);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setMyMemberRequestChecked(true));
   }, [members, migrationState]);
   // §Approved-member Google welcome(২৩ আগস্ট ২০২৬): নিজের memberRequest
   // "approved" হলে ও এখনো Google-linked না হলে, মূল App page-এ একবার
@@ -6695,7 +6703,7 @@ function App() {
       avgPct: Math.round(avg * 100)
     };
   }, [monthEntries, monthCursor, selectedMember, allFields]);
-  if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement("div", {
+  if (members === null || migrationState === undefined || !myMemberRequestChecked) return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex items-center justify-center bg-[#F4F7F1]"
   }, /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
@@ -6890,9 +6898,17 @@ function App() {
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
   // হলেই(সফল Google/Member-Password/approved onboarding) onbStep null
   // হয়ে স্বাভাবিক Dashboard render হবে।
-  if (onbStep) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
+  // §Onboarding Gate reopen-fix(২৩ আগস্ট ২০২৬): আগে শুধু onbStep(sessionStorage,
+  // ব্রাউজার-সেশন বন্ধ হলে হারিয়ে যায়) দিয়ে গেট হতো — ফলে "সদস্য হোন" পাঠানোর
+  // পর ব্রাউজার বন্ধ করে আবার খুললে pending থাকা সত্ত্বেও সরাসরি Dashboard
+  // render হয়ে যেত(write অবশ্য Rules-এই block হতো, কিন্তু UX ভুল)। এখন
+  // Firestore-persisted myMemberRequestStatus(session-independent)ও গেট
+  // trigger করে — onbStep না থাকলেও pending হলে একই pending-screen(step:
+  // "becomeMember") reuse হবে। denied/approved flow অপরিবর্তিত(এই condition
+  // শুধু "pending"-এ trigger করে)।
+  if (onbStep || myMemberRequestStatus === "pending") return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
     flow: onbFlow,
-    step: onbStep,
+    step: onbStep || "becomeMember",
     onAdvance: onbAdvance,
     isAdmin: isAdmin,
     myUid: auth.currentUser ? auth.currentUser.uid : null,
@@ -9724,9 +9740,7 @@ function Onboarding() {
       } else if (res && res.reason === "denied") {
         setError("এডমিন আপনার সদস্য হওয়ার অনুরোধটি বাতিল করেছেন। অনুগ্রহ করে আবার সদস্য হওয়ার জন্য অনুরোধ পাঠান।");
       } else {
-        // §TEMPORARY diagnostic(২৩ আগস্ট ২০২৬, পরে সরানো হবে): debugTag
-        // bracket-এ দেখিয়ে exact miss-reason বের করার জন্য।
-        setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।" + (res && res.debugTag ? " [" + res.debugTag + "]" : ""));
+        setError("Family Username বা Member Password মেলেনি। আবার চেষ্টা করুন।");
       }
       setBusy(false);
     }
