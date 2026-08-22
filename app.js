@@ -4317,13 +4317,17 @@ function generateMemberKeyPlain() {
 // তৈরি না হয়। শুধু plaintext key caller-কে return হয়(display/copy-এর
 // জন্য); hash claim-verify-এর জন্য Firestore-এ থাকে(sha256Hex reuse,
 // আগে Admin Recovery Key-তে ব্যবহৃত একই ফাংশন)।
-async function createMemberWithKey(member) {
+async function createMemberWithKey(member, presetKey) {
   const {
     id,
     ...fields
   } = member;
   const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(id);
-  const key = generateMemberKeyPlain();
+  // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬): presetKey দেওয়া
+  // হলে(admin approve path) requester-এর নিজের generate করা password-ই
+  // ব্যবহার হয়, নতুন generate হয় না — approval-এর আগে দেখানো password-ই
+  // approval-এর পর কার্যকর থাকতে হবে।
+  const key = presetKey || generateMemberKeyPlain();
   const hash = await sha256Hex(key);
   const batch = db.batch();
   // Admin FIFO ownerActivity missing-key fix(১৯ আগস্ট ২০২৬): ownerUids-সহ
@@ -4972,6 +4976,10 @@ function App() {
   const [becomeMemberGender, setBecomeMemberGender] = useState("male");
   const [becomeMemberBusy, setBecomeMemberBusy] = useState(false);
   const [myMemberRequestStatus, setMyMemberRequestStatus] = useState(null);
+  // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬): pending screen-এ
+  // দেখানোর জন্য — memberRequests/{uid}.presetKey থেকেই আসে(নতুন কোনো
+  // persistence-layer না, memberRequest doc-ই single source of truth)।
+  const [myMemberRequestKey, setMyMemberRequestKey] = useState(null);
   // §Onboarding continuation — Family Code submit-এর পরে reload হওয়া
   // সত্ত্বেও Onboarding() flow ধারাবাহিক রাখতে। sessionStorage flag
   // Onboarding()-এ সেট হয়েছে; এখানে শুধু পড়া+ধাপ-অনুসরণ। কোনো নতুন
@@ -5439,11 +5447,15 @@ function App() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     if (!myUid || migrationState !== "v2" || !getFamilyId()) {
       setMyMemberRequestStatus(null);
+      setMyMemberRequestKey(null);
       return;
     }
     db.collection("families").doc(getFamilyId())
       .collection("memberRequests").doc(myUid).get()
-      .then(snap => setMyMemberRequestStatus(snap.exists ? snap.data().status : null))
+      .then(snap => {
+        setMyMemberRequestStatus(snap.exists ? snap.data().status : null);
+        setMyMemberRequestKey(snap.exists ? (snap.data().presetKey || null) : null);
+      })
       .catch(() => {});
   }, [members, migrationState]);
   useEffect(() => {
@@ -5873,7 +5885,7 @@ function App() {
           createdAt: Date.now(),
           updatedAt: Date.now()
         };
-        await createMemberWithKey(newMember);
+        await createMemberWithKey(newMember, req.presetKey);
         setMembers(prev => [...(prev || []), newMember]);
       }
       await db.collection("families").doc(famId)
@@ -6775,10 +6787,16 @@ function App() {
       if (!name || !uid) return;
       setBecomeMemberBusy(true);
       try {
+        // §pre-generated Member Password(২২ আগস্ট ২০২৬): admin approve করার
+        // আগে কোনো members/private/key/keyIndex doc তৈরি হয় না — শুধু এই
+        // memberRequest doc-এ(self/admin-only readable) plaintext presetKey
+        // থাকে, approve হলে ঠিক এই key দিয়েই member তৈরি হয়।
+        const presetKey = generateMemberKeyPlain();
         await db.collection("families").doc(getFamilyId())
           .collection("memberRequests").doc(uid)
-          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now() });
+          .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now(), presetKey });
         setMyMemberRequestStatus("pending");
+        setMyMemberRequestKey(presetKey);
         setShowBecomeMemberModal(false);
         setBecomeMemberName("");
         try {
@@ -6826,7 +6844,8 @@ function App() {
     showClaimKeyModal: showClaimKeyModal,
     setClaimKeyTarget: setClaimKeyTarget,
     setShowClaimKeyModal: setShowClaimKeyModal,
-    myMemberRequestStatus: myMemberRequestStatus
+    myMemberRequestStatus: myMemberRequestStatus,
+    myMemberRequestKey: myMemberRequestKey
   }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
@@ -9198,7 +9217,7 @@ function OnboardingBridge({
   showGoogleAccountModal, setShowGoogleAccountModal,
   showBecomeMemberModal, setShowBecomeMemberModal,
   showClaimKeyModal, setClaimKeyTarget, setShowClaimKeyModal,
-  myMemberRequestStatus
+  myMemberRequestStatus, myMemberRequestKey
 }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState("male");
@@ -9306,7 +9325,27 @@ function OnboardingBridge({
       /*#__PURE__*/React.createElement("p", {
         key: "note",
         className: "text-sm text-slate-500 leading-relaxed"
-      }, "আপনার \"সদস্য হোন\" অনুরোধ পরিবারের এডমিনের কাছে পাঠানো হয়েছে। এডমিন অনুমোদন করলে স্বয়ংক্রিয়ভাবে পরবর্তী ধাপে যাবেন।")
+      }, "আপনার সদস্য হওয়ার অনুরোধ এডমিনের অনুমোদনের অপেক্ষায় রয়েছে।"),
+      myMemberRequestKey && /*#__PURE__*/React.createElement("div", {
+        key: "key",
+        className: "w-full py-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-xl tracking-widest font-bold font-mono"
+      }, myMemberRequestKey),
+      myMemberRequestKey && /*#__PURE__*/React.createElement("button", {
+        key: "copy",
+        onClick: () => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(myMemberRequestKey).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }).catch(() => {});
+          }
+        },
+        className: "text-sm font-bold text-emerald-800 underline underline-offset-2"
+      }, copied ? "কপি হয়েছে" : "কপি করুন"),
+      /*#__PURE__*/React.createElement("p", {
+        key: "note2",
+        className: "text-sm text-slate-500 leading-relaxed"
+      }, "মেম্বার পাসওয়ার্ড সংরক্ষণ করুন। অনুমোদন হলে ফ্যামিলি ইউজারনেম ও মেম্বার পাসওয়ার্ড দিয়ে পরিবারে প্রবেশ করতে পারবেন। এই পাসওয়ার্ড পরবর্তীতে যেকোনো সময় পরিবর্তন করা যাবে।")
     ]);
   }
 
