@@ -125,10 +125,12 @@ function getFamilyCode() {
 }
 const FAMILY_CODE_MIN_LENGTH = 6;
 const FAMILY_CODE_MAX_LENGTH = 30;
-// শুধু যেসব ক্যারেক্টার Firestore-এর path/collection নাম ভাঙতে পারে বা কপি-পেস্টে সমস্যা করে,
-// সেগুলোই বাদ: space, / (path separator), \ , ' এবং " (quoting সমস্যা এড়াতে)।
-// বাকি সব ইংরেজি অক্ষর (ছোট/বড় হাতের), সংখ্যা এবং বিশেষ চিহ্ন (@#*!$%^&()_+= ইত্যাদি) allow।
-const FAMILY_CODE_CHARSET_PATTERN = /^(?!\.+$)(?!__.*__$)[^\s/\\'"]+$/;
+// §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): শুধু English
+// letter(A-Z/a-z), digit(0-9), underscore(_), hyphen(-) allow — আগের
+// broader pattern(শুধু space/slash/backslash/quote বাদ, বাকি সব unicode-সহ
+// allow করত) সংকুচিত করে English-only করা হয়েছে। "__...__" reserved-prefix
+// guard(Firestore-সম্মত নাম এড়াতে) অপরিবর্তিত রাখা হয়েছে।
+const FAMILY_CODE_CHARSET_PATTERN = /^(?!__.*__$)[A-Za-z0-9_-]+$/;
 function isFamilyCodeCharsetValid(code) {
   return FAMILY_CODE_CHARSET_PATTERN.test(code);
 }
@@ -146,7 +148,7 @@ function setFamilyCode(code) {
     return;
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+    alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
     return;
   }
   localStorage.setItem("family_code", normalized);
@@ -4288,6 +4290,14 @@ function memberPrivateKeyRef(memberId) {
 // শুধু hash-ভিত্তিক, charset-নির্ভর নয়) — শুধু নতুন/rotate করা key-এ এই
 // ফরম্যাট প্রযোজ্য। firestore.rules-এ memberKey regex একসাথে আপডেট করা
 // হয়েছে(superset — পুরনো numeric-ও এখনো match করে)।
+// §English-only validation(২৩ আগস্ট ২০২৬, owner-approved) — Member Password-এ
+// allow: English letter(A-Za-z), digit(0-9), এবং নিচের generateMemberKeyPlain()-এ
+// ব্যবহৃত একই symbol pool(!@#$%&*+-_) — নতুন কোনো charset পুল না বানিয়ে
+// existing auto-gen pattern-ই reuse করা হয়েছে।
+const MEMBER_KEY_CHARSET_PATTERN = /^[A-Za-z0-9!@#$%&*+\-_]+$/;
+function isMemberKeyCharsetValid(key) {
+  return MEMBER_KEY_CHARSET_PATTERN.test(key);
+}
 function generateMemberKeyPlain() {
   const DIGITS = "23456789";
   const UPPER = "ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -4312,6 +4322,49 @@ function generateMemberKeyPlain() {
   }
   return chars.join("");
 }
+// §Readable Member Password(২৩ আগস্ট ২০২৬, owner-approved): আগের ৯-১২
+// ক্যারেক্টার জটিল random key-এর বদলে সহজে মনে-রাখা/পড়া যায় এমন প্যাটার্ন —
+// সদস্যের নামের English অংশ(Capitalize প্রথম অক্ষর) + ২-৩টি random digit,
+// যেমন "Nika21"। নামে ব্যবহারযোগ্য English letter(অন্তত ৩টি) না থাকলে(যেমন
+// বাংলা নাম) generic fallback "Member" + ৩টি digit(যেমন "Member482")।
+// Rules-এর min-length(৬) নিশ্চিত করতে প্রয়োজনে digit বাড়ানো হয়। পুরনো
+// generateMemberKeyPlain() অপরিবর্তিত রাখা হয়েছে — extreme-fallback(নিচে)
+// ও changeMemberKey()-এর dead-but-existing internal fallback branch-এ
+// এখনো ব্যবহৃত।
+function generateReadableMemberKey(name) {
+  function randInt(maxExclusive) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % maxExclusive;
+  }
+  const letters = (name || "").replace(/[^A-Za-z]/g, "");
+  const useFallback = letters.length < 3;
+  const base = useFallback ? "Member" : (letters[0].toUpperCase() + letters.slice(1).toLowerCase());
+  let digitCount = useFallback ? 3 : (2 + randInt(2)); // ২ বা ৩
+  let digits = "";
+  for (let i = 0; i < digitCount; i++) digits += String(randInt(10));
+  while ((base + digits).length < 6) digits += String(randInt(10));
+  return base + digits;
+}
+// §Collision-safe generation(২৩ আগস্ট ২০২৬, critical) — readable
+// প্যাটার্নে entropy অনেক কম(আগের high-entropy format-এর তুলনায়), তাই
+// keyIndex-এ duplicate-hash আছে কিনা bounded-retry দিয়ে check করা হয়।
+// প্রতিটি attempt-এ ১টি করে extra read(শুধু member-creation-এর মতো rare
+// action-এ, কোনো persistent listener/বাড়তি cost না)। bounded retry-ও
+// ব্যর্থ হলে(অত্যন্ত বিরল) পুরনো high-entropy generator fallback(ব্যবহারিকভাবে
+// collision-free) — কখনো silently duplicate key লেখা হয় না।
+async function generateUniqueReadableMemberKey(name) {
+  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const key = generateReadableMemberKey(name);
+    const hash = await sha256Hex(key);
+    const dupSnap = await keyIndexColl.doc(hash).get();
+    if (!dupSnap.exists) return { key, hash };
+  }
+  const key = generateMemberKeyPlain();
+  const hash = await sha256Hex(key);
+  return { key, hash };
+}
 // Member তৈরির সাথে সাথেই(admin-only path) key তৈরি — member doc ও
 // private/key doc একই batch-এ লেখা হয়, যাতে কখনো key-বিহীন member
 // তৈরি না হয়। শুধু plaintext key caller-কে return হয়(display/copy-এর
@@ -4323,13 +4376,23 @@ async function createMemberWithKey(member, presetKey) {
     ...fields
   } = member;
   const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(id);
-  // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬): presetKey দেওয়া
-  // হলে(admin approve path) requester-এর নিজের generate করা password-ই
-  // ব্যবহার হয়, নতুন generate হয় না — approval-এর আগে দেখানো password-ই
-  // approval-এর পর কার্যকর থাকতে হবে।
-  const key = presetKey || generateMemberKeyPlain();
-  const hash = await sha256Hex(key);
-  const batch = db.batch();
+  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
+  const privateRef = memberRef.collection("private").doc("key");
+  // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬, অপরিবর্তিত নীতি):
+  // presetKey দেওয়া হলে(admin approve path) requester-এর নিজের generate
+  // করা password-ই ব্যবহার হয়, silently regenerate হয় না — approval-এর
+  // আগে দেখানো password-ই approval-এর পর কার্যকর থাকতে হবে। presetKey না
+  // থাকলে(admin direct-add path) readable(নাম+২-৩ digit) key duplicate-check-সহ
+  // generate হয়(generateUniqueReadableMemberKey — pre-check retry)।
+  let key, hash;
+  if (presetKey) {
+    key = presetKey;
+    hash = await sha256Hex(key);
+  } else {
+    const generated = await generateUniqueReadableMemberKey(fields.name);
+    key = generated.key;
+    hash = generated.hash;
+  }
   // Admin FIFO ownerActivity missing-key fix(১৯ আগস্ট ২০২৬): ownerUids-সহ
   // তৈরি হওয়া member(approved memberRequest/first admin)-এর owner uid-এর
   // জন্য সাথে সাথে ownerActivity stamp করা হয় — নাহলে সেই uid নিজে entry
@@ -4343,25 +4406,35 @@ async function createMemberWithKey(member, presetKey) {
       initialOwnerActivity[u] = firebase.firestore.Timestamp.now();
     });
   }
-  batch.set(memberRef, {
-    ...fields,
-    ...(Object.keys(initialOwnerActivity).length ? { ownerActivity: initialOwnerActivity } : {}),
-    updatedAt: Date.now(),
-    lastActiveAt: firebase.firestore.Timestamp.now()
-  }, { merge: true });
-  batch.set(memberRef.collection("private").doc("key"), {
-    memberKey: key,
-    memberKeyHash: hash,
-    updatedAt: Date.now()
+  // §Collision-safe write(২৩ আগস্ট ২০২৬, critical) — batch.set()-এর বদলে
+  // transaction, যা লেখার ঠিক আগমুহূর্তে keyIndex/{hash} আবার verify করে
+  // (changeMemberKey()-এর existing duplicate-check pattern-এরই reuse)।
+  // readable password-এ entropy কম বলে pre-check(generateUniqueReadableMemberKey)
+  // ও এই final authoritative check — দুই স্তরেই duplicate silently overwrite
+  // হওয়া থেকে রক্ষা করে; কলিশন হলে(অত্যন্ত বিরল race) member তৈরি না হয়ে
+  // স্পষ্ট error throw হয়(caller-এর existing catch/alert দেখাবে)।
+  await db.runTransaction(async tx => {
+    const dupSnap = await tx.get(keyIndexColl.doc(hash));
+    if (dupSnap.exists) {
+      throw new Error("পাসওয়ার্ডে দ্বন্দ্ব(collision) হয়েছে — আবার চেষ্টা করুন।");
+    }
+    tx.set(memberRef, {
+      ...fields,
+      ...(Object.keys(initialOwnerActivity).length ? { ownerActivity: initialOwnerActivity } : {}),
+      updatedAt: Date.now(),
+      lastActiveAt: firebase.firestore.Timestamp.now()
+    }, { merge: true });
+    tx.set(privateRef, {
+      memberKey: key,
+      memberKeyHash: hash,
+      updatedAt: Date.now()
+    });
+    // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — routing-only ইনডেক্স,
+    // কোনো authorization field না। firestore.rules-এ ইতিমধ্যে implement করা
+    // আছে(cross-member injection-protected, duplicate-hash auto-block)।
+    tx.set(keyIndexColl.doc(hash), { memberId: id });
+    stampLastActive(tx, null, getFamilyId());
   });
-  // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — routing-only ইনডেক্স,
-  // কোনো authorization field না। firestore.rules-এ ইতিমধ্যে implement করা
-  // আছে(cross-member injection-protected, duplicate-hash auto-block)।
-  batch.set(db.collection("families").doc(getFamilyId()).collection("keyIndex").doc(hash), {
-    memberId: id
-  });
-  stampLastActive(batch, null, getFamilyId());
-  await batch.commit();
   return key;
 }
 // নিজের(owner) অথবা admin — member-এর plaintext key fetch(শুধু
@@ -4958,14 +5031,14 @@ function App() {
     if (owned.length === 0) return null;
     return owned.reduce((a, b) => (a.createdAt || 0) <= (b.createdAt || 0) ? a : b).id;
   }, [firstAdminUid, members]);
-  // §Notification System — unread notifications(boot-এ onSnapshot দিয়ে
-  // live-updated) ও panel খোলা আছে কিনা।
+  // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — read+unread উভয় notification
+  // live-updated(boot-এ onSnapshot দিয়ে) ও panel খোলা আছে কিনা। আগে শুধু
+  // unread(read==false) filter করা হতো, ফলে "seen" করলেই item panel থেকে
+  // হারিয়ে যেত(bug)। এখন পুরো list রাখা হয়, শুধু delete/Clear-all দিয়েই
+  // item সরে; badge/unread-count আলাদাভাবে notifications.filter(!read) থেকে
+  // derive করা হয়।
   const [notifications, setNotifications] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
-  // §Notification System — panel খোলার মুহূর্তের unread snapshot, যাতে
-  // "auto-mark-read on open" করার পরও(live query notifications থেকে সরে
-  // যায়) panel-এ item দেখানো যায়। নতুন collection/schema না, শুধু local UI state।
-  const [notifPanelItems, setNotifPanelItems] = useState([]);
   // §Recovery Key — first-admin claim-এর ঠিক পরে key দেখানোর modal, ও
   // [সরানো, Member Key সেশন] showRecoveryKeyModal/generatedRecoveryKey/
   // showRecoveryClaim/recoveryKeyInput/recoveryClaimBusy — Admin Recovery
@@ -5309,15 +5382,15 @@ function App() {
         setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
         // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
         setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
-        // §Notification System — শুধু নিজের unread notification-এ live
-        // listener(count/badge-এর জন্য যথেষ্ট; panel খোলার সময় আলাদা করে
-        // full/read-সহ list fetch হবে)। Spark-এ negligible cost(৩-member
-        // স্কেলে খুবই কম doc)।
+        // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
+        // notification(read+unread)-এ live listener, যাতে "seen"(read:true)
+        // করার পরও item panel থেকে হারিয়ে না যায়(শুধু explicit delete/Clear-all
+        // দিয়েই সরবে)। badge unread-count আলাদাভাবে filter করে বের করা হয়।
+        // Spark-এ negligible cost(৩-member স্কেলে খুবই কম doc)।
         if (myUid) {
           notifUnsub = db.collection("families").doc(migrationFamilyId)
             .collection("notifications")
             .where("targetUid", "==", myUid)
-            .where("read", "==", false)
             .onSnapshot(
               (nsnap) => {
                 setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -5933,6 +6006,13 @@ function App() {
   // অর্থাৎ approval-এর সাথে সাথেই সে নিজের member auto-claimed অবস্থায়
   // পায়, আলাদা করে "দায়িত্ব নিন" লাগে না।
   async function decideMemberRequest(req, decision) {
+    // §Race-fix(২৩ আগস্ট ২০২৬): member-list ও notification-panel উভয় জায়গা
+    // থেকেই একই pendingMemberRequests state থেকে render হয়(single source)।
+    // কোনো await-এর আগেই(synchronously) list থেকে সরানো হয়, যাতে দুই জায়গা
+    // থেকে quick double-tap হলেও দ্বিতীয় call approve/reject আর কিছু খুঁজে
+    // না পায়(duplicate member তৈরি/duplicate write প্রতিরোধ)। ব্যর্থ হলে
+    // item ফিরিয়ে আনা হয়, যাতে retry করা যায়।
+    setPendingMemberRequests(list => list.filter(r => r.id !== req.id));
     try {
       const famId = getFamilyId();
       if (decision === "approved") {
@@ -5951,8 +6031,8 @@ function App() {
       await db.collection("families").doc(famId)
         .collection("memberRequests").doc(req.id)
         .update({ status: decision, decidedAt: Date.now() });
-      setPendingMemberRequests(list => list.filter(r => r.id !== req.id));
     } catch (err) {
+      setPendingMemberRequests(list => list.some(r => r.id === req.id) ? list : [...list, req]);
       alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
     }
   }
@@ -5969,7 +6049,7 @@ function App() {
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
       return;
     }
     if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
@@ -5979,7 +6059,7 @@ function App() {
       if (result && result.aborted) {
         const reasonMsg = {
           length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-          charset: "অবৈধ ক্যারেক্টার।",
+          charset: "অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।",
           "code-taken": "এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে, অন্য একটি কোড ব্যবহার করুন।",
           error: result.error || "একটি সমস্যা হয়েছে।"
         }[result.reason] || "নতুন ফ্যামিলি তৈরি করা যায়নি।";
@@ -6029,7 +6109,7 @@ function App() {
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("ফ্যামিলি ইউজারনেমে স্পেস, / (স্ল্যাশ), \\ (ব্যাকস্ল্যাশ), বা কোটেশন চিহ্ন ( ' \" ) ব্যবহার করা যাবে না।");
+      window.alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
       return;
     }
     if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডেটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
@@ -6039,7 +6119,7 @@ function App() {
       if (result && result.aborted) {
         const reasonMsg = {
           length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-          charset: "অবৈধ ক্যারেক্টার।",
+          charset: "অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।",
           "no-auth": "সাইন ইন করা নেই।",
           error: result.error || "একটি সমস্যা হয়েছে।"
         }[result.reason] || "কোড পরিবর্তন করা যায়নি।";
@@ -6858,11 +6938,15 @@ function App() {
       if (!name || !uid) return;
       setBecomeMemberBusy(true);
       try {
-        // §pre-generated Member Password(২২ আগস্ট ২০২৬): admin approve করার
-        // আগে কোনো members/private/key/keyIndex doc তৈরি হয় না — শুধু এই
-        // memberRequest doc-এ(self/admin-only readable) plaintext presetKey
-        // থাকে, approve হলে ঠিক এই key দিয়েই member তৈরি হয়।
-        const presetKey = generateMemberKeyPlain();
+        // §pre-generated Member Password(২২ আগস্ট ২০২৬, readable-format
+        // সংশোধন ২৩ আগস্ট ২০২৬): admin approve করার আগে কোনো members/
+        // private/key/keyIndex doc তৈরি হয় না — শুধু এই memberRequest doc-এ
+        // (self/admin-only readable) plaintext presetKey থাকে, approve হলে
+        // ঠিক এই key দিয়েই member তৈরি হয়। readable(নাম+২-৩ digit) প্যাটার্নে
+        // entropy কম বলে generateUniqueReadableMemberKey() দিয়েই এখানেই(request
+        // submit-মুহূর্তে) keyIndex-এর বিপরীতে duplicate-check করা হয়(bounded
+        // retry) — approval-পর্যন্ত অপেক্ষা না করে যতটা সম্ভব আগেই কলিশন এড়ানো।
+        const { key: presetKey } = await generateUniqueReadableMemberKey(name);
         await db.collection("families").doc(getFamilyId())
           .collection("memberRequests").doc(uid)
           .set({ name, gender: becomeMemberGender, status: "pending", requestedAt: Date.now(), presetKey });
@@ -7290,7 +7374,13 @@ function App() {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      setIsMenuOpen(!isMenuOpen);
+      const next = !isMenuOpen;
+      setIsMenuOpen(next);
+      // §Member Request-in-list(২৩ আগস্ট ২০২৬) — admin dropdown খুললে pending
+      // memberRequests load(existing loadPendingMemberRequests() reuse, notif
+      // click-এর মতোই)। শুধু admin, শুধু menu-open মুহূর্তে(one-shot fetch,
+      // কোনো নতুন persistent listener না)।
+      if (next && isAdmin) loadPendingMemberRequests();
     },
     className: "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-white/15 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all shadow-sm active:scale-95"
   }, /*#__PURE__*/React.createElement(MenuIcon, {
@@ -7425,7 +7515,24 @@ function App() {
     title: "সদস্য বাদ দিন"
   }, /*#__PURE__*/React.createElement(Trash, {
     size: 12
-  })))))), null), /*#__PURE__*/React.createElement("button", {
+  })))))), isAdmin && pendingMemberRequests.length > 0 && pendingMemberRequests.map(req => /*#__PURE__*/React.createElement("div", {
+    key: "pendingReq-" + req.id,
+    className: "flex items-center justify-between flex-nowrap gap-x-1 px-2 py-1.5 rounded-lg text-slate-700"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5 shrink-0"
+  }, /*#__PURE__*/React.createElement(User, { size: 13 }), " ", req.name), /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center flex-nowrap gap-1 shrink-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 shrink-0"
+  }, "Pending"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => { e.stopPropagation(); decideMemberRequest(req, "approved"); },
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0",
+    title: "অনুমোদন করুন"
+  }, "Approve"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => { e.stopPropagation(); decideMemberRequest(req, "denied"); },
+    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-red-50 text-red-600 border border-red-100 shrink-0",
+    title: "প্রত্যাখ্যান করুন"
+  }, "Reject"))))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
       const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${getFamilyCode()}`;
@@ -7615,8 +7722,10 @@ function App() {
       setShowNotifPanel(v => {
         const next = !v;
         if (next) {
-          const toMark = notifications;
-          setNotifPanelItems(toMark);
+          // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — seen করলে item
+          // panel থেকে সরে না(শুধু delete/Clear-all করলেই সরবে); এখানে শুধু
+          // read:true mark করা হয়(badge কমানোর জন্য), list অপরিবর্তিত থাকে।
+          const toMark = notifications.filter(n => !n.read);
           if (toMark.length > 0) {
             const batch = db.batch();
             toMark.forEach(n => {
@@ -7626,9 +7735,10 @@ function App() {
               );
             });
             batch.commit().catch(() => {});
-            // Instant badge update — onSnapshot(read==false) নিজে থেকেও
-            // শীঘ্রই সরিয়ে দেবে, এটা শুধু তাৎক্ষণিক UI feedback-এর জন্য।
-            setNotifications([]);
+            // Instant badge update — onSnapshot নিজে থেকেও শীঘ্রই sync করবে,
+            // এটা শুধু তাৎক্ষণিক UI feedback-এর জন্য(item মোছে না, শুধু read flag)।
+            const markedIds = new Set(toMark.map(n => n.id));
+            setNotifications(prev => prev.map(n => markedIds.has(n.id) ? { ...n, read: true } : n));
           }
         }
         return next;
@@ -7638,16 +7748,16 @@ function App() {
     title: "নোটিফিকেশন"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm leading-none"
-  }, "🔔"), notifications.length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, "🔔"), notifications.filter(n => !n.read).length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
-  }, toBn(notifications.length))), showNotifPanel && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, toBn(notifications.filter(n => !n.read).length))), showNotifPanel && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-40",
     onClick: () => setShowNotifPanel(false)
   }), /*#__PURE__*/React.createElement("div", {
     className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs max-h-72 overflow-y-auto"
-  }, notifPanelItems.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, notifications.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-3 text-slate-400 text-center"
-  }, "কোনো নতুন নোটিফিকেশন নেই") : notifPanelItems.map(n => /*#__PURE__*/React.createElement("div", {
+  }, "কোনো নতুন নোটিফিকেশন নেই") : /*#__PURE__*/React.createElement(React.Fragment, null, notifications.map(n => /*#__PURE__*/React.createElement("div", {
     key: n.id,
     className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex items-start gap-2"
   }, /*#__PURE__*/React.createElement("div", {
@@ -7673,12 +7783,25 @@ function App() {
       db.collection("families").doc(getFamilyId())
         .collection("notifications").doc(n.id)
         .delete().catch(() => {});
-      setNotifPanelItems(prev => prev.filter(x => x.id !== n.id));
       setNotifications(prev => prev.filter(x => x.id !== n.id));
     },
     className: "shrink-0 p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors",
     title: "ডিলিট করুন"
-  }, /*#__PURE__*/React.createElement(Trash, { size: 12 })))))))), addingMember && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Trash, { size: 12 })))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => {
+      e.stopPropagation();
+      const all = notifications;
+      if (all.length === 0) return;
+      const batch = db.batch();
+      all.forEach(n => {
+        batch.delete(db.collection("families").doc(getFamilyId()).collection("notifications").doc(n.id));
+      });
+      batch.commit().catch(() => {});
+      setNotifications([]);
+    },
+    className: "w-full mt-1 px-4 py-2 text-center text-[11px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+  }, "সব মুছুন")))))), addingMember && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"
@@ -8575,6 +8698,10 @@ function App() {
       }
       if (manual.length < 6) {
         alert("Password কমপক্ষে ৬ ক্যারেক্টারের হতে হবে।");
+        return;
+      }
+      if (!isMemberKeyCharsetValid(manual)) {
+        alert("অনুগ্রহ করে শুধু English Alphabet ব্যবহার করুন।");
         return;
       }
       if (manual !== confirmVal) {
@@ -9696,7 +9823,7 @@ function Onboarding() {
   const errorText = reason => ({
     empty: "একটি Family Username দিন।",
     length: `Family Username ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-    charset: "Family Username-এ স্পেস, / , \\ , বা কোটেশন চিহ্ন ব্যবহার করা যাবে না।",
+    charset: "অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।",
     "code-taken": "এই Family Username ইতিমধ্যে ব্যবহৃত হচ্ছে। অন্য একটি কোড দিন।",
     "not-found": "এই Family Username খুঁজে পাওয়া যায়নি। বানান যাচাই করে আবার চেষ্টা করুন।",
     "same-family": "আপনি ইতিমধ্যে এই Family-তে আছেন।",
