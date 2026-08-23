@@ -315,11 +315,16 @@ async function createNewFamily(newCode) {
     } else {
       console.error("[New Family] auth.currentUser নেই — admin claim স্কিপ হলো।");
     }
-    console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। রিলোড হচ্ছে...`);
+    console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। in-place remount হচ্ছে...`);
     localStorage.setItem("family_id", newFamilyId);
     localStorage.setItem("family_code", normalized);
     localStorage.setItem("family_code_is_custom", "1");
-    window.location.reload();
+    // §Slow-flow fix — পূর্বে window.location.reload() ছিল(পুরো cold-boot
+    // দ্বিতীয়বার)। এখন remountAppInPlace() — নিচে দেখুন সেই ফাংশনের
+    // ব্যাখ্যা। sessionStorage dt_onboarding_flow="newFamily" আগে থেকেই
+    // Onboarding()-এর handleCreateNew()-এ সেট করা আছে, তাই নতুন App()
+    // mount সেটা পড়ে স্বাভাবিকভাবেই "addMember"(Name/Gender) স্টেপে যাবে।
+    remountAppInPlace();
     return { success: true, familyId: newFamilyId };
   } catch (err) {
     console.error("[New Family] ব্যর্থ:", err.message);
@@ -399,11 +404,15 @@ async function joinExistingFamily(code) {
     }
     return { aborted: true, reason: resolved.reason, error: resolved.error };
   }
-  console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${resolved.familyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+  console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${resolved.familyId}। এই ডিভাইস সুইচ হচ্ছে, in-place remount হচ্ছে...`);
   localStorage.setItem("family_id", resolved.familyId);
   localStorage.setItem("family_code", normalized);
   localStorage.setItem("family_code_is_custom", "1");
-  window.location.reload();
+  // §Slow-flow fix(ধাপ ২) — createNewFamily()-এর মতোই window.location.reload()-এর
+  // বদলে remountAppInPlace()। sessionStorage dt_onboarding_flow="existingFamily"
+  // (Onboarding()-এর handleJoinExisting()-এ আগে থেকেই সেট) নতুন App() mount
+  // পড়ে "becomeMember" স্টেপে যাবে — আগের reload-based আচরণের সাথে অভিন্ন।
+  remountAppInPlace();
   return { success: true };
 }
 if (typeof window !== "undefined") {
@@ -4670,7 +4679,12 @@ async function directIdentifyLogin(code, password) {
   if (isGoogleLinked()) {
     try { await saveUserFamilyCode(uid, normalizedCode, memberId); } catch {}
   }
-  window.location.reload();
+  // §Slow-flow fix(ধাপ ৩) — claim সম্পূর্ণ কমিট হওয়ার পরেই(উপরের সব await
+  // শেষে) window.location.reload()-এর বদলে remountAppInPlace()। এই flow-এ
+  // কোনো sessionStorage onboarding-flag নেই(direct login সরাসরি dashboard-এ
+  // যায়) — নতুন App() mount localStorage family_id/code থেকে স্বাভাবিক
+  // boot করবে, আগের reload-based আচরণের সাথে অভিন্ন।
+  remountAppInPlace();
   return { ok: true };
 }
 if (typeof window !== "undefined") {
@@ -10156,9 +10170,14 @@ function Onboarding() {
 
   return null;
 }
+// §Slow-flow fix(২৩ আগস্ট ২০২৬, ধাপ ১) — mountApp()-এর root module-scope
+// dtRoot-এ রাখা হলো(আগে local const ছিল), যাতে reload ছাড়াই safely
+// unmount+remount করা যায়(নিচে remountAppInPlace())। আচরণ অপরিবর্তিত —
+// শুধু root reference সংরক্ষণ, hasExistingSession/render logic হুবহু একই।
+let dtRoot = null;
 function mountApp() {
   const container = document.getElementById("root");
-  const root = ReactDOM.createRoot(container);
+  dtRoot = ReactDOM.createRoot(container);
   // Boot-gate: existing user/session কোনোভাবেই প্রভাবিত হয় না — শুধু
   // raw localStorage(family_id + family_code) না থাকলেই(সত্যিকারের
   // নতুন/Incognito context) Onboarding দেখানো হয়। এখানে ইচ্ছাকৃতভাবে
@@ -10166,9 +10185,31 @@ function mountApp() {
   // random id/code তৈরি+persist হয়ে যায়) — শুধু raw localStorage read।
   const hasExistingSession = !!(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
   if (hasExistingSession) {
-    root.render(/*#__PURE__*/React.createElement(App, null));
+    dtRoot.render(/*#__PURE__*/React.createElement(App, null));
   } else {
-    root.render(/*#__PURE__*/React.createElement(Onboarding, null));
+    dtRoot.render(/*#__PURE__*/React.createElement(Onboarding, null));
+  }
+}
+// §Slow-flow fix(২৩ আগস্ট ২০২৬) — createNewFamily()/joinExistingFamily()/
+// directIdentifyLogin()-এর সফল write/transaction-শেষে window.location.reload()-এর
+// বদলে এই ফাংশন ব্যবহার হয় (তিনটি flow-ই)। প্যাটার্নটি renderPendingGoogleReauthGate()-এর
+// proceedAnonymous()/handleGoogleClick()-এ ইতিমধ্যে ব্যবহৃত+প্রমাণিত
+// (root.unmount() তারপর নতুন createRoot) — এখানে App() ইতিমধ্যে mounted
+// থাকা অবস্থার জন্য reuse করা হলো(bootOnce()-এর appMounted-guard এড়াতে
+// সরাসরি mountApp() কল)। ফুল page reload এড়ানোয় App Check activation
+// (module-scope, script-load-এ একবারই হয়) ও Firebase Auth session restore
+// আবার হয় না — শুধু Onboarding()→App()-এর boot useEffect chain fresh
+// mount হয়ে নতুন localStorage family_id/code অনুযায়ী চলে(sessionStorage
+// dt_onboarding_flow flag আগের মতোই App()-এর mount-time useState দিয়ে
+// পড়া হয়, কোনো onboarding-state logic টাচ হয়নি)। ব্যর্থ(unmount exception)
+// হলে নিরাপদ fallback হিসেবে পুরনো reload আচরণ।
+function remountAppInPlace() {
+  try {
+    if (dtRoot) dtRoot.unmount();
+    mountApp();
+  } catch (e) {
+    console.error("[remountAppInPlace] ব্যর্থ, reload fallback:", e.message);
+    window.location.reload();
   }
 }
 
