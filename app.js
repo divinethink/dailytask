@@ -9589,22 +9589,16 @@ function OnboardingBridge({
   }
 
   if (step === "addMember") {
+    // §Back-button removal(bug-fix, ২৩ আগস্ট ২০২৬): এই step-এ পৌঁছানোর আগেই
+    // createNewFamily() family doc create + creator-uid adminUids-এ commit
+    // করে ফেলে(অপরিবর্তনযোগ্য, rollback নেই)। আগে এখানে "← ফিরে যান" বাটন
+    // ছিল যা শুধু onbStep/onbFlow(UI-state) clear করত("onAdvance(null)") —
+    // family creation/admin-claim অক্ষুণ্ণ থাকত। ফলে gate বন্ধ হয়ে normal
+    // Dashboard mount হতো, অথচ নিজের members doc(নাম/gender) তৈরিই হয়নি —
+    // Rules-side admin অনুযায়ী read/write বৈধভাবেই সফল হতো(authorization
+    // bug নয়, onboarding-completeness bug)। Fix: এই step non-skippable —
+    // Back সরানো হয়েছে, নাম দেওয়াই একমাত্র পথ।
     return shell([
-      /*#__PURE__*/React.createElement("button", {
-        key: "back",
-        type: "button",
-        onClick: () => {
-          // Onboarding বাতিল করে normal app-এ ফেরত — reload ছাড়াই সরাসরি
-          // state change(আগে full reload ব্যবহার হতো, যা মাঝে মাঝে onboarding
-          // welcome screen-এ ফিরিয়ে দিচ্ছিল — bug fix)।
-          try {
-            sessionStorage.removeItem("dt_onboarding_step");
-            sessionStorage.removeItem("dt_onboarding_flow");
-          } catch {}
-          onAdvance(null);
-        },
-        className: "self-start -mt-1 -mb-2 text-sm font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-1"
-      }, "← ফিরে যান"),
       /*#__PURE__*/React.createElement("div", {
         key: "title",
         className: "text-lg font-bold tracking-tight",
