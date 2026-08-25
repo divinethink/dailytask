@@ -1823,18 +1823,33 @@ if (typeof window !== "undefined") {
 async function backfillLastActiveAt(familyId, confirm) {
   const familyRoot = db.collection("families").doc(familyId);
   const membersSnap = await familyRoot.collection("members").get();
-  console.log(`[Lifecycle backfill] familyId=${familyId} — ${membersSnap.size}টি member doc + ১টি family doc lastActiveAt পাবে।`);
+  // TTL dry-run audit(২৫ আগস্ট ২০২৬) finding: entries-এ lastActiveAt কখনো
+  // stamp হতো না(saveEntry() ফিক্স হয়েছে future save-এর জন্য, কিন্তু
+  // existing doc-এর জন্য এই backfill-এই scope বাড়ানো হলো — same pattern)।
+  const entriesSnap = await familyRoot.collection("entries").get();
+  console.log(`[Lifecycle backfill] familyId=${familyId} — ${membersSnap.size}টি member + ${entriesSnap.size}টি entry doc + ১টি family doc lastActiveAt পাবে।`);
   if (!confirm) {
     console.log("[Lifecycle backfill] dry-run শেষ — আসল লেখা চালাতে backfillLastActiveAt(familyId, true) কল করুন।");
-    return { familyId, memberCount: membersSnap.size, dryRun: true };
+    return { familyId, memberCount: membersSnap.size, entryCount: entriesSnap.size, dryRun: true };
   }
   const ts = firebase.firestore.Timestamp.now();
-  const batch = db.batch();
-  membersSnap.docs.forEach(d => batch.set(d.ref, { lastActiveAt: ts }, { merge: true }));
+  // ৫০০/batch Firestore limit-এর কারণে entries বড় হলে chunk করা হলো
+  // (member+family ছোট বলে প্রথম batch-এই থাকছে, logic অপরিবর্তিত)।
+  const CHUNK = 400;
+  let batch = db.batch();
+  let opsInBatch = 0;
+  const flush = async () => { if (opsInBatch > 0) { await batch.commit(); batch = db.batch(); opsInBatch = 0; } };
+  membersSnap.docs.forEach(d => { batch.set(d.ref, { lastActiveAt: ts }, { merge: true }); opsInBatch++; });
   batch.set(familyRoot, { lastActiveAt: ts }, { merge: true });
-  await batch.commit();
-  console.log(`[Lifecycle backfill] সম্পন্ন — familyId=${familyId}, ${membersSnap.size}টি member + family doc আপডেট হয়েছে।`);
-  return { familyId, memberCount: membersSnap.size, dryRun: false };
+  opsInBatch++;
+  for (const d of entriesSnap.docs) {
+    if (opsInBatch >= CHUNK) await flush();
+    batch.set(d.ref, { lastActiveAt: ts }, { merge: true });
+    opsInBatch++;
+  }
+  await flush();
+  console.log(`[Lifecycle backfill] সম্পন্ন — familyId=${familyId}, ${membersSnap.size}টি member + ${entriesSnap.size}টি entry + family doc আপডেট হয়েছে।`);
+  return { familyId, memberCount: membersSnap.size, entryCount: entriesSnap.size, dryRun: false };
 }
 if (typeof window !== "undefined") {
   window.backfillLastActiveAt = backfillLastActiveAt;
@@ -4738,7 +4753,12 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   batch.set(ctx.entriesRef.doc(ctx.entryDocId(memberId, key)), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
-    ownerUid: ownerUid ?? null
+    ownerUid: ownerUid ?? null,
+    // TTL dry-run audit(২৫ আগস্ট ২০২৬) finding fix: এতদিন entry doc-এ
+    // lastActiveAt কখনো stamp হতো না(শুধু family+member-এ হতো) — ফলে
+    // Firestore TTL policy entry-তে কখনো trigger হতো না। existing
+    // Timestamp.now() pattern(দ্রষ্টব্য লাইন ৪০৫৯/৪২২৭) reuse করে এখানে যোগ।
+    lastActiveAt: firebase.firestore.Timestamp.now()
   }, {
     merge: true
   });
