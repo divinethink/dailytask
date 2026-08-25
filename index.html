@@ -1,93 +1,12 @@
 <!DOCTYPE html>
 <html lang="bn">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Daily Task — আমল ও পারিবারিক ট্র্যাকার</title>
-<meta name="theme-color" content="#0E4B43" />
-<link rel="manifest" href="manifest.json" />
-<link rel="icon" href="icon-192.png" />
-<link rel="apple-touch-icon" href="icon-192.png" />
-
-<!-- Preconnect: origin-এর DNS/TLS আগে থেকে parallel শুরু করার জন্য (execution order/dependency অপরিবর্তিত) -->
-<link rel="preconnect" href="https://cdn.tailwindcss.com" />
-<link rel="preconnect" href="https://unpkg.com" crossorigin />
-<link rel="preconnect" href="https://cdn.jsdelivr.net" />
-<link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-<link rel="preconnect" href="https://accounts.google.com" />
-
-<!-- Tailwind CSS -->
-<script>
-  // Suppresses two known-safe, cosmetic console warnings:
-  // 1) Tailwind's "should not be used in production" CDN notice.
-  // 2) Firestore's enableIndexedDbPersistence() deprecation notice
-  //    (app.js intentionally keeps using this proven API; only the
-  //    console noise is hidden here, behavior is unchanged).
-  (function () {
-    const _origWarn = console.warn;
-    const SUPPRESSED_SUBSTRINGS = [
-      "cdn.tailwindcss.com",
-      "enableIndexedDbPersistence",
-      "Failed to obtain exclusive access to the persistence layer",
-    ];
-    console.warn = function (...args) {
-      const combined = args
-        .map((a) => (typeof a === "string" ? a : (a && a.message) || ""))
-        .join(" ");
-      if (SUPPRESSED_SUBSTRINGS.some((s) => combined.includes(s))) return;
-      _origWarn.apply(console, args);
-    };
-  })();
-</script>
-<script src="https://cdn.tailwindcss.com" defer></script>
-
-<!-- React 18 -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin defer></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin defer></script>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-
-<!-- Firebase compat libraries -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer></script>
-
-<!-- নতুন ২টি লাইব্রেরি এখানে যুক্ত করা হয়েছে -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
-
-<!-- Firebase Analytics -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js" defer></script>
-
-<!-- Google Identity Services (GIS) — শুধুমাত্র Google Drive ব্যাকআপ ফিচারের
-     জন্য ব্যবহৃত হয় (drive.file স্কোপ, token client)। Firebase Auth-এর
-     Google Sign-In থেকে আলাদা এবং স্বাধীন। -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
-<style>
-  :root { --theme-primary: #0E4B43; }
-  html, body { background: #F4F7F1; margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-  
-  @media print {
-    @page { 
-      size: A4 portrait; 
-      margin: 10mm 10mm 10mm 15mm !important;
-    }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff !important; width: 183mm !important; }
-    .no-print { display: none !important; }
-    .page-break { page-break-before: always; }
-    .print-page { width: 183mm !important; max-width: 183mm !important; box-sizing: border-box !important; }
-    .print-daily-table { width: 100% !important; table-layout: fixed !important; }
-    .print-daily-table th, .print-daily-table td { box-sizing: border-box !important; }
-  }
-</style>
-
-</head>
-<body>
-<div id="root"></div>
-
-<script src="app.js" defer></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily Task — Vite Migration Test</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
