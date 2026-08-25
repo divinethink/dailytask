@@ -2324,11 +2324,10 @@ async function readAllFamilyDataForBackup(migrationState) {
     });
     return result;
   }
-  const [membersSnap, entriesSnap, weeklySnap, legacySnap] = await Promise.all([
+  const [membersSnap, entriesSnap, weeklySnap] = await Promise.all([
     ctx.membersRef.get(),
     ctx.entriesRef.get(),
-    ctx.weeklyRef.get(),
-    db.collection(getCollectionName()).get()
+    ctx.weeklyRef.get()
   ]);
   membersSnap.docs.forEach(d => {
     result[`member:${d.id}`] = d.data();
@@ -2343,12 +2342,25 @@ async function readAllFamilyDataForBackup(migrationState) {
     if (idx === -1) return;
     result[`weekly:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
   });
-  legacySnap.docs.forEach(doc => {
-    const id = doc.id;
-    if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
-      result[id] = doc.data();
-    }
-  });
+  // Fail-safe fix(২৫ আগস্ট ২০২৬): কিছু গ্রান্ডফাদার্ড family-র legacy
+  // collection-নাম(data_<familyCode>)-এ এমন ক্যারেক্টার(যেমন "@") থাকতে
+  // পারে যা বর্তমান English-only charset Rules regex(isAppCollection)-এর
+  // সাথে মেলে না — ফলে এই read permission-denied হয়, যদিও family
+  // ইতিমধ্যে সম্পূর্ণ v2। এই দুইটা key(custom_fields/meeting_rows_v2:)
+  // optional/legacy-only বলে এই ব্যর্থতাকে fail-safe খালি ফলাফল হিসেবে
+  // ধরা হচ্ছে যাতে মূল member/entry/weekly backup আটকে না যায়(Root-cause
+  // Learnings pattern reuse, V1 ফাইল ১.২ §১৭)।
+  try {
+    const legacySnap = await db.collection(getCollectionName()).get();
+    legacySnap.docs.forEach(doc => {
+      const id = doc.id;
+      if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
+        result[id] = doc.data();
+      }
+    });
+  } catch (err) {
+    console.warn("[Backup] Legacy custom_fields/meeting_rows_v2 read skip(permission-denied, সম্ভবত charset-mismatch):", err);
+  }
   return result;
 }
 // items: [{key, data}] — key সবসময় উপরের legacy-style compound format-এই
@@ -2372,26 +2384,46 @@ async function writeParsedBackupToFamily(migrationState, items) {
     return;
   }
   const legacyColRef = db.collection(getCollectionName());
-  const writes = items.map(({ key, data }) => {
+  const mainWrites = [];
+  const legacyWrites = [];
+  items.forEach(({ key, data }) => {
     if (key.startsWith("member:")) {
-      return { ref: ctx.membersRef.doc(key.slice("member:".length)), data };
+      mainWrites.push({ ref: ctx.membersRef.doc(key.slice("member:".length)), data });
+      return;
     }
     if (key.startsWith("entry:")) {
       const rest = key.slice("entry:".length);
       const idx = rest.indexOf(":");
-      if (idx === -1) return null;
-      return { ref: ctx.entriesRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+      if (idx === -1) return;
+      mainWrites.push({ ref: ctx.entriesRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
+      return;
     }
     if (key.startsWith("weekly:")) {
       const rest = key.slice("weekly:".length);
       const idx = rest.indexOf(":");
-      if (idx === -1) return null;
-      return { ref: ctx.weeklyRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data };
+      if (idx === -1) return;
+      mainWrites.push({ ref: ctx.weeklyRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
+      return;
     }
     // custom_fields / meeting_rows_v2: — legacy-only (উপরের নোট দেখুন)
-    return { ref: legacyColRef.doc(key), data };
-  }).filter(Boolean);
-  await commitInChunks(writes);
+    legacyWrites.push({ ref: legacyColRef.doc(key), data });
+  });
+  await commitInChunks(mainWrites);
+  // Fail-safe fix(২৫ আগস্ট ২০২৬): legacy custom_fields/meeting_rows_v2
+  // write আলাদা batch-এ সরানো হলো। কারণ — কিছু গ্রান্ডফাদার্ড family-র
+  // legacy collection-নামে(data_<familyCode>) এমন ক্যারেক্টার(যেমন "@")
+  // থাকতে পারে যা বর্তমান English-only charset Rules regex-এর সাথে না
+  // মিলে permission-denied দেয়; আগে এই write মূল member/entry/weekly
+  // write-এর সাথে একই batch-এ থাকায় Firestore batch atomic হওয়ার কারণে
+  // এই একটা denial পুরো restore-ই ব্যর্থ করে দিত। এখন এই optional/
+  // legacy-only অংশ আলাদা try/catch-এ fail-safe(main data অক্ষুণ্ণ থাকে)।
+  if (legacyWrites.length > 0) {
+    try {
+      await commitInChunks(legacyWrites);
+    } catch (err) {
+      console.warn("[Restore] Legacy custom_fields/meeting_rows_v2 write skip(permission-denied, সম্ভবত charset-mismatch):", err);
+    }
+  }
 }
 // পুরো ফ্যামিলি Firestore কালেকশন + এই ডিভাইসের প্রয়োজনীয় সেটিংস একসাথে
 // করে একটি Versioned, Extensible ব্যাকআপ অবজেক্ট বানায়। ভবিষ্যতে
