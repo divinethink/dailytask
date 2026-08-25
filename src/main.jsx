@@ -1,9 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
-
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// A3 — globals.js MUST be imported first: it attaches React/ReactDOM/
+// firebase/Chart to `window` before legacy/app.js (which reads them as
+// bare globals) executes. Import order below = evaluation order.
+import "./globals.js";
+import "./legacy/app.js";
