@@ -2905,6 +2905,7 @@ import { NotificationPanel } from "../components/NotificationPanel.jsx";
 import { ProfileDropdown } from "../components/ProfileDropdown.jsx";
 import { AccessRequestsModal, CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
+import { MemberRequestsModal } from "../components/MemberRequests.jsx";
 function useFonts() {
   useEffect(() => {
     const id = "dt-fonts";
@@ -7895,37 +7896,14 @@ function App() {
 
   // --- §"সদস্য অনুরোধ" — Admin-only অনুমোদন প্যানেল(accessRequests
   // মোডালের একই ডিজাইন-প্যাটার্ন)। অনুমোদনে member+key একসাথে তৈরি হয়।
-  showMemberRequestsModal && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800"
-  }, "সদস্য অনুরোধ"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowMemberRequestsModal(false)
-  }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
-  loadingMemberRequests ? /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-center py-6"
-  }, /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 20, color: "var(--theme-primary)" })) : pendingMemberRequests.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 py-3 text-center"
-  }, "কোনো পেন্ডিং অনুরোধ নেই।") : /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2 max-h-72 overflow-y-auto"
-  }, pendingMemberRequests.map(r => /*#__PURE__*/React.createElement("div", {
-    key: r.id,
-    className: "flex items-center justify-between gap-2 border border-slate-100 rounded-xl px-3 py-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-[11px] text-slate-700 font-semibold truncate"
-  }, r.name), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-1.5 shrink-0"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => decideMemberRequest(r, "approved"),
-    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-700 text-white"
-  }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => decideMemberRequest(r, "denied"),
-    className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান"))))))),
+  // A4-G4(part D): MemberRequests.jsx-এ extract করা হয়েছে(verbatim)।
+  React.createElement(MemberRequestsModal, {
+    show: showMemberRequestsModal,
+    onClose: () => setShowMemberRequestsModal(false),
+    loadingMemberRequests,
+    pendingMemberRequests,
+    decideMemberRequest
+  }),
 
   React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick}), /*#__PURE__*/React.createElement("input", {
     ref: importFileInputRef,
