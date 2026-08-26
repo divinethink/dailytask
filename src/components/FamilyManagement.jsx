@@ -299,5 +299,5 @@ export function AccessRequestsModal({
   }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => decideAccessRequest(r.id, "denied"),
     className: "px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান"))))));
+  }, "প্রত্যাখ্যান")))))));
 }
