@@ -30,7 +30,8 @@ export function ProfileDropdown({
   setShowGoogleAccountModal,
   setShowMemberKeyModal,
   showAccountMenu,
-  streak
+  streak,
+  toBn
 }) {
   return show && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-40",
