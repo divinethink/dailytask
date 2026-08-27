@@ -197,6 +197,7 @@ export function BecomeMemberModal({
             // [DEBUG, temporary]
             console.error("[DEBUG notif] family-fetch failed:", famErr);
           }
+          console.log("[DEBUG notif] starting Promise.all for", (freshAdminUids || []).length, "admin(s)");
           await Promise.all((freshAdminUids || []).map(adminUid =>
             db.collection("families").doc(getFamilyId())
               .collection("notifications").add({
@@ -205,11 +206,15 @@ export function BecomeMemberModal({
                 message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
                 createdAt: Date.now(),
                 read: false
+              }).then(docRef => {
+                // [DEBUG, temporary]
+                console.log("[DEBUG notif] WRITE SUCCESS for admin:", adminUid, "docId:", docRef.id);
               }).catch(writeErr => {
                 // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
                 console.error("[DEBUG notif] notification write failed for admin:", adminUid, writeErr);
               })
           ));
+          console.log("[DEBUG notif] Promise.all settled (all writes attempted)");
         } catch (outerErr) {
           // [DEBUG, temporary]
           console.error("[DEBUG notif] outer block failed:", outerErr);
