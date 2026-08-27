@@ -1068,9 +1068,14 @@ function App() {
             .limit(30)
             .onSnapshot(
               (nsnap) => {
+                // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
+                console.log("[DEBUG notif-listener] SNAPSHOT received, doc count:", nsnap.docs.length, "docs:", nsnap.docs.map(d => ({ id: d.id, targetUid: d.data().targetUid, createdAt: d.data().createdAt })));
                 setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
               },
-              () => {}
+              (err) => {
+                // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
+                console.error("[DEBUG notif-listener] ERROR:", err);
+              }
             );
         }
       } catch {}
