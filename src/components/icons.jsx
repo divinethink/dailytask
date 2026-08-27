@@ -552,3 +552,21 @@ export function ClockIcon({
     points: "12 7 12 12 15 15"
   }));
 }
+export function AppLogo({
+  size = 32,
+  className = ""
+}) {
+  return /*#__PURE__*/React.createElement("img", {
+    src: "logo.png",
+    alt: "Daily Task",
+    width: size,
+    height: size,
+    className: className,
+    style: {
+      width: size,
+      height: size,
+      objectFit: "contain",
+      flexShrink: 0
+    }
+  });
+}
