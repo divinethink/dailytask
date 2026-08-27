@@ -234,7 +234,7 @@ export function DailyEntrySection({
   isExcused,
   isFieldExcusable
 }) {
-  return recoveryMessage && /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, recoveryMessage && /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-br from-[#0E4B43] to-[#153f39] rounded-2xl p-4 flex items-start gap-3 shadow-sm"
@@ -461,5 +461,5 @@ export function DailyEntrySection({
   }, saving ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 18
-  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডেটা সেভ করুন"));
+  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডেটা সেভ করুন")));
 }
