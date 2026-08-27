@@ -191,13 +191,9 @@ export function BecomeMemberModal({
             if (famData && Array.isArray(famData.adminUids) && famData.adminUids.length > 0) {
               freshAdminUids = famData.adminUids;
             }
-            // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
-            console.log("[DEBUG notif] getFamilyId:", getFamilyId(), "famSnap.exists:", famSnap.exists, "freshAdminUids:", freshAdminUids);
           } catch (famErr) {
-            // [DEBUG, temporary]
-            console.error("[DEBUG notif] family-fetch failed:", famErr);
+            // fetch ব্যর্থ হলে prop-fallback ব্যবহার হয়, silent-skip নয় বলে rethrow দরকার নেই
           }
-          console.log("[DEBUG notif] starting Promise.all for", (freshAdminUids || []).length, "admin(s)");
           await Promise.all((freshAdminUids || []).map(adminUid =>
             db.collection("families").doc(getFamilyId())
               .collection("notifications").add({
@@ -206,18 +202,10 @@ export function BecomeMemberModal({
                 message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
                 createdAt: Date.now(),
                 read: false
-              }).then(docRef => {
-                // [DEBUG, temporary]
-                console.log("[DEBUG notif] WRITE SUCCESS for admin:", adminUid, "docId:", docRef.id);
-              }).catch(writeErr => {
-                // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
-                console.error("[DEBUG notif] notification write failed for admin:", adminUid, writeErr);
               })
           ));
-          console.log("[DEBUG notif] Promise.all settled (all writes attempted)");
         } catch (outerErr) {
-          // [DEBUG, temporary]
-          console.error("[DEBUG notif] outer block failed:", outerErr);
+          // notification-write ব্যর্থ হলেও মূল request-submit flow block করা হয় না
         }
       } catch (err) {
         alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
