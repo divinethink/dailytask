@@ -179,7 +179,20 @@ export function BecomeMemberModal({
         setShowBecomeMemberModal(false);
         setBecomeMemberName("");
         try {
-          await Promise.all((adminUidsList || []).map(adminUid =>
+          // adminUidsList prop boot-time listener থেকে আসে — নতুন-onboarding
+          // user-এর ক্ষেত্রে listener attach হওয়ার আগেই submit হলে race-condition-এ
+          // খালি থাকতে পারে (২৭ আগস্ট ২০২৬ ধরা পড়েছিল)। তাই stale prop-এর বদলে
+          // এই মুহূর্তে family root doc fresh fetch করে সেখান থেকে adminUids নেওয়া
+          // হচ্ছে; fetch ব্যর্থ হলেই শুধু prop-কে fallback হিসেবে ব্যবহার করা হয়।
+          let freshAdminUids = adminUidsList || [];
+          try {
+            const famSnap = await db.collection("families").doc(getFamilyId()).get();
+            const famData = famSnap.exists ? famSnap.data() : null;
+            if (famData && Array.isArray(famData.adminUids) && famData.adminUids.length > 0) {
+              freshAdminUids = famData.adminUids;
+            }
+          } catch {}
+          await Promise.all((freshAdminUids || []).map(adminUid =>
             db.collection("families").doc(getFamilyId())
               .collection("notifications").add({
                 targetUid: adminUid,
