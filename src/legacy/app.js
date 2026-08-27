@@ -1051,6 +1051,8 @@ function App() {
         const myUid = auth.currentUser ? auth.currentUser.uid : null;
         setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
         setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
+        // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
+        console.log("[DEBUG boot] myUid:", myUid, "famAdminUids:", famAdminUids, "isAdmin:", Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
         // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
         setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
         // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
