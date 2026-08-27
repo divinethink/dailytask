@@ -191,8 +191,12 @@ export function BecomeMemberModal({
             if (famData && Array.isArray(famData.adminUids) && famData.adminUids.length > 0) {
               freshAdminUids = famData.adminUids;
             }
-          } catch (e) { console.error("NOTIF_DEBUG famSnap.get() failed:", e); }
-          console.error("NOTIF_DEBUG freshAdminUids:", freshAdminUids);
+            // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
+            console.log("[DEBUG notif] getFamilyId:", getFamilyId(), "famSnap.exists:", famSnap.exists, "freshAdminUids:", freshAdminUids);
+          } catch (famErr) {
+            // [DEBUG, temporary]
+            console.error("[DEBUG notif] family-fetch failed:", famErr);
+          }
           await Promise.all((freshAdminUids || []).map(adminUid =>
             db.collection("families").doc(getFamilyId())
               .collection("notifications").add({
@@ -201,9 +205,15 @@ export function BecomeMemberModal({
                 message: `${name} "সদস্য হোন" অনুরোধ পাঠিয়েছেন। অনুমোদনের জন্য ট্যাপ করুন।`,
                 createdAt: Date.now(),
                 read: false
-              }).catch((e) => { console.error("NOTIF_DEBUG notification add() failed for", adminUid, ":", e); })
+              }).catch(writeErr => {
+                // [DEBUG, temporary] Diagnosis-purpose log — remove after root-cause confirmed.
+                console.error("[DEBUG notif] notification write failed for admin:", adminUid, writeErr);
+              })
           ));
-        } catch (e) { console.error("NOTIF_DEBUG outer block failed:", e); }
+        } catch (outerErr) {
+          // [DEBUG, temporary]
+          console.error("[DEBUG notif] outer block failed:", outerErr);
+        }
       } catch (err) {
         alert("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message);
       } finally {
