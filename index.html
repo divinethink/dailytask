@@ -2,6 +2,40 @@
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
+
+<!-- A8: Runtime Feature-Flag(instant rollback, redeploy ছাড়া) — এই origin(V2/Vite)-এর
+     সবচেয়ে প্রথম script, যাতে redirect সিদ্ধান্ত বাকি সব asset/JS লোড হওয়ার আগেই নেওয়া হয়।
+     ?legacy=1 → পুরনো(V1/main) production-এ পাঠায় + localStorage flag persist করে(পরবর্তী visit-এও কাজ করবে)।
+     ?legacy=0 → flag clear করে V2-তেই থাকে, URL থেকে param সরিয়ে দেয়(reload ছাড়া)।
+     কোনো param না থাকলে শুধু persisted flag চেক করে। কোনো error হলে fail-safe: চুপচাপ normal V2 লোড হয়। -->
+<script>
+  (function () {
+    try {
+      var LEGACY_URL = "https://dailytask-family.pages.dev/";
+      var FLAG_KEY = "dt_legacy_flag";
+      var params = new URLSearchParams(window.location.search);
+      var qp = params.get("legacy");
+      if (qp === "1") {
+        localStorage.setItem(FLAG_KEY, "1");
+        window.location.replace(LEGACY_URL);
+        return;
+      }
+      if (qp === "0") {
+        localStorage.removeItem(FLAG_KEY);
+        params.delete("legacy");
+        var newSearch = params.toString();
+        var newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
+        window.history.replaceState({}, "", newUrl);
+      } else if (localStorage.getItem(FLAG_KEY) === "1") {
+        window.location.replace(LEGACY_URL);
+        return;
+      }
+    } catch (e) {
+      // localStorage/URL blocked/unavailable হলেও silent fail — V2 স্বাভাবিকভাবে লোড হবে
+    }
+  })();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Daily Task — আমল ও পারিবারিক ট্র্যাকার</title>
 <meta name="theme-color" content="#0E4B43" />
