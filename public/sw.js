@@ -43,6 +43,15 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(e.request));
     return;
   }
+  // [নতুন] Cross-origin request(Firestore Listen/Write channel, Auth,
+  // reCAPTCHA ইত্যাদি) কখনো SW দিয়ে proxy/cache করা হবে না — এগুলোর
+  // মধ্যে কিছু streaming/long-polling connection, SW-এর respondWith()-এর
+  // মধ্য দিয়ে গেলে browser সেটা ভেঙে দেয়("ServiceWorker intercepted the
+  // request and encountered an unexpected error")। শুধু app-এর নিজের
+  // (same-origin) static asset-ই SW cache করবে, বাকি সব browser-এর
+  // default(direct network) আচরণে ছেড়ে দেওয়া হচ্ছে।
+  if (!e.request.url.startsWith(self.location.origin)) return;
+
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const fetchPromise = fetch(e.request)
