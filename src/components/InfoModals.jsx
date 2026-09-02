@@ -115,3 +115,51 @@ export function MeetingInfoModal({ show, onClose }) {
   }, "বুঝেছি")));
 }
 
+export function MonthlyOverviewInfoModal({ show, onClose }) {
+  return show && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(InfoIcon, {
+    size: 16,
+    color: "var(--theme-primary)"
+  }), " ক্যালেন্ডারের রঙ কী বোঝায়?"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onClose()
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 18,
+    className: "text-slate-400"
+  }))), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-600 leading-relaxed mb-3"
+  }, "প্রতিদিনের ঘরের রঙ সেদিনের স্কোরের উপর নির্ভর করে নির্ধারিত হয়:"), /*#__PURE__*/React.createElement("ul", {
+    className: "text-xs text-slate-700 leading-relaxed mb-4 space-y-2"
+  },
+  /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "var(--theme-primary)" } }),
+    "৮৫% বা তার বেশি — চমৎকার"
+  ),
+  /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#4C8C74" } }),
+    "৬০% থেকে ৮৪% — ভালো"
+  ),
+  /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#C89B3C" } }),
+    "৩৫% থেকে ৫৯% — মাঝারি"
+  ),
+  /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#C1666B" } }),
+    "০% এর বেশি কিন্তু ৩৫% এর কম — কম"
+  ),
+  /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0 border border-slate-300", style: { background: "#E7EEE3" } }),
+    "কোনো এন্ট্রি নেই বা স্কোর ০% — খালি"
+  )
+  ), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onClose(),
+    className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+  }, "বুঝেছি")));
+}
+

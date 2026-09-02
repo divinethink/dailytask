@@ -238,6 +238,7 @@ export function MonthlyOverviewSection({
   setMonthCursor,
   setMonthRefreshKey,
   setPrintMode,
+  setShowMonthlyInfoModal,
   setViewDate,
   total,
   weeklyDirtyRef,
@@ -260,7 +261,14 @@ export function MonthlyOverviewSection({
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 16,
     color: "var(--theme-primary)"
-  }), " মাসিক ওভারভিউ"), /*#__PURE__*/React.createElement("div", {
+  }), " মাসিক ওভারভিউ", /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowMonthlyInfoModal(true),
+    className: "text-slate-400 hover:text-emerald-700",
+    title: "তথ্য"
+  }, /*#__PURE__*/React.createElement(InfoIcon, {
+    size: 13
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setMonthRefreshKey(k => k + 1),

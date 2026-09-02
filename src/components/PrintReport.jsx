@@ -5,6 +5,14 @@
 // passed as explicit props (not assumed global — see G1 toBn lesson).
 import { Printer } from "./icons.jsx";
 
+const { useEffect } = React;
+
+// PDF filename suggestion: browser's "Save as PDF" print-dialog uses
+// document.title as the default filename. English month names used here
+// (independent of BN_MONTHS, which is Bengali-only) purely for filename
+// readability — no display text changes.
+const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 export function PrintReport({
   allFields,
   meetingState,
@@ -26,6 +34,15 @@ export function PrintReport({
   pad2,
   toBn
 }) {
+  useEffect(() => {
+    if (!printMode) return;
+    const prevTitle = document.title;
+    const namePart = (selectedMember?.name || "Report").trim().replace(/\s+/g, "_");
+    document.title = `${namePart}_${EN_MONTHS[monthCursor.month0]}_${monthCursor.year}`;
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [printMode, selectedMember, monthCursor]);
   const total = monthStats.total;
     const rows = Array.from({
       length: total
