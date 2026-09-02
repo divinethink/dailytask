@@ -142,7 +142,7 @@ export function MonthlyOverviewInfoModal({ show, onClose }) {
     "৮৫% বা তার বেশি — চমৎকার"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
-    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#4C8C74" } }),
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#7C5CBF" } }),
     "৬০% থেকে ৮৪% — ভালো"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },

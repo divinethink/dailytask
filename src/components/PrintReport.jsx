@@ -38,7 +38,8 @@ export function PrintReport({
     if (!printMode) return;
     const prevTitle = document.title;
     const namePart = (selectedMember?.name || "Report").trim().replace(/\s+/g, "_");
-    document.title = `${namePart}_${EN_MONTHS[monthCursor.month0]}_${monthCursor.year}`;
+    const monthNum = monthCursor.month0 + 1;
+    document.title = `${monthNum}_${namePart}_${EN_MONTHS[monthCursor.month0]}_${monthCursor.year}`;
     return () => {
       document.title = prevTitle;
     };

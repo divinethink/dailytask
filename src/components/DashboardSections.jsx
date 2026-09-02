@@ -264,7 +264,7 @@ export function MonthlyOverviewSection({
   }), " মাসিক ওভারভিউ", /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShowMonthlyInfoModal(true),
-    className: "text-slate-400 hover:text-emerald-700",
+    className: "text-slate-400 hover:text-emerald-700 -ml-1",
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
