@@ -538,7 +538,8 @@ import {
   MemberInfoModal,
   ExcuseInfoModal,
   WeeklyInfoModal,
-  MeetingInfoModal
+  MeetingInfoModal,
+  MonthlyOverviewInfoModal
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
@@ -886,6 +887,7 @@ function App() {
   const [showExcuseInfoModal, setShowExcuseInfoModal] = useState(false);
   const [showWeeklyInfoModal, setShowWeeklyInfoModal] = useState(false);
   const [showMeetingInfoModal, setShowMeetingInfoModal] = useState(false);
+  const [showMonthlyInfoModal, setShowMonthlyInfoModal] = useState(false);
   // §৫ Family Code Lifecycle Fix — Admin-only "কোড রিনেম" মোডাল (একই
   // familyId+data, শুধু কোড বদলায়) — বিদ্যমান "কাস্টম কোড" মোডাল থেকে
   // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডাটা-বিচ্ছিন্নতা না ঘটে।
@@ -2774,6 +2776,7 @@ function App() {
     setMonthCursor: setMonthCursor,
     setMonthRefreshKey: setMonthRefreshKey,
     setPrintMode: setPrintMode,
+    setShowMonthlyInfoModal: setShowMonthlyInfoModal,
     setViewDate: setViewDate,
     total: total,
     weeklyDirtyRef: weeklyDirtyRef,
@@ -2898,7 +2901,7 @@ function App() {
     handleDeleteGoogleAccount: handleDeleteGoogleAccount,
     setShowDeleteAccountWarning: setShowDeleteAccountWarning,
     showDeleteAccountWarning: showDeleteAccountWarning
-  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), React.createElement(AddCustomFieldModal, {
+  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), /*#__PURE__*/React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }), React.createElement(AddCustomFieldModal, {
     handleAddCustomField: handleAddCustomField,
     isLockedForSwitch: isLockedForSwitch,
     newCustomLabel: newCustomLabel,
