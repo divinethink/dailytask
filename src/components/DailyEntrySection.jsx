@@ -93,23 +93,41 @@ function NumberField({
   target,
   toBn
 }) {
+  // Stepper (+/-) UI matching CountStepper, but intentionally uncapped on the
+  // "+" side (unlike CountStepper's max) — user may log more than `target`
+  // (e.g. more Quran pages than the daily goal) and percentage calculation
+  // (appHelpers fieldPercent/monthly-percent) already caps at 100% via
+  // Math.min(field.target, value), so no separate capping needed here.
+  const v = Number(value) || 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    min: "0",
-    inputMode: "decimal",
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
     disabled: disabled,
-    value: value ?? "",
-    onChange: e => onChange(e.target.value),
-    placeholder: "০",
-    className: "w-16 h-9 rounded-xl border px-2 text-right outline-none font-bold text-sm bg-slate-50 focus:bg-white transition-all",
+    onClick: () => onChange(Math.max(0, v - 1)),
+    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
+      color: "#16302B"
+    }
+  }, "\u2212"), /*#__PURE__*/React.createElement("span", {
+    className: "w-8 text-center font-bold text-sm",
+    style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: "#16302B"
     }
-  }), target ? /*#__PURE__*/React.createElement("span", {
+  }, toBn(v)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: disabled,
+    onClick: () => onChange(v + 1),
+    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
+    style: {
+      borderColor: "#D8DED3",
+      color: "#16302B"
+    }
+  }, "+")), target ? /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-semibold",
     style: {
       color: "#8A9A8F",
