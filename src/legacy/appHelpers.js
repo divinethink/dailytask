@@ -141,7 +141,7 @@ const DEFAULT_DEEN_FIELDS = [{
   label: "কুরআন/তাফসীর ও আরবি শেখা (পৃষ্ঠা)",
   shortLabel: "কুরআন",
   type: "number",
-  target: 5
+  target: 2
 }, {
   key: "seerah",
   label: "সীরাত/জীবনী/ইতিহাস",
