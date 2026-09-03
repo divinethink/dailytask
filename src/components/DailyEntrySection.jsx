@@ -127,13 +127,10 @@ function NumberField({
       borderColor: "#D8DED3",
       color: "#16302B"
     }
-  }, "+")), target ? /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-semibold",
-    style: {
-      color: "#8A9A8F",
-      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
-    }
-  }, "/", toBn(target)) : null);
+  }, "+")));
+  // `target` prop intentionally unused/not rendered (owner request: hide the
+  // "/২" suffix) — kept in the function signature so the FieldGroup call-site
+  // (which still passes `target: f.target`) needs no change.
 }
 
 function FieldGroup({
