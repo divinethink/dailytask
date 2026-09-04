@@ -154,7 +154,7 @@ export function MonthlyOverviewInfoModal({ show, onClose }) {
     "০% এর বেশি কিন্তু ৩৫% এর কম — কম"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
-    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0 border border-slate-300", style: { background: "#E7EEE3" } }),
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0 border border-slate-300", style: { background: "#C89B3C" } }),
     "কোনো এন্ট্রি নেই বা স্কোর ০% — খালি"
   )
   ), /*#__PURE__*/React.createElement("button", {
