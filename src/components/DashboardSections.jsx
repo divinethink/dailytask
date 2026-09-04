@@ -124,6 +124,64 @@ function ProgressChart({
   }));
 }
 
+// Shared month-nav control (refresh + ◀ month ▶) — verbatim JSX previously
+// inlined only in MonthlyOverviewSection, now reused by Weekly/Meeting
+// sections too (owner-approved, same dirty-check confirm logic, no behavior
+// change — see chat: "মাসের ফিচার রিইউজ করা প্রয়োজন").
+function MonthNavControl({
+  monthCursor,
+  setMonthCursor,
+  setMonthRefreshKey,
+  weeklyDirtyRef,
+  meetingDirtyRef,
+  BN_MONTHS,
+  toBn
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMonthRefreshKey(k => k + 1),
+    title: "ক্যালেন্ডার রিফ্রেশ করুন",
+    className: "w-7 h-7 flex items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm text-emerald-800 hover:bg-slate-50"
+  }, /*#__PURE__*/React.createElement(RefreshIcon, {
+    size: 13
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-sm"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+      setMonthCursor(c => c.month0 === 0 ? {
+        year: c.year - 1,
+        month0: 11
+      } : {
+        year: c.year,
+        month0: c.month0 - 1
+      });
+    },
+    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100"
+  }, /*#__PURE__*/React.createElement(ChevronLeft, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold px-1 text-slate-700"
+  }, BN_MONTHS[monthCursor.month0], " ", /*#__PURE__*/React.createElement("span", {
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+  }, toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+      setMonthCursor(c => c.month0 === 11 ? {
+        year: c.year + 1,
+        month0: 0
+      } : {
+        year: c.year,
+        month0: c.month0 + 1
+      });
+    },
+    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100"
+  }, /*#__PURE__*/React.createElement(ChevronRight, {
+    size: 14
+  }))));
+}
+
 export function WeeklyReflectionSection({
   addWeeklyRow,
   handleSaveWeekly,
@@ -137,12 +195,18 @@ export function WeeklyReflectionSection({
   weeklyRowCount,
   weeklySavedTick,
   getWeekRanges,
-  toBn
+  toBn,
+  monthCursor,
+  setMonthCursor,
+  setMonthRefreshKey,
+  weeklyDirtyRef,
+  meetingDirtyRef,
+  BN_MONTHS
 }) {
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3"
+    className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -159,7 +223,15 @@ export function WeeklyReflectionSection({
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
-  }), " সারি যোগ করুন")), /*#__PURE__*/React.createElement("div", {
+  }), " সারি যোগ করুন"), /*#__PURE__*/React.createElement(MonthNavControl, {
+    monthCursor: monthCursor,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef,
+    BN_MONTHS: BN_MONTHS,
+    toBn: toBn
+  })), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto custom-scrollbar"
@@ -268,49 +340,15 @@ export function MonthlyOverviewSection({
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setMonthRefreshKey(k => k + 1),
-    title: "ক্যালেন্ডার রিফ্রেশ করুন",
-    className: "w-7 h-7 flex items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm text-emerald-800 hover:bg-slate-50"
-  }, /*#__PURE__*/React.createElement(RefreshIcon, {
-    size: 13
+  }))), /*#__PURE__*/React.createElement(MonthNavControl, {
+    monthCursor: monthCursor,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef,
+    BN_MONTHS: BN_MONTHS,
+    toBn: toBn
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-sm"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
-      setMonthCursor(c => c.month0 === 0 ? {
-        year: c.year - 1,
-        month0: 11
-      } : {
-        year: c.year,
-        month0: c.month0 - 1
-      });
-    },
-    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100"
-  }, /*#__PURE__*/React.createElement(ChevronLeft, {
-    size: 14
-  })), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold px-1 text-slate-700"
-  }, BN_MONTHS[monthCursor.month0], " ", /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
-      setMonthCursor(c => c.month0 === 11 ? {
-        year: c.year + 1,
-        month0: 0
-      } : {
-        year: c.year,
-        month0: c.month0 + 1
-      });
-    },
-    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100"
-  }, /*#__PURE__*/React.createElement(ChevronRight, {
-    size: 14
-  }))))), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 pb-3 border-b border-slate-100"
@@ -385,12 +423,16 @@ export function MeetingMinutesSection({
   setShowMeetingInfoModal,
   updateMeetingRow,
   BN_MONTHS,
-  toBn
+  toBn,
+  setMonthCursor,
+  setMonthRefreshKey,
+  weeklyDirtyRef,
+  meetingDirtyRef
 }) {
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3"
+    className: "flex items-center justify-between mb-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -404,21 +446,24 @@ export function MeetingMinutesSection({
     size: 13
   })), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold"
-  }, "লাইভ সিংক")), /*#__PURE__*/React.createElement("button", {
+  }, "লাইভ সিংক"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: addMeetingRow,
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
-  }), " সারি যোগ করুন")), /*#__PURE__*/React.createElement("div", {
+  }), " সারি যোগ করুন"), /*#__PURE__*/React.createElement(MonthNavControl, {
+    monthCursor: monthCursor,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef,
+    BN_MONTHS: BN_MONTHS,
+    toBn: toBn
+  })), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "pb-1"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 font-medium"
-  }, BN_MONTHS[monthCursor.month0], "'", toBn(monthCursor.year), " — সভার তারিখ অটোমেটিক আজকের তারিখ (", (() => {
-    const t = new Date();
-    return `${toBn(t.getDate())} ${BN_MONTHS[t.getMonth()]}, ${toBn(t.getFullYear())}`;
-  })(), ") হিসেবে দেখাবে")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto custom-scrollbar"
   }, /*#__PURE__*/React.createElement("table", {
     className: "w-full border-collapse min-w-[500px]"
