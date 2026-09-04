@@ -2763,7 +2763,13 @@ function App() {
     weeklyRowCount: weeklyRowCount,
     weeklySavedTick: weeklySavedTick,
     getWeekRanges: getWeekRanges,
-    toBn: toBn
+    toBn: toBn,
+    monthCursor: monthCursor,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef,
+    BN_MONTHS: BN_MONTHS
   }), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
@@ -2801,7 +2807,11 @@ function App() {
     setShowMeetingInfoModal: setShowMeetingInfoModal,
     updateMeetingRow: updateMeetingRow,
     BN_MONTHS: BN_MONTHS,
-    toBn: toBn
+    toBn: toBn,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef
   })), React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive}), React.createElement(FamilyCodeChoiceModal, {
     show: showFamilyCodeChoiceModal,
     onClose: () => setShowFamilyCodeChoiceModal(false),
