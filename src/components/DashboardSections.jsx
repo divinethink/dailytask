@@ -9,7 +9,7 @@
 // references (dailyScore/getThemeColor/hexToRgba/getWeekRanges/pad2/toBn) are now
 // explicit props threaded through from MonthlyOverviewSection's own props (they
 // were closures before — see G1 toBn prop-miss lesson, applied proactively here).
-import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, ChevronRight, Printer, MessageSquare, X } from "./icons.jsx";
+import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, ChevronRight, ChevronDown, Printer, MessageSquare, X } from "./icons.jsx";
 
 // React itself is a true runtime global (established pattern — no file in this
 // codebase imports it). app.js locally destructures hooks from it the same way;
@@ -17,7 +17,7 @@ import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, Chev
 // see app.js's local const. Chart (from Chart.js) is likewise already a true
 // global in the current runtime (app.js's ProgressChart used bare Chart with
 // no import/declaration at all) — unchanged, no action needed.
-const { useRef, useEffect } = React;
+const { useRef, useEffect, useState } = React;
 
 function ProgressChart({
   monthEntries,
@@ -204,6 +204,11 @@ export function WeeklyReflectionSection({
   meetingDirtyRef,
   BN_MONTHS
 }) {
+  const [openWeeks, setOpenWeeks] = useState({});
+  useEffect(() => {
+    setOpenWeeks({});
+  }, [monthCursor.year, monthCursor.month0]);
+  const toggleWeek = w => setOpenWeeks(prev => ({ ...prev, [w]: !prev[w] }));
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -220,7 +225,11 @@ export function WeeklyReflectionSection({
   }))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, weeklyRowCount < getWeekRanges(monthStats.total).length ? /*#__PURE__*/React.createElement("button", {
-    onClick: addWeeklyRow,
+    onClick: () => {
+      const nextWeek = weeklyRowCount + 1;
+      addWeeklyRow();
+      setOpenWeeks(prev => ({ ...prev, [nextWeek]: true }));
+    },
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
@@ -234,63 +243,61 @@ export function WeeklyReflectionSection({
     toBn: toBn,
     hideRefresh: true
   })), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "overflow-x-auto custom-scrollbar"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "w-full border-collapse min-w-[560px]"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
-    className: "bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
-  }, /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-2 border-r border-slate-200 text-center w-16"
-  }, "সপ্তাহ"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 border-r border-slate-200 text-left"
-  }, "যা ভালো হয়েছে"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 border-r border-slate-200 text-left"
-  }, "কোথায় ঘাটতি ছিল"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 text-left"
-  }, "আগামী সপ্তাহের পরিকল্পনা"))), /*#__PURE__*/React.createElement("tbody", null, getWeekRanges(monthStats.total).slice(0, weeklyRowCount).map(({
+    className: "space-y-2 mb-4"
+  }, getWeekRanges(monthStats.total).slice(0, weeklyRowCount).map(({
     week: w,
     start,
     end
-  }) => /*#__PURE__*/React.createElement("tr", {
-    key: w,
-    className: "border-b border-slate-200 hover:bg-slate-50/50"
-  }, /*#__PURE__*/React.createElement("td", {
-    className: "py-2 px-1 border-r border-slate-200 text-center font-bold text-xs text-emerald-900 bg-slate-50/80"
-  }, "সপ্তাহ ", /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(w)), /*#__PURE__*/React.createElement("div", {
-    className: "text-[9px] font-semibold text-slate-400 mt-0.5",
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5 border-r border-slate-200"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: weekly[w]?.good || "",
-    onChange: e => updateWeekly(w, "good", e.target.value),
-    placeholder: "এই সপ্তাহে যা ভালো হয়েছে...",
-    rows: 2,
-    disabled: isLockedForThisDevice,
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5 border-r border-slate-200"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: weekly[w]?.gap || "",
-    onChange: e => updateWeekly(w, "gap", e.target.value),
-    placeholder: "কোথায় ঘাটতি ছিল...",
-    rows: 2,
-    disabled: isLockedForThisDevice,
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: weekly[w]?.plan || "",
-    onChange: e => updateWeekly(w, "plan", e.target.value),
-    placeholder: "আগামী সপ্তাহের পরিকল্পনা...",
-    rows: 2,
-    disabled: isLockedForThisDevice,
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
-  }))))))), /*#__PURE__*/React.createElement("button", {
+  }) => {
+    const isOpen = !!openWeeks[w];
+    return /*#__PURE__*/React.createElement("div", {
+      key: w,
+      className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden"
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => toggleWeek(w),
+      className: "flex items-center justify-between px-3.5 py-2.5 cursor-pointer select-none"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "bg-emerald-900 text-white text-xs font-bold px-2.5 py-1 rounded-full",
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+    }, "সপ্তাহ ", toBn(w)), /*#__PURE__*/React.createElement("span", {
+      className: "text-[11px] text-slate-400 font-semibold",
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+    }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement(ChevronDown, {
+      size: 16,
+      className: "text-slate-400 transition-transform" + (isOpen ? " rotate-180" : "")
+    })), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "px-3.5 pb-3.5 space-y-2.5"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "যা ভালো হয়েছে"), /*#__PURE__*/React.createElement("textarea", {
+      value: weekly[w]?.good || "",
+      onChange: e => updateWeekly(w, "good", e.target.value),
+      placeholder: "এই সপ্তাহে যা ভালো হয়েছে...",
+      rows: 2,
+      disabled: isLockedForThisDevice,
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "কোথায় ঘাটতি ছিল"), /*#__PURE__*/React.createElement("textarea", {
+      value: weekly[w]?.gap || "",
+      onChange: e => updateWeekly(w, "gap", e.target.value),
+      placeholder: "কোথায় ঘাটতি ছিল...",
+      rows: 2,
+      disabled: isLockedForThisDevice,
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "আগামী সপ্তাহের পরিকল্পনা"), /*#__PURE__*/React.createElement("textarea", {
+      value: weekly[w]?.plan || "",
+      onChange: e => updateWeekly(w, "plan", e.target.value),
+      placeholder: "আগামী সপ্তাহের পরিকল্পনা...",
+      rows: 2,
+      disabled: isLockedForThisDevice,
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+    }))));
+  }), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveWeekly,
     disabled: isLockedForThisDevice || isLockedForSwitch,
     className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
@@ -431,6 +438,12 @@ export function MeetingMinutesSection({
   weeklyDirtyRef,
   meetingDirtyRef
 }) {
+  const [openRows, setOpenRows] = useState({});
+  useEffect(() => {
+    setOpenRows({});
+  }, [monthCursor.year, monthCursor.month0]);
+  const toggleRow = idx => setOpenRows(prev => ({ ...prev, [idx]: !prev[idx] }));
+  const rows = meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : [];
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -453,7 +466,11 @@ export function MeetingMinutesSection({
   }), "লাইভ সিংক"))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: addMeetingRow,
+    onClick: () => {
+      const nextIdx = rows.length;
+      addMeetingRow();
+      setOpenRows(prev => ({ ...prev, [nextIdx]: true }));
+    },
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
@@ -467,69 +484,70 @@ export function MeetingMinutesSection({
     toBn: toBn,
     hideRefresh: true
   })), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "overflow-x-auto custom-scrollbar"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "w-full border-collapse min-w-[500px]"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
-    className: "bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
-  }, /*#__PURE__*/React.createElement("th", {
-    onClick: addMeetingRow,
-    title: "নতুন সারি যোগ করতে ক্লিক করুন",
-    className: "py-2.5 px-2 border-r border-slate-200 text-center w-12 cursor-pointer hover:bg-emerald-100 text-emerald-900 transition-colors select-none"
-  }, "ক্র. ✚"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 border-r border-slate-200 text-left w-1/4"
-  }, "বিষয়"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 border-r border-slate-200 text-left"
-  }, "কার্যপরিধি/সিদ্ধান্ত"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-3 border-r border-slate-200 text-center w-1/4"
-  }, "বাস্তবায়নকারী"), /*#__PURE__*/React.createElement("th", {
-    className: "py-2.5 px-1 text-center w-8"
-  }))), /*#__PURE__*/React.createElement("tbody", null, (meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : []).map((row, idx) => /*#__PURE__*/React.createElement("tr", {
-    key: row.id || idx,
-    className: "border-b border-slate-200 hover:bg-slate-50/50"
-  }, /*#__PURE__*/React.createElement("td", {
-    className: "py-2 px-1 border-r border-slate-200 text-center font-bold text-xs text-slate-700 bg-slate-50/80"
-  }, toBn(idx + 1)), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5 border-r border-slate-200"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: row.topic || "",
-    onChange: e => updateMeetingRow(idx, "topic", e.target.value),
-    placeholder: "বিষয়...",
-    rows: 2,
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-semibold bg-white resize-none"
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5 border-r border-slate-200"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: row.decision || "",
-    onChange: e => updateMeetingRow(idx, "decision", e.target.value),
-    placeholder: "কার্যপরিধি/সিদ্ধান্ত...",
-    rows: 2,
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none"
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "p-1.5 border-r border-slate-200"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: row.person || "",
-    onChange: e => updateMeetingRow(idx, "person", e.target.value),
-    placeholder: "বাস্তবায়নকারী",
-    className: "w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 text-center font-medium bg-white"
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "p-1 text-center"
-  }, meetingState.rows.length > 1 && /*#__PURE__*/React.createElement("button", {
-    onClick: () => removeMeetingRow(idx),
-    className: "text-red-400 hover:text-red-600 p-1"
-  }, /*#__PURE__*/React.createElement(Trash, {
-    size: 14
-  })))))))), /*#__PURE__*/React.createElement("button", {
+    className: "space-y-2 mb-4"
+  }, rows.map((row, idx) => {
+    const isOpen = !!openRows[idx];
+    return /*#__PURE__*/React.createElement("div", {
+      key: row.id || idx,
+      className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden"
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => toggleRow(idx),
+      className: "flex items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer select-none"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 min-w-0"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "bg-[#C89B3C] text-emerald-950 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0",
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+    }, "ক্র. ", toBn(idx + 1)), row.topic && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-500 truncate"
+    }, row.topic)), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 flex-shrink-0"
+    }, rows.length > 1 && /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        removeMeetingRow(idx);
+      },
+      className: "text-red-400 hover:text-red-600 p-1"
+    }, /*#__PURE__*/React.createElement(Trash, {
+      size: 14
+    })), /*#__PURE__*/React.createElement(ChevronDown, {
+      size: 16,
+      className: "text-slate-400 transition-transform" + (isOpen ? " rotate-180" : "")
+    }))), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "px-3.5 pb-3.5 space-y-2.5"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "বিষয়"), /*#__PURE__*/React.createElement("textarea", {
+      value: row.topic || "",
+      onChange: e => updateMeetingRow(idx, "topic", e.target.value),
+      placeholder: "বিষয়...",
+      rows: 2,
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-semibold bg-white resize-none"
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "কার্যপরিধি/সিদ্ধান্ত"), /*#__PURE__*/React.createElement("textarea", {
+      value: row.decision || "",
+      onChange: e => updateMeetingRow(idx, "decision", e.target.value),
+      placeholder: "কার্যপরিধি/সিদ্ধান্ত...",
+      rows: 2,
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none"
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] font-bold text-slate-500 mb-1"
+    }, "বাস্তবায়নকারী"), /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: row.person || "",
+      onChange: e => updateMeetingRow(idx, "person", e.target.value),
+      placeholder: "বাস্তবায়নকারী",
+      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-medium bg-white"
+    }))));
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveMeeting,
     disabled: isLockedForSwitch,
     className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm"
   }, savingMeeting ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 16
-  }) : meetingSavedTick ? "সেভ ও সিংক হয়েছে!" : "মাসিক সভা ও সিদ্ধান্ত সেভ করুন")));
+  }) : meetingSavedTick ? "সেভ ও সিংক হয়েছে!" : "মাসিক সভা ও সিদ্ধান্ত সেভ করুন"));
 }
 
 export function DeleteAccountWarningModal({
