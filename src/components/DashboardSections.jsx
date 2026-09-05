@@ -147,7 +147,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#C89B3C] px-2 py-1 rounded-xl border border-[#b98a2f] shadow-sm text-emerald-950"
+    className: "flex items-center gap-1.5 bg-[#F5E6C8] px-2 py-1 rounded-xl border border-[#C89B3C]/50 shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
