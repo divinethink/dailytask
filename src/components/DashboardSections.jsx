@@ -222,9 +222,13 @@ function TopBottomActivityRanking({
   const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
   let cutoffDay = totalDays;
   if (isCurrentMonth) {
-    const todayDate = now.getDate();
-    const todayFilled = !!monthEntries[pad2(todayDate)];
-    cutoffDay = todayFilled ? todayDate : todayDate - 1;
+    // শুধু "আজ" special-case করলে যথেষ্ট না — গতকাল(বা তার আগের দিন)ও যদি এখনো
+    // পূরণ না হয়ে থাকে(owner এখনো এন্ট্রি দেননি), সেটাও বাদ দিতে হবে। তাই আজ
+    // থেকে পিছনের দিকে হেঁটে সর্বশেষ প্রকৃত-পূরণ-করা দিন খুঁজে বের করা হয়(owner
+    // পর্যবেক্ষণ, ৭ সেপ্টেম্বর ২০২৬: "পূরণ না করা পর্যন্ত হিসাবে ধরা যাবে না")।
+    let d = now.getDate();
+    while (d >= 1 && !monthEntries[pad2(d)]) d--;
+    cutoffDay = d;
   }
   if (cutoffDay < 1) return null;
   const results = [];
@@ -259,6 +263,9 @@ function TopBottomActivityRanking({
     const qazaPct = 100 - fardResult.pct;
     const jamaatResult = results.find(r => r.key === "jamaat");
     const goalMet = jamaatResult ? qazaPct === 0 && jamaatResult.pct >= 70 : qazaPct === 0;
+    // এই বক্সে % থাকবে(owner-স্পষ্টীকরণ, ৭ সেপ্টেম্বর ২০২৬: "কাযা, জামায়াত %
+    // থাকবে" — আগের রাউন্ডে ভুলবশত এখান থেকে % সরানো হয়েছিল, সেটা আসলে নিচের
+    // Rating badge-এর জন্য প্রযোজ্য ছিল, এই বক্সের জন্য না)।
     const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে সালাত আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
     const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয় এবং যথাসম্ভব জামায়াতে সালাত আদায় করার চেষ্টা করতে হবে।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয়।";
     qazaJamaatBlock = { infoText, goalText, goalMet };
@@ -287,13 +294,8 @@ function TopBottomActivityRanking({
   }))), /*#__PURE__*/React.createElement("div", {
     className: "bg-[#f0ede4] rounded-xl p-3 mb-2.5"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-baseline justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-bold text-slate-700"
-  }, badgeTier.emoji, " ", badgeTier.label), /*#__PURE__*/React.createElement("span", {
-    className: "text-lg font-bold text-slate-800",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }, toBn(overallPct), "%")), /*#__PURE__*/React.createElement("div", {
+  }, badgeTier.emoji, " ", badgeTier.label), /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-slate-500 mt-1"
   }, badgeTier.caption)), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
     className: qazaJamaatBlock.goalMet ? "bg-[#eaf3ee] border border-[#9fc9ae] rounded-xl p-3" : "bg-[#faece7] border border-[#f0997b] rounded-xl p-3"
