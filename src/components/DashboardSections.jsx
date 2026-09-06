@@ -131,68 +131,70 @@ function ProgressChart({
 // সামঞ্জস্যপূর্ণ)। Chart.js-এর নিজস্ব legend ব্যবহার করা হয়েছে(নাম+% দুটোই
 // legend-label-এর ভিতরে বেক করা), কারণ canvas slice-এর ভিতরে ছোট টেক্সট গোজার
 // চেয়ে regular legend-টেক্সট ছোট স্ক্রিনেও অনেক বেশি সহজে পড়া যায়।
-function ActivityRankDonut({ heading, headingColor, items, colors, toBn }) {
-  const canvasRef = useRef(null);
-  const chartInstance = useRef(null);
-  useEffect(() => {
-    if (!canvasRef.current || items.length === 0) return;
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-      chartInstance.current = null;
-    }
-    const ctx = canvasRef.current.getContext("2d");
-    chartInstance.current = new Chart(ctx, {
-      type: "pie",
-      data: {
-        labels: items.map(it => `${it.label} (${toBn(it.pct)}%)`),
-        datasets: [{
-          data: items.map(it => it.pct),
-          backgroundColor: colors.slice(0, items.length),
-          borderColor: "#fff",
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: {
-              boxWidth: 9,
-              boxHeight: 9,
-              padding: 8,
-              font: { size: 10, family: "'Hind Siliguri', sans-serif" }
-            }
-          }
-        }
-      }
-    });
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
-      }
-    };
-  }, [items, colors, toBn]);
-  if (items.length === 0) return null;
+// পারফরম্যান্স-tier রঙ — শুধু এই র‍্যাঙ্কিং-সেকশনের জন্য, existing scoreColor()
+// থেকে আলাদা রাখা হয়েছে ইচ্ছাকৃতভাবে: এখানে ০% মানে "সত্যিকারের রেকর্ড করা
+// শূন্য পারফরম্যান্স"(fieldPercent() ইতিমধ্যে non-null মানেই ডেটা আছে ধরে
+// নেয়), "কোনো এন্ট্রি নেই" নয় — তাই ০%-কেও colorless(#E7EEE3, যেটা ক্যালেন্ডারে
+// "খালি দিন" বোঝায়) না দেখিয়ে বাকি লাল-tier-এর মতোই স্পষ্ট লাল দেখানো হয়(owner
+// অনুরোধ, ৬ সেপ্টেম্বর ২০২৬)। ৮৫/৬০/৩৫% থ্রেশহোল্ড ও রঙ scoreColor()-এর সাথেই
+// অভিন্ন রাখা হয়েছে(visual language consistency)।
+function activityTierColor(pct) {
+  if (pct >= 85) return "var(--theme-primary)";
+  if (pct >= 60) return "#7C5CBF";
+  if (pct >= 35) return "#64748B";
+  return "#C1666B";
+}
+const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
+
+// একটা tier-row: "১ম সর্বোচ্চ: ১০০%" + ঐ শতাংশ-এ থাকা সবগুলো আমলের নাম(comma
+// দিয়ে একসাথে, owner-এর প্ল্যান অনুযায়ী) + একটা পাতলা প্রোগ্রেস-বার(দ্রুত visual
+// scan-এর জন্য)।
+function TierRow({ rankLabel, pct, labels, toBn }) {
+  const color = activityTierColor(pct);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "mb-2.5 last:mb-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between text-[10px] text-slate-500 mb-1"
+  }, /*#__PURE__*/React.createElement("span", null, rankLabel), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold",
+    style: { fontFamily: "'IBM Plex Mono', monospace", color }
+  }, toBn(pct), "%")), /*#__PURE__*/React.createElement("div", {
+    className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-full rounded-full",
+    style: { width: `${pct}%`, background: color }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-700 leading-snug"
+  }, labels.join(", ")));
+}
+
+// একটা কলাম(সর্বোচ্চ অথবা সর্বনিম্ন) — সর্বোচ্চ ৩টা distinct শতাংশ-tier(অথবা যত
+// distinct tier আসলে আছে, ৩-এর কম হলে ততটাই) দেখায়, প্রতিটা tier-এ সেই
+// শতাংশে-থাকা সবগুলো আমল একসাথে।
+function TierColumn({ heading, headingColor, tiers, rankPrefix, toBn }) {
+  if (tiers.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "text-xs font-bold mb-2 text-center",
     style: { color: headingColor }
-  }, heading), /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-40"
-  }, /*#__PURE__*/React.createElement("canvas", {
-    ref: canvasRef
+  }, heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
+    key: t.pct,
+    rankLabel: `${ORDINAL_BN[i]} ${rankPrefix}`,
+    pct: t.pct,
+    labels: t.labels,
+    toBn: toBn
   })));
 }
 
-// TopBottomActivityChart — চলতি মাসের ১ তারিখ থেকে "আজকের আগের দিন" পর্যন্ত
+// TopBottomActivityRanking — চলতি মাসের ১ তারিখ থেকে "আজকের আগের দিন" পর্যন্ত
 // (আজকের অসম্পূর্ণ/চলমান দিন বাদ) প্রতিটা আমল/অ্যাক্টিভিটির গড় % হিসাব করে
 // (fieldPercent() reuse — fardPrayers-এর ইনভার্টেড-স্কোরিং সহ সব বিদ্যমান নিয়ম
-// স্বয়ংক্রিয়ভাবে বজায় থাকে, যেমন ০টা কাযা হলে "ফরজ কাযা" ফিল্ড ১০০% দেখাবে)।
-// অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)। monthEntries পরিবর্তন হলেই
-// পরের render-এ স্বয়ংক্রিয়ভাবে rank/chart আপডেট হয় — আলাদা polling লাগে না।
-function TopBottomActivityChart({
+// স্বয়ংক্রিয়ভাবে বজায় থাকে)। অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)।
+// আগে ঠিক ৩টা আইটেম(item-count ভিত্তিক) দেখানো হতো, যাতে tie-এর কারণে ফরজ
+// আমল বাদ পড়ে যেতে পারত(owner-এর পর্যবেক্ষণ, ৬ সেপ্টেম্বর ২০২৬); এখন distinct
+// শতাংশ-tier ভিত্তিক(৩টা সর্বোচ্চ ও ৩টা সর্বনিম্ন tier) — একই শতাংশের সব আমল
+// একসাথে দেখায়, কোনো আমল আড়ালে থাকে না। monthEntries পরিবর্তন হলেই পরের
+// render-এ স্বয়ংক্রিয়ভাবে আপডেট হয়।
+function TopBottomActivityRanking({
   monthEntries,
   totalDays,
   member,
@@ -209,36 +211,36 @@ function TopBottomActivityChart({
   const results = [];
   for (const f of allFields) {
     const pct = fieldPercent(f, monthEntries, cutoffDay, member);
-    if (pct !== null) results.push({ key: f.key, label: f.shortLabel || f.label, pct });
+    if (pct !== null) results.push({ label: f.shortLabel || f.label, pct });
   }
   if (results.length === 0) return null;
-  // Tie-handling consistent: % সমান হলে key(ফিল্ডের নিজস্ব stable identifier)
-  // অনুযায়ী বাছাই হয় — দুই দিকেই একই নিয়ম, তাই re-render-এও ক্রম অপরিবর্তিত।
-  const bestSorted = [...results].sort((a, b) => b.pct - a.pct || a.key.localeCompare(b.key));
-  const best = bestSorted.slice(0, 3);
-  const bestKeys = new Set(best.map(b => b.key));
-  const worst = results.filter(r => !bestKeys.has(r.key)).sort((a, b) => a.pct - b.pct || a.key.localeCompare(b.key)).slice(0, 3);
-  const bestColors = ["#0E4B43", "#2F8F7E", "#66B8A8"];
-  const worstColors = ["#C1666B", "#D98A8F", "#F0B3B7"];
+  const uniquePercents = [...new Set(results.map(r => r.pct))];
+  const descPercents = [...uniquePercents].sort((a, b) => b - a);
+  const topPercents = descPercents.slice(0, 3);
+  const topSet = new Set(topPercents);
+  const bottomPercents = uniquePercents.filter(p => !topSet.has(p)).sort((a, b) => a - b).slice(0, 3);
+  const labelsFor = pct => results.filter(r => r.pct === pct).map(r => r.label);
+  const topTiers = topPercents.map(pct => ({ pct, labels: labelsFor(pct) }));
+  const bottomTiers = bottomPercents.map(pct => ({ pct, labels: labelsFor(pct) }));
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
-  }, "আজ পর্যন্ত আপনার সেরা ৩ ও সর্বনিম্ন ৩ পারফরম্যান্স"), /*#__PURE__*/React.createElement("div", {
+  }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন পারফরম্যান্স/এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-4"
-  }, /*#__PURE__*/React.createElement(ActivityRankDonut, {
-    heading: "সেরা ৩ অ্যাক্টিভিটি",
+  }, /*#__PURE__*/React.createElement(TierColumn, {
+    heading: "সর্বোচ্চ ৩ এক্টিভিটি",
     headingColor: "#0E4B43",
-    items: best,
-    colors: bestColors,
+    tiers: topTiers,
+    rankPrefix: "সর্বোচ্চ",
     toBn: toBn
   }), /*#__PURE__*/React.createElement("div", {
     className: "border-l border-slate-200 pl-4"
-  }, /*#__PURE__*/React.createElement(ActivityRankDonut, {
-    heading: "সর্বনিম্ন ৩ অ্যাক্টিভিটি",
+  }, /*#__PURE__*/React.createElement(TierColumn, {
+    heading: "সর্বনিম্ন ৩ এক্টিভিটি",
     headingColor: "#C1666B",
-    items: worst,
-    colors: worstColors,
+    tiers: bottomTiers,
+    rankPrefix: "সর্বনিম্ন",
     toBn: toBn
   }))));
 }
@@ -537,7 +539,7 @@ export function MonthlyOverviewSection({
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
-  })))), /*#__PURE__*/React.createElement(TopBottomActivityChart, {
+  })))), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
     monthEntries: monthEntries,
     totalDays: total,
     member: selectedMember,
