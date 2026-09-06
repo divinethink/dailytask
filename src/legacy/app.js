@@ -2769,6 +2769,7 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     BN_WEEKDAYS: BN_WEEKDAYS,
     dailyScore: dailyScore,
+    fieldPercent: fieldPercent,
     pad2: pad2,
     scoreColor: scoreColor,
     toBn: toBn,
