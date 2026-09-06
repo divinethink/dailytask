@@ -124,9 +124,38 @@ function ProgressChart({
   }));
 }
 
+// hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
+// effect তৈরির জন্য, কোনো নতুন color-library লাগেনি।
+function shadeColor(hex, percent) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const clamp = v => Math.max(0, Math.min(255, v));
+  const r = clamp((num >> 16) + Math.round(2.55 * percent));
+  const g = clamp(((num >> 8) & 0xff) + Math.round(2.55 * percent));
+  const b = clamp((num & 0xff) + Math.round(2.55 * percent));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// প্রতিটা segment-এর নিচে নরম drop-shadow — চার্টে সামান্য "elevated/3D" অনুভূতি
+// দেয়। label-plugin-এর আগে array-তে বসানো হয়েছে যাতে shadow টেক্সটে না লাগে
+// (beforeDatasetsDraw-এ shadow সেট, afterDatasetsDraw-এ save/restore দিয়ে সরিয়ে
+// ফেলা হয় — পরের plugin(label) নিখুঁত/sharp টেক্সট আঁকতে পারে)।
+const dropShadowPlugin = {
+  id: "dropShadowPlugin",
+  beforeDatasetsDraw(chart) {
+    chart.ctx.save();
+    chart.ctx.shadowColor = "rgba(15, 23, 42, 0.28)";
+    chart.ctx.shadowBlur = 12;
+    chart.ctx.shadowOffsetY = 5;
+  },
+  afterDatasetsDraw(chart) {
+    chart.ctx.restore();
+  }
+};
+
 // draws day-label + exact% inside each donut segment — plain Chart.js plugin
 // object (afterDatasetsDraw hook), avoids adding a new npm dependency
-// (chartjs-plugin-datalabels) for this single use-case.
+// (chartjs-plugin-datalabels) for this single use-case. টেক্সটে সরু dark-stroke
+// outline যোগ করা হয়েছে যাতে gradient-background যেকোনো টোনেই পড়া সহজ থাকে।
 function makeSliceLabelPlugin(items) {
   return {
     id: "sliceLabelPlugin",
@@ -138,15 +167,41 @@ function makeSliceLabelPlugin(items) {
         if (!item) return;
         const pos = arc.tooltipPosition();
         ctx.save();
-        ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.fillStyle = "#fff";
         ctx.font = "bold 10px 'Hind Siliguri', sans-serif";
+        ctx.strokeText(item.dayLabel, pos.x, pos.y - 6);
         ctx.fillText(item.dayLabel, pos.x, pos.y - 6);
         ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+        ctx.strokeText(item.pctLabel, pos.x, pos.y + 7);
         ctx.fillText(item.pctLabel, pos.x, pos.y + 7);
         ctx.restore();
       });
+    }
+  };
+}
+
+// Donut-এর মাঝখানে ছোট "গড়" সংখ্যা(finance-app স্টাইলের center-callout)।
+function makeCenterTextPlugin(mainText, subText, color) {
+  return {
+    id: "centerTextPlugin",
+    afterDraw(chart) {
+      const { ctx, chartArea } = chart;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = color;
+      ctx.font = "bold 15px 'IBM Plex Mono', monospace";
+      ctx.fillText(mainText, cx, cy - 7);
+      ctx.fillStyle = "#94A3B8";
+      ctx.font = "9px 'Hind Siliguri', sans-serif";
+      ctx.fillText(subText, cx, cy + 9);
+      ctx.restore();
     }
   };
 }
@@ -161,10 +216,11 @@ function RankDonut({ heading, items, colors, toBn }) {
       chartInstance.current.destroy();
       chartInstance.current = null;
     }
-    const labelItems = items.map((it, i) => ({
+    const labelItems = items.map(it => ({
       dayLabel: `${toBn(it.day)} তারিখ`,
       pctLabel: `${toBn(it.exactPct)}%`
     }));
+    const avg = items.reduce((sum, it) => sum + it.score, 0) / items.length;
     const ctx = canvasRef.current.getContext("2d");
     chartInstance.current = new Chart(ctx, {
       type: "doughnut",
@@ -172,19 +228,35 @@ function RankDonut({ heading, items, colors, toBn }) {
         labels: items.map(it => `${toBn(it.day)} তারিখ`),
         datasets: [{
           data: items.map(it => it.score * 100),
-          backgroundColor: colors.slice(0, items.length),
+          backgroundColor: context => {
+            const { chart, dataIndex } = context;
+            const { chartArea } = chart;
+            const hex = colors[dataIndex];
+            if (!chartArea) return hex;
+            const cx = (chartArea.left + chartArea.right) / 2;
+            const cy = (chartArea.top + chartArea.bottom) / 2;
+            const radius = (chartArea.right - chartArea.left) / 2;
+            const grad = chart.ctx.createRadialGradient(cx, cy, radius * 0.35, cx, cy, radius);
+            grad.addColorStop(0, shadeColor(hex, 28));
+            grad.addColorStop(1, shadeColor(hex, -12));
+            return grad;
+          },
           borderColor: "#fff",
-          borderWidth: 2
+          borderWidth: 2,
+          borderRadius: 8,
+          spacing: 3,
+          hoverOffset: 6
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        cutout: "62%",
         plugins: {
           legend: { display: false }
         }
       },
-      plugins: [makeSliceLabelPlugin(labelItems)]
+      plugins: [dropShadowPlugin, makeSliceLabelPlugin(labelItems), makeCenterTextPlugin(`${toBn((avg * 100).toFixed(1))}%`, "গড়", colors[0])]
     });
     return () => {
       if (chartInstance.current) {
@@ -197,15 +269,20 @@ function RankDonut({ heading, items, colors, toBn }) {
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "text-xs font-bold text-slate-500 mb-1"
   }, heading), /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-40"
+    className: "w-full h-44"
   }, /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef
   })), /*#__PURE__*/React.createElement("ul", {
-    className: "mt-2 space-y-0.5"
-  }, items.map(it => /*#__PURE__*/React.createElement("li", {
+    className: "mt-2 space-y-1"
+  }, items.map((it, i) => /*#__PURE__*/React.createElement("li", {
     key: it.day,
     className: "flex items-center justify-between text-[11px] text-slate-600"
-  }, /*#__PURE__*/React.createElement("span", null, toBn(it.day), " তারিখ"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "inline-block w-2 h-2 rounded-full",
+    style: { background: colors[i] }
+  }), toBn(it.day), " তারিখ"), /*#__PURE__*/React.createElement("span", {
     className: "font-bold",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
   }, toBn(it.exactPct), "%")))));
