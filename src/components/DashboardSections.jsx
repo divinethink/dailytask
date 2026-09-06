@@ -185,15 +185,29 @@ function TierColumn({ heading, headingColor, tiers, rankPrefix, toBn }) {
   })));
 }
 
-// TopBottomActivityRanking — চলতি মাসের ১ তারিখ থেকে "আজকের আগের দিন" পর্যন্ত
-// (আজকের অসম্পূর্ণ/চলমান দিন বাদ) প্রতিটা আমল/অ্যাক্টিভিটির গড় % হিসাব করে
-// (fieldPercent() reuse — fardPrayers-এর ইনভার্টেড-স্কোরিং সহ সব বিদ্যমান নিয়ম
-// স্বয়ংক্রিয়ভাবে বজায় থাকে)। অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)।
-// আগে ঠিক ৩টা আইটেম(item-count ভিত্তিক) দেখানো হতো, যাতে tie-এর কারণে ফরজ
-// আমল বাদ পড়ে যেতে পারত(owner-এর পর্যবেক্ষণ, ৬ সেপ্টেম্বর ২০২৬); এখন distinct
-// শতাংশ-tier ভিত্তিক(৩টা সর্বোচ্চ ও ৩টা সর্বনিম্ন tier) — একই শতাংশের সব আমল
-// একসাথে দেখায়, কোনো আমল আড়ালে থাকে না। monthEntries পরিবর্তন হলেই পরের
-// render-এ স্বয়ংক্রিয়ভাবে আপডেট হয়।
+// Rating-tier থ্রেশহোল্ড ও ক্যাপশন — owner-চূড়ান্ত (৭ সেপ্টেম্বর ২০২৬)।
+function ratingTier(pct) {
+  if (pct >= 90) return { emoji: "⭐", label: "উৎকৃষ্ট", caption: "ধারাবাহিকতা খুব ভালো, এভাবেই বজায় রাখুন।" };
+  if (pct >= 80) return { emoji: "🌿", label: "খুব ভালো", caption: "সামান্য উন্নতির সুযোগ আছে।" };
+  if (pct >= 70) return { emoji: "👍", label: "ভালো", caption: "নিয়মিত আমলে আরও ধারাবাহিকতা প্রয়োজন।" };
+  if (pct >= 50) return { emoji: "🔄", label: "উন্নতি প্রয়োজন", caption: "কয়েকটি গুরুত্বপূর্ণ আমল নিয়মিত করার চেষ্টা করুন।" };
+  return { emoji: "🌱", label: "পুনরায় ধারাবাহিকতা গড়ার পর্যায়", caption: "ছোট ছোট লক্ষ্য নিয়ে ধারাবাহিকতা গড়ুন।" };
+}
+
+// TopBottomActivityRanking — চলতি মাসের ১ তারিখ থেকে "যতদিন পূরণ হয়েছে" ততদিন
+// পর্যন্ত (আজকের এন্ট্রি সেভ হয়ে থাকলে আজও ধরা হয়, না থাকলে গতকাল পর্যন্ত —
+// filled-status-ভিত্তিক, rigid date-cutoff না; owner-এর কথা: "ফিল্ড করার সাথে
+// সাথে সব জায়গায় আপডেট হওয়া উচিত") প্রতিটা আমলের গড় % হিসাব করে(fieldPercent()
+// reuse)। অতীত মাস দেখলে পুরো মাস।
+//
+// Fard Gate: ফরজ কাযা(fardPrayers) ঠিক ১০০% না হলে "সর্বোচ্চ" তালিকায় আসবে
+// না(even ৯৯%) — "সর্বনিম্ন"-এ কোনো বাধা নেই। একই নিয়ম জামায়াতে সালাত(male-only
+// field)-এর জন্য ৭০% থ্রেশহোল্ডে। এই দুইটা field সবসময় Overall%-গড়ে যোগ হয়(gate
+// শুধু তালিকা-প্রদর্শনে প্রভাব ফেলে, সংখ্যায় না)।
+//
+// Rating badge-এ আলাদা Fard Gate: Overall ৯০%+ হলেও fardPrayers ১০০% না হলে
+// "উৎকৃষ্ট" badge দেখানো হবে না(এক ধাপ নিচে নামবে, "খুব ভালো") — কিন্তু আসল
+// Overall% সংখ্যা অপরিবর্তিত থাকে(owner-চূড়ান্ত সিদ্ধান্ত)।
 function TopBottomActivityRanking({
   monthEntries,
   totalDays,
@@ -206,28 +220,56 @@ function TopBottomActivityRanking({
 }) {
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
-  const cutoffDay = isCurrentMonth ? now.getDate() - 1 : totalDays;
+  let cutoffDay = totalDays;
+  if (isCurrentMonth) {
+    const todayDate = now.getDate();
+    const todayFilled = !!monthEntries[pad2(todayDate)];
+    cutoffDay = todayFilled ? todayDate : todayDate - 1;
+  }
   if (cutoffDay < 1) return null;
   const results = [];
   for (const f of allFields) {
     const pct = fieldPercent(f, monthEntries, cutoffDay, member);
-    if (pct !== null) results.push({ label: f.shortLabel || f.label, pct });
+    if (pct !== null) results.push({ key: f.key, label: f.shortLabel || f.label, pct });
   }
   if (results.length === 0) return null;
-  const uniquePercents = [...new Set(results.map(r => r.pct))];
-  const descPercents = [...uniquePercents].sort((a, b) => b - a);
-  const topPercents = descPercents.slice(0, 3);
+
+  const topEligible = r => {
+    if (r.key === "fardPrayers") return r.pct === 100;
+    if (r.key === "jamaat") return r.pct >= 70;
+    return true;
+  };
+  const topPercents = [...new Set(results.filter(topEligible).map(r => r.pct))].sort((a, b) => b - a).slice(0, 3);
   const topSet = new Set(topPercents);
-  const bottomPercents = uniquePercents.filter(p => !topSet.has(p)).sort((a, b) => a - b).slice(0, 3);
-  const labelsFor = pct => results.filter(r => r.pct === pct).map(r => r.label);
-  const topTiers = topPercents.map(pct => ({ pct, labels: labelsFor(pct) }));
-  const bottomTiers = bottomPercents.map(pct => ({ pct, labels: labelsFor(pct) }));
+  const bottomPercents = [...new Set(results.map(r => r.pct))].filter(p => !topSet.has(p)).sort((a, b) => a - b).slice(0, 3);
+  const labelsForTop = pct => results.filter(r => r.pct === pct && topEligible(r)).map(r => r.label);
+  const labelsForAny = pct => results.filter(r => r.pct === pct).map(r => r.label);
+  const topTiers = topPercents.map(pct => ({ pct, labels: labelsForTop(pct) }));
+  const bottomTiers = bottomPercents.map(pct => ({ pct, labels: labelsForAny(pct) }));
+
+  const overallPct = Math.round(results.reduce((s, r) => s + r.pct, 0) / results.length);
+  let badgeTier = ratingTier(overallPct);
+  const fardResult = results.find(r => r.key === "fardPrayers");
+  if (fardResult && fardResult.pct !== 100 && overallPct >= 90) {
+    badgeTier = ratingTier(89);
+  }
+
+  let qazaJamaatBlock = null;
+  if (fardResult) {
+    const qazaPct = 100 - fardResult.pct;
+    const jamaatResult = results.find(r => r.key === "jamaat");
+    const goalMet = jamaatResult ? qazaPct === 0 && jamaatResult.pct >= 70 : qazaPct === 0;
+    const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে সালাত আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
+    const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয় এবং যথাসম্ভব জামায়াতে সালাত আদায় করার চেষ্টা করতে হবে।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয়।";
+    qazaJamaatBlock = { infoText, goalText, goalMet };
+  }
+
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
-  }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন পারফরম্যান্স/এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 gap-4"
+  }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-4 mb-4"
   }, /*#__PURE__*/React.createElement(TierColumn, {
     heading: "সর্বোচ্চ ৩ এক্টিভিটি",
     headingColor: "#0E4B43",
@@ -242,7 +284,28 @@ function TopBottomActivityRanking({
     tiers: bottomTiers,
     rankPrefix: "সর্বনিম্ন",
     toBn: toBn
-  }))));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-[#f0ede4] rounded-xl p-3 mb-2.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-baseline justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-bold text-slate-700"
+  }, badgeTier.emoji, " ", badgeTier.label), /*#__PURE__*/React.createElement("span", {
+    className: "text-lg font-bold text-slate-800",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }, toBn(overallPct), "%")), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-500 mt-1"
+  }, badgeTier.caption)), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
+    className: qazaJamaatBlock.goalMet ? "bg-[#eaf3ee] border border-[#9fc9ae] rounded-xl p-3" : "bg-[#faece7] border border-[#f0997b] rounded-xl p-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm leading-none"
+  }, qazaJamaatBlock.goalMet ? "✅" : "⚠️"), /*#__PURE__*/React.createElement("div", {
+    className: qazaJamaatBlock.goalMet ? "text-xs font-bold text-[#215339] leading-relaxed" : "text-xs font-bold text-[#712b13] leading-relaxed"
+  }, qazaJamaatBlock.infoText))), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
+    className: qazaJamaatBlock.goalMet ? "text-xs text-[#215339] leading-relaxed mt-1.5 pl-6" : "text-xs text-[#712b13] leading-relaxed mt-1.5 pl-6"
+  }, qazaJamaatBlock.goalText));
 }
 
 // Shared month-nav control (refresh + ◀ month ▶) — verbatim JSX previously
