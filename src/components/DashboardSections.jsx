@@ -124,6 +124,82 @@ function ProgressChart({
   }));
 }
 
+// TopBottomDaysChart — live per-member pie chart, added below Monthly Overview.
+// শুধু filled(entry-থাকা) দিন থেকে সেরা ৩ ও খারাপ ৩ দিন বাছাই করে(score
+// অনুযায়ী), তাই চলতি মাসে আজ পর্যন্ত যতদিন পূরণ হয়েছে ততদিনের ভিত্তিতেই
+// স্বয়ংক্রিয়ভাবে "লাইভ" — নতুন দিন পূরণ হলে monthEntries prop বদলে useEffect
+// re-run করবে, কোনো আলাদা "আজকের তারিখ" লজিক লাগে না।
+function TopBottomDaysChart({
+  monthEntries,
+  totalDays,
+  member,
+  allFields,
+  dailyScore,
+  pad2,
+  toBn
+}) {
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
+  const filled = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const s = dailyScore(monthEntries[pad2(d)], member, allFields);
+    if (s !== null) filled.push({ day: d, score: s });
+  }
+  const sortedDesc = [...filled].sort((a, b) => b.score - a.score);
+  const best = sortedDesc.slice(0, 3);
+  const worst = sortedDesc.slice(3).slice(-3);
+  const slices = [...best, ...worst];
+  useEffect(() => {
+    if (!chartRef.current || slices.length === 0) return;
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+      chartInstance.current = null;
+    }
+    const bestColors = ["#0E4B43", "#2F8F7E", "#66B8A8"];
+    const worstColors = ["#C1666B", "#D98A8F", "#F0B3B7"];
+    const colors = slices.map((item, i) => i < best.length ? bestColors[i] : worstColors[i - best.length]);
+    const ctx = chartRef.current.getContext("2d");
+    chartInstance.current = new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: slices.map(item => `${toBn(item.day)} তারিখ (${toBn(Math.round(item.score * 100))}%)`),
+        datasets: [{
+          data: slices.map(item => Math.round(item.score * 100)),
+          backgroundColor: colors,
+          borderColor: "#fff",
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { font: { size: 10 }, boxWidth: 10 }
+          }
+        }
+      }
+    });
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+        chartInstance.current = null;
+      }
+    };
+  }, [monthEntries, totalDays, member, allFields]);
+  if (filled.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800 mb-2"
+  }, "সেরা ৩ ও খারাপ ৩ দিন"), /*#__PURE__*/React.createElement("div", {
+    className: "w-full h-56"
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: chartRef
+  })));
+}
+
 // Shared month-nav control (refresh + ◀ month ▶) — verbatim JSX previously
 // inlined only in MonthlyOverviewSection, now reused by Weekly/Meeting
 // sections too (owner-approved, same dirty-check confirm logic, no behavior
@@ -417,7 +493,15 @@ export function MonthlyOverviewSection({
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
-  })))));
+  })))), /*#__PURE__*/React.createElement(TopBottomDaysChart, {
+    monthEntries: monthEntries,
+    totalDays: total,
+    member: selectedMember,
+    allFields: allFields,
+    dailyScore: dailyScore,
+    pad2: pad2,
+    toBn: toBn
+  }));
 }
 
 export function MeetingMinutesSection({
