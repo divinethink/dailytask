@@ -2750,26 +2750,6 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable
-  }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
-    addWeeklyRow: addWeeklyRow,
-    handleSaveWeekly: handleSaveWeekly,
-    isLockedForSwitch: isLockedForSwitch,
-    isLockedForThisDevice: isLockedForThisDevice,
-    monthStats: monthStats,
-    savingWeekly: savingWeekly,
-    setShowWeeklyInfoModal: setShowWeeklyInfoModal,
-    updateWeekly: updateWeekly,
-    weekly: weekly,
-    weeklyRowCount: weeklyRowCount,
-    weeklySavedTick: weeklySavedTick,
-    getWeekRanges: getWeekRanges,
-    toBn: toBn,
-    monthCursor: monthCursor,
-    setMonthCursor: setMonthCursor,
-    setMonthRefreshKey: setMonthRefreshKey,
-    weeklyDirtyRef: weeklyDirtyRef,
-    meetingDirtyRef: meetingDirtyRef,
-    BN_MONTHS: BN_MONTHS
   }), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
@@ -2795,6 +2775,26 @@ function App() {
     getThemeColor: getThemeColor,
     hexToRgba: hexToRgba,
     getWeekRanges: getWeekRanges
+  }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
+    addWeeklyRow: addWeeklyRow,
+    handleSaveWeekly: handleSaveWeekly,
+    isLockedForSwitch: isLockedForSwitch,
+    isLockedForThisDevice: isLockedForThisDevice,
+    monthStats: monthStats,
+    savingWeekly: savingWeekly,
+    setShowWeeklyInfoModal: setShowWeeklyInfoModal,
+    updateWeekly: updateWeekly,
+    weekly: weekly,
+    weeklyRowCount: weeklyRowCount,
+    weeklySavedTick: weeklySavedTick,
+    getWeekRanges: getWeekRanges,
+    toBn: toBn,
+    monthCursor: monthCursor,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: weeklyDirtyRef,
+    meetingDirtyRef: meetingDirtyRef,
+    BN_MONTHS: BN_MONTHS
   }), /*#__PURE__*/React.createElement(MeetingMinutesSection, {
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,
