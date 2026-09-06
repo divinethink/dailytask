@@ -124,48 +124,55 @@ function ProgressChart({
   }));
 }
 
-// TopBottomDaysChart — live per-member pie chart, added below Monthly Overview.
-// শুধু filled(entry-থাকা) দিন থেকে সেরা ৩ ও খারাপ ৩ দিন বাছাই করে(score
-// অনুযায়ী), তাই চলতি মাসে আজ পর্যন্ত যতদিন পূরণ হয়েছে ততদিনের ভিত্তিতেই
-// স্বয়ংক্রিয়ভাবে "লাইভ" — নতুন দিন পূরণ হলে monthEntries prop বদলে useEffect
-// re-run করবে, কোনো আলাদা "আজকের তারিখ" লজিক লাগে না।
-function TopBottomDaysChart({
-  monthEntries,
-  totalDays,
-  member,
-  allFields,
-  dailyScore,
-  pad2,
-  toBn
-}) {
-  const chartRef = useRef(null);
+// draws day-label + exact% inside each donut segment — plain Chart.js plugin
+// object (afterDatasetsDraw hook), avoids adding a new npm dependency
+// (chartjs-plugin-datalabels) for this single use-case.
+function makeSliceLabelPlugin(items) {
+  return {
+    id: "sliceLabelPlugin",
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      const { ctx } = chart;
+      meta.data.forEach((arc, i) => {
+        const item = items[i];
+        if (!item) return;
+        const pos = arc.tooltipPosition();
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold 10px 'Hind Siliguri', sans-serif";
+        ctx.fillText(item.dayLabel, pos.x, pos.y - 6);
+        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+        ctx.fillText(item.pctLabel, pos.x, pos.y + 7);
+        ctx.restore();
+      });
+    }
+  };
+}
+
+// একটা donut(সেরা ৩ অথবা সর্বনিম্ন ৩) + তার নিচে exact-average লিস্ট।
+function RankDonut({ heading, items, colors, toBn }) {
+  const canvasRef = useRef(null);
   const chartInstance = useRef(null);
-  const filled = [];
-  for (let d = 1; d <= totalDays; d++) {
-    const s = dailyScore(monthEntries[pad2(d)], member, allFields);
-    if (s !== null) filled.push({ day: d, score: s });
-  }
-  const sortedDesc = [...filled].sort((a, b) => b.score - a.score);
-  const best = sortedDesc.slice(0, 3);
-  const worst = sortedDesc.slice(3).slice(-3);
-  const slices = [...best, ...worst];
   useEffect(() => {
-    if (!chartRef.current || slices.length === 0) return;
+    if (!canvasRef.current || items.length === 0) return;
     if (chartInstance.current) {
       chartInstance.current.destroy();
       chartInstance.current = null;
     }
-    const bestColors = ["#0E4B43", "#2F8F7E", "#66B8A8"];
-    const worstColors = ["#C1666B", "#D98A8F", "#F0B3B7"];
-    const colors = slices.map((item, i) => i < best.length ? bestColors[i] : worstColors[i - best.length]);
-    const ctx = chartRef.current.getContext("2d");
+    const labelItems = items.map((it, i) => ({
+      dayLabel: `${toBn(it.day)} তারিখ`,
+      pctLabel: `${toBn(it.exactPct)}%`
+    }));
+    const ctx = canvasRef.current.getContext("2d");
     chartInstance.current = new Chart(ctx, {
-      type: "pie",
+      type: "doughnut",
       data: {
-        labels: slices.map(item => `${toBn(item.day)} তারিখ (${toBn(Math.round(item.score * 100))}%)`),
+        labels: items.map(it => `${toBn(it.day)} তারিখ`),
         datasets: [{
-          data: slices.map(item => Math.round(item.score * 100)),
-          backgroundColor: colors,
+          data: items.map(it => it.score * 100),
+          backgroundColor: colors.slice(0, items.length),
           borderColor: "#fff",
           borderWidth: 2
         }]
@@ -174,12 +181,10 @@ function TopBottomDaysChart({
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position: "bottom",
-            labels: { font: { size: 10 }, boxWidth: 10 }
-          }
+          legend: { display: false }
         }
-      }
+      },
+      plugins: [makeSliceLabelPlugin(labelItems)]
     });
     return () => {
       if (chartInstance.current) {
@@ -187,16 +192,73 @@ function TopBottomDaysChart({
         chartInstance.current = null;
       }
     };
-  }, [monthEntries, totalDays, member, allFields]);
+  }, [items, colors, toBn]);
+  if (items.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-slate-500 mb-1"
+  }, heading), /*#__PURE__*/React.createElement("div", {
+    className: "w-full h-40"
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef
+  })), /*#__PURE__*/React.createElement("ul", {
+    className: "mt-2 space-y-0.5"
+  }, items.map(it => /*#__PURE__*/React.createElement("li", {
+    key: it.day,
+    className: "flex items-center justify-between text-[11px] text-slate-600"
+  }, /*#__PURE__*/React.createElement("span", null, toBn(it.day), " তারিখ"), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }, toBn(it.exactPct), "%")))));
+}
+
+// TopBottomDaysChart — live per-member সেরা ৩/সর্বনিম্ন ৩ পারফরম্যান্স, Monthly
+// Overview-এর নিচে। Calculation: চলতি মাস হলে শুধু "আজকের আগের দিন" পর্যন্ত
+// (আজকের অসম্পূর্ণ/চলমান দিন বাদ); অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)।
+// monthEntries পরিবর্তন হলেই(নতুন entry save) useEffect re-run করে চার্ট
+// স্বয়ংক্রিয়ভাবে আপডেট হয় — আলাদা কোনো polling/timer লাগে না।
+function TopBottomDaysChart({
+  monthEntries,
+  totalDays,
+  member,
+  allFields,
+  dailyScore,
+  pad2,
+  toBn,
+  monthCursor
+}) {
+  const now = new Date();
+  const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
+  const cutoffDay = isCurrentMonth ? now.getDate() - 1 : totalDays;
+  const filled = [];
+  for (let d = 1; d <= cutoffDay; d++) {
+    const s = dailyScore(monthEntries[pad2(d)], member, allFields);
+    if (s !== null) filled.push({ day: d, score: s, exactPct: (s * 100).toFixed(1) });
+  }
+  // Tie-handling consistent: score সমান হলে আগের তারিখ অগ্রাধিকার পায়(দুই
+  // দিকেই একই নিয়ম), ফলে re-render/rebuild-এও ক্রম সবসময় একই থাকে।
+  const bestSorted = [...filled].sort((a, b) => b.score - a.score || a.day - b.day);
+  const best = bestSorted.slice(0, 3);
+  const bestDays = new Set(best.map(b => b.day));
+  const worst = filled.filter(f => !bestDays.has(f.day)).sort((a, b) => a.score - b.score || a.day - b.day).slice(0, 3);
+  const bestColors = ["#0E4B43", "#2F8F7E", "#66B8A8"];
+  const worstColors = ["#C1666B", "#D98A8F", "#F0B3B7"];
   if (filled.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800 mb-2"
-  }, "সেরা ৩ ও খারাপ ৩ দিন"), /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-56"
-  }, /*#__PURE__*/React.createElement("canvas", {
-    ref: chartRef
+    className: "font-bold text-sm text-slate-800 mb-3"
+  }, "আজ পর্যন্ত আপনার সেরা ৩ ও সর্বনিম্ন ৩ পারফরম্যান্স"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 gap-4"
+  }, /*#__PURE__*/React.createElement(RankDonut, {
+    heading: "সেরা ৩",
+    items: best,
+    colors: bestColors,
+    toBn: toBn
+  }), /*#__PURE__*/React.createElement(RankDonut, {
+    heading: "সর্বনিম্ন ৩",
+    items: worst,
+    colors: worstColors,
+    toBn: toBn
   })));
 }
 
@@ -500,7 +562,8 @@ export function MonthlyOverviewSection({
     allFields: allFields,
     dailyScore: dailyScore,
     pad2: pad2,
-    toBn: toBn
+    toBn: toBn,
+    monthCursor: monthCursor
   }));
 }
 
