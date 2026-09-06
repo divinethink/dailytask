@@ -126,88 +126,12 @@ function ProgressChart({
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
 // effect তৈরির জন্য, কোনো নতুন color-library লাগেনি।
-function shadeColor(hex, percent) {
-  const num = parseInt(hex.replace("#", ""), 16);
-  const clamp = v => Math.max(0, Math.min(255, v));
-  const r = clamp((num >> 16) + Math.round(2.55 * percent));
-  const g = clamp(((num >> 8) & 0xff) + Math.round(2.55 * percent));
-  const b = clamp((num & 0xff) + Math.round(2.55 * percent));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-// প্রতিটা segment-এর নিচে নরম drop-shadow — চার্টে সামান্য "elevated/3D" অনুভূতি
-// দেয়। label-plugin-এর আগে array-তে বসানো হয়েছে যাতে shadow টেক্সটে না লাগে
-// (beforeDatasetsDraw-এ shadow সেট, afterDatasetsDraw-এ save/restore দিয়ে সরিয়ে
-// ফেলা হয় — পরের plugin(label) নিখুঁত/sharp টেক্সট আঁকতে পারে)।
-const dropShadowPlugin = {
-  id: "dropShadowPlugin",
-  beforeDatasetsDraw(chart) {
-    chart.ctx.save();
-    chart.ctx.shadowColor = "rgba(15, 23, 42, 0.28)";
-    chart.ctx.shadowBlur = 12;
-    chart.ctx.shadowOffsetY = 5;
-  },
-  afterDatasetsDraw(chart) {
-    chart.ctx.restore();
-  }
-};
-
-// draws day-label + exact% inside each donut segment — plain Chart.js plugin
-// object (afterDatasetsDraw hook), avoids adding a new npm dependency
-// (chartjs-plugin-datalabels) for this single use-case. টেক্সটে সরু dark-stroke
-// outline যোগ করা হয়েছে যাতে gradient-background যেকোনো টোনেই পড়া সহজ থাকে।
-function makeSliceLabelPlugin(items) {
-  return {
-    id: "sliceLabelPlugin",
-    afterDatasetsDraw(chart) {
-      const meta = chart.getDatasetMeta(0);
-      const { ctx } = chart;
-      meta.data.forEach((arc, i) => {
-        const item = items[i];
-        if (!item) return;
-        const pos = arc.tooltipPosition();
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(0,0,0,0.35)";
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 10px 'Hind Siliguri', sans-serif";
-        ctx.strokeText(item.dayLabel, pos.x, pos.y - 6);
-        ctx.fillText(item.dayLabel, pos.x, pos.y - 6);
-        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
-        ctx.strokeText(item.pctLabel, pos.x, pos.y + 7);
-        ctx.fillText(item.pctLabel, pos.x, pos.y + 7);
-        ctx.restore();
-      });
-    }
-  };
-}
-
-// Donut-এর মাঝখানে ছোট "গড়" সংখ্যা(finance-app স্টাইলের center-callout)।
-function makeCenterTextPlugin(mainText, subText, color) {
-  return {
-    id: "centerTextPlugin",
-    afterDraw(chart) {
-      const { ctx, chartArea } = chart;
-      const cx = (chartArea.left + chartArea.right) / 2;
-      const cy = (chartArea.top + chartArea.bottom) / 2;
-      ctx.save();
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = color;
-      ctx.font = "bold 15px 'IBM Plex Mono', monospace";
-      ctx.fillText(mainText, cx, cy - 7);
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "9px 'Hind Siliguri', sans-serif";
-      ctx.fillText(subText, cx, cy + 9);
-      ctx.restore();
-    }
-  };
-}
-
-// একটা donut(সেরা ৩ অথবা সর্বনিম্ন ৩) + তার নিচে exact-average লিস্ট।
-function RankDonut({ heading, items, colors, toBn }) {
+// একটা donut(সেরা ৩ অথবা সর্বনিম্ন ৩ অ্যাক্টিভিটি) — সাধারণ, flat রঙ(কোনো
+// gradient/shadow/3D-effect নেই, existing dashboard-এর color-palette-এর সাথেই
+// সামঞ্জস্যপূর্ণ)। Chart.js-এর নিজস্ব legend ব্যবহার করা হয়েছে(নাম+% দুটোই
+// legend-label-এর ভিতরে বেক করা), কারণ canvas slice-এর ভিতরে ছোট টেক্সট গোজার
+// চেয়ে regular legend-টেক্সট ছোট স্ক্রিনেও অনেক বেশি সহজে পড়া যায়।
+function ActivityRankDonut({ heading, headingColor, items, colors, toBn }) {
   const canvasRef = useRef(null);
   const chartInstance = useRef(null);
   useEffect(() => {
@@ -216,47 +140,33 @@ function RankDonut({ heading, items, colors, toBn }) {
       chartInstance.current.destroy();
       chartInstance.current = null;
     }
-    const labelItems = items.map(it => ({
-      dayLabel: `${toBn(it.day)} তারিখ`,
-      pctLabel: `${toBn(it.exactPct)}%`
-    }));
-    const avg = items.reduce((sum, it) => sum + it.score, 0) / items.length;
     const ctx = canvasRef.current.getContext("2d");
     chartInstance.current = new Chart(ctx, {
-      type: "doughnut",
+      type: "pie",
       data: {
-        labels: items.map(it => `${toBn(it.day)} তারিখ`),
+        labels: items.map(it => `${it.label} (${toBn(it.pct)}%)`),
         datasets: [{
-          data: items.map(it => it.score * 100),
-          backgroundColor: context => {
-            const { chart, dataIndex } = context;
-            const { chartArea } = chart;
-            const hex = colors[dataIndex];
-            if (!chartArea) return hex;
-            const cx = (chartArea.left + chartArea.right) / 2;
-            const cy = (chartArea.top + chartArea.bottom) / 2;
-            const radius = (chartArea.right - chartArea.left) / 2;
-            const grad = chart.ctx.createRadialGradient(cx, cy, radius * 0.35, cx, cy, radius);
-            grad.addColorStop(0, shadeColor(hex, 28));
-            grad.addColorStop(1, shadeColor(hex, -12));
-            return grad;
-          },
+          data: items.map(it => it.pct),
+          backgroundColor: colors.slice(0, items.length),
           borderColor: "#fff",
-          borderWidth: 2,
-          borderRadius: 8,
-          spacing: 3,
-          hoverOffset: 6
+          borderWidth: 2
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "62%",
         plugins: {
-          legend: { display: false }
+          legend: {
+            position: "bottom",
+            labels: {
+              boxWidth: 9,
+              boxHeight: 9,
+              padding: 8,
+              font: { size: 10, family: "'Hind Siliguri', sans-serif" }
+            }
+          }
         }
-      },
-      plugins: [dropShadowPlugin, makeSliceLabelPlugin(labelItems), makeCenterTextPlugin(`${toBn((avg * 100).toFixed(1))}%`, "গড়", colors[0])]
+      }
     });
     return () => {
       if (chartInstance.current) {
@@ -267,38 +177,27 @@ function RankDonut({ heading, items, colors, toBn }) {
   }, [items, colors, toBn]);
   if (items.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-bold text-slate-500 mb-1"
+    className: "text-xs font-bold mb-2 text-center",
+    style: { color: headingColor }
   }, heading), /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-44"
+    className: "w-full h-40"
   }, /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef
-  })), /*#__PURE__*/React.createElement("ul", {
-    className: "mt-2 space-y-1"
-  }, items.map((it, i) => /*#__PURE__*/React.createElement("li", {
-    key: it.day,
-    className: "flex items-center justify-between text-[11px] text-slate-600"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1.5"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "inline-block w-2 h-2 rounded-full",
-    style: { background: colors[i] }
-  }), toBn(it.day), " তারিখ"), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }, toBn(it.exactPct), "%")))));
+  })));
 }
 
-// TopBottomDaysChart — live per-member সেরা ৩/সর্বনিম্ন ৩ পারফরম্যান্স, Monthly
-// Overview-এর নিচে। Calculation: চলতি মাস হলে শুধু "আজকের আগের দিন" পর্যন্ত
-// (আজকের অসম্পূর্ণ/চলমান দিন বাদ); অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)।
-// monthEntries পরিবর্তন হলেই(নতুন entry save) useEffect re-run করে চার্ট
-// স্বয়ংক্রিয়ভাবে আপডেট হয় — আলাদা কোনো polling/timer লাগে না।
-function TopBottomDaysChart({
+// TopBottomActivityChart — চলতি মাসের ১ তারিখ থেকে "আজকের আগের দিন" পর্যন্ত
+// (আজকের অসম্পূর্ণ/চলমান দিন বাদ) প্রতিটা আমল/অ্যাক্টিভিটির গড় % হিসাব করে
+// (fieldPercent() reuse — fardPrayers-এর ইনভার্টেড-স্কোরিং সহ সব বিদ্যমান নিয়ম
+// স্বয়ংক্রিয়ভাবে বজায় থাকে, যেমন ০টা কাযা হলে "ফরজ কাযা" ফিল্ড ১০০% দেখাবে)।
+// অতীত মাস দেখলে পুরো মাস(ইতিমধ্যে সম্পন্ন)। monthEntries পরিবর্তন হলেই
+// পরের render-এ স্বয়ংক্রিয়ভাবে rank/chart আপডেট হয় — আলাদা polling লাগে না।
+function TopBottomActivityChart({
   monthEntries,
   totalDays,
   member,
   allFields,
-  dailyScore,
+  fieldPercent,
   pad2,
   toBn,
   monthCursor
@@ -306,37 +205,42 @@ function TopBottomDaysChart({
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
   const cutoffDay = isCurrentMonth ? now.getDate() - 1 : totalDays;
-  const filled = [];
-  for (let d = 1; d <= cutoffDay; d++) {
-    const s = dailyScore(monthEntries[pad2(d)], member, allFields);
-    if (s !== null) filled.push({ day: d, score: s, exactPct: (s * 100).toFixed(1) });
+  if (cutoffDay < 1) return null;
+  const results = [];
+  for (const f of allFields) {
+    const pct = fieldPercent(f, monthEntries, cutoffDay, member);
+    if (pct !== null) results.push({ key: f.key, label: f.shortLabel || f.label, pct });
   }
-  // Tie-handling consistent: score সমান হলে আগের তারিখ অগ্রাধিকার পায়(দুই
-  // দিকেই একই নিয়ম), ফলে re-render/rebuild-এও ক্রম সবসময় একই থাকে।
-  const bestSorted = [...filled].sort((a, b) => b.score - a.score || a.day - b.day);
+  if (results.length === 0) return null;
+  // Tie-handling consistent: % সমান হলে key(ফিল্ডের নিজস্ব stable identifier)
+  // অনুযায়ী বাছাই হয় — দুই দিকেই একই নিয়ম, তাই re-render-এও ক্রম অপরিবর্তিত।
+  const bestSorted = [...results].sort((a, b) => b.pct - a.pct || a.key.localeCompare(b.key));
   const best = bestSorted.slice(0, 3);
-  const bestDays = new Set(best.map(b => b.day));
-  const worst = filled.filter(f => !bestDays.has(f.day)).sort((a, b) => a.score - b.score || a.day - b.day).slice(0, 3);
+  const bestKeys = new Set(best.map(b => b.key));
+  const worst = results.filter(r => !bestKeys.has(r.key)).sort((a, b) => a.pct - b.pct || a.key.localeCompare(b.key)).slice(0, 3);
   const bestColors = ["#0E4B43", "#2F8F7E", "#66B8A8"];
   const worstColors = ["#C1666B", "#D98A8F", "#F0B3B7"];
-  if (filled.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800 mb-3"
+    className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, "আজ পর্যন্ত আপনার সেরা ৩ ও সর্বনিম্ন ৩ পারফরম্যান্স"), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-1 gap-4"
-  }, /*#__PURE__*/React.createElement(RankDonut, {
-    heading: "সেরা ৩",
+    className: "grid grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement(ActivityRankDonut, {
+    heading: "সেরা ৩ অ্যাক্টিভিটি",
+    headingColor: "#0E4B43",
     items: best,
     colors: bestColors,
     toBn: toBn
-  }), /*#__PURE__*/React.createElement(RankDonut, {
-    heading: "সর্বনিম্ন ৩",
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "border-l border-slate-200 pl-4"
+  }, /*#__PURE__*/React.createElement(ActivityRankDonut, {
+    heading: "সর্বনিম্ন ৩ অ্যাক্টিভিটি",
+    headingColor: "#C1666B",
     items: worst,
     colors: worstColors,
     toBn: toBn
-  })));
+  }))));
 }
 
 // Shared month-nav control (refresh + ◀ month ▶) — verbatim JSX previously
@@ -541,6 +445,7 @@ export function MonthlyOverviewSection({
   BN_MONTHS,
   BN_WEEKDAYS,
   dailyScore,
+  fieldPercent,
   pad2,
   scoreColor,
   toBn,
@@ -632,12 +537,12 @@ export function MonthlyOverviewSection({
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
-  })))), /*#__PURE__*/React.createElement(TopBottomDaysChart, {
+  })))), /*#__PURE__*/React.createElement(TopBottomActivityChart, {
     monthEntries: monthEntries,
     totalDays: total,
     member: selectedMember,
     allFields: allFields,
-    dailyScore: dailyScore,
+    fieldPercent: fieldPercent,
     pad2: pad2,
     toBn: toBn,
     monthCursor: monthCursor
