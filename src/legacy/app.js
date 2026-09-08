@@ -1,7 +1,7 @@
 import { db, auth, analytics, logAnalyticsEvent } from "./firebaseConfig.js";
 import {
-  FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS, hexToRgba,
-  getThemeColor, applyThemeColor, useThemeColor, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
+  FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
+  applyThemeColor, useThemeColor, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
   fieldApplies, isExcused, isFieldExcusable, BN_DIGITS, toBn, BN_MONTHS, BN_WEEKDAYS,
   DAILY_INSPIRATIONS, AYAT_LIST, HADITH_LIST, QUOTE_LIST, INSPIRATION_TYPE_CYCLE,
   getDailyInspiration, pad2, dateKey, formatBnDateTime, isFutureDate, monthPrefix,
@@ -2773,9 +2773,7 @@ function App() {
     pad2: pad2,
     scoreColor: scoreColor,
     toBn: toBn,
-    getThemeColor: getThemeColor,
-    hexToRgba: hexToRgba,
-    getWeekRanges: getWeekRanges
+    streak: streak
   }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
     addWeeklyRow: addWeeklyRow,
     handleSaveWeekly: handleSaveWeekly,
