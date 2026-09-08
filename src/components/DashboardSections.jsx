@@ -1,127 +1,36 @@
 // A4-G6-Part C — Dashboard secondary sections: Weekly Reflection, Monthly
-// Overview(+ProgressChart), Meeting Minutes, and small inline modals
-// (Delete-Account-Warning, Add-Custom-Field, Feedback, Milestone-Toast).
+// Overview, Meeting Minutes, and small inline modals (Delete-Account-Warning,
+// Add-Custom-Field, Feedback, Milestone-Toast).
 // Extracted verbatim from legacy App() (app.js lines ~7235-7722, scattered).
 // Structural-only (Owner Rule 2): no logic/condition change, only moved to its
-// own file + split into named exports. ProgressChart (previously a standalone
-// module-level function only used by Monthly Overview, app.js lines ~4448-4545)
-// moved into this file too since it has no other caller; its module-level helper
-// references (dailyScore/getThemeColor/hexToRgba/getWeekRanges/pad2/toBn) are now
-// explicit props threaded through from MonthlyOverviewSection's own props (they
-// were closures before — see G1 toBn prop-miss lesson, applied proactively here).
+// own file + split into named exports.
+// [৮ সেপ্টেম্বর ২০২৬] Chart.js-ভিত্তিক ProgressChart(সাপ্তাহিক লাইন-গ্রাফ)
+// সরিয়ে StreakCard দিয়ে প্রতিস্থাপন করা হয়েছে(owner-approved, নিচে দ্রষ্টব্য)।
 import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, ChevronRight, ChevronDown, Printer, MessageSquare, X } from "./icons.jsx";
 
 // React itself is a true runtime global (established pattern — no file in this
-// codebase imports it). app.js locally destructures hooks from it the same way;
-// ProgressChart (moved here) needs the same destructure since it can no longer
-// see app.js's local const. Chart (from Chart.js) is likewise already a true
-// global in the current runtime (app.js's ProgressChart used bare Chart with
-// no import/declaration at all) — unchanged, no action needed.
-const { useRef, useEffect, useState } = React;
+// codebase imports it). app.js locally destructures hooks from it the same way.
+const { useEffect, useState } = React;
 
-function ProgressChart({
-  monthEntries,
-  totalDays,
-  member,
-  allFields,
-  dailyScore,
-  getThemeColor,
-  hexToRgba,
-  getWeekRanges,
-  pad2,
-  toBn
-}) {
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
-  useEffect(() => {
-    if (!chartRef.current) return;
-    // আগে এখানে সবসময় হার্ডকোডেড ৫টি সপ্তাহ প্লট করা হতো, ফলে ২৮ দিনের
-    // ফেব্রুয়ারির মতো মাসে অস্তিত্বহীন "সপ্তাহ ৫" ভুলভাবে ০% হিসেবে দেখাতো।
-    // getWeekRanges() ব্যবহার করে এখন শুধু ঐ মাসে আসলে যে কয়টা সপ্তাহ আছে
-    // (৪ বা ৫) সেটাই প্লট হবে — সাপ্তাহিক রিফ্লেকশন টেবিল ও প্রিন্ট PDF-এ
-    // এই একই ফাংশন যেভাবে ব্যবহৃত হয়, সেভাবে।
-    const weekRanges = getWeekRanges(totalDays);
-    const weekLabels = weekRanges.map(({
-      week
-    }) => `সপ্তাহ ${toBn(week)}`);
-    const weekScores = weekRanges.map(({
-      start,
-      end
-    }) => {
-      let sum = 0;
-      let count = 0;
-      for (let d = start; d <= end; d++) {
-        const e = monthEntries[pad2(d)];
-        const s = dailyScore(e, member, allFields);
-        if (s !== null) {
-          sum += s;
-          count += 1;
-        }
-      }
-      return count ? Math.round(sum / count * 100) : 0;
-    });
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-      chartInstance.current = null;
-    }
-    const ctx = chartRef.current.getContext("2d");
-    const themePrimary = getThemeColor("#0E4B43");
-    chartInstance.current = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: weekLabels,
-        datasets: [{
-          label: "সাপ্তাহিক গড় স্কোর (%)",
-          data: weekScores,
-          borderColor: themePrimary,
-          backgroundColor: hexToRgba(themePrimary, 0.1),
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointBackgroundColor: "#C89B3C"
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            min: 0,
-            max: 100,
-            ticks: {
-              stepSize: 25,
-              font: {
-                size: 10
-              }
-            }
-          },
-          x: {
-            ticks: {
-              font: {
-                size: 10
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          }
-        }
-      }
-    });
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
-      }
-    };
-  }, [monthEntries, totalDays, member, allFields]);
+// StreakCard — ProgressChart(Chart.js লাইন-গ্রাফ)-এর প্রতিস্থাপন(৮ সেপ্টেম্বর
+// ২০২৬, owner-approved: "গ্রাফ কাজে লাগছে না, আগ্রহ তৈরি হয় এমন কিছু আনা
+// হোক")। কোনো নতুন calculation লাগেনি — `calculateStreak()`(appHelpers.js)
+// আগে থেকেই তৈরি ও app.js-এ প্রতি রেন্ডারে গণনা হচ্ছিল, শুধু এতদিন কোথাও
+// প্রধানভাবে দেখানো হতো না(শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
+// (৭/৩০/১০০/৩৬৫ দিন) toast system-ও আগে থেকেই আছে, অপরিবর্তিত।
+function StreakCard({ streak, toBn }) {
+  const n = streak || 0;
+  const caption = n === 0 ? "আজ থেকে ধারাবাহিকতা শুরু করুন!" : "চালিয়ে যান, মাশাআল্লাহ!";
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-32 mt-2"
-  }, /*#__PURE__*/React.createElement("canvas", {
-    ref: chartRef
-  }));
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] p-4 flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-3xl leading-none"
+  }, "🔥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-xl font-bold text-emerald-950",
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+  }, toBn(n), " দিন ধারাবাহিক"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-500 mt-0.5"
+  }, caption)));
 }
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
@@ -194,11 +103,17 @@ function ratingTier(pct) {
   return { emoji: "🌱", label: "পুনরায় ধারাবাহিকতা গড়ার পর্যায়", caption: "ছোট ছোট লক্ষ্য নিয়ে ধারাবাহিকতা গড়ুন।" };
 }
 
-// TopBottomActivityRanking — চলতি মাসের ১ তারিখ থেকে "যতদিন পূরণ হয়েছে" ততদিন
-// পর্যন্ত (আজকের এন্ট্রি সেভ হয়ে থাকলে আজও ধরা হয়, না থাকলে গতকাল পর্যন্ত —
-// filled-status-ভিত্তিক, rigid date-cutoff না; owner-এর কথা: "ফিল্ড করার সাথে
-// সাথে সব জায়গায় আপডেট হওয়া উচিত") প্রতিটা আমলের গড় % হিসাব করে(fieldPercent()
-// reuse)। অতীত মাস দেখলে পুরো মাস।
+// computeActivityStats — TopBottomActivityRanking(তালিকা) ও
+// MonthlyOverviewSection(শুধু rating badge)-এর জন্য একই hisab reuse করার
+// pure helper(৮ সেপ্টেম্বর ২০২৬-এ extract করা, কোনো logic বদলায়নি, শুধু
+// component-এর ভিতর থেকে বের করে দুই জায়গায় reuse-যোগ্য করা হয়েছে — কারণ
+// badge এখন শুধু Monthly Overview বক্সে দেখানো হয়, ranking বক্সে না, অথচ
+// দুটোই একই Overall%/Fard-Gate hisab-এর উপর নির্ভরশীল)।
+//
+// চলতি মাসের ১ তারিখ থেকে "যতদিন পূরণ হয়েছে" ততদিন পর্যন্ত (আজকের এন্ট্রি
+// সেভ হয়ে থাকলে আজও ধরা হয়, না থাকলে গতকাল পর্যন্ত — filled-status-ভিত্তিক,
+// rigid date-cutoff না) প্রতিটা আমলের গড় % হিসাব করে(fieldPercent() reuse)।
+// অতীত মাস দেখলে পুরো মাস।
 //
 // Fard Gate: ফরজ কাযা(fardPrayers) ঠিক ১০০% না হলে "সর্বোচ্চ" তালিকায় আসবে
 // না(even ৯৯%) — "সর্বনিম্ন"-এ কোনো বাধা নেই। একই নিয়ম জামায়াতে সালাত(male-only
@@ -208,16 +123,7 @@ function ratingTier(pct) {
 // Rating badge-এ আলাদা Fard Gate: Overall ৯০%+ হলেও fardPrayers ১০০% না হলে
 // "উৎকৃষ্ট" badge দেখানো হবে না(এক ধাপ নিচে নামবে, "খুব ভালো") — কিন্তু আসল
 // Overall% সংখ্যা অপরিবর্তিত থাকে(owner-চূড়ান্ত সিদ্ধান্ত)।
-function TopBottomActivityRanking({
-  monthEntries,
-  totalDays,
-  member,
-  allFields,
-  fieldPercent,
-  pad2,
-  toBn,
-  monthCursor
-}) {
+function computeActivityStats({ monthEntries, totalDays, member, allFields, fieldPercent, pad2, toBn, monthCursor }) {
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
   let cutoffDay = totalDays;
@@ -234,7 +140,13 @@ function TopBottomActivityRanking({
   const results = [];
   for (const f of allFields) {
     const pct = fieldPercent(f, monthEntries, cutoffDay, member);
-    if (pct !== null) results.push({ key: f.key, label: f.shortLabel || f.label, pct });
+    // "ফরজ কাযা" ফিল্ডের pct আসলে ইনভার্টেড(কাযা-মুক্ত/সময়মতো-আদায়ের হার,
+    // fieldPercent()-এর ডকুমেন্টেড কনভেনশন) — তালিকায় সরাসরি "ফরজ কাযা" নামে
+    // এই মান দেখালে নিচের কাযা-বার্তা(complementary %)-র সাথে বৈপরীত্য মনে
+    // হয়(owner পর্যবেক্ষণ, ৮ সেপ্টেম্বর ২০২৬)। তাই শুধু এই ranking-লেবেলে
+    // স্পষ্ট নাম ব্যবহার করা হলো — সংখ্যা/hisab অপরিবর্তিত।
+    const label = f.key === "fardPrayers" ? "ফরজ আদায় (কাযা-মুক্ত)" : f.shortLabel || f.label;
+    if (pct !== null) results.push({ key: f.key, label, pct });
   }
   if (results.length === 0) return null;
 
@@ -263,13 +175,28 @@ function TopBottomActivityRanking({
     const qazaPct = 100 - fardResult.pct;
     const jamaatResult = results.find(r => r.key === "jamaat");
     const goalMet = jamaatResult ? qazaPct === 0 && jamaatResult.pct >= 70 : qazaPct === 0;
-    // এই বক্সে % থাকবে(owner-স্পষ্টীকরণ, ৭ সেপ্টেম্বর ২০২৬: "কাযা, জামায়াত %
-    // থাকবে" — আগের রাউন্ডে ভুলবশত এখান থেকে % সরানো হয়েছিল, সেটা আসলে নিচের
-    // Rating badge-এর জন্য প্রযোজ্য ছিল, এই বক্সের জন্য না)।
-    const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে সালাত আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
-    const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয় এবং যথাসম্ভব জামায়াতে সালাত আদায় করার চেষ্টা করতে হবে।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা নয়।";
+    // টেক্সট আপডেট(৮ সেপ্টেম্বর ২০২৬, owner-চূড়ান্ত ওয়র্ডিং)।
+    const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
+    const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা এবং যথাসম্ভব জামায়াতে আদায়ের চেষ্টা করা।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা।";
     qazaJamaatBlock = { infoText, goalText, goalMet };
   }
+
+  return { topTiers, bottomTiers, overallPct, badgeTier, qazaJamaatBlock };
+}
+
+function TopBottomActivityRanking({
+  monthEntries,
+  totalDays,
+  member,
+  allFields,
+  fieldPercent,
+  pad2,
+  toBn,
+  monthCursor
+}) {
+  const stats = computeActivityStats({ monthEntries, totalDays, member, allFields, fieldPercent, pad2, toBn, monthCursor });
+  if (!stats) return null;
+  const { topTiers, bottomTiers, qazaJamaatBlock } = stats;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
@@ -291,13 +218,7 @@ function TopBottomActivityRanking({
     tiers: bottomTiers,
     rankPrefix: "সর্বনিম্ন",
     toBn: toBn
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-[#f0ede4] rounded-xl p-3 mb-2.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-bold text-slate-700"
-  }, badgeTier.emoji, " ", badgeTier.label), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-500 mt-1"
-  }, badgeTier.caption)), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
+  }))), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
     className: qazaJamaatBlock.goalMet ? "bg-[#eaf3ee] border border-[#9fc9ae] rounded-xl p-3" : "bg-[#faece7] border border-[#f0997b] rounded-xl p-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-start gap-2"
@@ -516,10 +437,13 @@ export function MonthlyOverviewSection({
   pad2,
   scoreColor,
   toBn,
-  getThemeColor,
-  hexToRgba,
-  getWeekRanges
+  streak
 }) {
+  // Rating badge("উৎকৃষ্ট"/"উন্নতি প্রয়োজন" ইত্যাদি) — এতদিন শুধু নিচের
+  // "সর্বোচ্চ-সর্বনিম্ন এক্টিভিটি" বক্সে ছিল, এখন এখানে(গড় স্কোরের ঠিক
+  // নিচে) আনা হয়েছে(owner-approved, ৮ সেপ্টেম্বর ২০২৬) — যেহেতু গড় স্কোর
+  // এই বক্সেই দেখানো হয়, ডুপ্লিকেট এড়াতে নিচের বক্স থেকে সরানো হয়েছে।
+  const activityStats = computeActivityStats({ monthEntries, totalDays: total, member: selectedMember, allFields, fieldPercent, pad2, toBn, monthCursor });
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -563,16 +487,14 @@ export function MonthlyOverviewSection({
     className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
-  }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement(ProgressChart, {
-    monthEntries: monthEntries,
-    totalDays: monthStats.total,
-    member: selectedMember,
-    allFields: allFields,
-    dailyScore: dailyScore,
-    getThemeColor: getThemeColor,
-    hexToRgba: hexToRgba,
-    getWeekRanges: getWeekRanges,
-    pad2: pad2,
+  }), " PDF / প্রিন্ট (২ পেজ)")), activityStats && /*#__PURE__*/React.createElement("div", {
+    className: "mb-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-bold text-slate-700"
+  }, activityStats.badgeTier.emoji, " ", activityStats.badgeTier.label), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-500 mt-1"
+  }, activityStats.badgeTier.caption)), /*#__PURE__*/React.createElement(StreakCard, {
+    streak: streak,
     toBn: toBn
   }), /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
