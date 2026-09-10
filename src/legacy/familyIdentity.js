@@ -4,6 +4,11 @@
 // by both this file ও memberData.js, single source of truth).
 import { db, auth } from "./firebaseConfig.js";
 import { FAMILY_CODE_CHARS, generateSecureCode } from "./appHelpers.js";
+// §২.৪ Identity Simplification — Sign Up(§২.১) নতুন Google-only family
+// creation path-এর জন্য(নিচে createNewFamilyGoogleOnly)। শুধু এই একটা
+// helper import করা হচ্ছে, পুরনো createNewFamily()/কোনো existing flow
+// touch হয়নি।
+import { writeUserMapping } from "./googleIdentity.js";
 
 const APP_CREATOR_UID = "yiirNJKJHlM27guiiS10zsp2FYT2";
 function isCreatorAuth() {
@@ -247,6 +252,103 @@ async function createNewFamily(newCode) {
 }
 if (typeof window !== "undefined") {
   window.createNewFamily = createNewFamily;
+}
+
+// §২.৪ §২.১ — নতুন Sign Up(Google-only) family creation path। পুরনো
+// createNewFamily()(Anonymous-Auth-based) সম্পূর্ণ অপরিবর্তিত রাখা হয়েছে —
+// এই ফাংশন সম্পূর্ণ আলাদা, additive। কোনো existing UI এখনো এটা কল করে না
+// (নতুন Sign Up UI component পরের sub-phase-এ এটা wire করবে)।
+//
+// Precondition(caller-এর দায়িত্ব, §১০.৩ single-popup pattern অনুযায়ী):
+// Google Sign-in(signInWithPopup) ইতিমধ্যে সফল হয়ে auth.currentUser এখন
+// সেই Google user — এই ফাংশন নিজে popup ট্রিগার করে না(UI button-এর
+// onClick-এর সবচেয়ে প্রথম synchronous statement হিসেবে popup থাকতে হবে,
+// এই ফাংশন সেই .then()-এর ভিতর থেকে call হবে)।
+//
+// firestore.rules-এর family create-clause-এ 'identityModel' allowed-keys
+// list-এ নেই বলে creation-এই সেট করা যায় না — dedicated update-clause
+// অনুযায়ী absent→"transitioning"→"google-only" দুই ধাপে সেট করতে হয়
+// (২.৪ প্ল্যান অনুযায়ী নতুন family-ও এই পথেই যাবে, শুধু create-এর ঠিক
+// পরেই, কোনো real dual-path window দরকার নেই যেহেতু family brand-new)।
+async function createNewFamilyGoogleOnly(newCode, name, gender) {
+  const normalized = (newCode || "").trim();
+  if (!normalized) return { aborted: true, reason: "empty" };
+  if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
+    console.error(`[New Family/Google] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    return { aborted: true, reason: "length" };
+  }
+  if (!isFamilyCodeCharsetValid(normalized)) {
+    console.error("[New Family/Google] অবৈধ ক্যারেক্টার।");
+    return { aborted: true, reason: "charset" };
+  }
+  if (!name || !name.trim()) {
+    return { aborted: true, reason: "name-required" };
+  }
+  if (!auth.currentUser || !isGoogleLinked()) {
+    console.error("[New Family/Google] Google Sign-in সম্পন্ন না হয়েই কল হয়েছে।");
+    return { aborted: true, reason: "google-signin-required" };
+  }
+  const uid = auth.currentUser.uid;
+  const newFamilyId = generateSecureCode(20);
+  try {
+    const codeRef = db.collection("familyCodes").doc(normalizeFamilyKey(normalized));
+    await db.runTransaction(async tx => {
+      const codeSnap = await tx.get(codeRef);
+      if (codeSnap.exists) {
+        throw new Error("code-taken");
+      }
+      tx.set(codeRef, { familyId: newFamilyId, createdAt: Date.now() });
+    });
+    const familyRef = db.collection("families").doc(newFamilyId);
+    await familyRef.set({
+      familyId: newFamilyId,
+      familyCode: normalized,
+      isCustomCode: true,
+      dataCollectionName: `data_${normalized}`,
+      migrationState: "v2",
+      createdAt: Date.now(),
+      createdByUid: uid,
+      schemaVersion: 1,
+      adminUids: []
+    });
+    // Rules: adminUids.size()==0 → [uid] + firstAdminUid(একবারই, উপরের
+    // পুরনো createNewFamily()-এর মতোই একই clause reuse)।
+    await familyRef.update({
+      adminUids: [uid],
+      firstAdminUid: uid,
+      updatedAt: Date.now()
+    });
+    // identityModel — দুই-ধাপ(Rules-gated), উপরের কমেন্ট দ্রষ্টব্য।
+    await familyRef.update({ identityModel: "transitioning", updatedAt: Date.now() });
+    await familyRef.update({ identityModel: "google-only", updatedAt: Date.now() });
+    // First-admin member — claimed অবস্থাতেই তৈরি(googleUid=uid), কখনো
+    // email field বসে না(unclaimed-proxy পথ ভিন্ন, §৫.১)।
+    const memberId = generateSecureCode(16);
+    await familyRef.collection("members").doc(memberId).set({
+      name: name.trim(),
+      gender: gender || null,
+      role: "admin",
+      googleUid: uid,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    await writeUserMapping(uid, newFamilyId, memberId);
+    console.log(`[New Family/Google] সফল — familyId: ${newFamilyId}, memberId: ${memberId}। রিলোড হচ্ছে...`);
+    localStorage.setItem("family_id", newFamilyId);
+    localStorage.setItem("family_code", normalized);
+    localStorage.setItem("family_code_is_custom", "1");
+    window.location.reload();
+    return { success: true, familyId: newFamilyId, memberId };
+  } catch (err) {
+    console.error("[New Family/Google] ব্যর্থ:", err.message);
+    if (err.message === "code-taken") {
+      return { aborted: true, reason: "code-taken" };
+    }
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+if (typeof window !== "undefined") {
+  window.createNewFamilyGoogleOnly = createNewFamilyGoogleOnly;
 }
 
 async function resolveFamilyIdFromCode(code) {
@@ -691,6 +793,7 @@ export {
   setFamilyCode,
   changeFamilyCodeForExistingFamily,
   createNewFamily,
+  createNewFamilyGoogleOnly,
   resolveFamilyIdFromCode,
   joinExistingFamily,
   checkFamilyCodeExists,
