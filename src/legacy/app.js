@@ -557,6 +557,10 @@ import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 import { Onboarding } from "../components/Onboarding.jsx";
+// §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
+import { BottomNav } from "../components/BottomNav.jsx";
+import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
+import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_TASBIH, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
 
@@ -683,6 +687,15 @@ import { Onboarding } from "../components/Onboarding.jsx";
 
 function App() {
   useFonts();
+  // §Bottom Navigation(2_4 §৯.২) — App()-এর নতুন top-level routing state।
+  // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে) — নিচের
+  // onbFlow/onbStep lazy-init pattern-এর সাথে সামঞ্জস্যপূর্ণ।
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || TAB_FAMILY; } catch { return TAB_FAMILY; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
+  }, [activeTab]);
   const [themeColor, setThemeColor] = useThemeColor();
   const [members, setMembers] = useState(null);
   // Switch prep (Step 1): families/<familyId>.migrationState-এর লাইভ
@@ -2550,6 +2563,21 @@ function App() {
   // থাকে, শুধু ownerUids খালি হয় — তাই ভুলভাবে trigger হয় না)।
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
   const needsOwnMemberProfile = isAdmin && Array.isArray(members) && members.length === 0 && !!myUid;
+  // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
+  // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
+  // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
+  // gate-logic byte-identical অপরিবর্তিত।
+  if (activeTab !== TAB_FAMILY) {
+    const placeholderTitle =
+      activeTab === TAB_PRAYER_TIMES ? "সময়সূচি" :
+      activeTab === TAB_TASBIH ? "তাসবীহ" :
+      activeTab === TAB_TOOLS ? "সহায়িকা" :
+      activeTab === TAB_SETTINGS ? "সেটিং" : "";
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      React.createElement(PublicToolsPlaceholder, { title: placeholderTitle }),
+      React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+    );
+  }
   if (onbStep || myMemberRequestStatus === "pending" || needsOwnMemberProfile) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
     flow: onbFlow,
     step: onbStep || (needsOwnMemberProfile ? "addMember" : "becomeMember"),
@@ -2930,7 +2958,7 @@ function App() {
     milestoneToast: milestoneToast,
     setMilestoneToast: setMilestoneToast,
     toBn: toBn
-  }));
+  }), React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab }));
 }
 
 // --- Google Account Linking (fully optional) ---
