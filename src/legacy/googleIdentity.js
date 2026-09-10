@@ -226,6 +226,66 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   }
 }
 
+// §৫.৩ — Family ত্যাগ(self-leave, claimed member)। firstAdminUid client-side
+// pre-check(UX friendly-message) — চূড়ান্ত protection সবসময় firestore.rules-
+// এর member-delete clause-এই enforced। মেম্বার doc delete + সংশ্লিষ্ট
+// familyMemberEmails mapping(composite familyId+memberId reverse-query,
+// ২.৪ §৩-এ নোট করা index প্রয়োজন) — একই batch-এ(atomic)।
+async function leaveFamily(familyId, memberId) {
+  if (!auth.currentUser) {
+    return { aborted: true, reason: "not-signed-in" };
+  }
+  const uid = auth.currentUser.uid;
+  const familyRef = db.collection("families").doc(familyId);
+  let fam = null;
+  try {
+    const familySnap = await familyRef.get();
+    fam = familySnap.exists ? familySnap.data() : null;
+  } catch (err) {
+    return { aborted: true, reason: "error", error: err.message };
+  }
+  if (fam && fam.firstAdminUid && fam.firstAdminUid === uid) {
+    return { aborted: true, reason: "first-admin-must-transfer" };
+  }
+  try {
+    const mappingQuery = await db.collection("familyMemberEmails")
+      .where("familyId", "==", familyId)
+      .where("memberId", "==", memberId)
+      .limit(1)
+      .get();
+    const batch = db.batch();
+    batch.delete(familyRef.collection("members").doc(memberId));
+    if (!mappingQuery.empty) {
+      batch.delete(mappingQuery.docs[0].ref);
+    }
+    await batch.commit();
+    return { success: true };
+  } catch (err) {
+    console.error("[Leave Family] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+
+// §৯.৪ "প্রোফাইল এডিট" — claimed member নিজে নাম/জেন্ডার বদলাতে পারবেন
+// (firestore.rules: isClaimedByGoogle + affectedKeys hasOnly ['name',
+// 'gender','updatedAt'])।
+async function editOwnProfile(familyId, memberId, name, gender) {
+  if (!auth.currentUser) {
+    return { aborted: true, reason: "not-signed-in" };
+  }
+  try {
+    await db.collection("families").doc(familyId).collection("members").doc(memberId).update({
+      name: (name || "").trim(),
+      gender: gender || null,
+      updatedAt: Date.now()
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("[Profile Edit] ব্যর্থ:", err.message);
+    return { aborted: true, reason: "error", error: err.message };
+  }
+}
+
 export {
   normalizeEmail,
   writeUserMapping,
@@ -239,6 +299,8 @@ export {
   generateInviteToken,
   rotateInviteLink,
   revokeInviteLink,
-  joinFamilyViaInviteLink
+  joinFamilyViaInviteLink,
+  leaveFamily,
+  editOwnProfile
 };
 
