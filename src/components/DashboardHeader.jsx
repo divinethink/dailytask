@@ -34,6 +34,7 @@ export function DashboardHeader({
   members,
   monthCursor,
   newGender,
+  newMemberEmail,
   newName,
   notifications,
   selectedId,
@@ -44,6 +45,7 @@ export function DashboardHeader({
   setDriveBackupStatus,
   setIsMenuOpen,
   setNewGender,
+  setNewMemberEmail,
   setNewName,
   setNotifications,
   setSelectedId,
@@ -292,8 +294,8 @@ export function DashboardHeader({
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"
-  }, "শুরু করতে আপনার নাম ও জেন্ডার দিয়ে নিজেকে একজন সদস্য হিসেবে যোগ করুন 👇"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2"
+  }, "শুরু করতে আপনার নাম, ইমেইল ও জেন্ডার দিয়ে নিজেকে একজন সদস্য হিসেবে যোগ করুন 👇"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-1.5"
   }, /*#__PURE__*/React.createElement("input", {
     value: newName,
     onChange: e => setNewName(e.target.value),
@@ -307,7 +309,15 @@ export function DashboardHeader({
     value: "male"
   }, "পুরুষ"), /*#__PURE__*/React.createElement("option", {
     value: "female"
-  }, "নারী")), /*#__PURE__*/React.createElement("button", {
+  }, "নারী"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: newMemberEmail,
+    onChange: e => setNewMemberEmail(e.target.value),
+    placeholder: "সদস্যের ইমেইল(Google সাইন-ইনের জন্য)...",
+    className: "flex-1 px-3 py-1.5 rounded-xl text-xs text-slate-900 outline-none font-medium"
+  }), /*#__PURE__*/React.createElement("button", {
     onClick: handleAddMember,
     disabled: isLockedForSwitch,
     className: "px-3 py-1.5 rounded-xl text-xs font-bold bg-[#C89B3C] text-[#16302B]"
