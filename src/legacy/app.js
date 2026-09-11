@@ -31,10 +31,10 @@ import {
 } from "./legacyMigrationTools.js";
 import {
   meetingKey, saveMeetingData, loadWeekly, saveWeekly, loadLegacyMembers, stampLastActive,
-  tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc, claimMemberDoc,
-  releaseMemberDoc, memberPrivateKeyRef, isMemberKeyCharsetValid, generateMemberKeyPlain,
-  generateReadableMemberKey, generateUniqueReadableMemberKey, createMemberWithKey,
-  fetchMemberKey, changeMemberKey, claimMemberWithKey, directIdentifyLogin, migrateMembersIfNeeded,
+  tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc,
+  releaseMemberDoc,
+  generateUniqueReadableMemberKey, createMemberWithKey,
+  directIdentifyLogin, migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory
 } from "./memberData.js";
@@ -548,12 +548,10 @@ import {
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
-import { ProfileDropdown } from "../components/ProfileDropdown.jsx";
 import { AccessRequestsModal, CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
 import { MemberRequestsModal } from "../components/MemberRequests.jsx";
-import { MemberKeyModal } from "../components/MemberKeyModal.jsx";
-import { BecomeMemberModal, ClaimKeyModal } from "../components/MemberOnboardingModals.jsx";
+import { BecomeMemberModal } from "../components/MemberOnboardingModals.jsx";
 import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 import { PrintReport } from "../components/PrintReport.jsx";
@@ -738,30 +736,20 @@ function App() {
   // showRecoveryClaim/recoveryKeyInput/recoveryClaimBusy — Admin Recovery
   // Key UI toggle-গুলো বাদ দেওয়া হয়েছে(নিচে §Member Key state দেখুন)।
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  // §Member Key(নতুন) — key প্রদর্শন/copy/change মোডাল, claim-with-key
-  // মোডাল, এবং "সদস্য হোন" self-request মোডাল+admin-approval প্যানেল।
-  const [showMemberKeyModal, setShowMemberKeyModal] = useState(false);
-  const [memberKeyTarget, setMemberKeyTarget] = useState(null);
-  const [memberKeyValue, setMemberKeyValue] = useState(null);
-  // fetch শেষ হয়েছে কিন্তু key doc-ই নেই(পুরনো, Member Key System-এর আগে
-  // তৈরি member) — এই অবস্থাকে "এখনো লোড হচ্ছে"(null) থেকে আলাদা করতে।
-  const [memberKeyLoading, setMemberKeyLoading] = useState(false);
-  const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
-  const [showChangeKeyForm, setShowChangeKeyForm] = useState(false);
-  const [memberKeyBusy, setMemberKeyBusy] = useState(false);
-  const [copiedMemberKey, setCopiedMemberKey] = useState(false);
-  // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
-  // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
-  const [manualKeyInput, setManualKeyInput] = useState("");
-  // §Password UI revamp(২০ আগস্ট ২০২৬): oldKeyInput এখন "পূর্বের Password
-  // verify" এর বদলে confirm-password ঘর হিসেবে reuse হচ্ছে — পূর্বের
-  // password শুধু masked display(readonly), যাচাই করার প্রয়োজন নেই(owner
-  // নিজে ঠিক করেছেন — এই অ্যাপ শুধু daily-amal ট্র্যাকার, risk গ্রহণযোগ্য)।
-  const [confirmKeyInput, setConfirmKeyInput] = useState("");
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): Member Key
+  // view/copy/change modal state(showMemberKeyModal/memberKeyTarget/
+  // memberKeyValue/memberKeyLoading/memberKeyRevealed/showChangeKeyForm/
+  // memberKeyBusy/copiedMemberKey/manualKeyInput/confirmKeyInput) ও Claim Key
+  // modal-এর claimKeyInput/claimKeyBusy সরানো হয়েছে — MemberKeyModal.jsx
+  // ইতিমধ্যে dead ছিল(কোনো live trigger ছিল না, ProfileDropdown→
+  // ProfileDropdownGoogle swap-এর পর থেকে) ও claim-UI এই সেশনেই
+  // MemberListSection.jsx থেকে সরানো হয়েছে। showClaimKeyModal/claimKeyTarget
+  // এখনো রাখা হয়েছে — OnboardingBridge-এর "keyClaim" step এই দুটো props
+  // হিসেবে নেয়(Phase 3 scope, এই সেশনে touch করা হয়নি); modal নিজে না থাকায়
+  // সেই narrow edge-case step এখন no-op(আগে থেকেই Rules-level ownerUids-claim
+  // path google-only family-তে বন্ধ ছিল বলে কোনো real capability loss নেই)।
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
-  const [claimKeyInput, setClaimKeyInput] = useState("");
-  const [claimKeyBusy, setClaimKeyBusy] = useState(false);
   const [showBecomeMemberModal, setShowBecomeMemberModal] = useState(false);
   const [becomeMemberName, setBecomeMemberName] = useState("");
   const [becomeMemberGender, setBecomeMemberGender] = useState("male");
@@ -2077,63 +2065,14 @@ function App() {
       setSelectedId(next.length ? next[0].id : null);
     }
   }
-  // [Legacy fallback-only] Member Key ছাড়া free-claim — শুধু legacy(v1)
-  // path-এ ব্যবহৃত হয়(বাস্তবে উভয় real family v2-তে, তাই কার্যত অব্যবহৃত)।
-  // v2-তে ভুলবশত কল হলেও এখানেই আটকে যাবে — key-based claim
-  // (claimMemberWithKey, উপরে) v2-এর একমাত্র বৈধ path।
-  async function handleClaimMember(m) {
-    if (migrationState === "v2") {
-      alert("এই family-তে Member Password দিয়ে দায়িত্ব নিতে হবে।");
-      return;
-    }
-    const uid = auth.currentUser ? auth.currentUser.uid : null;
-    if (!uid) return;
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    try {
-      await claimMemberDoc(migrationState, m.id, uid);
-      setMembers(prev => prev.map(x => x.id === m.id ? {
-        ...x,
-        ownerUid: uid
-      } : x));
-    } catch (err) {
-      alert("দায়িত্ব নিতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
-  // §Admin Force-Release(নতুন, ১৫ আগস্ট ২০২৬) — অন্য (হয়তো অনুপস্থিত/lost)
-  // ডিভাইসের claim করা member-কে admin জোরপূর্বক unclaim করতে পারবেন,
-  // যাতে সেই ব্যক্তি নতুন ডিভাইস থেকে আবার "দায়িত্ব নিন" দিয়ে claim করতে
-  // পারেন। Rules ইতিমধ্যে admin-কে যেকোনো member-এর ownerUid পরিবর্তনের
-  // অনুমতি দেয় (isAdminOfFamily শাখা) — তাই কোনো Rules পরিবর্তন লাগেনি,
-  // শুধু existing releaseMemberDoc() reuse করা হচ্ছে admin path থেকে।
-  async function handleAdminForceRelease(m) {
-    // §First Admin Protection(Force-Release, ১৯ আগস্ট ২০২৬) — client-side
-    // pre-check(UX-এর জন্য, Rules-level protection এখনো ব্যাকলগে)। প্রথম
-    // Admin-কে অন্য কোনো admin force-release করতে পারবেন না, শুধু তিনি
-    // নিজে(Self-demote/নিজ ডিভাইস থেকে normal release দিয়ে) পারবেন।
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && memberOwnerUids(m).includes(firstAdminUid) && myUid !== firstAdminUid) {
-      alert("প্রথম এডমিনের দায়িত্ব অন্য কোনো এডমিন জোরপূর্বক মুক্ত করতে পারবেন না — শুধু তিনি নিজেই তার ডিভাইস থেকে ছাড়তে পারেন।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    const ok = window.confirm(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে সংরক্ষিত আছে। এডমিন হিসেবে জোরপূর্বক মুক্ত করতে চান? এরপর যেকোনো ডিভাইস এই সদস্যের দায়িত্ব নিতে পারবে (নিশ্চিত হয়ে নিন যে আসল সদস্যই নতুন ডিভাইস থেকে দাবি করবেন)।`);
-    if (!ok) return;
-    try {
-      await releaseMemberDoc(migrationState, m.id);
-      setMembers(prev => prev.map(x => x.id === m.id ? {
-        ...x,
-        ownerUids: []
-      } : x));
-    } catch (err) {
-      alert("জোরপূর্বক মুক্ত করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): handleClaimMember
+  // (legacy-v1-only free-claim, বাস্তবে উভয় real family v2-তে থাকায় already-dead)
+  // ও handleAdminForceRelease(Member Password/ownerUids claim-system-নির্ভর,
+  // দুটো real family-ই ইতিমধ্যে identityModel:"google-only" — Rules-level এই
+  // legacy claim/force-release path আগে থেকেই বন্ধ) সরানো হয়েছে। "রিসেট
+  // করুন"/"দায়িত্ব নিন" বাটন MemberListSection.jsx থেকেও একই সেশনে সরানো
+  // হয়েছে। handleReleaseMember(self-only device-release, Member Key-নির্ভর
+  // না) অপরিবর্তিত।
   async function handleReleaseMember(m) {
     // Firestore rules-এ isUnownedOrMine() চেক করে — অন্য ডিভাইসের claim
     // করা সদস্যকে release করার চেষ্টা করলে সার্ভার সবসময় reject করবে
@@ -2558,24 +2497,11 @@ function App() {
     linkGoogleAccount: linkGoogleAccount,
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
-  // A4-G4(part B): ClaimKeyModal.jsx-এ extract করা হয়েছে(verbatim)। dual-use
-  // pattern(gate-branch+normal-tree) অপরিবর্তিত — variable name একই রাখা হয়েছে।
-  const claimKeyModalNode = React.createElement(ClaimKeyModal, {
-    showClaimKeyModal,
-    claimKeyTarget,
-    claimKeyInput,
-    setClaimKeyInput,
-    claimKeyBusy,
-    setClaimKeyBusy,
-    setShowClaimKeyModal,
-    setClaimKeyTarget,
-    setMembers,
-    auth,
-    claimMemberWithKey,
-    isGoogleLinked,
-    saveUserFamilyCode,
-    getFamilyCode
-  });
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬): claimKeyModalNode(ClaimKeyModal
+  // render) সরানো হয়েছে — ClaimKeyModal.jsx export নিজেই এই সেশনে সরানো হয়েছে
+  // (দেখুন MemberOnboardingModals.jsx)। showClaimKeyModal/setClaimKeyTarget/
+  // setShowClaimKeyModal state এখনো আছে(OnboardingBridge-এর keyClaim step প্রপ
+  // হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে render হয় না।
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
   // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
   // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
@@ -2686,7 +2612,7 @@ function App() {
     myMemberRequestStatus: myMemberRequestStatus,
     myMemberRequestKey: myMemberRequestKey,
     createMemberWithKey: createMemberWithKey
-  }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
+  }), googleAccountModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -2757,9 +2683,7 @@ function App() {
     entryDirtyRef: entryDirtyRef,
     firstAdminUid: firstAdminUid,
     handleAddMember: handleAddMember,
-    handleAdminForceRelease: handleAdminForceRelease,
     handleChangeGmail: handleChangeGmail,
-    handleClaimMember: handleClaimMember,
     handleCopyCode: handleCopyCode,
     handleFullLogout: handleFullLogout,
     handleEditOwnProfile: handleEditOwnProfile,
@@ -2774,7 +2698,6 @@ function App() {
     isMenuOpen: isMenuOpen,
     loadPendingMemberRequests: loadPendingMemberRequests,
     members: members,
-    migrationState: migrationState,
     monthCursor: monthCursor,
     newGender: newGender,
     newName: newName,
@@ -2785,16 +2708,8 @@ function App() {
     setAddingMember: setAddingMember,
     setArchiveMonth0: setArchiveMonth0,
     setArchiveYear: setArchiveYear,
-    setClaimKeyInput: setClaimKeyInput,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setConfirmKeyInput: setConfirmKeyInput,
     setDriveBackupStatus: setDriveBackupStatus,
     setIsMenuOpen: setIsMenuOpen,
-    setManualKeyInput: setManualKeyInput,
-    setMemberKeyLoading: setMemberKeyLoading,
-    setMemberKeyRevealed: setMemberKeyRevealed,
-    setMemberKeyTarget: setMemberKeyTarget,
-    setMemberKeyValue: setMemberKeyValue,
     setNewGender: setNewGender,
     setNewName: setNewName,
     setNotifications: setNotifications,
@@ -2802,13 +2717,10 @@ function App() {
     setShowAccountMenu: setShowAccountMenu,
     setShowArchiveModal: setShowArchiveModal,
     setShowBackupOptionsModal: setShowBackupOptionsModal,
-    setShowChangeKeyForm: setShowChangeKeyForm,
-    setShowClaimKeyModal: setShowClaimKeyModal,
     setShowFamilyCodeChoiceModal: setShowFamilyCodeChoiceModal,
     setShowFeedbackModal: setShowFeedbackModal,
     setShowGoogleAccountModal: setShowGoogleAccountModal,
     setShowImportOptionsModal: setShowImportOptionsModal,
-    setShowMemberKeyModal: setShowMemberKeyModal,
     setShowMemberRequestsModal: setShowMemberRequestsModal,
     setShowNotifPanel: setShowNotifPanel,
     setShowProfileDropdown: setShowProfileDropdown,
@@ -2822,7 +2734,6 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     auth: auth,
     db: db,
-    fetchMemberKey: fetchMemberKey,
     getFamilyCode: getFamilyCode,
     getFamilyId: getFamilyId,
     isGoogleLinked: isGoogleLinked,
@@ -2972,33 +2883,10 @@ function App() {
     decideAccessRequest
   }), googleAccountModalNode, approvedGoogleWelcomeNode,
 
-  // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
-  // default, click করলে reveal, Family Code masking-এর মতো একই প্যাটার্ন)।
-  // A4-G4(part A): MemberKeyModal.jsx-এ extract করা হয়েছে(verbatim)।
-  React.createElement(MemberKeyModal, {
-    show: showMemberKeyModal,
-    memberKeyTarget,
-    onClose: () => setShowMemberKeyModal(false),
-    memberKeyLoading,
-    memberKeyValue,
-    setMemberKeyValue,
-    memberKeyRevealed,
-    setMemberKeyRevealed,
-    showChangeKeyForm,
-    setShowChangeKeyForm,
-    manualKeyInput,
-    setManualKeyInput,
-    confirmKeyInput,
-    setConfirmKeyInput,
-    memberKeyBusy,
-    setMemberKeyBusy,
-    isMemberKeyCharsetValid,
-    changeMemberKey
-  }),
-
-  // --- §Member Key claim("দায়িত্ব নিন") মোডাল — সব member-এর জন্য প্রযোজ্য
-  // (claimed/unclaimed নির্বিশেষে), সঠিক key দিলেই ownerUid বদলায়।
-  claimKeyModalNode,
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): MemberKeyModal
+  // render(key view/copy/change) ও claimKeyModalNode(claim modal) সরানো হয়েছে —
+  // MemberKeyModal.jsx already-dead ছিল(কোনো live trigger ছিল না) ও
+  // ClaimKeyModal export এই সেশনে সরানো হয়েছে(MemberOnboardingModals.jsx)।
 
   // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
   // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
