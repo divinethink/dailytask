@@ -3186,10 +3186,29 @@ function renderPendingGoogleReauthGate() {
 function renderGoogleLandingGate() {
   const container = document.getElementById("root");
   const root = ReactDOM.createRoot(container);
-  function handleGoogleGateSuccess(familyId, memberId) {
+  // §Google-login boot-gate fix(১১ সেপ্টেম্বর ২০২৬): mountApp()-এর
+  // hasExistingSession() শর্ত family_id **ও** family_code দুটোই require
+  // করে(পুরনো Onboarding-gate-এর নিয়ম অপরিবর্তিত রাখতে, উপরের comment
+  // দ্রষ্টব্য) — কিন্তু এই Google flow আগে শুধু family_id সেট করত,
+  // family_code কখনো না। ফলে সফল login-এর পরের reload-এও hasExistingSession
+  // false থেকে যেত এবং পুরনো Onboarding("নতুন Family তৈরি করুন"/"বিদ্যমান
+  // Family-তে প্রবেশ করুন") স্ক্রিন দেখাত। Fix: families/{familyId} doc
+  // থেকে আসল familyCode read করে সেটাও persist করা হচ্ছে(fetch ব্যর্থ
+  // হলেও gate যেন আটকে না যায়, তাই familyId-কে safe fallback রাখা হলো —
+  // getFamilyCode()-এর display/backup-filename ব্যবহারে সামান্য প্রভাব
+  // পড়তে পারে শুধু সেই edge-case-এ, কিন্তু login-loop হবে না)।
+  async function handleGoogleGateSuccess(familyId, memberId) {
+    let famCode = familyId;
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (famSnap.exists && famSnap.data().familyCode) {
+        famCode = famSnap.data().familyCode;
+      }
+    } catch {}
     try {
       localStorage.setItem("family_id", familyId);
       localStorage.setItem("dt_google_preferred_member", memberId);
+      localStorage.setItem("family_code", famCode);
     } catch {}
     root.unmount();
     window.location.reload();
