@@ -1144,11 +1144,28 @@ function App() {
       setCustomFields(cf);
       let last = null;
       try {
-        const r = await appStorage.get(`last-selected-member:${getFamilyCode()}`, false);
-        last = r ? JSON.parse(r.value) : null;
+        // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
+        // matched/তৈরি হওয়া নিজের memberId one-time preference হিসেবে
+        // localStorage-এ থাকে(renderGoogleLandingGate() দেখুন), এটাই
+        // প্রথম-বুট-এ সবচেয়ে নির্ভরযোগ্য "নিজের member" সংকেত।
+        const preferredGoogleMember = localStorage.getItem("dt_google_preferred_member");
+        if (preferredGoogleMember) {
+          localStorage.removeItem("dt_google_preferred_member");
+          last = preferredGoogleMember;
+        }
       } catch {}
+      if (!last) {
+        try {
+          const r = await appStorage.get(`last-selected-member:${getFamilyCode()}`, false);
+          last = r ? JSON.parse(r.value) : null;
+        } catch {}
+      }
+      const myUidForSelect = auth.currentUser ? auth.currentUser.uid : null;
+      const myOwnMember = myUidForSelect ? m.find(x => x.googleUid === myUidForSelect) : null;
       if (last && m.find(x => x.id === last)) {
         setSelectedId(last);
+      } else if (myOwnMember) {
+        setSelectedId(myOwnMember.id);
       } else if (m.length) {
         setSelectedId(m[0].id);
       }
@@ -1232,7 +1249,13 @@ function App() {
   // Unclaimed members (ownerUid null) are editable by anyone — that's the
   // "manual member, no phone of their own" case. Read access is never
   // restricted, only writing.
-  const isLockedForThisDevice = !!(selectedMember && selectedMember.ownerUids && selectedMember.ownerUids.length && (!auth.currentUser || !selectedMember.ownerUids.includes(auth.currentUser.uid)));
+  // §Google-only identity(১১ সেপ্টেম্বর ২০২৬) — member.googleUid(নতুন
+  // model) ও member.ownerUids(পুরনো Anonymous-Auth model) দুটোই সাপোর্ট
+  // করার জন্য dual-check helper। googleUid থাকলে সেটাই একমাত্র owner-uid,
+  // নাহলে পুরনো ownerUids array — কোনো ডেটা/schema পরিবর্তন হয়নি, শুধু
+  // client-side compatibility shim(২_৪_১ §৬-এর dual-check নীতি অনুযায়ী)।
+  const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : ((m && m.ownerUids) || []);
+  const isLockedForThisDevice = !!(selectedMember && memberOwnerUids(selectedMember).length && (!auth.currentUser || !memberOwnerUids(selectedMember).includes(auth.currentUser.uid)));
   // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
   // (approved design) is the real safety boundary; this is purely UX so the
   // person sees a clear message instead of a raw Firestore permission error
@@ -2028,7 +2051,7 @@ function App() {
     // অনুমতি দেয় — অন্য ডিভাইসের claim করা সদস্য মুছতে গেলে সার্ভার সেটা
     // reject করবে। আগে থেকে একই চেক না করলে UI optimistically সদস্যকে
     // লিস্ট থেকে সরিয়ে ফেলত, অথচ আসল ডিলিট ব্যর্থ হতো — বিভ্রান্তিকর।
-    if ((m.ownerUids && m.ownerUids.length) && (!auth.currentUser || !m.ownerUids.includes(auth.currentUser.uid))) {
+    if (memberOwnerUids(m).length && (!auth.currentUser || !memberOwnerUids(m).includes(auth.currentUser.uid))) {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে বাদ দেওয়া যাবে না। প্রথমে সেই ডিভাইস থেকে দায়িত্ব ছাড়তে বলুন, তারপর বাদ দিন।");
       return;
     }
@@ -2086,7 +2109,7 @@ function App() {
     // Admin-কে অন্য কোনো admin force-release করতে পারবেন না, শুধু তিনি
     // নিজে(Self-demote/নিজ ডিভাইস থেকে normal release দিয়ে) পারবেন।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && m.ownerUids && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
+    if (firstAdminUid && memberOwnerUids(m).includes(firstAdminUid) && myUid !== firstAdminUid) {
       alert("প্রথম এডমিনের দায়িত্ব অন্য কোনো এডমিন জোরপূর্বক মুক্ত করতে পারবেন না — শুধু তিনি নিজেই তার ডিভাইস থেকে ছাড়তে পারেন।");
       return;
     }
@@ -2114,7 +2137,7 @@ function App() {
     // স্পষ্ট বার্তা দেখানো হচ্ছে, যাতে ব্যবহারকারী বুঝতে পারে এটা কেন
     // সম্ভব নয় এবং কী করতে হবে।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if ((m.ownerUids && m.ownerUids.length) && !m.ownerUids.includes(myUid)) {
+    if (memberOwnerUids(m).length && !memberOwnerUids(m).includes(myUid)) {
       alert(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে আছে — এই সদস্যের দায়িত্ব শুধুমাত্র সেই ডিভাইস থেকেই ছাড়া যাবে, এখান থেকে সম্ভব নয়।`);
       return;
     }
@@ -2139,7 +2162,8 @@ function App() {
   // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
   // নিজে দেয় না।
   async function handleMakeAdmin(m) {
-    if (!m.ownerUids || !m.ownerUids.length) {
+    const mUids = memberOwnerUids(m);
+    if (!mUids.length) {
       alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
       return;
     }
@@ -2156,7 +2180,7 @@ function App() {
       const memberRef = famRef.collection("members").doc(m.id);
       const batch = db.batch();
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayUnion(...m.ownerUids),
+        adminUids: firebase.firestore.FieldValue.arrayUnion(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2164,11 +2188,11 @@ function App() {
         updatedAt: Date.now()
       });
       await batch.commit();
-      setAdminUidsList(prev => Array.from(new Set([...prev, ...m.ownerUids])));
+      setAdminUidsList(prev => Array.from(new Set([...prev, ...mUids])));
       // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
       // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
       try {
-        await Promise.all(m.ownerUids.map(uid => db.collection("families").doc(getFamilyId())
+        await Promise.all(mUids.map(uid => db.collection("families").doc(getFamilyId())
           .collection("notifications").add({
             targetUid: uid,
             type: "admin_assigned",
@@ -2185,7 +2209,8 @@ function App() {
   // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
   // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
   async function handleRemoveAdmin(m) {
-    if (!m.ownerUids || !m.ownerUids.length) return;
+    const mUids = memberOwnerUids(m);
+    if (!mUids.length) return;
     // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "সর্বশেষ admin" এখন
     // distinct ব্যক্তি(role==="admin" member সংখ্যা) দিয়ে গণনা, adminUids
     // UID-count দিয়ে না(একই ব্যক্তির multi-device একাধিক UID থাকলে আগে এই
@@ -2199,7 +2224,7 @@ function App() {
     // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
     // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
+    if (firstAdminUid && mUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
       alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
       return;
     }
@@ -2215,7 +2240,7 @@ function App() {
       const memberRef = famRef.collection("members").doc(m.id);
       const batch = db.batch();
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayRemove(...m.ownerUids),
+        adminUids: firebase.firestore.FieldValue.arrayRemove(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2223,7 +2248,7 @@ function App() {
         updatedAt: Date.now()
       });
       await batch.commit();
-      setAdminUidsList(prev => prev.filter(u => !m.ownerUids.includes(u)));
+      setAdminUidsList(prev => prev.filter(u => !mUids.includes(u)));
     } catch (err) {
       alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
     }
@@ -2248,7 +2273,7 @@ function App() {
       // নিজের ownerUids-এ myUid থাকা member খুঁজে বের করা হচ্ছে(role
       // authoritative source, না মিললে role sync বাদ যায় — adminUids
       // sync তবুও হবে, যাতে lockout না হয়)।
-      const myMember = (members || []).find(x => x.ownerUids && x.ownerUids.includes(myUid));
+      const myMember = (members || []).find(x => memberOwnerUids(x).includes(myUid));
       // বাগফিক্স — শুধু current-session myUid না, এই ব্যক্তির নিজের সব
       // UID(multi-device claim থেকে) যেগুলো adminUids-এ আছে, একসাথে সরানো
       // হচ্ছে(নাহলে role="member" হওয়ার পরও অন্য নিজস্ব UID adminUids-এ
@@ -2257,7 +2282,7 @@ function App() {
       // rules-এর First Admin Protection পুরো write block করে দিত; তাই সেই
       // UID বাদ রেখে বাকিগুলো সরানো হয়(protection invariant অক্ষুণ্ণ)।
       const myOwnAdminUids = myMember
-        ? (myMember.ownerUids || []).filter(u =>
+        ? memberOwnerUids(myMember).filter(u =>
             adminUidsList.includes(u) && (u !== firstAdminUid || myUid === firstAdminUid)
           )
         : [myUid];
@@ -3151,26 +3176,40 @@ function renderPendingGoogleReauthGate() {
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
 }
+// §Google-only identity(১১ সেপ্টেম্বর ২০২৬) — এখন থেকে কোনো user না থাকলে
+// আর automatic anonymous sign-in হয় না(পুরনো "zero-login" ডিফল্ট বাতিল,
+// ২.৪ §১ Core Decision অনুযায়ী)। এর বদলে সরাসরি GoogleSignInGate পূর্ণ-পেজ
+// landing হিসেবে দেখানো হয় — সফল হলে(email-match বা নতুন family তৈরি)
+// familyId/memberId localStorage-এ বসিয়ে reload করে, তখন normal bootOnce()
+// path-ই চলে(renderPendingGoogleReauthGate()-এর মতোই root-unmount pattern
+// reuse)।
+function renderGoogleLandingGate() {
+  const container = document.getElementById("root");
+  const root = ReactDOM.createRoot(container);
+  function handleGoogleGateSuccess(familyId, memberId) {
+    try {
+      localStorage.setItem("family_id", familyId);
+      localStorage.setItem("dt_google_preferred_member", memberId);
+    } catch {}
+    root.unmount();
+    window.location.reload();
+  }
+  root.render(/*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 gap-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-base font-bold text-[#0E4B43] text-center"
+  }, "Daily Task"), /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-xs bg-white rounded-2xl border border-slate-200 shadow-sm"
+  }, /*#__PURE__*/React.createElement(GoogleSignInGate, { onSuccess: handleGoogleGateSuccess }))));
+}
 const unsubscribeAuth = auth.onAuthStateChanged(user => {
   unsubscribeAuth();
   if (user) {
     bootOnce();
   } else {
-    let pendingGoogleReauth = false;
     try {
-      pendingGoogleReauth = localStorage.getItem("dt_pending_google_reauth") === "1";
+      localStorage.removeItem("dt_pending_google_reauth");
     } catch {}
-    if (pendingGoogleReauth) {
-      try {
-        localStorage.removeItem("dt_pending_google_reauth");
-      } catch {}
-      renderPendingGoogleReauthGate();
-    } else {
-      auth.signInAnonymously().catch(err => {
-        console.error("Anonymous sign-in failed:", err);
-      }).finally(() => {
-        bootOnce(); // don't leave the user stuck on a blank screen
-      });
-    }
+    renderGoogleLandingGate();
   }
 });
