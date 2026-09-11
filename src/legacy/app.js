@@ -11,10 +11,10 @@ import {
 import {
   isCreatorAuth, enterFamilyAsCreator, exitCreatorOverride, getFamilyCode,
   isFamilyCodeCharsetValid, normalizeFamilyKey, setFamilyCode, changeFamilyCodeForExistingFamily,
-  createNewFamily, resolveFamilyIdFromCode, joinExistingFamily, checkFamilyCodeExists, getFamilyId,
+  createNewFamily, joinExistingFamily, checkFamilyCodeExists, getFamilyId,
   ensureFamilyCodeMapping, familyDocRef, ensureFamilyMeta, ensureDataCollectionName,
   ensureLegacyCollectionMap, claimFirstAdminIfEligible, loadUserFamilyCode, saveUserFamilyCode,
-  loadUserFamilyMapping, syncFamilyCodeWithAccount, getCollectionName, appStorage,
+  syncFamilyCodeWithAccount, getCollectionName, appStorage,
   resolvePathContext, FAMILY_CODE_MIN_LENGTH, FAMILY_CODE_MAX_LENGTH, isGoogleLinked
 } from "./familyIdentity.js";
 // §ProfileDropdownGoogle wiring(১১ সেপ্টেম্বর ২০২৬): নতুন Google-only
@@ -34,7 +34,7 @@ import {
   tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc,
   releaseMemberDoc,
   createMemberWithKey,
-  directIdentifyLogin, migrateMembersIfNeeded,
+  migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory
 } from "./memberData.js";
@@ -561,7 +561,6 @@ import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 // harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
 // কোনো normal render-path এই component ব্যবহার করে না।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
-import { Onboarding } from "../components/Onboarding.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
@@ -2892,30 +2891,31 @@ function signOutToFreshAnonymous() {
 
 
 function mountApp() {
-  const container = document.getElementById("root");
-  const root = ReactDOM.createRoot(container);
   // Boot-gate: existing user/session কোনোভাবেই প্রভাবিত হয় না — শুধু
   // raw localStorage(family_id + family_code) না থাকলেই(সত্যিকারের
-  // নতুন/Incognito context) Onboarding দেখানো হয়। এখানে ইচ্ছাকৃতভাবে
+  // নতুন/Incognito context, অথবা কোনো পুরনো session-এ শুধু এই key দুটো
+  // মুছে গেলে) App()-এর বদলে landing gate দেখানো হয়। এখানে ইচ্ছাকৃতভাবে
   // getFamilyId()/getFamilyCode() কল করা হয়নি(ওগুলো কল করলেই নিজে থেকে
   // random id/code তৈরি+persist হয়ে যায়) — শুধু raw localStorage read।
   const hasExistingSession = !!(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
   if (hasExistingSession) {
+    const container = document.getElementById("root");
+    const root = ReactDOM.createRoot(container);
     root.render(/*#__PURE__*/React.createElement(App, null));
   } else {
-    root.render(/*#__PURE__*/React.createElement(Onboarding, {
-      AppLogo: AppLogo,
-      FAMILY_CODE_MAX_LENGTH: FAMILY_CODE_MAX_LENGTH,
-      FAMILY_CODE_MIN_LENGTH: FAMILY_CODE_MIN_LENGTH,
-      auth: auth,
-      createNewFamily: createNewFamily,
-      directIdentifyLogin: directIdentifyLogin,
-      isGoogleLinked: isGoogleLinked,
-      joinExistingFamily: joinExistingFamily,
-      loadUserFamilyMapping: loadUserFamilyMapping,
-      linkGoogleAccount: linkGoogleAccount,
-      resolveFamilyIdFromCode: resolveFamilyIdFromCode
-    }));
+    // §Old-code cleanup Phase 3(১১ সেপ্টেম্বর ২০২৬, owner-approved): আগে এখানে
+    // পুরনো `Onboarding`("নতুন Family তৈরি করুন"/"বিদ্যমান Family-তে প্রবেশ
+    // করুন", anonymous-UID+Member-Password-ভিত্তিক createNewFamily()/
+    // joinExistingFamily() কল করত) দেখানো হতো। এই path এখন শুধুমাত্র narrow
+    // edge-case-এ reachable(যেমন কোনো authenticated সেশনে localStorage-এর
+    // family_id/family_code key শুধু মুছে গেলে) — কিন্তু পুরনো flow ব্যবহার
+    // করলে হয় নতুন non-google-only family তৈরি হতো(migration নীতির বিপরীত)
+    // অথবা দুটো real(ইতিমধ্যে google-only) family-তে join করার চেষ্টা
+    // ব্যর্থ/অসম্পূর্ণ অবস্থায় থেকে যেত(Member Key system Phase 1/2-এ
+    // সরানো হয়ে গেছে)। এখন সরাসরি renderGoogleLandingGate() reuse করা
+    // হচ্ছে(একই ফাংশন, নতুন কোনো root তৈরি করা হয়নি এখানে যাতে duplicate
+    // React root তৈরি না হয়) — এই edge-case এখন সঠিক, working entry-তেই যায়।
+    renderGoogleLandingGate();
   }
 }
 
