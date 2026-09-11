@@ -9,7 +9,7 @@
 import { CalIcon, ChevronDown, CopyIcon, DownloadIcon, EditIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon, User, X } from "./icons.jsx";
 import { MemberListSection } from "./MemberListSection.jsx";
 import { NotificationPanel } from "./NotificationPanel.jsx";
-import { ProfileDropdown } from "./ProfileDropdown.jsx";
+import { ProfileDropdownGoogle } from "./ProfileDropdownGoogle.jsx";
 
 export function DashboardHeader({
   addingMember,
@@ -19,11 +19,11 @@ export function DashboardHeader({
   entryDirtyRef,
   firstAdminUid,
   handleAddMember,
-  handleAdminForceRelease,
   handleChangeGmail,
-  handleClaimMember,
   handleCopyCode,
   handleFullLogout,
+  handleEditOwnProfile,
+  handleLeaveFamily,
   handleMakeAdmin,
   handleReleaseMember,
   handleRemoveAdmin,
@@ -34,7 +34,6 @@ export function DashboardHeader({
   isMenuOpen,
   loadPendingMemberRequests,
   members,
-  migrationState,
   monthCursor,
   newGender,
   newName,
@@ -45,16 +44,8 @@ export function DashboardHeader({
   setAddingMember,
   setArchiveMonth0,
   setArchiveYear,
-  setClaimKeyInput,
-  setClaimKeyTarget,
-  setConfirmKeyInput,
   setDriveBackupStatus,
   setIsMenuOpen,
-  setManualKeyInput,
-  setMemberKeyLoading,
-  setMemberKeyRevealed,
-  setMemberKeyTarget,
-  setMemberKeyValue,
   setNewGender,
   setNewName,
   setNotifications,
@@ -62,13 +53,10 @@ export function DashboardHeader({
   setShowAccountMenu,
   setShowArchiveModal,
   setShowBackupOptionsModal,
-  setShowChangeKeyForm,
-  setShowClaimKeyModal,
   setShowFamilyCodeChoiceModal,
   setShowFeedbackModal,
   setShowGoogleAccountModal,
   setShowImportOptionsModal,
-  setShowMemberKeyModal,
   setShowMemberRequestsModal,
   setShowNotifPanel,
   setShowProfileDropdown,
@@ -82,7 +70,6 @@ export function DashboardHeader({
   BN_MONTHS,
   auth,
   db,
-  fetchMemberKey,
   getFamilyCode,
   getFamilyId,
   isGoogleLinked,
@@ -171,15 +158,9 @@ export function DashboardHeader({
     weeklyDirtyRef: weeklyDirtyRef,
     auth: auth,
     handleReleaseMember: handleReleaseMember,
-    migrationState: migrationState,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setClaimKeyInput: setClaimKeyInput,
-    setShowClaimKeyModal: setShowClaimKeyModal,
-    handleClaimMember: handleClaimMember,
     isLockedForSwitch: isLockedForSwitch,
     isAdmin: isAdmin,
     adminUidsList: adminUidsList,
-    handleAdminForceRelease: handleAdminForceRelease,
     handleMakeAdmin: handleMakeAdmin,
     handleRemoveAdmin: handleRemoveAdmin,
     handleRemoveMember: handleRemoveMember,
@@ -264,14 +245,23 @@ export function DashboardHeader({
   }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন", /*#__PURE__*/React.createElement(ChevronDown, {
     size: 12,
     className: `transition-transform duration-200 ${showProfileDropdown ? "rotate-180" : ""}`
-  })), /*#__PURE__*/React.createElement(ProfileDropdown, {
+  })), /*#__PURE__*/React.createElement(ProfileDropdownGoogle, {
   show: showProfileDropdown,
   onClose: () => setShowProfileDropdown(false),
-  BN_MONTHS, adminUidsList, auth, fetchMemberKey, firstAdminUid, handleChangeGmail,
-  handleFullLogout, handleSelfDemote, isGoogleLinked, members, selectedMember,
-  setConfirmKeyInput, setManualKeyInput, setMemberKeyLoading, setMemberKeyRevealed,
-  setMemberKeyTarget, setMemberKeyValue, setShowAccountMenu, setShowChangeKeyForm,
-  setShowGoogleAccountModal, setShowMemberKeyModal, showAccountMenu, streak, toBn
+  BN_MONTHS,
+  toBn,
+  // §Google-only Profile Dropdown(১১ সেপ্টেম্বর ২০২৬): "নিজের" member —
+  // googleUid এই ডিভাইসের auth uid-এর সাথে মেলে। App()-এর boot-effect-এর
+  // myOwnMember লজিকের(app.js) হুবহু একই derive-pattern, presentational
+  // component-এই সীমাবদ্ধ(নতুন state না, শুধু render-time computation)।
+  ownMember: (members || []).find(x => x.googleUid === (auth.currentUser ? auth.currentUser.uid : null)) || null,
+  isAdmin,
+  isFirstAdmin: !!(firstAdminUid && auth.currentUser && auth.currentUser.uid === firstAdminUid),
+  streak,
+  onDemoteSelf: handleSelfDemote,
+  onEditProfile: handleEditOwnProfile,
+  onLeaveFamily: handleLeaveFamily,
+  onLogout: handleFullLogout
 })), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {

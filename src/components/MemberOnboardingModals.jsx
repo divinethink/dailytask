@@ -1,115 +1,16 @@
-// A4 G4 (part B+C) — ClaimKeyModal("দায়িত্ব নিন") + BecomeMemberModal("সদস্য
-// হোন" self-request), extracted verbatim from legacy App(). Structural-only
-// (Owner Rule 2): JSX body unchanged, state ownership stays in App(). These
-// two are dual-used(Onboarding Gate early-return branch + normal tree) —
-// App() still assigns each to a `const ...Node = React.createElement(...)`
-// variable exactly as before, so both usage-sites and the gate-logic itself
-// are untouched by this extraction; only the JSX body moved.
+// A4 G4 (part C) — BecomeMemberModal("সদস্য হোন" self-request), extracted
+// verbatim from legacy App(). Structural-only (Owner Rule 2): JSX body
+// unchanged, state ownership stays in App(). Dual-used(Onboarding Gate
+// early-return branch + normal tree) — App() still assigns it to a
+// `const becomeMemberModalNode = React.createElement(...)` variable exactly
+// as before, so both usage-sites and the gate-logic itself are untouched.
+// §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): ClaimKeyModal
+// ("দায়িত্ব নিন", Member Password claim) এই ফাইল থেকে সরানো হয়েছে — Google-only
+// identity model(2_4)-এ দুটো real family-ই ইতিমধ্যে cutover হয়ে যাওয়ায়
+// Rules-level এই legacy claim-path আগে থেকেই বন্ধ, এবং app.js-এ এর একমাত্র
+// live trigger("দায়িত্ব নিন" ডাশবোর্ড বাটন) MemberListSection.jsx থেকেও একই
+// সেশনে সরানো হয়েছে। BecomeMemberModal(Phase 2 scope) অপরিবর্তিত।
 import { X } from "./icons.jsx";
-
-export function ClaimKeyModal({
-  showClaimKeyModal,
-  claimKeyTarget,
-  claimKeyInput,
-  setClaimKeyInput,
-  claimKeyBusy,
-  setClaimKeyBusy,
-  setShowClaimKeyModal,
-  setClaimKeyTarget,
-  setMembers,
-  auth,
-  claimMemberWithKey,
-  isGoogleLinked,
-  saveUserFamilyCode,
-  getFamilyCode
-}) {
-  return showClaimKeyModal && claimKeyTarget && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-emerald-900 mb-1"
-  }, "\"", claimKeyTarget.name, "\"-এর দায়িত্ব নিন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
-  }, "এই সদস্যের Member Password দিন। সঠিক হলে সঙ্গে সঙ্গে এই ডিভাইসে তার সব ডেটা/পরিচয় ফিরে আসবে।"),
-  /*#__PURE__*/React.createElement("form", {
-    // §Notification simplification + Password Autofill(১৯ আগস্ট ২০২৬):
-    // (১) FIFO/admin-eviction alert বাদ(owner-সিদ্ধান্ত, নিচে দ্রষ্টব্য)।
-    // (২) <form onSubmit> ব্যবহার করা হচ্ছে যাতে browser-এর native
-    // password manager submit event দেখে save-prompt দেখাতে পারে(custom
-    // storage/localStorage নেই — শুধু standard form+autocomplete)।
-    onSubmit: async e => {
-      e.preventDefault();
-      const uid = auth.currentUser ? auth.currentUser.uid : null;
-      if (!uid || claimKeyBusy || !claimKeyInput.trim()) return;
-      setClaimKeyBusy(true);
-      try {
-        const res = await claimMemberWithKey(claimKeyTarget.id, claimKeyInput, uid);
-        if (res.ok) {
-          setMembers(prev => prev.map(x => {
-            if (x.id !== claimKeyTarget.id) return x;
-            const owners = Array.isArray(x.ownerUids)
-              ? x.ownerUids
-              : (x.ownerUid ? [x.ownerUid] : []);
-            const nextOwners = owners.includes(uid)
-              ? owners
-              : (res.revoked ? [...owners.filter(o => o !== res.evictedUid), uid] : [...owners, uid]);
-            return { ...x, ownerUids: nextOwners };
-          }));
-          setShowClaimKeyModal(false);
-          setClaimKeyInput("");
-          setClaimKeyTarget(null);
-          // FIFO replace(admin বা non-admin) হলেও(res.revoked) আলাদা
-          // alert দেখানো হয় না(owner-সিদ্ধান্ত, ১৯ আগস্ট ২০২৬) — সফল
-          // claim silent থাকে।
-          // §Member Key Direct-Identify(touch-point 3) — Google-linked হলে
-          // পরবর্তী one-click Google sign-in-এর জন্য memberId mapping save
-          // (best-effort, non-blocking)।
-          if (isGoogleLinked()) {
-            saveUserFamilyCode(uid, getFamilyCode(), claimKeyTarget.id).catch(() => {});
-          }
-        } else {
-          alert("Member Password মেলেনি — আবার চেষ্টা করুন।");
-        }
-      } finally {
-        setClaimKeyBusy(false);
-      }
-    }
-  },
-  /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    name: "username",
-    autoComplete: "username",
-    value: getFamilyCode(),
-    readOnly: true,
-    tabIndex: -1,
-    "aria-hidden": "true",
-    style: { position: "absolute", width: "1px", height: "1px", padding: 0, margin: "-1px", overflow: "hidden", clip: "rect(0,0,0,0)", border: 0 }
-  }),
-  /*#__PURE__*/React.createElement("input", {
-    type: "password",
-    name: "current-password",
-    autoComplete: "current-password",
-    value: claimKeyInput,
-    onChange: e => setClaimKeyInput(e.target.value),
-    placeholder: "Member Password",
-    className: "w-full px-3 py-2 rounded-xl text-xs text-slate-900 border border-slate-200 outline-none font-medium mb-3",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "submit",
-    disabled: claimKeyBusy || !claimKeyInput.trim(),
-    className: "flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-800 text-white disabled:opacity-50"
-  }, claimKeyBusy ? "যাচাই হচ্ছে..." : "যাচাই করুন"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowClaimKeyModal(false);
-      setClaimKeyInput("");
-    },
-    className: "px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-600"
-  }, "বাতিল")))));
-}
 
 export function BecomeMemberModal({
   showBecomeMemberModal,

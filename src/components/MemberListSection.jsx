@@ -1,8 +1,17 @@
-// A4-G4-Part E — Member list + claim/release/admin actions + pending-request approve/reject,
+// A4-G4-Part E — Member list + release/admin actions + pending-request approve/reject,
 // extracted verbatim from legacy App() hamburger dropdown (app.js lines ~6840-6945).
 // Structural-only (Owner Rule 2): no logic/condition change, only moved to its own file.
 // Returns a React.Fragment (label block + list block are siblings inside one wrapper div,
 // so this component returns that single wrapper div as before).
+// §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): "দায়িত্ব নিন"(Member
+// Password claim) ও "রিসেট করুন"(Admin Force-Release) বাটন সরানো হয়েছে — উভয়টাই
+// Google-only identity model(2_4)-এ obsolete(দুটো real family-ই ইতিমধ্যে
+// identityModel:"google-only", Rules-level এই legacy ownerUids-claim path আগে থেকেই
+// বন্ধ)। সংশ্লিষ্ট props(setClaimKeyTarget/setClaimKeyInput/setShowClaimKeyModal/
+// handleClaimMember/handleAdminForceRelease/migrationState) আর নেওয়া হয় না। নিজের
+// device-এর দায়িত্ব ছেড়ে দেওয়া("আপনি" badge → handleReleaseMember, self-only, Member
+// Key-নির্ভর না) ও Make/Remove Admin(googleUid-model-এও active থাকে, 2_4 §৮ "অপরিবর্তিত"
+// নীতি অনুযায়ী) অপরিবর্তিত।
 import { InfoIcon, Trash, User, UsersIcon } from "./icons.jsx";
 
 export function MemberListSection({
@@ -14,15 +23,9 @@ export function MemberListSection({
   weeklyDirtyRef,
   auth,
   handleReleaseMember,
-  migrationState,
-  setClaimKeyTarget,
-  setClaimKeyInput,
-  setShowClaimKeyModal,
-  handleClaimMember,
   isLockedForSwitch,
   isAdmin,
   adminUidsList,
-  handleAdminForceRelease,
   handleMakeAdmin,
   handleRemoveAdmin,
   handleRemoveMember,
@@ -68,32 +71,10 @@ export function MemberListSection({
       e.stopPropagation();
     },
     className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0 flex items-center gap-0.5 cursor-default",
-    title: "অন্য ডিভাইসের দায়িত্বে আছে — Member Password দিয়ে ফিরে পাওয়া যাবে"
+    title: "অন্য ডিভাইসের দায়িত্বে আছে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 10
-  })), /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      if (migrationState === "v2") {
-        setClaimKeyTarget(m);
-        setClaimKeyInput("");
-        setShowClaimKeyModal(true);
-      } else {
-        handleClaimMember(m);
-      }
-    },
-    disabled: isLockedForSwitch || (migrationState !== "v2" && !!(m.ownerUids && m.ownerUids.length)),
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 shrink-0 disabled:opacity-40 whitespace-nowrap",
-    title: "এই সদস্যের দায়িত্ব নিন(Member Password লাগবে)"
-  }, "দায়িত্ব নিন"), isAdmin && !!(m.ownerUids && m.ownerUids.length) && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      handleAdminForceRelease(m);
-    },
-    disabled: isLockedForSwitch,
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
-    title: "এডমিন হিসেবে জোরপূর্বক মুক্ত করুন (অন্য ডিভাইস অনুপস্থিত/lost হলে ব্যবহার করুন)"
-  }, "রিসেট করুন")), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
+  }))), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
