@@ -80,7 +80,12 @@ export function ProfileDropdownGoogle({
       onClick: closeAndReset
     }),
     /*#__PURE__*/React.createElement("div", {
-      className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
+      // §fix(পজিশনিং, ১১ সেপ্টেম্বর ২০২৬): "Hasan" বাটনের wrapping div
+      // ছোট(শুধু বাটনের সমান প্রস্থ) ও স্ক্রিনের বাম দিকে অবস্থিত(existing
+      // পুরনো ProfileDropdown.jsx-এর মতোই) — তাই "right-0" ব্যবহার করলে
+      // dropdown উল্টো বাম দিকে(off-screen) চলে যায়। পুরনো কম্পোনেন্টের
+      // "left-0"-ই সঠিক pattern, এখানে reuse করা হলো।
+      className: "absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
     },
       // --- হেডার: নাম+streak+role badge ---
       /*#__PURE__*/React.createElement("div", {
