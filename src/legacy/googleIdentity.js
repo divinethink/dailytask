@@ -264,6 +264,14 @@ async function leaveFamily(familyId, memberId) {
     if (!mappingQuery.empty) {
       batch.delete(mappingQuery.docs[0].ref);
     }
+    // §fix(১১ সেপ্টেম্বর ২০২৬, ProfileDropdownGoogle wiring-এর সময় ধরা
+    // পড়েছে): আগে users/{uid} mapping এখানে delete হতো না — leave-এর পর
+    // এই একই device পরের বার Google sign-in করলে loadUserMapping()
+    // fast-path(signInExistingMemberByGoogle()) পুরনো(এখন-deleted)
+    // familyId/memberId-ই ফেরত দিত, dead-end/permission-denied তৈরি হতো।
+    // এটা নিজের(request.auth.uid==uid) doc, Rules ইতিমধ্যে self-delete
+    // অনুমোদিত — কোনো Rules change লাগেনি।
+    batch.delete(db.collection("users").doc(uid));
     await batch.commit();
     return { success: true };
   } catch (err) {

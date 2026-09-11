@@ -17,6 +17,11 @@ import {
   loadUserFamilyMapping, syncFamilyCodeWithAccount, getCollectionName, appStorage,
   resolvePathContext, FAMILY_CODE_MIN_LENGTH, FAMILY_CODE_MAX_LENGTH, isGoogleLinked
 } from "./familyIdentity.js";
+// §ProfileDropdownGoogle wiring(১১ সেপ্টেম্বর ২০২৬): নতুন Google-only
+// Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
+// দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
+// UI থেকে wire হচ্ছে।
+import { editOwnProfile, leaveFamily } from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
   healthCheckFamily, auditAllFamiliesHealthCheck, extractOwnerUidsFromMemberData,
@@ -2306,6 +2311,36 @@ function App() {
       alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
   }
+  // §ProfileDropdownGoogle(নতুন, ১১ সেপ্টেম্বর ২০২৬) — "প্রোফাইল এডিট"।
+  // নিজের(googleUid-matched) member খুঁজে familyId+memberId দিয়ে
+  // editOwnProfile() কল করা — Firestore write logic googleIdentity.js-এ,
+  // এখানে শুধু "কোনটা নিজের member" resolve করা হচ্ছে(App() state-owner,
+  // Owner Rule ২)।
+  async function handleEditOwnProfile(name, gender) {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const myOwn = myUid ? (members || []).find(x => x.googleUid === myUid) : null;
+    if (!myOwn) return { aborted: true, reason: "no-own-member" };
+    return editOwnProfile(getFamilyId(), myOwn.id, name, gender);
+  }
+  // §ProfileDropdownGoogle — "এই পরিবার ত্যাগ করুন"। সফল হলে এই ডিভাইসের
+  // local family session(family_id/family_code) পরিষ্কার করে reload করা
+  // হয়(handleFullLogout()-এর tail-এর একই cleanup-pattern reuse) — Google
+  // sign-out করা হয় না(শুধু family membership ত্যাগ, account/session না)।
+  async function handleLeaveFamily() {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const myOwn = myUid ? (members || []).find(x => x.googleUid === myUid) : null;
+    if (!myOwn) return { aborted: true, reason: "no-own-member" };
+    const res = await leaveFamily(getFamilyId(), myOwn.id);
+    if (res && res.success) {
+      try {
+        localStorage.removeItem("family_id");
+        localStorage.removeItem("family_code");
+        localStorage.removeItem("family_code_is_custom");
+      } catch {}
+      window.location.reload();
+    }
+    return res;
+  }
   // Single Logout — Family code session + Google session, দুটোই একসাথে
   // পরিষ্কার। কোনো Firestore/member ownership data পরিবর্তন হয় না — শুধু
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
@@ -2727,6 +2762,8 @@ function App() {
     handleClaimMember: handleClaimMember,
     handleCopyCode: handleCopyCode,
     handleFullLogout: handleFullLogout,
+    handleEditOwnProfile: handleEditOwnProfile,
+    handleLeaveFamily: handleLeaveFamily,
     handleMakeAdmin: handleMakeAdmin,
     handleReleaseMember: handleReleaseMember,
     handleRemoveAdmin: handleRemoveAdmin,
