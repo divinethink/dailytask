@@ -48,6 +48,48 @@ async function lookupFamilyByEmail(email) {
   return snap.exists ? { normalizedEmail: key, ...snap.data() } : null;
 }
 
+// §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap): পুরনো createMemberWithKey()
+// (Member Password-ভিত্তিক, memberData.js) google-only family-তে
+// firestore.rules-এর `private/key` create rule(`!isGoogleOnly(familyId)`
+// guard)-এ blocked হয়ে যাওয়ায় Dashboard-এর "Add Member" বাটন ভাঙা ছিল —
+// দুটো real family-ই ইতিমধ্যে identityModel:"google-only"। এই ফাংশন 2_4
+// §৫.১("Admin-added Proxy Member") pattern অনুসরণ করে: email দিয়ে unclaimed
+// member তৈরি(googleUid:null), সদস্য পরে নিজে Google Sign-in করলে
+// signInExistingMemberByGoogle()-এর email-match branch দিয়ে auto-claim হবে
+// (একই ফাইলের নিচে, existing flow — নতুন কিছু লাগেনি)।
+// memberId caller(app.js) আগে থেকে generate করে পাঠায়(optimistic local UI
+// update-এর জন্য, পুরনো handleAddMember()-এর প্যাটার্নের সাথে সামঞ্জস্যপূর্ণ)।
+// member doc + familyMemberEmails mapping একই batch-এ লেখা হয়(Rules-এর
+// admin-create branch getAfter() দিয়ে member.email verify করে বলে batch/
+// transaction আবশ্যক, আলাদা sequential write permission-denied দেবে)।
+// email আগে থেকে অন্য কোনো(claimed/unclaimed) সদস্যের সাথে যুক্ত থাকলে —
+// প্রথমে friendly pre-check(lookupFamilyByEmail), তারপরও race হলে Rules
+// নিজেই reject করবে(familyMemberEmails doc already exists → update-branch,
+// যা `allow update: if false`)।
+async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    throw new Error("সঠিক ইমেইল ঠিকানা প্রয়োজন।");
+  }
+  const existing = await lookupFamilyByEmail(normalizedEmail);
+  if (existing) {
+    throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
+  }
+  const batch = db.batch();
+  const memberRef = db.collection("families").doc(familyId).collection("members").doc(memberId);
+  batch.set(memberRef, {
+    name,
+    gender: gender || "male",
+    role: "member",
+    email: normalizedEmail,
+    googleUid: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  });
+  batch.set(familyMemberEmailRef(normalizedEmail), { familyId, memberId });
+  await batch.commit();
+}
+
 // §৫.৩ — family ত্যাগ/remove-এর সময় mapping cleanup। Claimed member-এর
 // email field claim-মুহূর্তেই member-doc থেকে delete হয়ে যায়(§৪), তাই
 // normalizedEmail caller-কেই আলাদাভাবে জানা/পাস করা লাগবে(reverse-query
@@ -316,6 +358,7 @@ export {
   loadUserMapping,
   familyMemberEmailRef,
   lookupFamilyByEmail,
+  addProxyMemberByAdmin,
   deleteFamilyMemberEmail,
   currentGoogleUid,
   currentGoogleEmail,

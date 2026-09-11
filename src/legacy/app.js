@@ -21,7 +21,7 @@ import {
 // Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
 // দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
 // UI থেকে wire হচ্ছে।
-import { editOwnProfile, leaveFamily } from "./googleIdentity.js";
+import { editOwnProfile, leaveFamily, addProxyMemberByAdmin } from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
   healthCheckFamily, auditAllFamiliesHealthCheck, extractOwnerUidsFromMemberData,
@@ -31,7 +31,7 @@ import {
 } from "./legacyMigrationTools.js";
 import {
   meetingKey, saveMeetingData, loadWeekly, saveWeekly, loadLegacyMembers, stampLastActive,
-  tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc,
+  tsToMillis, memberDocId, loadMembersV2, deleteMemberDoc,
   releaseMemberDoc,
   createMemberWithKey,
   migrateMembersIfNeeded,
@@ -810,6 +810,9 @@ function App() {
   const [addingMember, setAddingMember] = useState(false);
   const [newName, setNewName] = useState("");
   const [newGender, setNewGender] = useState("male");
+  // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬) — google-only model-এ নতুন সদস্যের
+  // email আবশ্যক(2_4 §৫.১ proxy-member pattern, নিচে handleAddMember())।
+  const [newMemberEmail, setNewMemberEmail] = useState("");
   const [customFields, setCustomFields] = useState([]);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -1948,31 +1951,38 @@ function App() {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
     }
+    // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap fix): আগে এখানে
+    // createMemberWithKey()(Member Password-ভিত্তিক) কল হতো, যা google-only
+    // family-তে Rules-level(`private/key` create, `!isGoogleOnly` guard)
+    // blocked — বাটন ভাঙা ছিল(দুটো real family-ই ইতিমধ্যে google-only)। এখন
+    // 2_4 §৫.১ Admin-added Proxy Member pattern(email-ভিত্তিক, googleUid:
+    // null) ব্যবহার করা হচ্ছে — সদস্য পরে নিজে Google Sign-in করলে auto-claim
+    // হবে(googleIdentity.js: signInExistingMemberByGoogle(), অপরিবর্তিত)।
+    const email = (newMemberEmail || "").trim();
+    if (!email || !email.includes("@")) {
+      alert("সদস্যের সঠিক ইমেইল ঠিকানা দিন — পরে Google দিয়ে সাইন-ইন করার জন্য প্রয়োজন।");
+      return;
+    }
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const newMember = {
-      id,
-      name,
-      gender: newGender,
-      ownerUids: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    const next = [...(members || []), newMember];
-    setMembers(next);
-    setSelectedId(id);
-    setNewName("");
-    setNewGender("male");
-    setAddingMember(false);
     try {
-      if (migrationState === "v2") {
-        await createMemberWithKey(newMember);
-      } else {
-        // legacy fallback(real family-দুটোই v2-তে, তাই এই path বাস্তবে
-        // ব্যবহৃত হওয়ার কথা না) — Member Key ছাড়া পুরনো আচরণ।
-        await saveMemberDoc(migrationState, newMember);
-      }
+      await addProxyMemberByAdmin(getFamilyId(), id, name, newGender, email);
+      const newMember = {
+        id,
+        name,
+        gender: newGender,
+        email: email.trim().toLowerCase(),
+        googleUid: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setMembers(prev => [...(prev || []), newMember]);
+      setSelectedId(id);
+      setNewName("");
+      setNewGender("male");
+      setNewMemberEmail("");
+      setAddingMember(false);
     } catch (err) {
-      alert("সদস্য সিংক করতে সমস্যা হয়েছে: " + err.message);
+      alert("সদস্য যোগ করতে সমস্যা হয়েছে: " + err.message);
     }
   }
   async function handleRemoveMember(m) {
@@ -2618,6 +2628,7 @@ function App() {
     members: members,
     monthCursor: monthCursor,
     newGender: newGender,
+    newMemberEmail: newMemberEmail,
     newName: newName,
     notifications: notifications,
     selectedId: selectedId,
@@ -2628,6 +2639,7 @@ function App() {
     setDriveBackupStatus: setDriveBackupStatus,
     setIsMenuOpen: setIsMenuOpen,
     setNewGender: setNewGender,
+    setNewMemberEmail: setNewMemberEmail,
     setNewName: setNewName,
     setNotifications: setNotifications,
     setSelectedId: setSelectedId,
