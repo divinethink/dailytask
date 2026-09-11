@@ -15,7 +15,6 @@ export function DashboardHeader({
   addingMember,
   adminUidsList,
   copiedCode,
-  decideMemberRequest,
   entryDirtyRef,
   firstAdminUid,
   handleAddMember,
@@ -32,13 +31,11 @@ export function DashboardHeader({
   isAdmin,
   isLockedForSwitch,
   isMenuOpen,
-  loadPendingMemberRequests,
   members,
   monthCursor,
   newGender,
   newName,
   notifications,
-  pendingMemberRequests,
   selectedId,
   selectedMember,
   setAddingMember,
@@ -57,7 +54,6 @@ export function DashboardHeader({
   setShowFeedbackModal,
   setShowGoogleAccountModal,
   setShowImportOptionsModal,
-  setShowMemberRequestsModal,
   setShowNotifPanel,
   setShowProfileDropdown,
   showAccountMenu,
@@ -100,11 +96,6 @@ export function DashboardHeader({
     onClick: () => {
       const next = !isMenuOpen;
       setIsMenuOpen(next);
-      // §Member Request-in-list(২৩ আগস্ট ২০২৬) — admin dropdown খুললে pending
-      // memberRequests load(existing loadPendingMemberRequests() reuse, notif
-      // click-এর মতোই)। শুধু admin, শুধু menu-open মুহূর্তে(one-shot fetch,
-      // কোনো নতুন persistent listener না)।
-      if (next && isAdmin) loadPendingMemberRequests();
     },
     className: "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-white/15 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all shadow-sm active:scale-95"
   }, /*#__PURE__*/React.createElement(MenuIcon, {
@@ -163,9 +154,7 @@ export function DashboardHeader({
     adminUidsList: adminUidsList,
     handleMakeAdmin: handleMakeAdmin,
     handleRemoveAdmin: handleRemoveAdmin,
-    handleRemoveMember: handleRemoveMember,
-    pendingMemberRequests: pendingMemberRequests,
-    decideMemberRequest: decideMemberRequest
+    handleRemoveMember: handleRemoveMember
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
@@ -299,7 +288,7 @@ export function DashboardHeader({
     className: "text-sm leading-none"
   }, "🔔"), notifications.filter(n => !n.read).length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
-  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, setShowMemberRequestsModal, loadPendingMemberRequests, db, getFamilyId }))), addingMember && /*#__PURE__*/React.createElement("div", {
+  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, db, getFamilyId }))), addingMember && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"

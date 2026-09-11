@@ -9,8 +9,6 @@ export function NotificationPanel({
   onClose,
   notifications,
   setNotifications,
-  setShowMemberRequestsModal,
-  loadPendingMemberRequests,
   db,
   getFamilyId
 }) {
@@ -29,11 +27,11 @@ export function NotificationPanel({
       db.collection("families").doc(getFamilyId())
         .collection("notifications").doc(n.id)
         .update({ read: true }).catch(() => {});
-      if (n.type === "member_request") {
-        onClose();
-        setShowMemberRequestsModal(true);
-        loadPendingMemberRequests();
-      }
+      // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
+      // "member_request" type click → MemberRequestsModal open করার branch
+      // সরানো হয়েছে(সেই মোডাল নিজেই সরানো হয়েছে, app.js দ্রষ্টব্য) — পুরনো,
+      // cutover-এর আগের কোনো stale notification থাকলেও এখন শুধু read:true
+      // mark হবে, কোনো error/no-op ছাড়া।
     },
     className: "flex-1 cursor-pointer"
   }, /*#__PURE__*/React.createElement("div", {

@@ -1,5 +1,5 @@
-// A4-G4-Part E — Member list + release/admin actions + pending-request approve/reject,
-// extracted verbatim from legacy App() hamburger dropdown (app.js lines ~6840-6945).
+// A4-G4-Part E — Member list + release/admin actions, extracted verbatim from
+// legacy App() hamburger dropdown (app.js lines ~6840-6945).
 // Structural-only (Owner Rule 2): no logic/condition change, only moved to its own file.
 // Returns a React.Fragment (label block + list block are siblings inside one wrapper div,
 // so this component returns that single wrapper div as before).
@@ -7,11 +7,13 @@
 // Password claim) ও "রিসেট করুন"(Admin Force-Release) বাটন সরানো হয়েছে — উভয়টাই
 // Google-only identity model(2_4)-এ obsolete(দুটো real family-ই ইতিমধ্যে
 // identityModel:"google-only", Rules-level এই legacy ownerUids-claim path আগে থেকেই
-// বন্ধ)। সংশ্লিষ্ট props(setClaimKeyTarget/setClaimKeyInput/setShowClaimKeyModal/
-// handleClaimMember/handleAdminForceRelease/migrationState) আর নেওয়া হয় না। নিজের
-// device-এর দায়িত্ব ছেড়ে দেওয়া("আপনি" badge → handleReleaseMember, self-only, Member
-// Key-নির্ভর না) ও Make/Remove Admin(googleUid-model-এও active থাকে, 2_4 §৮ "অপরিবর্তিত"
-// নীতি অনুযায়ী) অপরিবর্তিত।
+// বন্ধ)। নিজের device-এর দায়িত্ব ছেড়ে দেওয়া("আপনি" badge → handleReleaseMember,
+// self-only, Member Key-নির্ভর না) ও Make/Remove Admin(googleUid-model-এও active
+// থাকে, 2_4 §৮ "অপরিবর্তিত" নীতি অনুযায়ী) অপরিবর্তিত।
+// §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved): pending
+// memberRequests-এর inline Approve/Reject ব্লক সরানো হয়েছে — Approve-branch
+// createMemberWithKey() দিয়ে private/key তৈরি করত, যা google-only family-তে
+// Rules-level এখন blocked(উভয় real family-ই ইতিমধ্যে google-only)।
 import { InfoIcon, Trash, User, UsersIcon } from "./icons.jsx";
 
 export function MemberListSection({
@@ -28,9 +30,7 @@ export function MemberListSection({
   adminUidsList,
   handleMakeAdmin,
   handleRemoveAdmin,
-  handleRemoveMember,
-  pendingMemberRequests,
-  decideMemberRequest
+  handleRemoveMember
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "py-1"
@@ -100,22 +100,5 @@ export function MemberListSection({
     title: "সদস্য বাদ দিন"
   }, /*#__PURE__*/React.createElement(Trash, {
     size: 12
-  })))))), isAdmin && pendingMemberRequests.length > 0 && pendingMemberRequests.map(req => /*#__PURE__*/React.createElement("div", {
-    key: "pendingReq-" + req.id,
-    className: "flex items-center justify-between flex-nowrap gap-x-1 px-2 py-1.5 rounded-lg text-slate-700"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1.5 shrink-0"
-  }, /*#__PURE__*/React.createElement(User, { size: 13 }), " ", req.name), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center flex-nowrap gap-1 shrink-0"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 shrink-0"
-  }, "Pending"), /*#__PURE__*/React.createElement("button", {
-    onClick: e => { e.stopPropagation(); decideMemberRequest(req, "approved"); },
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0",
-    title: "অনুমোদন করুন"
-  }, "Approve"), /*#__PURE__*/React.createElement("button", {
-    onClick: e => { e.stopPropagation(); decideMemberRequest(req, "denied"); },
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-red-50 text-red-600 border border-red-100 shrink-0",
-    title: "প্রত্যাখ্যান করুন"
-  }, "Reject")))));
+  })))))));
 }
