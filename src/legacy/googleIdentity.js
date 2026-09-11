@@ -19,7 +19,13 @@ function normalizeEmail(email) {
 // নিজের uid নিজে read/write করতে পারে — তাই caller সবসময় নিজের
 // auth.currentUser.uid-ই পাঠাবে(অন্য uid দিয়ে call করলে permission-denied)।
 async function writeUserMapping(googleUid, familyId, memberId) {
-  await db.collection("users").doc(googleUid).set({ familyId, memberId });
+  // §fix(১১ সেপ্টেম্বর ২০২৬) — `users/{uid}` collection পুরনো ফিচারেও
+  // ব্যবহৃত(familyIdentity.js: saveUserFamilyCode(), schema
+  // {familyCode, updatedAt})। আগে এখানে plain .set() পুরনো doc সম্পূর্ণ
+  // overwrite করে ফেলত(অথবা উল্টো — পুরনো doc-এ familyId না থাকায়
+  // loadUserMapping() fast-path মিস করত)। merge:true দিয়ে দুই schema
+  // নিরাপদে সহাবস্থান করবে, কোনো ডেটা হারাবে না।
+  await db.collection("users").doc(googleUid).set({ familyId, memberId }, { merge: true });
 }
 
 async function loadUserMapping(googleUid) {
