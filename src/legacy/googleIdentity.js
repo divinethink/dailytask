@@ -286,6 +286,16 @@ async function editOwnProfile(familyId, memberId, name, gender) {
   }
 }
 
+// §১০.৩ Single-Popup Pattern — shared helper। এই ফাংশন UI button-এর
+// onClick-এর সবচেয়ে প্রথম synchronous statement হিসেবে সরাসরি কল হবে
+// (কোনো await/.then()-এর ভিতর থেকে না) — existing GoogleAccountModal.jsx-
+// এর googleProvider(app.js) প্যাটার্নের সাথে সামঞ্জস্যপূর্ণ, এখানে আলাদা
+// module-level instance(কোনো extra config লাগে না, একই default provider)।
+const googleSignInProvider = new firebase.auth.GoogleAuthProvider();
+function triggerGoogleSignInPopup() {
+  return auth.signInWithPopup(googleSignInProvider);
+}
+
 export {
   normalizeEmail,
   writeUserMapping,
@@ -301,6 +311,7 @@ export {
   revokeInviteLink,
   joinFamilyViaInviteLink,
   leaveFamily,
-  editOwnProfile
+  editOwnProfile,
+  triggerGoogleSignInPopup
 };
 
