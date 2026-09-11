@@ -17,6 +17,11 @@ import {
   loadUserFamilyMapping, syncFamilyCodeWithAccount, getCollectionName, appStorage,
   resolvePathContext, FAMILY_CODE_MIN_LENGTH, FAMILY_CODE_MAX_LENGTH, isGoogleLinked
 } from "./familyIdentity.js";
+// §ProfileDropdownGoogle wiring(১১ সেপ্টেম্বর ২০২৬): নতুন Google-only
+// Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
+// দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
+// UI থেকে wire হচ্ছে।
+import { editOwnProfile, leaveFamily } from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
   healthCheckFamily, auditAllFamiliesHealthCheck, extractOwnerUidsFromMemberData,
@@ -26,10 +31,10 @@ import {
 } from "./legacyMigrationTools.js";
 import {
   meetingKey, saveMeetingData, loadWeekly, saveWeekly, loadLegacyMembers, stampLastActive,
-  tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc, claimMemberDoc,
-  releaseMemberDoc, memberPrivateKeyRef, isMemberKeyCharsetValid, generateMemberKeyPlain,
-  generateReadableMemberKey, generateUniqueReadableMemberKey, createMemberWithKey,
-  fetchMemberKey, changeMemberKey, claimMemberWithKey, directIdentifyLogin, migrateMembersIfNeeded,
+  tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc,
+  releaseMemberDoc,
+  generateUniqueReadableMemberKey, createMemberWithKey,
+  directIdentifyLogin, migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory
 } from "./memberData.js";
@@ -543,12 +548,10 @@ import {
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
-import { ProfileDropdown } from "../components/ProfileDropdown.jsx";
 import { AccessRequestsModal, CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
 import { MemberRequestsModal } from "../components/MemberRequests.jsx";
-import { MemberKeyModal } from "../components/MemberKeyModal.jsx";
-import { BecomeMemberModal, ClaimKeyModal } from "../components/MemberOnboardingModals.jsx";
+import { BecomeMemberModal } from "../components/MemberOnboardingModals.jsx";
 import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 import { PrintReport } from "../components/PrintReport.jsx";
@@ -556,7 +559,15 @@ import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection,
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
+// §১১ সেপ্টেম্বর ২০২৬ — Google-only identity migration, isolated test
+// harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
+// কোনো normal render-path এই component ব্যবহার করে না।
+import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
 import { Onboarding } from "../components/Onboarding.jsx";
+// §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
+import { BottomNav } from "../components/BottomNav.jsx";
+import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
+import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_TASBIH, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
 
@@ -683,6 +694,15 @@ import { Onboarding } from "../components/Onboarding.jsx";
 
 function App() {
   useFonts();
+  // §Bottom Navigation(2_4 §৯.২) — App()-এর নতুন top-level routing state।
+  // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে) — নিচের
+  // onbFlow/onbStep lazy-init pattern-এর সাথে সামঞ্জস্যপূর্ণ।
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || TAB_FAMILY; } catch { return TAB_FAMILY; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
+  }, [activeTab]);
   const [themeColor, setThemeColor] = useThemeColor();
   const [members, setMembers] = useState(null);
   // Switch prep (Step 1): families/<familyId>.migrationState-এর লাইভ
@@ -716,30 +736,20 @@ function App() {
   // showRecoveryClaim/recoveryKeyInput/recoveryClaimBusy — Admin Recovery
   // Key UI toggle-গুলো বাদ দেওয়া হয়েছে(নিচে §Member Key state দেখুন)।
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  // §Member Key(নতুন) — key প্রদর্শন/copy/change মোডাল, claim-with-key
-  // মোডাল, এবং "সদস্য হোন" self-request মোডাল+admin-approval প্যানেল।
-  const [showMemberKeyModal, setShowMemberKeyModal] = useState(false);
-  const [memberKeyTarget, setMemberKeyTarget] = useState(null);
-  const [memberKeyValue, setMemberKeyValue] = useState(null);
-  // fetch শেষ হয়েছে কিন্তু key doc-ই নেই(পুরনো, Member Key System-এর আগে
-  // তৈরি member) — এই অবস্থাকে "এখনো লোড হচ্ছে"(null) থেকে আলাদা করতে।
-  const [memberKeyLoading, setMemberKeyLoading] = useState(false);
-  const [memberKeyRevealed, setMemberKeyRevealed] = useState(false);
-  const [showChangeKeyForm, setShowChangeKeyForm] = useState(false);
-  const [memberKeyBusy, setMemberKeyBusy] = useState(false);
-  const [copiedMemberKey, setCopiedMemberKey] = useState(false);
-  // §Manual Member Password set(২০ আগস্ট ২০২৬) — খালি রাখলে auto-generate,
-  // পূরণ করলে owner নিজে টাইপ করা password সেভ হয়(changeMemberKey customKey)।
-  const [manualKeyInput, setManualKeyInput] = useState("");
-  // §Password UI revamp(২০ আগস্ট ২০২৬): oldKeyInput এখন "পূর্বের Password
-  // verify" এর বদলে confirm-password ঘর হিসেবে reuse হচ্ছে — পূর্বের
-  // password শুধু masked display(readonly), যাচাই করার প্রয়োজন নেই(owner
-  // নিজে ঠিক করেছেন — এই অ্যাপ শুধু daily-amal ট্র্যাকার, risk গ্রহণযোগ্য)।
-  const [confirmKeyInput, setConfirmKeyInput] = useState("");
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): Member Key
+  // view/copy/change modal state(showMemberKeyModal/memberKeyTarget/
+  // memberKeyValue/memberKeyLoading/memberKeyRevealed/showChangeKeyForm/
+  // memberKeyBusy/copiedMemberKey/manualKeyInput/confirmKeyInput) ও Claim Key
+  // modal-এর claimKeyInput/claimKeyBusy সরানো হয়েছে — MemberKeyModal.jsx
+  // ইতিমধ্যে dead ছিল(কোনো live trigger ছিল না, ProfileDropdown→
+  // ProfileDropdownGoogle swap-এর পর থেকে) ও claim-UI এই সেশনেই
+  // MemberListSection.jsx থেকে সরানো হয়েছে। showClaimKeyModal/claimKeyTarget
+  // এখনো রাখা হয়েছে — OnboardingBridge-এর "keyClaim" step এই দুটো props
+  // হিসেবে নেয়(Phase 3 scope, এই সেশনে touch করা হয়নি); modal নিজে না থাকায়
+  // সেই narrow edge-case step এখন no-op(আগে থেকেই Rules-level ownerUids-claim
+  // path google-only family-তে বন্ধ ছিল বলে কোনো real capability loss নেই)।
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
-  const [claimKeyInput, setClaimKeyInput] = useState("");
-  const [claimKeyBusy, setClaimKeyBusy] = useState(false);
   const [showBecomeMemberModal, setShowBecomeMemberModal] = useState(false);
   const [becomeMemberName, setBecomeMemberName] = useState("");
   const [becomeMemberGender, setBecomeMemberGender] = useState("male");
@@ -1127,11 +1137,28 @@ function App() {
       setCustomFields(cf);
       let last = null;
       try {
-        const r = await appStorage.get(`last-selected-member:${getFamilyCode()}`, false);
-        last = r ? JSON.parse(r.value) : null;
+        // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
+        // matched/তৈরি হওয়া নিজের memberId one-time preference হিসেবে
+        // localStorage-এ থাকে(renderGoogleLandingGate() দেখুন), এটাই
+        // প্রথম-বুট-এ সবচেয়ে নির্ভরযোগ্য "নিজের member" সংকেত।
+        const preferredGoogleMember = localStorage.getItem("dt_google_preferred_member");
+        if (preferredGoogleMember) {
+          localStorage.removeItem("dt_google_preferred_member");
+          last = preferredGoogleMember;
+        }
       } catch {}
+      if (!last) {
+        try {
+          const r = await appStorage.get(`last-selected-member:${getFamilyCode()}`, false);
+          last = r ? JSON.parse(r.value) : null;
+        } catch {}
+      }
+      const myUidForSelect = auth.currentUser ? auth.currentUser.uid : null;
+      const myOwnMember = myUidForSelect ? m.find(x => x.googleUid === myUidForSelect) : null;
       if (last && m.find(x => x.id === last)) {
         setSelectedId(last);
+      } else if (myOwnMember) {
+        setSelectedId(myOwnMember.id);
       } else if (m.length) {
         setSelectedId(m[0].id);
       }
@@ -1215,7 +1242,13 @@ function App() {
   // Unclaimed members (ownerUid null) are editable by anyone — that's the
   // "manual member, no phone of their own" case. Read access is never
   // restricted, only writing.
-  const isLockedForThisDevice = !!(selectedMember && selectedMember.ownerUids && selectedMember.ownerUids.length && (!auth.currentUser || !selectedMember.ownerUids.includes(auth.currentUser.uid)));
+  // §Google-only identity(১১ সেপ্টেম্বর ২০২৬) — member.googleUid(নতুন
+  // model) ও member.ownerUids(পুরনো Anonymous-Auth model) দুটোই সাপোর্ট
+  // করার জন্য dual-check helper। googleUid থাকলে সেটাই একমাত্র owner-uid,
+  // নাহলে পুরনো ownerUids array — কোনো ডেটা/schema পরিবর্তন হয়নি, শুধু
+  // client-side compatibility shim(২_৪_১ §৬-এর dual-check নীতি অনুযায়ী)।
+  const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : ((m && m.ownerUids) || []);
+  const isLockedForThisDevice = !!(selectedMember && memberOwnerUids(selectedMember).length && (!auth.currentUser || !memberOwnerUids(selectedMember).includes(auth.currentUser.uid)));
   // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
   // (approved design) is the real safety boundary; this is purely UX so the
   // person sees a clear message instead of a raw Firestore permission error
@@ -2011,7 +2044,7 @@ function App() {
     // অনুমতি দেয় — অন্য ডিভাইসের claim করা সদস্য মুছতে গেলে সার্ভার সেটা
     // reject করবে। আগে থেকে একই চেক না করলে UI optimistically সদস্যকে
     // লিস্ট থেকে সরিয়ে ফেলত, অথচ আসল ডিলিট ব্যর্থ হতো — বিভ্রান্তিকর।
-    if ((m.ownerUids && m.ownerUids.length) && (!auth.currentUser || !m.ownerUids.includes(auth.currentUser.uid))) {
+    if (memberOwnerUids(m).length && (!auth.currentUser || !memberOwnerUids(m).includes(auth.currentUser.uid))) {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে বাদ দেওয়া যাবে না। প্রথমে সেই ডিভাইস থেকে দায়িত্ব ছাড়তে বলুন, তারপর বাদ দিন।");
       return;
     }
@@ -2032,63 +2065,14 @@ function App() {
       setSelectedId(next.length ? next[0].id : null);
     }
   }
-  // [Legacy fallback-only] Member Key ছাড়া free-claim — শুধু legacy(v1)
-  // path-এ ব্যবহৃত হয়(বাস্তবে উভয় real family v2-তে, তাই কার্যত অব্যবহৃত)।
-  // v2-তে ভুলবশত কল হলেও এখানেই আটকে যাবে — key-based claim
-  // (claimMemberWithKey, উপরে) v2-এর একমাত্র বৈধ path।
-  async function handleClaimMember(m) {
-    if (migrationState === "v2") {
-      alert("এই family-তে Member Password দিয়ে দায়িত্ব নিতে হবে।");
-      return;
-    }
-    const uid = auth.currentUser ? auth.currentUser.uid : null;
-    if (!uid) return;
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    try {
-      await claimMemberDoc(migrationState, m.id, uid);
-      setMembers(prev => prev.map(x => x.id === m.id ? {
-        ...x,
-        ownerUid: uid
-      } : x));
-    } catch (err) {
-      alert("দায়িত্ব নিতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
-  // §Admin Force-Release(নতুন, ১৫ আগস্ট ২০২৬) — অন্য (হয়তো অনুপস্থিত/lost)
-  // ডিভাইসের claim করা member-কে admin জোরপূর্বক unclaim করতে পারবেন,
-  // যাতে সেই ব্যক্তি নতুন ডিভাইস থেকে আবার "দায়িত্ব নিন" দিয়ে claim করতে
-  // পারেন। Rules ইতিমধ্যে admin-কে যেকোনো member-এর ownerUid পরিবর্তনের
-  // অনুমতি দেয় (isAdminOfFamily শাখা) — তাই কোনো Rules পরিবর্তন লাগেনি,
-  // শুধু existing releaseMemberDoc() reuse করা হচ্ছে admin path থেকে।
-  async function handleAdminForceRelease(m) {
-    // §First Admin Protection(Force-Release, ১৯ আগস্ট ২০২৬) — client-side
-    // pre-check(UX-এর জন্য, Rules-level protection এখনো ব্যাকলগে)। প্রথম
-    // Admin-কে অন্য কোনো admin force-release করতে পারবেন না, শুধু তিনি
-    // নিজে(Self-demote/নিজ ডিভাইস থেকে normal release দিয়ে) পারবেন।
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && m.ownerUids && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
-      alert("প্রথম এডমিনের দায়িত্ব অন্য কোনো এডমিন জোরপূর্বক মুক্ত করতে পারবেন না — শুধু তিনি নিজেই তার ডিভাইস থেকে ছাড়তে পারেন।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    const ok = window.confirm(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে সংরক্ষিত আছে। এডমিন হিসেবে জোরপূর্বক মুক্ত করতে চান? এরপর যেকোনো ডিভাইস এই সদস্যের দায়িত্ব নিতে পারবে (নিশ্চিত হয়ে নিন যে আসল সদস্যই নতুন ডিভাইস থেকে দাবি করবেন)।`);
-    if (!ok) return;
-    try {
-      await releaseMemberDoc(migrationState, m.id);
-      setMembers(prev => prev.map(x => x.id === m.id ? {
-        ...x,
-        ownerUids: []
-      } : x));
-    } catch (err) {
-      alert("জোরপূর্বক মুক্ত করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): handleClaimMember
+  // (legacy-v1-only free-claim, বাস্তবে উভয় real family v2-তে থাকায় already-dead)
+  // ও handleAdminForceRelease(Member Password/ownerUids claim-system-নির্ভর,
+  // দুটো real family-ই ইতিমধ্যে identityModel:"google-only" — Rules-level এই
+  // legacy claim/force-release path আগে থেকেই বন্ধ) সরানো হয়েছে। "রিসেট
+  // করুন"/"দায়িত্ব নিন" বাটন MemberListSection.jsx থেকেও একই সেশনে সরানো
+  // হয়েছে। handleReleaseMember(self-only device-release, Member Key-নির্ভর
+  // না) অপরিবর্তিত।
   async function handleReleaseMember(m) {
     // Firestore rules-এ isUnownedOrMine() চেক করে — অন্য ডিভাইসের claim
     // করা সদস্যকে release করার চেষ্টা করলে সার্ভার সবসময় reject করবে
@@ -2097,7 +2081,7 @@ function App() {
     // স্পষ্ট বার্তা দেখানো হচ্ছে, যাতে ব্যবহারকারী বুঝতে পারে এটা কেন
     // সম্ভব নয় এবং কী করতে হবে।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if ((m.ownerUids && m.ownerUids.length) && !m.ownerUids.includes(myUid)) {
+    if (memberOwnerUids(m).length && !memberOwnerUids(m).includes(myUid)) {
       alert(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে আছে — এই সদস্যের দায়িত্ব শুধুমাত্র সেই ডিভাইস থেকেই ছাড়া যাবে, এখান থেকে সম্ভব নয়।`);
       return;
     }
@@ -2122,7 +2106,8 @@ function App() {
   // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
   // নিজে দেয় না।
   async function handleMakeAdmin(m) {
-    if (!m.ownerUids || !m.ownerUids.length) {
+    const mUids = memberOwnerUids(m);
+    if (!mUids.length) {
       alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
       return;
     }
@@ -2139,7 +2124,7 @@ function App() {
       const memberRef = famRef.collection("members").doc(m.id);
       const batch = db.batch();
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayUnion(...m.ownerUids),
+        adminUids: firebase.firestore.FieldValue.arrayUnion(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2147,11 +2132,11 @@ function App() {
         updatedAt: Date.now()
       });
       await batch.commit();
-      setAdminUidsList(prev => Array.from(new Set([...prev, ...m.ownerUids])));
+      setAdminUidsList(prev => Array.from(new Set([...prev, ...mUids])));
       // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
       // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
       try {
-        await Promise.all(m.ownerUids.map(uid => db.collection("families").doc(getFamilyId())
+        await Promise.all(mUids.map(uid => db.collection("families").doc(getFamilyId())
           .collection("notifications").add({
             targetUid: uid,
             type: "admin_assigned",
@@ -2168,7 +2153,8 @@ function App() {
   // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
   // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
   async function handleRemoveAdmin(m) {
-    if (!m.ownerUids || !m.ownerUids.length) return;
+    const mUids = memberOwnerUids(m);
+    if (!mUids.length) return;
     // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "সর্বশেষ admin" এখন
     // distinct ব্যক্তি(role==="admin" member সংখ্যা) দিয়ে গণনা, adminUids
     // UID-count দিয়ে না(একই ব্যক্তির multi-device একাধিক UID থাকলে আগে এই
@@ -2182,7 +2168,7 @@ function App() {
     // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
     // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (firstAdminUid && m.ownerUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
+    if (firstAdminUid && mUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
       alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
       return;
     }
@@ -2198,7 +2184,7 @@ function App() {
       const memberRef = famRef.collection("members").doc(m.id);
       const batch = db.batch();
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayRemove(...m.ownerUids),
+        adminUids: firebase.firestore.FieldValue.arrayRemove(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2206,7 +2192,7 @@ function App() {
         updatedAt: Date.now()
       });
       await batch.commit();
-      setAdminUidsList(prev => prev.filter(u => !m.ownerUids.includes(u)));
+      setAdminUidsList(prev => prev.filter(u => !mUids.includes(u)));
     } catch (err) {
       alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
     }
@@ -2231,7 +2217,7 @@ function App() {
       // নিজের ownerUids-এ myUid থাকা member খুঁজে বের করা হচ্ছে(role
       // authoritative source, না মিললে role sync বাদ যায় — adminUids
       // sync তবুও হবে, যাতে lockout না হয়)।
-      const myMember = (members || []).find(x => x.ownerUids && x.ownerUids.includes(myUid));
+      const myMember = (members || []).find(x => memberOwnerUids(x).includes(myUid));
       // বাগফিক্স — শুধু current-session myUid না, এই ব্যক্তির নিজের সব
       // UID(multi-device claim থেকে) যেগুলো adminUids-এ আছে, একসাথে সরানো
       // হচ্ছে(নাহলে role="member" হওয়ার পরও অন্য নিজস্ব UID adminUids-এ
@@ -2240,7 +2226,7 @@ function App() {
       // rules-এর First Admin Protection পুরো write block করে দিত; তাই সেই
       // UID বাদ রেখে বাকিগুলো সরানো হয়(protection invariant অক্ষুণ্ণ)।
       const myOwnAdminUids = myMember
-        ? (myMember.ownerUids || []).filter(u =>
+        ? memberOwnerUids(myMember).filter(u =>
             adminUidsList.includes(u) && (u !== firstAdminUid || myUid === firstAdminUid)
           )
         : [myUid];
@@ -2263,6 +2249,36 @@ function App() {
     } catch (err) {
       alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
+  }
+  // §ProfileDropdownGoogle(নতুন, ১১ সেপ্টেম্বর ২০২৬) — "প্রোফাইল এডিট"।
+  // নিজের(googleUid-matched) member খুঁজে familyId+memberId দিয়ে
+  // editOwnProfile() কল করা — Firestore write logic googleIdentity.js-এ,
+  // এখানে শুধু "কোনটা নিজের member" resolve করা হচ্ছে(App() state-owner,
+  // Owner Rule ২)।
+  async function handleEditOwnProfile(name, gender) {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const myOwn = myUid ? (members || []).find(x => x.googleUid === myUid) : null;
+    if (!myOwn) return { aborted: true, reason: "no-own-member" };
+    return editOwnProfile(getFamilyId(), myOwn.id, name, gender);
+  }
+  // §ProfileDropdownGoogle — "এই পরিবার ত্যাগ করুন"। সফল হলে এই ডিভাইসের
+  // local family session(family_id/family_code) পরিষ্কার করে reload করা
+  // হয়(handleFullLogout()-এর tail-এর একই cleanup-pattern reuse) — Google
+  // sign-out করা হয় না(শুধু family membership ত্যাগ, account/session না)।
+  async function handleLeaveFamily() {
+    const myUid = auth.currentUser ? auth.currentUser.uid : null;
+    const myOwn = myUid ? (members || []).find(x => x.googleUid === myUid) : null;
+    if (!myOwn) return { aborted: true, reason: "no-own-member" };
+    const res = await leaveFamily(getFamilyId(), myOwn.id);
+    if (res && res.success) {
+      try {
+        localStorage.removeItem("family_id");
+        localStorage.removeItem("family_code");
+        localStorage.removeItem("family_code_is_custom");
+      } catch {}
+      window.location.reload();
+    }
+    return res;
   }
   // Single Logout — Family code session + Google session, দুটোই একসাথে
   // পরিষ্কার। কোনো Firestore/member ownership data পরিবর্তন হয় না — শুধু
@@ -2481,24 +2497,11 @@ function App() {
     linkGoogleAccount: linkGoogleAccount,
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
-  // A4-G4(part B): ClaimKeyModal.jsx-এ extract করা হয়েছে(verbatim)। dual-use
-  // pattern(gate-branch+normal-tree) অপরিবর্তিত — variable name একই রাখা হয়েছে।
-  const claimKeyModalNode = React.createElement(ClaimKeyModal, {
-    showClaimKeyModal,
-    claimKeyTarget,
-    claimKeyInput,
-    setClaimKeyInput,
-    claimKeyBusy,
-    setClaimKeyBusy,
-    setShowClaimKeyModal,
-    setClaimKeyTarget,
-    setMembers,
-    auth,
-    claimMemberWithKey,
-    isGoogleLinked,
-    saveUserFamilyCode,
-    getFamilyCode
-  });
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬): claimKeyModalNode(ClaimKeyModal
+  // render) সরানো হয়েছে — ClaimKeyModal.jsx export নিজেই এই সেশনে সরানো হয়েছে
+  // (দেখুন MemberOnboardingModals.jsx)। showClaimKeyModal/setClaimKeyTarget/
+  // setShowClaimKeyModal state এখনো আছে(OnboardingBridge-এর keyClaim step প্রপ
+  // হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে render হয় না।
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
   // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
   // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
@@ -2524,6 +2527,30 @@ function App() {
     setMyMemberRequestKey,
     adminUidsList
   });
+  // §১১ সেপ্টেম্বর ২০২৬ — Google-only identity migration isolated test
+  // harness। "?googleAuthTest=1" থাকলে পুরো normal render(Onboarding
+  // Gate/Dashboard/Bottom-Nav সব) সম্পূর্ণ bypass করে শুধু GoogleSignInGate
+  // দেখানো হয় — production flow-এ কোনো প্রভাব নেই(flag ছাড়া এই ব্লক কখনো
+  // fire করে না)। উদ্দেশ্য: আসল Firestore-এর বিপরীতে নতুন Sign-in/
+  // account-creation flow যাচাই করা, Dashboard-এর ownerUids-ভিত্তিক
+  // member-lookup logic এখনো টাচ হয়নি বলে সরাসরি Dashboard-এ integrate
+  // করা হয়নি(পরের ধাপে)।
+  let googleAuthTestFlag = false;
+  try {
+    googleAuthTestFlag = new URLSearchParams(window.location.search).get("googleAuthTest") === "1";
+  } catch {}
+  if (googleAuthTestFlag) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { maxWidth: "360px", margin: "40px auto", fontFamily: "sans-serif" }
+    },
+      /*#__PURE__*/React.createElement("h3", { style: { textAlign: "center" } }, "Google Sign-in Test"),
+      /*#__PURE__*/React.createElement(GoogleSignInGate, {
+        onSuccess: (familyId, memberId) => {
+          alert(`মিল পাওয়া গেছে!\nfamilyId: ${familyId}\nmemberId: ${memberId}`);
+        }
+      })
+    );
+  }
   // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
   // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
@@ -2550,6 +2577,21 @@ function App() {
   // থাকে, শুধু ownerUids খালি হয় — তাই ভুলভাবে trigger হয় না)।
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
   const needsOwnMemberProfile = isAdmin && Array.isArray(members) && members.length === 0 && !!myUid;
+  // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
+  // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
+  // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
+  // gate-logic byte-identical অপরিবর্তিত।
+  if (activeTab !== TAB_FAMILY) {
+    const placeholderTitle =
+      activeTab === TAB_PRAYER_TIMES ? "সময়সূচি" :
+      activeTab === TAB_TASBIH ? "তাসবীহ" :
+      activeTab === TAB_TOOLS ? "সহায়িকা" :
+      activeTab === TAB_SETTINGS ? "সেটিং" : "";
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      React.createElement(PublicToolsPlaceholder, { title: placeholderTitle }),
+      React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+    );
+  }
   if (onbStep || myMemberRequestStatus === "pending" || needsOwnMemberProfile) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
     flow: onbFlow,
     step: onbStep || (needsOwnMemberProfile ? "addMember" : "becomeMember"),
@@ -2570,7 +2612,7 @@ function App() {
     myMemberRequestStatus: myMemberRequestStatus,
     myMemberRequestKey: myMemberRequestKey,
     createMemberWithKey: createMemberWithKey
-  }), googleAccountModalNode, claimKeyModalNode, becomeMemberModalNode);
+  }), googleAccountModalNode, becomeMemberModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -2641,11 +2683,11 @@ function App() {
     entryDirtyRef: entryDirtyRef,
     firstAdminUid: firstAdminUid,
     handleAddMember: handleAddMember,
-    handleAdminForceRelease: handleAdminForceRelease,
     handleChangeGmail: handleChangeGmail,
-    handleClaimMember: handleClaimMember,
     handleCopyCode: handleCopyCode,
     handleFullLogout: handleFullLogout,
+    handleEditOwnProfile: handleEditOwnProfile,
+    handleLeaveFamily: handleLeaveFamily,
     handleMakeAdmin: handleMakeAdmin,
     handleReleaseMember: handleReleaseMember,
     handleRemoveAdmin: handleRemoveAdmin,
@@ -2656,7 +2698,6 @@ function App() {
     isMenuOpen: isMenuOpen,
     loadPendingMemberRequests: loadPendingMemberRequests,
     members: members,
-    migrationState: migrationState,
     monthCursor: monthCursor,
     newGender: newGender,
     newName: newName,
@@ -2667,16 +2708,8 @@ function App() {
     setAddingMember: setAddingMember,
     setArchiveMonth0: setArchiveMonth0,
     setArchiveYear: setArchiveYear,
-    setClaimKeyInput: setClaimKeyInput,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setConfirmKeyInput: setConfirmKeyInput,
     setDriveBackupStatus: setDriveBackupStatus,
     setIsMenuOpen: setIsMenuOpen,
-    setManualKeyInput: setManualKeyInput,
-    setMemberKeyLoading: setMemberKeyLoading,
-    setMemberKeyRevealed: setMemberKeyRevealed,
-    setMemberKeyTarget: setMemberKeyTarget,
-    setMemberKeyValue: setMemberKeyValue,
     setNewGender: setNewGender,
     setNewName: setNewName,
     setNotifications: setNotifications,
@@ -2684,13 +2717,10 @@ function App() {
     setShowAccountMenu: setShowAccountMenu,
     setShowArchiveModal: setShowArchiveModal,
     setShowBackupOptionsModal: setShowBackupOptionsModal,
-    setShowChangeKeyForm: setShowChangeKeyForm,
-    setShowClaimKeyModal: setShowClaimKeyModal,
     setShowFamilyCodeChoiceModal: setShowFamilyCodeChoiceModal,
     setShowFeedbackModal: setShowFeedbackModal,
     setShowGoogleAccountModal: setShowGoogleAccountModal,
     setShowImportOptionsModal: setShowImportOptionsModal,
-    setShowMemberKeyModal: setShowMemberKeyModal,
     setShowMemberRequestsModal: setShowMemberRequestsModal,
     setShowNotifPanel: setShowNotifPanel,
     setShowProfileDropdown: setShowProfileDropdown,
@@ -2704,7 +2734,6 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     auth: auth,
     db: db,
-    fetchMemberKey: fetchMemberKey,
     getFamilyCode: getFamilyCode,
     getFamilyId: getFamilyId,
     isGoogleLinked: isGoogleLinked,
@@ -2854,33 +2883,10 @@ function App() {
     decideAccessRequest
   }), googleAccountModalNode, approvedGoogleWelcomeNode,
 
-  // --- §Member Key(নতুন) — key display/copy/change মোডাল(masked-by-
-  // default, click করলে reveal, Family Code masking-এর মতো একই প্যাটার্ন)।
-  // A4-G4(part A): MemberKeyModal.jsx-এ extract করা হয়েছে(verbatim)।
-  React.createElement(MemberKeyModal, {
-    show: showMemberKeyModal,
-    memberKeyTarget,
-    onClose: () => setShowMemberKeyModal(false),
-    memberKeyLoading,
-    memberKeyValue,
-    setMemberKeyValue,
-    memberKeyRevealed,
-    setMemberKeyRevealed,
-    showChangeKeyForm,
-    setShowChangeKeyForm,
-    manualKeyInput,
-    setManualKeyInput,
-    confirmKeyInput,
-    setConfirmKeyInput,
-    memberKeyBusy,
-    setMemberKeyBusy,
-    isMemberKeyCharsetValid,
-    changeMemberKey
-  }),
-
-  // --- §Member Key claim("দায়িত্ব নিন") মোডাল — সব member-এর জন্য প্রযোজ্য
-  // (claimed/unclaimed নির্বিশেষে), সঠিক key দিলেই ownerUid বদলায়।
-  claimKeyModalNode,
+  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): MemberKeyModal
+  // render(key view/copy/change) ও claimKeyModalNode(claim modal) সরানো হয়েছে —
+  // MemberKeyModal.jsx already-dead ছিল(কোনো live trigger ছিল না) ও
+  // ClaimKeyModal export এই সেশনে সরানো হয়েছে(MemberOnboardingModals.jsx)।
 
   // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
   // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
@@ -2930,7 +2936,7 @@ function App() {
     milestoneToast: milestoneToast,
     setMilestoneToast: setMilestoneToast,
     toBn: toBn
-  }));
+  }), React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab }));
 }
 
 // --- Google Account Linking (fully optional) ---
@@ -3095,26 +3101,59 @@ function renderPendingGoogleReauthGate() {
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
 }
+// §Google-only identity(১১ সেপ্টেম্বর ২০২৬) — এখন থেকে কোনো user না থাকলে
+// আর automatic anonymous sign-in হয় না(পুরনো "zero-login" ডিফল্ট বাতিল,
+// ২.৪ §১ Core Decision অনুযায়ী)। এর বদলে সরাসরি GoogleSignInGate পূর্ণ-পেজ
+// landing হিসেবে দেখানো হয় — সফল হলে(email-match বা নতুন family তৈরি)
+// familyId/memberId localStorage-এ বসিয়ে reload করে, তখন normal bootOnce()
+// path-ই চলে(renderPendingGoogleReauthGate()-এর মতোই root-unmount pattern
+// reuse)।
+function renderGoogleLandingGate() {
+  const container = document.getElementById("root");
+  const root = ReactDOM.createRoot(container);
+  // §Google-login boot-gate fix(১১ সেপ্টেম্বর ২০২৬): mountApp()-এর
+  // hasExistingSession() শর্ত family_id **ও** family_code দুটোই require
+  // করে(পুরনো Onboarding-gate-এর নিয়ম অপরিবর্তিত রাখতে, উপরের comment
+  // দ্রষ্টব্য) — কিন্তু এই Google flow আগে শুধু family_id সেট করত,
+  // family_code কখনো না। ফলে সফল login-এর পরের reload-এও hasExistingSession
+  // false থেকে যেত এবং পুরনো Onboarding("নতুন Family তৈরি করুন"/"বিদ্যমান
+  // Family-তে প্রবেশ করুন") স্ক্রিন দেখাত। Fix: families/{familyId} doc
+  // থেকে আসল familyCode read করে সেটাও persist করা হচ্ছে(fetch ব্যর্থ
+  // হলেও gate যেন আটকে না যায়, তাই familyId-কে safe fallback রাখা হলো —
+  // getFamilyCode()-এর display/backup-filename ব্যবহারে সামান্য প্রভাব
+  // পড়তে পারে শুধু সেই edge-case-এ, কিন্তু login-loop হবে না)।
+  async function handleGoogleGateSuccess(familyId, memberId) {
+    let famCode = familyId;
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (famSnap.exists && famSnap.data().familyCode) {
+        famCode = famSnap.data().familyCode;
+      }
+    } catch {}
+    try {
+      localStorage.setItem("family_id", familyId);
+      localStorage.setItem("dt_google_preferred_member", memberId);
+      localStorage.setItem("family_code", famCode);
+    } catch {}
+    root.unmount();
+    window.location.reload();
+  }
+  root.render(/*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 gap-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-base font-bold text-[#0E4B43] text-center"
+  }, "Daily Task"), /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-xs bg-white rounded-2xl border border-slate-200 shadow-sm"
+  }, /*#__PURE__*/React.createElement(GoogleSignInGate, { onSuccess: handleGoogleGateSuccess }))));
+}
 const unsubscribeAuth = auth.onAuthStateChanged(user => {
   unsubscribeAuth();
   if (user) {
     bootOnce();
   } else {
-    let pendingGoogleReauth = false;
     try {
-      pendingGoogleReauth = localStorage.getItem("dt_pending_google_reauth") === "1";
+      localStorage.removeItem("dt_pending_google_reauth");
     } catch {}
-    if (pendingGoogleReauth) {
-      try {
-        localStorage.removeItem("dt_pending_google_reauth");
-      } catch {}
-      renderPendingGoogleReauthGate();
-    } else {
-      auth.signInAnonymously().catch(err => {
-        console.error("Anonymous sign-in failed:", err);
-      }).finally(() => {
-        bootOnce(); // don't leave the user stuck on a blank screen
-      });
-    }
+    renderGoogleLandingGate();
   }
 });
