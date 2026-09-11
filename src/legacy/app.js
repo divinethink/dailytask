@@ -556,6 +556,10 @@ import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection,
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
+// §১১ সেপ্টেম্বর ২০২৬ — Google-only identity migration, isolated test
+// harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
+// কোনো normal render-path এই component ব্যবহার করে না।
+import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
 import { Onboarding } from "../components/Onboarding.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
@@ -2537,6 +2541,30 @@ function App() {
     setMyMemberRequestKey,
     adminUidsList
   });
+  // §১১ সেপ্টেম্বর ২০২৬ — Google-only identity migration isolated test
+  // harness। "?googleAuthTest=1" থাকলে পুরো normal render(Onboarding
+  // Gate/Dashboard/Bottom-Nav সব) সম্পূর্ণ bypass করে শুধু GoogleSignInGate
+  // দেখানো হয় — production flow-এ কোনো প্রভাব নেই(flag ছাড়া এই ব্লক কখনো
+  // fire করে না)। উদ্দেশ্য: আসল Firestore-এর বিপরীতে নতুন Sign-in/
+  // account-creation flow যাচাই করা, Dashboard-এর ownerUids-ভিত্তিক
+  // member-lookup logic এখনো টাচ হয়নি বলে সরাসরি Dashboard-এ integrate
+  // করা হয়নি(পরের ধাপে)।
+  let googleAuthTestFlag = false;
+  try {
+    googleAuthTestFlag = new URLSearchParams(window.location.search).get("googleAuthTest") === "1";
+  } catch {}
+  if (googleAuthTestFlag) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { maxWidth: "360px", margin: "40px auto", fontFamily: "sans-serif" }
+    },
+      /*#__PURE__*/React.createElement("h3", { style: { textAlign: "center" } }, "Google Sign-in Test"),
+      /*#__PURE__*/React.createElement(GoogleSignInGate, {
+        onSuccess: (familyId, memberId) => {
+          alert(`মিল পাওয়া গেছে!\nfamilyId: ${familyId}\nmemberId: ${memberId}`);
+        }
+      })
+    );
+  }
   // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
   // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
