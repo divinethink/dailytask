@@ -33,7 +33,7 @@ import {
   meetingKey, saveMeetingData, loadWeekly, saveWeekly, loadLegacyMembers, stampLastActive,
   tsToMillis, memberDocId, loadMembersV2, saveMemberDoc, deleteMemberDoc,
   releaseMemberDoc,
-  generateUniqueReadableMemberKey, createMemberWithKey,
+  createMemberWithKey,
   directIdentifyLogin, migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory
@@ -548,10 +548,8 @@ import {
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
-import { AccessRequestsModal, CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
+import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
-import { MemberRequestsModal } from "../components/MemberRequests.jsx";
-import { BecomeMemberModal } from "../components/MemberOnboardingModals.jsx";
 import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 import { PrintReport } from "../components/PrintReport.jsx";
@@ -751,9 +749,12 @@ function App() {
   const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
   const [claimKeyTarget, setClaimKeyTarget] = useState(null);
   const [showBecomeMemberModal, setShowBecomeMemberModal] = useState(false);
-  const [becomeMemberName, setBecomeMemberName] = useState("");
-  const [becomeMemberGender, setBecomeMemberGender] = useState("male");
-  const [becomeMemberBusy, setBecomeMemberBusy] = useState(false);
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved): becomeMemberName/
+  // becomeMemberGender/becomeMemberBusy(BecomeMemberModal-এর ভিতরের ফর্ম-state)
+  // সরানো হয়েছে — BecomeMemberModal নিজেই MemberOnboardingModals.jsx থেকে সরানো
+  // হয়েছে(নিচে দ্রষ্টব্য)। showBecomeMemberModal/myMemberRequestStatus/
+  // myMemberRequestKey এখনো রাখা হয়েছে — OnboardingBridge-এর "becomeMember" step
+  // এই state গুলো props হিসেবে নেয়(Phase 3 scope, এই সেশনে touch করা হয়নি)।
   const [myMemberRequestStatus, setMyMemberRequestStatus] = useState(null);
   // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬): pending screen-এ
   // দেখানোর জন্য — memberRequests/{uid}.presetKey থেকেই আসে(নতুন কোনো
@@ -797,9 +798,12 @@ function App() {
       onbAdvance(onbFlow === "newFamily" ? "addMember" : "becomeMember");
     }
   }, [onbFlow]);
-  const [showMemberRequestsModal, setShowMemberRequestsModal] = useState(false);
-  const [pendingMemberRequests, setPendingMemberRequests] = useState([]);
-  const [loadingMemberRequests, setLoadingMemberRequests] = useState(false);
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
+  // showMemberRequestsModal/pendingMemberRequests/loadingMemberRequests state
+  // সরানো হয়েছে — এই admin-review প্যানেল(ও MemberListSection-এর ভিতরের
+  // inline Approve/Reject) Rules-level এখন google-only উভয় real family-তেই
+  // ব্যবহারযোগ্য না(Approve → createMemberWithKey() → private/key create,
+  // isGoogleOnly() guard দিয়ে blocked)।
   // pending = নিজের accessRequest এখনো admin-approval-এর অপেক্ষায়;
   // null = জানা যায়নি বা প্রযোজ্য না (admin/approved/legacy path)।
   const [accessPending, setAccessPending] = useState(false);
@@ -872,10 +876,10 @@ function App() {
   const [showJoinFamilyModal, setShowJoinFamilyModal] = useState(false);
   const [joinFamCodeInput, setJoinFamCodeInput] = useState("");
   const [joinFamCodeBusy, setJoinFamCodeBusy] = useState(false);
-  // Access Approval Gate — Step 4: admin-only pending-request panel state।
-  const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
-  const [pendingAccessRequests, setPendingAccessRequests] = useState([]);
-  const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved): Access
+  // Approval Gate-এর admin-review panel state সরানো হয়েছে — grep-verify
+  // করে নিশ্চিত হয়েছে এই cluster-এর কোনো live trigger কোনো component-এ কখনো
+  // ছিল না(১_৩ ফাইলে আগে থেকেই "unreachable UI" হিসেবে flagged ছিল)।
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
   // §Approved-member Google welcome(২৩ আগস্ট ২০২৬) — নিচের myMemberRequestStatus
   // effect-এ trigger হয়(main App render-এ, onboarding gate-এর বাইরে)।
@@ -1667,83 +1671,16 @@ function App() {
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   }
-  // Access Approval Gate — Step 4: admin-only pending accessRequests লোড।
-  async function loadPendingAccessRequests() {
-    setLoadingAccessRequests(true);
-    try {
-      const famId = getFamilyId();
-      const snap = await db.collection("families").doc(famId)
-        .collection("accessRequests").where("status", "==", "pending").get();
-      setPendingAccessRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch {
-      setPendingAccessRequests([]);
-    } finally {
-      setLoadingAccessRequests(false);
-    }
-  }
-  // decision: "approved" | "denied"। Rules-এ শুধু pending→approved/denied
-  // এবং শুধু status+decidedAt field অনুমোদিত।
-  async function decideAccessRequest(uid, decision) {
-    try {
-      const famId = getFamilyId();
-      await db.collection("families").doc(famId)
-        .collection("accessRequests").doc(uid)
-        .update({ status: decision, decidedAt: Date.now() });
-      setPendingAccessRequests(list => list.filter(r => r.id !== uid));
-    } catch (err) {
-      alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
-  // §"সদস্য হোন" — Admin-only pending memberRequests লোড(accessRequests-এর
-  // একই pattern)।
-  async function loadPendingMemberRequests() {
-    setLoadingMemberRequests(true);
-    try {
-      const famId = getFamilyId();
-      const snap = await db.collection("families").doc(famId)
-        .collection("memberRequests").where("status", "==", "pending").get();
-      setPendingMemberRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch {
-      setPendingMemberRequests([]);
-    } finally {
-      setLoadingMemberRequests(false);
-    }
-  }
-  // decision: "approved" | "denied"। approved হলে member doc + private/key
-  // একই সময়ে(createMemberWithKey) তৈরি হয়, ownerUid = অনুরোধকারীর uid —
-  // অর্থাৎ approval-এর সাথে সাথেই সে নিজের member auto-claimed অবস্থায়
-  // পায়, আলাদা করে "দায়িত্ব নিন" লাগে না।
-  async function decideMemberRequest(req, decision) {
-    // §Race-fix(২৩ আগস্ট ২০২৬): member-list ও notification-panel উভয় জায়গা
-    // থেকেই একই pendingMemberRequests state থেকে render হয়(single source)।
-    // কোনো await-এর আগেই(synchronously) list থেকে সরানো হয়, যাতে দুই জায়গা
-    // থেকে quick double-tap হলেও দ্বিতীয় call approve/reject আর কিছু খুঁজে
-    // না পায়(duplicate member তৈরি/duplicate write প্রতিরোধ)। ব্যর্থ হলে
-    // item ফিরিয়ে আনা হয়, যাতে retry করা যায়।
-    setPendingMemberRequests(list => list.filter(r => r.id !== req.id));
-    try {
-      const famId = getFamilyId();
-      if (decision === "approved") {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        const newMember = {
-          id,
-          name: req.name,
-          gender: req.gender || "male",
-          ownerUids: [req.id],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        };
-        await createMemberWithKey(newMember, req.presetKey);
-        setMembers(prev => [...(prev || []), newMember]);
-      }
-      await db.collection("families").doc(famId)
-        .collection("memberRequests").doc(req.id)
-        .update({ status: decision, decidedAt: Date.now() });
-    } catch (err) {
-      setPendingMemberRequests(list => list.some(r => r.id === req.id) ? list : [...list, req]);
-      alert("সিদ্ধান্ত সংরক্ষণ করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
+  // loadPendingAccessRequests/decideAccessRequest(Access Approval Gate
+  // admin-review, কোনো live trigger ছিল না — grep-verify করা হয়েছে) ও
+  // loadPendingMemberRequests/decideMemberRequest("সদস্য হোন" admin-approve,
+  // Approve-branch createMemberWithKey() দিয়ে private/key তৈরি করে, যা
+  // google-only family-তে Rules-level blocked — উভয় real family-ই ইতিমধ্যে
+  // google-only) সরানো হয়েছে। handleAddMember()(সরাসরি admin-add, একই
+  // createMemberWithKey() ব্যবহার করে) এই সেশনে touch করা হয়নি — এটা এখনো
+  // live UI path, যদিও একই কারণে বর্তমানে ভাঙা(পৃথক finding হিসেবে
+  // রিপোর্ট করা হয়েছে, §৮ cleanup scope-এর বাইরে — নতুন feature-work লাগবে)।
   // "নতুন ফ্যামিলি কোড তৈরি করুন" — সব সদস্যের জন্য উন্মুক্ত (কারো নিজস্ব
   // পৃথক family স্পেস দরকার হলে)। সম্পূর্ণ নতুন familyId+data — বর্তমান
   // family/data কোনোভাবে touch হয় না, শুধু এই ডিভাইসটি নতুন (blank)
@@ -2503,30 +2440,14 @@ function App() {
   // setShowClaimKeyModal state এখনো আছে(OnboardingBridge-এর keyClaim step প্রপ
   // হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে render হয় না।
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
-  // শুধু নিচের(নন-গেট) JSX-এর ভিতরে বাঁধা ছিল, googleAccountModalNode/
-  // claimKeyModalNode-এর মতো variable-এ বের করা হয়নি — ফলে onbStep===
-  // "becomeMember" অবস্থায় early-return branch-এ এটি render হতো না এবং
-  // সাদা পেজ দেখাতো। এখন একই pattern-এ variable-এ বের করে দুই জায়গাতেই
-  // reuse করা হচ্ছে — কোনো নতুন logic/state নেই।
-  // A4-G4(part C): BecomeMemberModal.jsx-এ extract করা হয়েছে(verbatim)।
-  // dual-use pattern(gate-branch+normal-tree) অপরিবর্তিত।
-  const becomeMemberModalNode = React.createElement(BecomeMemberModal, {
-    showBecomeMemberModal,
-    becomeMemberName,
-    setBecomeMemberName,
-    becomeMemberGender,
-    setBecomeMemberGender,
-    becomeMemberBusy,
-    setBecomeMemberBusy,
-    setShowBecomeMemberModal,
-    auth,
-    db,
-    getFamilyId,
-    generateUniqueReadableMemberKey,
-    setMyMemberRequestStatus,
-    setMyMemberRequestKey,
-    adminUidsList
-  });
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
+  // becomeMemberModalNode(BecomeMemberModal render) সরানো হয়েছে —
+  // BecomeMemberModal export নিজেই এই সেশনে MemberOnboardingModals.jsx থেকে
+  // সরানো হয়েছে(file এখন খালি, delete করা হয়েছে)। showBecomeMemberModal/
+  // myMemberRequestStatus/myMemberRequestKey state এখনো আছে(OnboardingBridge-
+  // এর "becomeMember" step প্রপ হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে
+  // render হয় না — সেই narrow edge-case step এখন no-op(দুটো real family-ই
+  // google-only, approve-path আগে থেকেই Rules-blocked ছিল)।
   // §১১ সেপ্টেম্বর ২০২৬ — Google-only identity migration isolated test
   // harness। "?googleAuthTest=1" থাকলে পুরো normal render(Onboarding
   // Gate/Dashboard/Bottom-Nav সব) সম্পূর্ণ bypass করে শুধু GoogleSignInGate
@@ -2612,7 +2533,7 @@ function App() {
     myMemberRequestStatus: myMemberRequestStatus,
     myMemberRequestKey: myMemberRequestKey,
     createMemberWithKey: createMemberWithKey
-  }), googleAccountModalNode, becomeMemberModalNode);
+  }), googleAccountModalNode);
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -2679,7 +2600,6 @@ function App() {
     addingMember: addingMember,
     adminUidsList: adminUidsList,
     copiedCode: copiedCode,
-    decideMemberRequest: decideMemberRequest,
     entryDirtyRef: entryDirtyRef,
     firstAdminUid: firstAdminUid,
     handleAddMember: handleAddMember,
@@ -2696,13 +2616,11 @@ function App() {
     isAdmin: isAdmin,
     isLockedForSwitch: isLockedForSwitch,
     isMenuOpen: isMenuOpen,
-    loadPendingMemberRequests: loadPendingMemberRequests,
     members: members,
     monthCursor: monthCursor,
     newGender: newGender,
     newName: newName,
     notifications: notifications,
-    pendingMemberRequests: pendingMemberRequests,
     selectedId: selectedId,
     selectedMember: selectedMember,
     setAddingMember: setAddingMember,
@@ -2721,7 +2639,6 @@ function App() {
     setShowFeedbackModal: setShowFeedbackModal,
     setShowGoogleAccountModal: setShowGoogleAccountModal,
     setShowImportOptionsModal: setShowImportOptionsModal,
-    setShowMemberRequestsModal: setShowMemberRequestsModal,
     setShowNotifPanel: setShowNotifPanel,
     setShowProfileDropdown: setShowProfileDropdown,
     showAccountMenu: showAccountMenu,
@@ -2875,33 +2792,16 @@ function App() {
     getFamilyCode,
     handleRenameFamilyCode,
     FAMILY_CODE_MIN_LENGTH
-  }), React.createElement(AccessRequestsModal, {
-    show: showAccessRequestsModal,
-    onClose: () => setShowAccessRequestsModal(false),
-    loadingAccessRequests,
-    pendingAccessRequests,
-    decideAccessRequest
   }), googleAccountModalNode, approvedGoogleWelcomeNode,
 
   // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): MemberKeyModal
   // render(key view/copy/change) ও claimKeyModalNode(claim modal) সরানো হয়েছে —
   // MemberKeyModal.jsx already-dead ছিল(কোনো live trigger ছিল না) ও
   // ClaimKeyModal export এই সেশনে সরানো হয়েছে(MemberOnboardingModals.jsx)।
-
-  // --- §"সদস্য হোন" — non-admin self-request মোডাল(নাম+জেন্ডার দিয়ে
-  // memberRequests-এ pending তৈরি, Admin অনুমোদনের পর member+key তৈরি হয়)।
-  becomeMemberModalNode,
-
-  // --- §"সদস্য অনুরোধ" — Admin-only অনুমোদন প্যানেল(accessRequests
-  // মোডালের একই ডিজাইন-প্যাটার্ন)। অনুমোদনে member+key একসাথে তৈরি হয়।
-  // A4-G4(part D): MemberRequests.jsx-এ extract করা হয়েছে(verbatim)।
-  React.createElement(MemberRequestsModal, {
-    show: showMemberRequestsModal,
-    onClose: () => setShowMemberRequestsModal(false),
-    loadingMemberRequests,
-    pendingMemberRequests,
-    decideMemberRequest
-  }),
+  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
+  // AccessRequestsModal(কোনো live trigger ছিল না) ও becomeMemberModalNode+
+  // MemberRequestsModal("সদস্য হোন" submit+admin-approve — approve-branch
+  // google-only family-তে Rules-blocked) সরানো হয়েছে।
 
   React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick}), /*#__PURE__*/React.createElement("input", {
     ref: importFileInputRef,
