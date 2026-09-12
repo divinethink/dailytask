@@ -561,6 +561,7 @@ import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 // harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
 // কোনো normal render-path এই component ব্যবহার করে না।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
+import { NonMemberLanding } from "../components/NonMemberLanding.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
@@ -3050,13 +3051,7 @@ function renderGoogleLandingGate() {
     root.unmount();
     window.location.reload();
   }
-  root.render(/*#__PURE__*/React.createElement("div", {
-    className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 gap-4"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-base font-bold text-[#0E4B43] text-center"
-  }, "Daily Task"), /*#__PURE__*/React.createElement("div", {
-    className: "w-full max-w-xs bg-white rounded-2xl border border-slate-200 shadow-sm"
-  }, /*#__PURE__*/React.createElement(GoogleSignInGate, { onSuccess: handleGoogleGateSuccess }))));
+  root.render(/*#__PURE__*/React.createElement(NonMemberLanding, { onSuccess: handleGoogleGateSuccess }));
 }
 const unsubscribeAuth = auth.onAuthStateChanged(user => {
   unsubscribeAuth();
