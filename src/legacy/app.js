@@ -723,7 +723,13 @@ function App() {
   // নেওয়া হয় না যতক্ষণ না সার্ভার থেকে প্রকৃত মান (বা নিশ্চিত absence)
   // পাওয়া যায়। এই মুহূর্তে কোনো caller এই state ব্যবহার করছে না
   // (unwired), শুধু loading-gate-কে প্রভাবিত করে।
-  const [migrationState, setMigrationState] = useState(undefined);
+  // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬, বাগ-ফিক্স): boot-loader effect
+  // guest-এ skip হয় বলে migrationState কখনো set হতো না(চিরস্থায়ী
+  // `undefined` থেকে যেত) — নিচের loading-gate(`migrationState ===
+  // undefined`) তাই কখনো pass করতো না, ফলে logout-এর পর অনন্ত spinner
+  // (owner-রিপোর্টেড বাগ)। guest-এ শুধু placeholder মান("v2", কোনো real
+  // family-কে প্রভাবিত করে না, শুধু guest-এর নিজের local render-এ ব্যবহৃত)।
+  const [migrationState, setMigrationState] = useState(isGuestMode ? "v2" : undefined);
   // Access Approval Gate — Step 4: বর্তমান ব্যবহারকারী এই family-র admin
   // কিনা (existing migFamSnap boot-fetch থেকেই সেট হয়, কোনো extra read
   // যোগ করা হয়নি)। null = এখনো জানা যায়নি।
@@ -780,7 +786,10 @@ function App() {
   // ছাড়া হবে না(নিচে দ্রষ্টব্য), যাতে pending status Firestore থেকে confirm
   // হওয়ার আগেই Dashboard-এর transient bypass না ঘটে। একবার true হলে পরের
   // re-run-গুলোতে আর false-এ reset হয় না(normal user-দের জন্য flicker এড়াতে)।
-  const [myMemberRequestChecked, setMyMemberRequestChecked] = useState(false);
+  // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬, একই বাগের অংশ) — guest-এ এই flag
+  // set করার effect-ও skip হয়, তাই সরাসরি true দিয়ে শুরু(কোনো pending
+  // memberRequest-check দরকার নেই, real family-ই নেই)।
+  const [myMemberRequestChecked, setMyMemberRequestChecked] = useState(isGuestMode ? true : false);
   // §Onboarding continuation — Family Code submit-এর পরে reload হওয়া
   // সত্ত্বেও Onboarding() flow ধারাবাহিক রাখতে। sessionStorage flag
   // Onboarding()-এ সেট হয়েছে; এখানে শুধু পড়া+ধাপ-অনুসরণ। কোনো নতুন
