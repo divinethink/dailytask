@@ -17,6 +17,8 @@ export function DashboardHeader({
   copiedCode,
   entryDirtyRef,
   firstAdminUid,
+  isGuestMode,
+  onGuestSignInTap,
   handleAddMember,
   handleChangeGmail,
   handleCopyCode,
@@ -96,6 +98,7 @@ export function DashboardHeader({
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
+      if (isGuestMode) { onGuestSignInTap(); return; }
       const next = !isMenuOpen;
       setIsMenuOpen(next);
     },
@@ -225,6 +228,7 @@ export function DashboardHeader({
     type: "button",
     onClick: e => {
       e.stopPropagation();
+      if (isGuestMode) { onGuestSignInTap(); return; }
       setShowProfileDropdown(v => !v);
     },
     className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform",
@@ -234,7 +238,7 @@ export function DashboardHeader({
     }
   }, /*#__PURE__*/React.createElement(User, {
     size: 13
-  }), " ", selectedMember ? selectedMember.name : "সদস্য বেছে নিন", /*#__PURE__*/React.createElement(ChevronDown, {
+  }), " ", isGuestMode ? "প্রোফাইল/নন-মেম্বার" : (selectedMember ? selectedMember.name : "সদস্য বেছে নিন"), /*#__PURE__*/React.createElement(ChevronDown, {
     size: 12,
     className: `transition-transform duration-200 ${showProfileDropdown ? "rotate-180" : ""}`
   })), /*#__PURE__*/React.createElement(ProfileDropdownGoogle, {
@@ -260,6 +264,7 @@ export function DashboardHeader({
     type: "button",
     onClick: e => {
       e.stopPropagation();
+      if (isGuestMode) { onGuestSignInTap(); return; }
       setShowNotifPanel(v => {
         const next = !v;
         if (next) {
