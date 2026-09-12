@@ -561,7 +561,6 @@ import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 // harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
 // কোনো normal render-path এই component ব্যবহার করে না।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
-import { NonMemberLanding } from "../components/NonMemberLanding.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
@@ -692,6 +691,16 @@ import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_TASBIH, TAB_TOOLS, TAB_SETTINGS, ACTI
 
 function App() {
   useFonts();
+  // §Guest-mode Dashboard(১২ সেপ্টেম্বর ২০২৬, owner-approved) — App() এখন
+  // authenticated member এবং non-member উভয়ের জন্যই একই component/UI —
+  // কোনো আলাদা "landing page" নেই। auth.currentUser না থাকলে, অথবা থাকলেও
+  // localStorage-এ family_id/family_code(hasExistingSession-এর পুরনো একই
+  // শর্ত) না থাকলে — guest ধরা হয়। এই একটা flag-ই বাকি সব guard নিয়ন্ত্রণ
+  // করে। auth.currentUser/localStorage কোনোটাই এই component mount-এর
+  // ভিতরে বদলায় না(সফল sign-in হলে সবসময় reload হয়, নিচের
+  // handleGuestSignInSuccess() দ্রষ্টব্য) — তাই plain const হিসেবে প্রতি
+  // render-এ recompute করা নিরাপদ, আলাদা state লাগে না।
+  const isGuestMode = !auth.currentUser || !(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
   // §Bottom Navigation(2_4 §৯.২) — App()-এর নতুন top-level routing state।
   // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে) — নিচের
   // onbFlow/onbStep lazy-init pattern-এর সাথে সামঞ্জস্যপূর্ণ।
@@ -702,7 +711,13 @@ function App() {
     try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
   }, [activeTab]);
   const [themeColor, setThemeColor] = useThemeColor();
-  const [members, setMembers] = useState(null);
+  // §Guest-mode fix: guest অবস্থায় boot-loader effect(নিচে) কখনো চলে না,
+  // তাই members কখনো populate হবে না — null থাকলে যেকোনো .map()/.find()
+  // যেখানে `|| []` fallback নেই সেখানে crash করতে পারে। শুধু guest-এই
+  // ডিফল্ট []-এ পরিবর্তন(authenticated member-দের loading-state UX(null =
+  // "এখনো লোড হচ্ছে") সম্পূর্ণ অপরিবর্তিত)।
+  const [members, setMembers] = useState(isGuestMode ? [] : null);
+  const [showGuestSignIn, setShowGuestSignIn] = useState(false);
   // Switch prep (Step 1): families/<familyId>.migrationState-এর লাইভ
   // অবস্থা। undefined = "এখনো জানা যায়নি" (fail-closed) — "legacy" ধরে
   // নেওয়া হয় না যতক্ষণ না সার্ভার থেকে প্রকৃত মান (বা নিশ্চিত absence)
@@ -954,6 +969,11 @@ function App() {
     });
   }
   useEffect(() => {
+    // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬): guest অবস্থায় family/member/
+    // notification কোনো Firestore read/listener-ই শুরু হবে না(2_5 Screen
+    // 0-এর "zero Firestore call" নীতি অনুযায়ী) — permission-denied fallback
+    // ভরসা না করে সরাসরি skip করা হচ্ছে।
+    if (isGuestMode) return;
     let migrationUnsub = null;
     let notifUnsub = null;
     (async () => {
@@ -1389,6 +1409,11 @@ function App() {
     refreshWeekly();
   }, [refreshWeekly]);
   useEffect(() => {
+    // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬): এই effect selectedId-নির্বিশেষে
+    // মাউন্ট হওয়ার সাথে সাথেই meeting-doc listener চালু করে — guest
+    // অবস্থায় এটাই একমাত্র "অরক্ষিত" Firestore call ছিল(বাকিগুলো আগে থেকেই
+    // selectedId/myUid না থাকলে self-guard করে)। এখন এখানেও skip।
+    if (isGuestMode) return;
     // New document (different month) — nothing local worth protecting yet.
     meetingDirtyRef.current = false;
     const docKey = meetingKey(monthCursor.year, monthCursor.month0);
@@ -1823,6 +1848,7 @@ function App() {
     }
   }
   function updateWeekly(weekIdx, field, value) {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     weeklyDirtyRef.current = true;
     setWeekly(prev => ({
       ...prev,
@@ -1833,10 +1859,12 @@ function App() {
     }));
   }
   function addWeeklyRow() {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     const maxPossible = getWeekRanges(daysInMonth(monthCursor.year, monthCursor.month0)).length;
     setWeeklyRowCount(c => Math.min(c + 1, maxPossible));
   }
   function addMeetingRow() {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     meetingDirtyRef.current = true;
     setMeetingState(prev => ({
       ...prev,
@@ -1849,6 +1877,7 @@ function App() {
     }));
   }
   function removeMeetingRow(idx) {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     meetingDirtyRef.current = true;
     setMeetingState(prev => {
       const nextRows = [...prev.rows];
@@ -1860,6 +1889,7 @@ function App() {
     });
   }
   function updateMeetingRow(idx, field, value) {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     meetingDirtyRef.current = true;
     setMeetingState(prev => {
       const nextRows = [...prev.rows];
@@ -2303,6 +2333,7 @@ function App() {
     }
   }
   function updateField(key, value) {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     if (isFutureDate(viewDate) || isLockedForThisDevice) return;
     entryDirtyRef.current = true;
     setEntry(prev => ({
@@ -2311,6 +2342,7 @@ function App() {
     }));
   }
   function updateExcuse(key, value) {
+    if (isGuestMode) { setShowGuestSignIn(true); return; }
     if (isFutureDate(viewDate) || isLockedForThisDevice) return;
     entryDirtyRef.current = true;
     setEntry(prev => ({
@@ -2320,6 +2352,27 @@ function App() {
         [key]: value
       }
     }));
+  }
+  // §Guest-mode sign-in success(১২ সেপ্টেম্বর ২০২৬) — আগে এই ঠিক একই logic
+  // renderGoogleLandingGate()(আলাদা root)-এর handleGoogleGateSuccess()-এ
+  // ছিল, এখন App()-এর ভিতরের guest-mode popover থেকে সরাসরি reuse। familyId
+  // থেকে আসল familyCode fetch করে(না পারলে familyId-ই fallback, login-loop
+  // এড়াতে) localStorage সেট করে reload — reload-এর পরে normal bootOnce()
+  // path-ই চলে, isGuestMode আর true থাকবে না।
+  async function handleGuestSignInSuccess(familyId, memberId) {
+    let famCode = familyId;
+    try {
+      const famSnap = await db.collection("families").doc(familyId).get();
+      if (famSnap.exists && famSnap.data().familyCode) {
+        famCode = famSnap.data().familyCode;
+      }
+    } catch {}
+    try {
+      localStorage.setItem("family_id", familyId);
+      localStorage.setItem("dt_google_preferred_member", memberId);
+      localStorage.setItem("family_code", famCode);
+    } catch {}
+    window.location.reload();
   }
   async function handleSave() {
     if (!selectedId || isFutureDate(viewDate)) return;
@@ -2612,6 +2665,8 @@ function App() {
     copiedCode: copiedCode,
     entryDirtyRef: entryDirtyRef,
     firstAdminUid: firstAdminUid,
+    isGuestMode: isGuestMode,
+    onGuestSignInTap: () => setShowGuestSignIn(true),
     handleAddMember: handleAddMember,
     handleChangeGmail: handleChangeGmail,
     handleCopyCode: handleCopyCode,
@@ -2848,7 +2903,20 @@ function App() {
     milestoneToast: milestoneToast,
     setMilestoneToast: setMilestoneToast,
     toBn: toBn
-  }), React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab }));
+  }),
+  // §Guest-mode sign-in popover(১২ সেপ্টেম্বর ২০২৬) — profile-pill/মেনু/যেকোনো
+  // write-action(updateField/updateExcuse/updateWeekly/meeting-actions)
+  // guest অবস্থায় ট্যাপ করলে এটা খোলে(existing GoogleSignInGate reuse)।
+  showGuestSignIn && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      className: "fixed inset-0 bg-black/40 z-[60]",
+      onClick: () => setShowGuestSignIn(false)
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      className: "fixed inset-x-4 top-24 z-[70] max-w-xs mx-auto bg-white rounded-2xl shadow-xl border border-slate-100"
+    }, /*#__PURE__*/React.createElement(GoogleSignInGate, { onSuccess: handleGuestSignInSuccess }))
+  ),
+  React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab }));
 }
 
 // --- Google Account Linking (fully optional) ---
@@ -2904,32 +2972,17 @@ function signOutToFreshAnonymous() {
 
 
 function mountApp() {
-  // Boot-gate: existing user/session কোনোভাবেই প্রভাবিত হয় না — শুধু
-  // raw localStorage(family_id + family_code) না থাকলেই(সত্যিকারের
-  // নতুন/Incognito context, অথবা কোনো পুরনো session-এ শুধু এই key দুটো
-  // মুছে গেলে) App()-এর বদলে landing gate দেখানো হয়। এখানে ইচ্ছাকৃতভাবে
-  // getFamilyId()/getFamilyCode() কল করা হয়নি(ওগুলো কল করলেই নিজে থেকে
-  // random id/code তৈরি+persist হয়ে যায়) — শুধু raw localStorage read।
-  const hasExistingSession = !!(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
-  if (hasExistingSession) {
-    const container = document.getElementById("root");
-    const root = ReactDOM.createRoot(container);
-    root.render(/*#__PURE__*/React.createElement(App, null));
-  } else {
-    // §Old-code cleanup Phase 3(১১ সেপ্টেম্বর ২০২৬, owner-approved): আগে এখানে
-    // পুরনো `Onboarding`("নতুন Family তৈরি করুন"/"বিদ্যমান Family-তে প্রবেশ
-    // করুন", anonymous-UID+Member-Password-ভিত্তিক createNewFamily()/
-    // joinExistingFamily() কল করত) দেখানো হতো। এই path এখন শুধুমাত্র narrow
-    // edge-case-এ reachable(যেমন কোনো authenticated সেশনে localStorage-এর
-    // family_id/family_code key শুধু মুছে গেলে) — কিন্তু পুরনো flow ব্যবহার
-    // করলে হয় নতুন non-google-only family তৈরি হতো(migration নীতির বিপরীত)
-    // অথবা দুটো real(ইতিমধ্যে google-only) family-তে join করার চেষ্টা
-    // ব্যর্থ/অসম্পূর্ণ অবস্থায় থেকে যেত(Member Key system Phase 1/2-এ
-    // সরানো হয়ে গেছে)। এখন সরাসরি renderGoogleLandingGate() reuse করা
-    // হচ্ছে(একই ফাংশন, নতুন কোনো root তৈরি করা হয়নি এখানে যাতে duplicate
-    // React root তৈরি না হয়) — এই edge-case এখন সঠিক, working entry-তেই যায়।
-    renderGoogleLandingGate();
-  }
+  // §Guest-mode consolidation(১২ সেপ্টেম্বর ২০২৬, owner-approved) — আগে এখানে
+  // localStorage(family_id+family_code)-এর উপস্থিতি অনুযায়ী দুইটা সম্পূর্ণ
+  // ভিন্ন component(App vs আলাদা landing-gate root) render হতো। এখন App()
+  // নিজেই ভিতরে isGuestMode(auth.currentUser + localStorage উভয় চেক করে)
+  // দিয়ে guest/member উভয় অবস্থা সামলায় — একই component, একই root,
+  // কোনো আলাদা "landing page" নেই(2_4 §২-এর মূল Core Decision অনুযায়ী:
+  // "App খুললেই Main Page — কোনো Onboarding Gate/auth-check নেই")। তাই
+  // এখানে branching সরিয়ে সবসময় সরাসরি App() render করা হচ্ছে।
+  const container = document.getElementById("root");
+  const root = ReactDOM.createRoot(container);
+  root.render(/*#__PURE__*/React.createElement(App, null));
 }
 
 // --- Anonymous Authentication (background, no login UI) ---
@@ -3014,53 +3067,19 @@ function renderPendingGoogleReauthGate() {
   }
   root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
 }
-// §Google-only identity(১১ সেপ্টেম্বর ২০২৬) — এখন থেকে কোনো user না থাকলে
-// আর automatic anonymous sign-in হয় না(পুরনো "zero-login" ডিফল্ট বাতিল,
-// ২.৪ §১ Core Decision অনুযায়ী)। এর বদলে সরাসরি GoogleSignInGate পূর্ণ-পেজ
-// landing হিসেবে দেখানো হয় — সফল হলে(email-match বা নতুন family তৈরি)
-// familyId/memberId localStorage-এ বসিয়ে reload করে, তখন normal bootOnce()
-// path-ই চলে(renderPendingGoogleReauthGate()-এর মতোই root-unmount pattern
-// reuse)।
-function renderGoogleLandingGate() {
-  const container = document.getElementById("root");
-  const root = ReactDOM.createRoot(container);
-  // §Google-login boot-gate fix(১১ সেপ্টেম্বর ২০২৬): mountApp()-এর
-  // hasExistingSession() শর্ত family_id **ও** family_code দুটোই require
-  // করে(পুরনো Onboarding-gate-এর নিয়ম অপরিবর্তিত রাখতে, উপরের comment
-  // দ্রষ্টব্য) — কিন্তু এই Google flow আগে শুধু family_id সেট করত,
-  // family_code কখনো না। ফলে সফল login-এর পরের reload-এও hasExistingSession
-  // false থেকে যেত এবং পুরনো Onboarding("নতুন Family তৈরি করুন"/"বিদ্যমান
-  // Family-তে প্রবেশ করুন") স্ক্রিন দেখাত। Fix: families/{familyId} doc
-  // থেকে আসল familyCode read করে সেটাও persist করা হচ্ছে(fetch ব্যর্থ
-  // হলেও gate যেন আটকে না যায়, তাই familyId-কে safe fallback রাখা হলো —
-  // getFamilyCode()-এর display/backup-filename ব্যবহারে সামান্য প্রভাব
-  // পড়তে পারে শুধু সেই edge-case-এ, কিন্তু login-loop হবে না)।
-  async function handleGoogleGateSuccess(familyId, memberId) {
-    let famCode = familyId;
-    try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (famSnap.exists && famSnap.data().familyCode) {
-        famCode = famSnap.data().familyCode;
-      }
-    } catch {}
-    try {
-      localStorage.setItem("family_id", familyId);
-      localStorage.setItem("dt_google_preferred_member", memberId);
-      localStorage.setItem("family_code", famCode);
-    } catch {}
-    root.unmount();
-    window.location.reload();
-  }
-  root.render(/*#__PURE__*/React.createElement(NonMemberLanding, { onSuccess: handleGoogleGateSuccess }));
-}
+// §Guest-mode consolidation(১২ সেপ্টেম্বর ২০২৬, owner-approved) — আগে এখানে
+// কোনো user না থাকলে renderGoogleLandingGate()(আলাদা root, আলাদা
+// component) দেখানো হতো। এখন App() নিজেই isGuestMode দিয়ে guest অবস্থা
+// সামলায়(উপরে App()-এর শুরুতে দেখুন) — তাই user থাকুক বা না থাকুক,
+// সবসময় একই bootOnce()→mountApp()→App() path। renderGoogleLandingGate()
+// ফাংশনটাই আর দরকার নেই, সরিয়ে ফেলা হলো(NonMemberLanding.jsx-ও এখন
+// unused, সেটাও সরানো হয়েছে)।
 const unsubscribeAuth = auth.onAuthStateChanged(user => {
   unsubscribeAuth();
-  if (user) {
-    bootOnce();
-  } else {
+  if (!user) {
     try {
       localStorage.removeItem("dt_pending_google_reauth");
     } catch {}
-    renderGoogleLandingGate();
   }
+  bootOnce();
 });
