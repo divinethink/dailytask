@@ -14,7 +14,7 @@
 // memberRequests-এর inline Approve/Reject ব্লক সরানো হয়েছে — Approve-branch
 // createMemberWithKey() দিয়ে private/key তৈরি করত, যা google-only family-তে
 // Rules-level এখন blocked(উভয় real family-ই ইতিমধ্যে google-only)।
-import { InfoIcon, Trash, User, UsersIcon } from "./icons.jsx";
+import { InfoIcon, Plus, Trash, User, UsersIcon } from "./icons.jsx";
 
 export function MemberListSection({
   members,
@@ -30,15 +30,32 @@ export function MemberListSection({
   adminUidsList,
   handleMakeAdmin,
   handleRemoveAdmin,
-  handleRemoveMember
+  handleRemoveMember,
+  setAddingMember
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"
+    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between gap-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1"
   }, /*#__PURE__*/React.createElement(UsersIcon, {
     size: 12
-  }), " সদস্যবৃন্দ"), /*#__PURE__*/React.createElement("div", {
+  }), " সদস্যবৃন্দ"),
+  // §Add-Member-button fix(১২ সেপ্টেম্বর ২০২৬, owner-reported): আগে
+  // addingMember ফর্ম শুধু family-তে সদস্য একদম শূন্য থাকলে(প্রথম-সদস্য
+  // setup) auto-open হতো — এরপর কোনো persistent "+" বাটন কোথাও ছিল না,
+  // ফলে admin ২য়/৩য় সদস্য যোগ করতে পারতেন না। এটা এই সেশনের কোনো
+  // পরিবর্তনের কারণে হয়নি(pre-existing gap), এখন fix করা হলো।
+  isAdmin && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      setIsMenuOpen(false);
+      setAddingMember(true);
+    },
+    className: "flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case",
+    title: "নতুন সদস্য যোগ করুন"
+  }, /*#__PURE__*/React.createElement(Plus, { size: 11 }), " নতুন সদস্য")), /*#__PURE__*/React.createElement("div", {
     className: "max-h-36 overflow-y-auto custom-scrollbar px-2"
   }, members.map(m => /*#__PURE__*/React.createElement("div", {
     key: m.id,

@@ -156,7 +156,8 @@ export function DashboardHeader({
     adminUidsList: adminUidsList,
     handleMakeAdmin: handleMakeAdmin,
     handleRemoveAdmin: handleRemoveAdmin,
-    handleRemoveMember: handleRemoveMember
+    handleRemoveMember: handleRemoveMember,
+    setAddingMember: setAddingMember
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
