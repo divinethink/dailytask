@@ -296,15 +296,33 @@ async function leaveFamily(familyId, memberId) {
     return { aborted: true, reason: "first-admin-must-transfer" };
   }
   try {
-    const mappingQuery = await db.collection("familyMemberEmails")
-      .where("familyId", "==", familyId)
-      .where("memberId", "==", memberId)
-      .limit(1)
-      .get();
+    // §Leave-Family fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported "ব্যর্থ হয়েছে"):
+    // আগে এখানে familyMemberEmails-এ .where(familyId).where(memberId) query
+    // চালানো হতো — কিন্তু Rules-এ এই collection-এর "list" সম্পূর্ণ বন্ধ
+    // (email-enumeration প্রতিরোধে, §১০.২ "allow list: if false") — তাই এই
+    // query নিজেই সবসময় permission-denied দিত, batch.commit()-এ পৌঁছানোর
+    // আগেই leaveFamily() পুরোপুরি ব্যর্থ হতো। Fix: query-এর বদলে নিজের
+    // (claimed) Google account email দিয়ে normalizeEmail()-ভিত্তিক doc-id
+    // সরাসরি "get"(Rules-এ অনুমোদিত, list শুধু বন্ধ get না) — তারপর
+    // familyId/memberId মিলে কিনা cross-verify করে তবেই delete করা হয়(অন্য
+    // family/member-এর mapping ভুলবশত মুছে ফেলা থেকে রক্ষা)। Invite-link
+    // দিয়ে join করা সদস্যদের(কখনো email-mapping তৈরিই হয়নি) জন্য
+    // mapSnap.exists false হবে, স্বাভাবিকভাবে skip — আগের behavior অক্ষুণ্ণ।
+    let mappingRef = null;
+    try {
+      const myEmail = auth.currentUser.email;
+      if (myEmail) {
+        const emailKey = normalizeEmail(myEmail);
+        const mapSnap = await db.collection("familyMemberEmails").doc(emailKey).get();
+        if (mapSnap.exists && mapSnap.data().familyId === familyId && mapSnap.data().memberId === memberId) {
+          mappingRef = mapSnap.ref;
+        }
+      }
+    } catch {}
     const batch = db.batch();
     batch.delete(familyRef.collection("members").doc(memberId));
-    if (!mappingQuery.empty) {
-      batch.delete(mappingQuery.docs[0].ref);
+    if (mappingRef) {
+      batch.delete(mappingRef);
     }
     // §fix(১১ সেপ্টেম্বর ২০২৬, ProfileDropdownGoogle wiring-এর সময় ধরা
     // পড়েছে): আগে users/{uid} mapping এখানে delete হতো না — leave-এর পর
