@@ -88,7 +88,36 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
   }
   const existing = await lookupFamilyByEmail(normalizedEmail);
   if (existing) {
-    throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
+    // §Bug-fix(owner-reported #২ — "family ত্যাগ/remove-এর পর একই email
+    // পুনরায় ব্যবহারযোগ্য হওয়া উচিত"): আগে stale mapping(target member
+    // ইতিমধ্যে remove/delete হয়ে গেছে)-কেও "already registered" ধরে
+    // ভুলভাবে ব্লক করত — একই email কখনো reuse করা যেত না। এখন target
+    // সত্যিই এখনো বিদ্যমান কিনা self-heal check(অন্য ফাংশনগুলোর একই
+    // fetchMemberData() pattern reuse)।
+    let existingMemberData;
+    try {
+      existingMemberData = await fetchMemberData(existing.familyId, existing.memberId);
+    } catch (err) {
+      throw new Error("যাচাই করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
+    }
+    if (existingMemberData) {
+      throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
+    }
+    // Stale(সত্যিই deleted) — same-family হলে এই admin-এর delete-permission
+    // আছে(Rules: isAdminOfFamily(resource.data.familyId)) বলে নিরাপদে
+    // পরিষ্কার করে reuse খোলা যায়। Cross-family stale হলে এই admin-এর সেই
+    // অন্য family-র mapping delete করার permission নেই — fail-safe(আগের
+    // আচরণ) হিসেবে ব্লক-ই থাকল, ভাঙা হয়নি(rare edge-case, data-hygiene
+    // debt মাত্র — reuse অন্তত same-family-তে সম্পূর্ণ কাজ করবে)।
+    if (existing.familyId === familyId) {
+      try {
+        await deleteFamilyMemberEmail(normalizedEmail);
+      } catch (err) {
+        throw new Error("পুরনো তথ্য পরিষ্কার করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
+      }
+    } else {
+      throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
+    }
   }
   const batch = db.batch();
   const memberRef = db.collection("families").doc(familyId).collection("members").doc(memberId);
