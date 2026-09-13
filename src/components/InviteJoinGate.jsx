@@ -16,18 +16,61 @@
 //      handleGuestSignInSuccess reuse যা guest sign-in flow-এও ব্যবহৃত)।
 //   ৪) token invalid/revoked/family-not-found হলে "লিংক নিষ্ক্রিয়" বার্তা।
 //
-// সম্পূর্ণ নতুন, additive ফাইল — backend(joinFamilyViaInviteLink ইত্যাদি)
-// আগে থেকেই লেখা, শুধু UI যোগ হলো। createElement-style(existing codebase
-// convention, JSX syntax না)।
-import { useState } from "react";
+// §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #২): familyCode prop(app.js-
+// এর "fc" query-param থেকে, শুধু display-purpose — কোনো authorization
+// এখানে involve না, আসল যাচাই familyId+token দিয়েই হয়) থাকলে personalized
+// "আপনি {code} পরিবারে যোগ দিচ্ছেন" দেখায়, না থাকলে(পুরনো লিংক) আগের
+// generic টেক্সট fallback।
+//
+// §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #৩): WhatsApp/Facebook-এর
+// in-app(embedded WebView) browser-এ Google OAuth popup প্রায়ই ব্যর্থ হয়
+// বা loop করে(Google নিজেই disallowed_useragent হিসেবে ব্লক করে) — user
+// রিপোর্ট করেছেন ঠিক এই symptom(বারবার ফর্ম-এ ফেরত)। সম্পূর্ণ নিশ্চিতভাবে
+// force-redirect করার কোনো cross-platform JS API নেই, তাই দুই স্তরের
+// best-effort mitigation: (ক) Android-এ known WebView UA-marker পেলে
+// "intent://" scheme দিয়ে system Chrome-এ auto-redirect চেষ্টা(অনেক
+// Android in-app-browser এই trick honor করে, ব্যর্থ হলে silently no-op,
+// কোনো ক্ষতি নেই)। (খ) সবসময়(iOS-সহ, যেখানে কোনো reliable trick নেই) একটা
+// সতর্কতা-ব্যানার দেখানো হয় manual "Open in Browser" নির্দেশনা সহ।
+import { useState, useEffect } from "react";
 import { triggerGoogleSignInPopup, joinFamilyViaInviteLink } from "../legacy/googleIdentity.js";
 
-export function InviteJoinGate({ familyId, token, onSuccess, onBackToMain }) {
+function detectInAppBrowser() {
+  try {
+    const ua = navigator.userAgent || "";
+    // Android generic embedded WebView marker(WhatsApp/অনেক অ্যাপ এটাই
+    // ব্যবহার করে, নিজের নাম UA-তে স্পষ্ট করে না) + কিছু app-এর নিজস্ব
+    // পরিচিত UA-marker(defense-in-depth)।
+    const isAndroidWebView = /; ?wv\)/i.test(ua);
+    const isKnownInAppUA = /FBAN|FBAV|Instagram|Line\//i.test(ua);
+    return {
+      inApp: isAndroidWebView || isKnownInAppUA,
+      isAndroid: /Android/i.test(ua)
+    };
+  } catch {
+    return { inApp: false, isAndroid: false };
+  }
+}
+
+export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackToMain }) {
   // "form" | "joining" | "invalid"
   const [stage, setStage] = useState("form");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [errorMsg, setErrorMsg] = useState(null);
+  const [showInAppWarning, setShowInAppWarning] = useState(false);
+
+  useEffect(() => {
+    const { inApp, isAndroid } = detectInAppBrowser();
+    if (!inApp) return;
+    setShowInAppWarning(true);
+    if (isAndroid) {
+      try {
+        const target = window.location.href.replace(/^https?:\/\//, "");
+        window.location.href = `intent://${target}#Intent;scheme=https;package=com.android.chrome;end`;
+      } catch {}
+    }
+  }, []);
 
   function handleJoinClick() {
     if (!name.trim()) {
@@ -55,15 +98,20 @@ export function InviteJoinGate({ familyId, token, onSuccess, onBackToMain }) {
       })
       .catch(err => {
         console.error("[Invite-Link Join] ব্যর্থ:", err && err.message);
-        setErrorMsg("সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
+        setErrorMsg("সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন। এটি WhatsApp/Facebook-এর ভেতরের ব্রাউজারে হয়ে থাকলে নিচের নির্দেশনা অনুসরণ করুন।");
         setStage("form");
       });
   }
+
+  const inAppWarningEl = showInAppWarning && /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-xs mb-3 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-[11px] text-amber-800 leading-relaxed"
+  }, "⚠️ লিংকটি অ্যাপের ভেতরের ব্রাউজারে খোলা হয়েছে — এখানে Google সাইন-ইন কাজ নাও করতে পারে। উপরের ডান কোণের মেনু (⋮ / •••) থেকে \"Open in Browser\" বেছে নিয়ে আবার চেষ্টা করুন।");
 
   if (stage === "invalid") {
     return /*#__PURE__*/React.createElement("div", {
       className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
     },
+      inAppWarningEl,
       /*#__PURE__*/React.createElement("p", {
         className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
       }, "এই আমন্ত্রণ লিংকটি নিষ্ক্রিয় বা অবৈধ।"),
@@ -79,12 +127,13 @@ export function InviteJoinGate({ familyId, token, onSuccess, onBackToMain }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6"
   },
+    inAppWarningEl,
     /*#__PURE__*/React.createElement("div", {
       className: "w-full max-w-xs space-y-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-5"
     },
       /*#__PURE__*/React.createElement("p", {
         className: "text-sm font-semibold text-slate-700 text-center"
-      }, "👥 আপনি একটি পরিবারে যোগ দিচ্ছেন"),
+      }, familyCode ? `👥 আপনি ${familyCode} পরিবারে যোগ দিচ্ছেন` : "👥 আপনি একটি পরিবারে যোগ দিচ্ছেন"),
       /*#__PURE__*/React.createElement("input", {
         type: "text",
         value: name,

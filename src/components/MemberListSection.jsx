@@ -107,13 +107,13 @@ export function MemberListSection({
     disabled: isLockedForSwitch,
     className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
     title: "এডমিন পদ থেকে বাদ দিন"
-  }, "Remove Admin"), /*#__PURE__*/React.createElement("button", {
+  }, "Remove Admin"), isAdmin && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleRemoveMember(m);
     },
     disabled: isLockedForSwitch,
-    className: "p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity",
+    className: "p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 shrink-0",
     title: "সদস্য বাদ দিন"
   }, /*#__PURE__*/React.createElement(Trash, {
     size: 12
