@@ -231,6 +231,24 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     return { aborted: true, reason: "invalid-token" };
   }
 
+  // §Bug-fix(owner-reported — "১ email = ১ member" invariant, 2_4 §১):
+  // আগে এখানে কোনো users/{uid} mapping-check ছিল না বলে একই Google
+  // account বারবার(এমনকি একই invite-link repeat-click করেও) নতুন-নতুন
+  // duplicate member তৈরি করতে পারত — নিচের self-create branch কখনো
+  // familyMemberEmails mapping লিখত না বলে পরের বার lookup কিছুই খুঁজে
+  // পেত না। signInExistingMemberByGoogle()-এর fast-path-এর একই
+  // loadUserMapping() reuse করে প্রথমেই check করা হচ্ছে।
+  const existingMapping = await loadUserMapping(uid);
+  if (existingMapping && existingMapping.familyId && existingMapping.memberId) {
+    if (existingMapping.familyId === familyId) {
+      // এই family-রই আগে থেকে সদস্য(পুরনো invite-link পুনরায় ব্যবহার) —
+      // duplicate না বানিয়ে বিদ্যমান profile-এ সরাসরি সফল ধরা হচ্ছে।
+      return { success: true, familyId, memberId: existingMapping.memberId, bound: true, alreadyMember: true };
+    }
+    // অন্য family-র সদস্য — system-wide ১ email = ১ member নীতিতে ব্লক।
+    return { aborted: true, reason: "already-member-elsewhere" };
+  }
+
   // পূর্ব-নিবন্ধিত email(rare edge-case, §৫.২) — নতুন member তৈরি না করে
   // বিদ্যমান(admin-added unclaimed) profile bind।
   const email = currentGoogleEmail();
@@ -251,6 +269,11 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
         return { aborted: true, reason: "error", error: err.message };
       }
     }
+    // §Bug-fix: এই email ইতিমধ্যে ভিন্ন family-তে(অন্য admin-added
+    // unclaimed proxy হিসেবে) নিবন্ধিত — নতুন member এখানে তৈরি করা যাবে না।
+    if (lookup && lookup.familyId && lookup.familyId !== familyId) {
+      return { aborted: true, reason: "already-member-elsewhere" };
+    }
   }
 
   // নতুন member — self-create(firestore.rules-এর invite-token clause,
@@ -267,6 +290,19 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
       updatedAt: Date.now()
     });
     await writeUserMapping(uid, familyId, memberId);
+    // §Bug-fix: familyMemberEmails mapping লেখা হচ্ছে(আগে হতো না) — যাতে
+    // ভবিষ্যতে একই email দিয়ে আবার কোনো join চেষ্টা উপরের দুই check-এর
+    // যেকোনো একটাতে ধরা পড়ে। isClaimedByGoogle() Rules-check ঠিক-উপরের
+    // await-এ committed member.googleUid পড়েই pass করবে(sequential
+    // read-after-write, transaction লাগে না)। ব্যর্থ হলেও(non-fatal) মূল
+    // join সফলই থাকে — শুধু future-dedup convenience layer মিস হবে।
+    if (email) {
+      try {
+        await familyMemberEmailRef(normalizeEmail(email)).set({ familyId, memberId });
+      } catch (err) {
+        console.error("[Invite-Link] email-mapping write ব্যর্থ(non-fatal):", err.message);
+      }
+    }
     return { success: true, familyId, memberId, bound: false };
   } catch (err) {
     console.error("[Invite-Link] join ব্যর্থ:", err.message);
