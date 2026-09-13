@@ -2439,7 +2439,16 @@ function App() {
       localStorage.setItem("dt_google_preferred_member", memberId);
       localStorage.setItem("family_code", famCode);
     } catch {}
-    window.location.reload();
+    // §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #৪ — Invite-Link loop):
+    // আগে এখানে plain reload() হতো, কিন্তু URL-এ তখনও Invite-Link-এর
+    // ?joinFid=/joinToken= query-param থেকে যেত — reload-এর পর app.js-এর
+    // সবার-আগের early-return route শুধু URL-param দেখেই(join ইতিমধ্যে সফল
+    // হয়েছে কিনা না দেখে) আবার fresh InviteJoinGate("form" stage) render
+    // করে ফেলত, অসীম-লুপ-এর মতো দেখাত(join আসলে প্রথমবারই সফল হয়ে গিয়েছিল)।
+    // origin-এ hard-redirect করলে param strip হয়ে যায় — normal guest
+    // sign-in flow(যেখানে URL এমনিতেই origin) আচরণ অপরিবর্তিত, existing
+    // onBackToMain()-এর একই pattern reuse।
+    window.location.href = window.location.origin;
   }
   async function handleSave() {
     if (!selectedId || isFutureDate(viewDate)) return;
