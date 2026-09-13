@@ -97,6 +97,12 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
           // করা যাবে না। সাধারণ "আবার চেষ্টা করুন" retry-loop না দেখিয়ে
           // স্পষ্ট, dedicated বার্তা।
           setStage("already-member");
+        } else if (reason === "email-already-member") {
+          // §Bug-fix(owner-reported #১, ১৩ সেপ্টেম্বর ২০২৬): এই email
+          // এই family-রই অন্য(ভিন্ন Google account-এ claimed) সদস্যের সাথে
+          // ইতিমধ্যে যুক্ত — আগে এই check-ই ছিল না(silent/generic error)।
+          setErrorMsg("এই ইমেইল ইতিমধ্যে পরিবারের একজন সদস্য হিসেবে যুক্ত আছে। অনুগ্রহ করে ভিন্ন Google একাউন্ট দিয়ে চেষ্টা করুন।");
+          setStage("form");
         } else {
           setErrorMsg("যোগ দিতে ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
           setStage("form");
