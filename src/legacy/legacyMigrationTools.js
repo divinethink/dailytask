@@ -593,7 +593,15 @@ if (typeof window !== "undefined") {
 }
 
 function extractOwnerUidsFromMemberData(data) {
+  // §Google-Login fallback(১৩ সেপ্টেম্বর ২০২৬, backup/restore ownership-detection
+  // fix): pure-googleUid member(ownerUids field-ই নেই)-এ আগে এই function সবসময়
+  // খালি array(unclaimed) রিটার্ন করত — backup.js-এর isMineOrUnclaimed() তখন
+  // ভুলভাবে সবাইকে "unclaimed" ধরে নিত, restore-এ অন্য সদস্যের data ভুলবশত
+  // overwrite হওয়ার ঝুঁকি তৈরি করত। legacy ownerUids-থাকা member(এখনো
+  // বিদ্যমান সব real member)-এ behavior অপরিবর্তিত — শুধু ownerUids সম্পূর্ণ
+  // অনুপস্থিত/খালি হলেই googleUid fallback প্রযোজ্য।
   const arr = Array.isArray(data.ownerUids) ? data.ownerUids : [];
+  if (arr.length === 0 && data.googleUid) return [data.googleUid];
   return arr.filter(u => typeof u === "string" && u);
 }
 async function auditGrandfatherCandidates(extraFamilyIds) {
