@@ -73,7 +73,7 @@ export function MemberListSection({
     className: "flex items-center flex-nowrap justify-end gap-0.5 overflow-x-auto"
   }, m.id === selectedId && /*#__PURE__*/React.createElement("span", {
     className: "w-2 h-2 rounded-full bg-emerald-600"
-  }), m.ownerUids?.includes(auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
+  }), (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleReleaseMember(m);
@@ -83,7 +83,7 @@ export function MemberListSection({
     title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
   }, "আপনি") : /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1"
-  }, !!(m.ownerUids && m.ownerUids.length) && /*#__PURE__*/React.createElement("span", {
+  }, !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && /*#__PURE__*/React.createElement("span", {
     onClick: e => {
       e.stopPropagation();
     },
@@ -91,7 +91,7 @@ export function MemberListSection({
     title: "অন্য ডিভাইসের দায়িত্বে আছে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 10
-  }))), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
+  }))), isAdmin && !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleMakeAdmin(m);
@@ -99,7 +99,7 @@ export function MemberListSection({
     disabled: isLockedForSwitch,
     className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 whitespace-nowrap",
     title: "এডমিন করুন"
-  }, "Make Admin"), isAdmin && !!(m.ownerUids && m.ownerUids.length) && m.ownerUids.some(u => adminUidsList.includes(u)) && !m.ownerUids.includes(auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
+  }, "Make Admin"), isAdmin && !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).some(u => adminUidsList.includes(u)) && !(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       handleRemoveAdmin(m);

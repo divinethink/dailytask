@@ -58,7 +58,7 @@ export function OnboardingBridge({
       if (flow === "newFamily") {
         onAdvance("keyReveal");
       } else {
-        const matched = !!(myUid && (members || []).some(m => m.ownerUids?.includes(myUid)));
+        const matched = !!(myUid && (members || []).some(m => (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(myUid)));
         onAdvance(matched ? null : "becomeMember");
       }
     }
@@ -98,7 +98,7 @@ export function OnboardingBridge({
   // আগে gate তাৎক্ষণিক clear হতো বলে এই auto-advance আলাদাভাবে দরকার
   // ছিল না।
   useEffect(() => {
-    if (step === "becomeMember" && myUid && (members || []).some(m => m.ownerUids?.includes(myUid))) {
+    if (step === "becomeMember" && myUid && (members || []).some(m => (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(myUid))) {
       onAdvance(null);
     }
   }, [step, members, myUid]);
@@ -106,7 +106,7 @@ export function OnboardingBridge({
   // Member-Key claim মোডাল বন্ধ হলে, সফল হলে(ownerUid match করলে) done।
   useEffect(() => {
     if (prevClaimOpen.current && !showClaimKeyModal && step === "keyClaim") {
-      const matched = !!(myUid && (members || []).some(m => m.ownerUids?.includes(myUid)));
+      const matched = !!(myUid && (members || []).some(m => (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(myUid)));
       if (matched) onAdvance(null);
     }
     prevClaimOpen.current = showClaimKeyModal;
