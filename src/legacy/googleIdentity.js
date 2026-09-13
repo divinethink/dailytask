@@ -48,6 +48,21 @@ async function lookupFamilyByEmail(email) {
   return snap.exists ? { normalizedEmail: key, ...snap.data() } : null;
 }
 
+// §Self-heal fix(owner-reported, ১৩ সেপ্টেম্বর ২০২৬): admin কর্তৃক
+// handleRemoveMember() member doc delete করে, কিন্তু users/{uid} ও
+// familyMemberEmails mapping cleanup করে না(Rules-restriction —
+// admin অন্যের users/{uid} touch করতে পারে না, এবং claim-মুহূর্তে
+// email field মুছে যাওয়ায় admin removed-member-এর email-ই জানে না)।
+// ফলে এই দুই mapping stale/dangling থেকে যেতে পারে। এই helper দিয়ে
+// signInExistingMemberByGoogle()/joinFamilyViaInviteLink() — দুটোতেই
+// bind করার আগে target member সত্যিই এখনো বিদ্যমান কিনা যাচাই করা হয়,
+// stale হলে trust না করে normal("no-match"-এর মতো) flow-এ পড়ে যায়।
+async function fetchMemberData(familyId, memberId) {
+  const snap = await db.collection("families").doc(familyId)
+    .collection("members").doc(memberId).get();
+  return snap.exists ? snap.data() : null;
+}
+
 // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap): পুরনো createMemberWithKey()
 // (Member Password-ভিত্তিক, memberData.js) google-only family-তে
 // firestore.rules-এর `private/key` create rule(`!isGoogleOnly(familyId)`
@@ -135,12 +150,27 @@ async function signInExistingMemberByGoogle() {
   // ধাপ ১ — fast path(আগে থেকে claimed)।
   const existingMapping = await loadUserMapping(uid);
   if (existingMapping && existingMapping.familyId && existingMapping.memberId) {
-    return {
-      matched: true,
-      familyId: existingMapping.familyId,
-      memberId: existingMapping.memberId,
-      firstClaim: false
-    };
+    let staleCheckData;
+    try {
+      staleCheckData = await fetchMemberData(existingMapping.familyId, existingMapping.memberId);
+    } catch (err) {
+      return { matched: false, reason: "error", error: err.message };
+    }
+    if (staleCheckData) {
+      return {
+        matched: true,
+        familyId: existingMapping.familyId,
+        memberId: existingMapping.memberId,
+        firstClaim: false
+      };
+    }
+    // Stale mapping(admin আগে remove করেছেন) — নিজের(self-owned, Rules-
+    // permitted) users/{uid} doc delete করে ধাপ ২-এ fresh চেষ্টা।
+    try {
+      await db.collection("users").doc(uid).delete();
+    } catch (err) {
+      console.error("[Google Sign-in] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
+    }
   }
 
   // ধাপ ২ — প্রথমবার claim(email-match)।
@@ -150,6 +180,18 @@ async function signInExistingMemberByGoogle() {
   }
   const lookup = await lookupFamilyByEmail(email);
   if (!lookup || !lookup.familyId || !lookup.memberId) {
+    return { matched: false, reason: "no-match" };
+  }
+  let targetMemberData;
+  try {
+    targetMemberData = await fetchMemberData(lookup.familyId, lookup.memberId);
+  } catch (err) {
+    return { matched: false, reason: "claim-failed", error: err.message };
+  }
+  if (!targetMemberData) {
+    // Stale familyMemberEmails mapping(admin আগে remove করেছেন) — trust
+    // না করে নতুন-ইউজার flow-এ পড়ে যাওয়া(mapping doc নিজে delete করার
+    // permission caller-এর নেই বলে শুধু bypass করা হচ্ছে, harmless)।
     return { matched: false, reason: "no-match" };
   }
   const memberRef = db.collection("families").doc(lookup.familyId)
@@ -240,13 +282,29 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   // loadUserMapping() reuse করে প্রথমেই check করা হচ্ছে।
   const existingMapping = await loadUserMapping(uid);
   if (existingMapping && existingMapping.familyId && existingMapping.memberId) {
-    if (existingMapping.familyId === familyId) {
-      // এই family-রই আগে থেকে সদস্য(পুরনো invite-link পুনরায় ব্যবহার) —
-      // duplicate না বানিয়ে বিদ্যমান profile-এ সরাসরি সফল ধরা হচ্ছে।
-      return { success: true, familyId, memberId: existingMapping.memberId, bound: true, alreadyMember: true };
+    // §Self-heal fix(owner-reported #২): target member সত্যিই এখনো
+    // বিদ্যমান কিনা যাচাই — admin আগে remove করে থাকলে stale mapping
+    // ভুলভাবে "অন্য family-র সদস্য" বলে block করে দিত।
+    let existingMemberData;
+    try {
+      existingMemberData = await fetchMemberData(existingMapping.familyId, existingMapping.memberId);
+    } catch (err) {
+      return { aborted: true, reason: "error", error: err.message };
     }
-    // অন্য family-র সদস্য — system-wide ১ email = ১ member নীতিতে ব্লক।
-    return { aborted: true, reason: "already-member-elsewhere" };
+    if (existingMemberData) {
+      if (existingMapping.familyId === familyId) {
+        // এই family-রই আগে থেকে সদস্য(পুরনো invite-link পুনরায় ব্যবহার) —
+        // duplicate না বানিয়ে বিদ্যমান profile-এ সরাসরি সফল ধরা হচ্ছে।
+        return { success: true, familyId, memberId: existingMapping.memberId, bound: true, alreadyMember: true };
+      }
+      // অন্য family-র সদস্য — system-wide ১ email = ১ member নীতিতে ব্লক।
+      return { aborted: true, reason: "already-member-elsewhere" };
+    }
+    try {
+      await db.collection("users").doc(uid).delete();
+    } catch (err) {
+      console.error("[Invite-Link] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
+    }
   }
 
   // পূর্ব-নিবন্ধিত email(rare edge-case, §৫.২) — নতুন member তৈরি না করে
@@ -255,24 +313,52 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   if (email) {
     const lookup = await lookupFamilyByEmail(email);
     if (lookup && lookup.familyId === familyId && lookup.memberId) {
-      const memberRef = familyRef.collection("members").doc(lookup.memberId);
+      let targetMemberData;
       try {
-        await memberRef.update({
-          googleUid: uid,
-          email: firebase.firestore.FieldValue.delete(),
-          updatedAt: Date.now()
-        });
-        await writeUserMapping(uid, familyId, lookup.memberId);
-        return { success: true, familyId, memberId: lookup.memberId, bound: true };
+        targetMemberData = await fetchMemberData(familyId, lookup.memberId);
       } catch (err) {
-        console.error("[Invite-Link] pre-registered bind ব্যর্থ:", err.message);
         return { aborted: true, reason: "error", error: err.message };
       }
-    }
-    // §Bug-fix: এই email ইতিমধ্যে ভিন্ন family-তে(অন্য admin-added
-    // unclaimed proxy হিসেবে) নিবন্ধিত — নতুন member এখানে তৈরি করা যাবে না।
-    if (lookup && lookup.familyId && lookup.familyId !== familyId) {
-      return { aborted: true, reason: "already-member-elsewhere" };
+      if (targetMemberData) {
+        // §Bug-fix(owner-reported #১): email আগে থেকেই claimed(এই বা অন্য
+        // কারো account দিয়ে) — আগে এখানে কোনো check ছিল না, তাই হয়
+        // silent-mismatch অথবা generic error দেখাত। এখন স্পষ্ট branch।
+        if (targetMemberData.googleUid) {
+          if (targetMemberData.googleUid === uid) {
+            return { success: true, familyId, memberId: lookup.memberId, bound: true, alreadyMember: true };
+          }
+          return { aborted: true, reason: "email-already-member" };
+        }
+        const memberRef = familyRef.collection("members").doc(lookup.memberId);
+        try {
+          await memberRef.update({
+            googleUid: uid,
+            email: firebase.firestore.FieldValue.delete(),
+            updatedAt: Date.now()
+          });
+          await writeUserMapping(uid, familyId, lookup.memberId);
+          return { success: true, familyId, memberId: lookup.memberId, bound: true };
+        } catch (err) {
+          console.error("[Invite-Link] pre-registered bind ব্যর্থ:", err.message);
+          return { aborted: true, reason: "error", error: err.message };
+        }
+      }
+      // stale mapping(admin আগে remove করেছেন) — নিচের self-create
+      // path-এ স্বাভাবিকভাবে পড়ে যাবে।
+    } else if (lookup && lookup.familyId && lookup.familyId !== familyId) {
+      // §Bug-fix: এই email ইতিমধ্যে ভিন্ন family-তে নিবন্ধিত থাকলেই শুধু
+      // block — কিন্তু সেই target সত্যিই এখনো বিদ্যমান কিনা যাচাই করে
+      // (stale mapping হলে ভুলভাবে block করবে না)। error হলে fail-safe
+      // আগের(block) আচরণই বজায় থাকবে।
+      let otherMemberData;
+      try {
+        otherMemberData = await fetchMemberData(lookup.familyId, lookup.memberId);
+      } catch {
+        otherMemberData = "unknown";
+      }
+      if (otherMemberData !== null) {
+        return { aborted: true, reason: "already-member-elsewhere" };
+      }
     }
   }
 
