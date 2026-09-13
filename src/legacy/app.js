@@ -1735,8 +1735,15 @@ function App() {
         tokenObj = { token, createdAt: Date.now(), revoked: false };
         setActiveInviteToken(tokenObj);
       }
-      const link = `${window.location.origin}/?joinFid=${encodeURIComponent(getFamilyId())}&joinToken=${encodeURIComponent(tokenObj.token)}`;
-      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)-এর পরিবারে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। নিচের লিংকে ক্লিক করে Google দিয়ে সাইন-ইন করে যোগ দিন।\n${link}`;
+      const link = `${window.location.origin}/?joinFid=${encodeURIComponent(getFamilyId())}&joinToken=${encodeURIComponent(tokenObj.token)}&fc=${encodeURIComponent(getFamilyCode())}`;
+      // §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #১): বার্তায় পরিবারের
+      // ইউজারনেম ও ইনভাইট-পাঠানো ব্যক্তির নাম যোগ — নিজের member-doc
+      // (existing myOwnMember pattern, ProfileDropdownGoogle-এর মতোই derive)
+      // থেকে নাম বের করা হয়, না পাওয়া গেলে generic fallback।
+      const myUid = auth.currentUser ? auth.currentUser.uid : null;
+      const myOwnMember = (members || []).find(x => x.googleUid === myUid);
+      const inviterName = (myOwnMember && myOwnMember.name) || "একজন সদস্য";
+      const text = `আসসালামু আলাইকুম 🌸\nDaily Task (দৈনিক আমল ও পারিবারিক ট্র্যাকার)- App এর ${getFamilyCode()} পরিবারে যোগদানের জন্য ${inviterName} আপনাকে আমন্ত্রণ জানিয়েছেন।\nপরিবারের সদস্য হতে নিচের লিংকে ক্লিক করে প্রয়োজনীয় তথ্য পূরণ করুন এবং পরিবারের সদস্য হোন।\n\n🔗 লিংক: ${link}`;
       if (navigator.share) {
         await navigator.share({ title: "Daily Task", text });
       } else if (navigator.clipboard) {
@@ -2076,14 +2083,17 @@ function App() {
     }
   }
   async function handleRemoveMember(m) {
-    // Firestore rules এখন ownerUid-ভিত্তিক isUnownedOrMine() চেক করে delete
-    // অনুমতি দেয় — অন্য ডিভাইসের claim করা সদস্য মুছতে গেলে সার্ভার সেটা
-    // reject করবে। আগে থেকে একই চেক না করলে UI optimistically সদস্যকে
-    // লিস্ট থেকে সরিয়ে ফেলত, অথচ আসল ডিলিট ব্যর্থ হতো — বিভ্রান্তিকর।
-    if (memberOwnerUids(m).length && (!auth.currentUser || !memberOwnerUids(m).includes(auth.currentUser.uid))) {
-      alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে বাদ দেওয়া যাবে না। প্রথমে সেই ডিভাইস থেকে দায়িত্ব ছাড়তে বলুন, তারপর বাদ দিন।");
-      return;
-    }
+    // §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #৪): আগে এখানে
+    // memberOwnerUids(m)-ভিত্তিক একটা guard ছিল("অন্য ডিভাইসের দায়িত্বে
+    // আছে") — এটা পুরনো ownerUids self-serve মডেলের অবশিষ্টাংশ। বর্তমান
+    // firestore.rules-এ member delete শুধু isAdminOfFamily()-নির্ভর
+    // (ownership-নিরপেক্ষ, "বাগ-ফিক্স ২৭.৪" দ্রষ্টব্য) — তাই admin যেকোনো
+    // claimed member(নিজে owner না হলেও) delete করতে পারার কথা, কিন্তু এই
+    // stale client-guard সেটা ভুলভাবে ব্লক করছিল(test member remove করতে
+    // না পারার আসল কারণ)। Trash বাটন এখন isAdmin-গেটেড(MemberListSection.jsx)
+    // বলে এই ফাংশন কল হওয়া মানেই caller admin — আলাদা client-check
+    // redundant, তাই সরিয়ে ফেলা হলো। Server-side Rules অপরিবর্তিত(একমাত্র
+    // real authorization boundary)।
     if (isLockedForSwitch) {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
@@ -2609,12 +2619,14 @@ function App() {
     const qp = new URLSearchParams(window.location.search);
     const joinFid = qp.get("joinFid");
     const joinToken = qp.get("joinToken");
-    if (joinFid && joinToken) inviteJoinParams = { joinFid, joinToken };
+    const joinFc = qp.get("fc");
+    if (joinFid && joinToken) inviteJoinParams = { joinFid, joinToken, joinFc };
   } catch {}
   if (inviteJoinParams) {
     return /*#__PURE__*/React.createElement(InviteJoinGate, {
       familyId: inviteJoinParams.joinFid,
       token: inviteJoinParams.joinToken,
+      familyCode: inviteJoinParams.joinFc,
       onSuccess: handleGuestSignInSuccess,
       onBackToMain: () => {
         window.location.href = window.location.origin;
