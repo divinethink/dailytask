@@ -53,7 +53,7 @@ function detectInAppBrowser() {
 }
 
 export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackToMain }) {
-  // "form" | "joining" | "invalid"
+  // "form" | "joining" | "invalid" | "already-member"
   const [stage, setStage] = useState("form");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
@@ -91,6 +91,12 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
         const reason = res && res.reason;
         if (reason === "invalid-token" || reason === "family-not-found") {
           setStage("invalid");
+        } else if (reason === "already-member-elsewhere") {
+          // §Bug-fix(owner-reported — "১ email = ১ member"): এই Google
+          // account ইতিমধ্যে অন্য family-র সদস্য — নতুন family-তে join
+          // করা যাবে না। সাধারণ "আবার চেষ্টা করুন" retry-loop না দেখিয়ে
+          // স্পষ্ট, dedicated বার্তা।
+          setStage("already-member");
         } else {
           setErrorMsg("যোগ দিতে ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
           setStage("form");
@@ -106,6 +112,22 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
   const inAppWarningEl = showInAppWarning && /*#__PURE__*/React.createElement("div", {
     className: "w-full max-w-xs mb-3 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-[11px] text-amber-800 leading-relaxed"
   }, "⚠️ লিংকটি অ্যাপের ভেতরের ব্রাউজারে খোলা হয়েছে — এখানে Google সাইন-ইন কাজ নাও করতে পারে। উপরের ডান কোণের মেনু (⋮ / •••) থেকে \"Open in Browser\" বেছে নিয়ে আবার চেষ্টা করুন।");
+
+  if (stage === "already-member") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+    },
+      /*#__PURE__*/React.createElement("p", {
+        className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
+      }, "আপনার এই Google account ইতিমধ্যে অন্য একটি পরিবারের সদস্য — একই ইমেইল দিয়ে দুটি পরিবারে যোগ দেওয়া যায় না।"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onBackToMain,
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
+        style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
+      }, "প্রথম পেজে ফিরে যান")
+    );
+  }
 
   if (stage === "invalid") {
     return /*#__PURE__*/React.createElement("div", {
