@@ -53,12 +53,13 @@ function detectInAppBrowser() {
 }
 
 export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackToMain }) {
-  // "form" | "joining" | "invalid" | "already-member"
+  // "form" | "joining" | "invalid" | "already-member" | "already-in-family"
   const [stage, setStage] = useState("form");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [errorMsg, setErrorMsg] = useState(null);
   const [showInAppWarning, setShowInAppWarning] = useState(false);
+  const [pendingSuccess, setPendingSuccess] = useState(null);
 
   useEffect(() => {
     const { inApp, isAndroid } = detectInAppBrowser();
@@ -85,6 +86,16 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
       .then(() => joinFamilyViaInviteLink(familyId, token, name.trim(), gender || null))
       .then(res => {
         if (res && res.success) {
+          // §Bug-fix(owner-reported, ১৩ সেপ্টেম্বর ২০২৬, আসল root-cause):
+          // আগে এখানে alreadyMember flag check না করেই সরাসরি onSuccess()
+          // কল হতো — এই Google account যদি এই একই family-র আগে থেকে সদস্য
+          // হন(নিজেকে/অন্য claimed সদস্যকে দিয়ে টেস্ট), silently কোনো বার্তা
+          // ছাড়াই dashboard-এ পাঠিয়ে দিত("কিছুই হয়নি"-এর মতো লাগত)।
+          if (res.alreadyMember) {
+            setPendingSuccess({ familyId: res.familyId, memberId: res.memberId });
+            setStage("already-in-family");
+            return;
+          }
           onSuccess(res.familyId, res.memberId);
           return;
         }
@@ -118,6 +129,22 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
   const inAppWarningEl = showInAppWarning && /*#__PURE__*/React.createElement("div", {
     className: "w-full max-w-xs mb-3 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-[11px] text-amber-800 leading-relaxed"
   }, "⚠️ লিংকটি অ্যাপের ভেতরের ব্রাউজারে খোলা হয়েছে — এখানে Google সাইন-ইন কাজ নাও করতে পারে। উপরের ডান কোণের মেনু (⋮ / •••) থেকে \"Open in Browser\" বেছে নিয়ে আবার চেষ্টা করুন।");
+
+  if (stage === "already-in-family") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
+    },
+      /*#__PURE__*/React.createElement("p", {
+        className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
+      }, "আপনি ইতিমধ্যে এই পরিবারের একজন সদস্য — নতুন করে যোগ দেওয়ার দরকার নেই।"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => pendingSuccess && onSuccess(pendingSuccess.familyId, pendingSuccess.memberId),
+        className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
+        style: { background: "#0E4B43", borderColor: "#0E4B43", color: "#fff" }
+      }, "ড্যাশবোর্ডে যান")
+    );
+  }
 
   if (stage === "already-member") {
     return /*#__PURE__*/React.createElement("div", {
