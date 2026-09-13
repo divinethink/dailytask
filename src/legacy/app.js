@@ -22,7 +22,8 @@ import {
 // দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
 // UI থেকে wire হচ্ছে।
 import {
-  editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink
+  editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink,
+  deleteFamilyMemberEmail, normalizeEmail
 } from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
@@ -2102,6 +2103,25 @@ function App() {
     setMembers(next);
     try {
       await deleteMemberDoc(migrationState, m.id);
+      // §Bug-fix(owner-reported #২ — "family ত্যাগ/remove-এর পর একই email
+      // পুনরায় ব্যবহারযোগ্য হওয়া উচিত"): আগে admin-remove এখানে
+      // familyMemberEmails mapping কখনো clean করত না। Unclaimed proxy
+      // member(googleUid null)-এর email এখনো doc-এ/local state-এ জানা
+      // থাকে বলে(claimed member-এর মতো claim-মুহূর্তে delete হয়নি) এই
+      // case নিরাপদে(non-fatal, Rules: isAdminOfFamily() delete-permission
+      // ইতিমধ্যে সমর্থিত) clean করা সম্ভব — করা হলো। Claimed member(email
+      // field claim-এই delete হয়ে গেছে) admin জানেনই না বলে সেই case-এ
+      // এখনো self-heal(googleIdentity.js: fetchMemberData() ব্যবহারকারী
+      // check-গুলো)-এর উপর নির্ভর করে — data-loss/security ঝুঁকি নেই, শুধু
+      // stale mapping doc রয়ে যেতে পারে(future join/add attempt-এ স্ব-
+      // সংশোধিত)।
+      if (!m.googleUid && m.email) {
+        try {
+          await deleteFamilyMemberEmail(normalizeEmail(m.email));
+        } catch (err) {
+          console.error("[Remove Member] email-mapping cleanup ব্যর্থ(non-fatal):", err.message);
+        }
+      }
     } catch (err) {
       alert("সদস্য সিংক করতে সমস্যা হয়েছে: " + err.message);
     }
