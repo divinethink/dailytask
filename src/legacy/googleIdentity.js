@@ -28,9 +28,34 @@ async function writeUserMapping(googleUid, familyId, memberId) {
   await db.collection("users").doc(googleUid).set({ familyId, memberId }, { merge: true });
 }
 
+// --- Startup-race retry(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported
+// ইনসিডেন্ট root-cause fix — কনসোল-লগ দিয়ে নিশ্চিত হওয়া গেছে) ---
+// Diagnostic থেকে প্রমাণিত: App Check নিজে ঠিকই ছিল(getToken(true) সফল),
+// কিন্তু signInExistingMemberByGoogle()/joinFamilyViaInviteLink()-এর
+// একেবারে প্রথম, unguarded Firestore read(loadUserMapping) মাঝেমাঝে
+// "permission-denied" দিয়ে ব্যর্থ হচ্ছিল — Google popup সফল হওয়ার ঠিক
+// পরপরই App Check token attach হওয়ার একটা ছোট startup-race(পরের request-
+// এই আবার সফল হয়)। ছোট delay দিয়ে একবার retry করলেই এই class-এর
+// transient সমস্যা resolve হয়ে যায় — শুধু permission-denied/unavailable
+// code-এ retry হয়(প্রকৃত authorization-denial retry করলেও একই থাকবে,
+// unnecessary delay এড়াতে immediate propagate)।
+async function withStartupRaceRetry(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err && (err.code === "permission-denied" || err.code === "unavailable")) {
+      await new Promise(r => setTimeout(r, 800));
+      return await fn();
+    }
+    throw err;
+  }
+}
+
 async function loadUserMapping(googleUid) {
-  const snap = await db.collection("users").doc(googleUid).get();
-  return snap.exists ? snap.data() : null;
+  return withStartupRaceRetry(async () => {
+    const snap = await db.collection("users").doc(googleUid).get();
+    return snap.exists ? snap.data() : null;
+  });
 }
 
 // familyMemberEmails/{normalizedEmail} → { familyId, memberId }(§৩,
@@ -44,8 +69,10 @@ function familyMemberEmailRef(normalizedEmail) {
 
 async function lookupFamilyByEmail(email) {
   const key = normalizeEmail(email);
-  const snap = await familyMemberEmailRef(key).get();
-  return snap.exists ? { normalizedEmail: key, ...snap.data() } : null;
+  return withStartupRaceRetry(async () => {
+    const snap = await familyMemberEmailRef(key).get();
+    return snap.exists ? { normalizedEmail: key, ...snap.data() } : null;
+  });
 }
 
 // §Self-heal fix(owner-reported, ১৩ সেপ্টেম্বর ২০২৬): admin কর্তৃক
