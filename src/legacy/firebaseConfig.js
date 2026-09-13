@@ -43,4 +43,24 @@ const db = firebase.firestore();
 db.enablePersistence().catch(() => {});
 const auth = firebase.auth();
 
-export { db, auth, analytics, logAnalyticsEvent };
+// --- Diagnostic helper(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported sudden
+// Google Sign-in/Add-Member ব্যর্থতা ইনসিডেন্ট-এর পরে) ---
+// Firestore-এর "Missing or insufficient permissions" ও Google Sign-in
+// popup-এর generic ব্যর্থতা — দুটোই App Check(reCAPTCHA v3) token mint
+// ব্যর্থ হলে ঠিক একই রকম দেখায়(Firebase-এর পরিচিত confusing আচরণ — App
+// Check reject করলে আলাদা কোনো distinguishing error code দেয় না, Rules-
+// denial-এর মতোই দেখায়)। এই helper কোনো existing flow/logic পরিবর্তন করে
+// না(pure-additive, fire-and-forget) — শুধু catch-block থেকে ডাকা হয়,
+// console-এ প্রকৃত error.code/message + App Check স্বাস্থ্য log করে, যাতে
+// পরের বার এই সমস্যা হলে browser console(বা remote-debug/screen-record)
+// দেখে দ্রুত root-cause(App Check/network vs প্রকৃত Rules-denial) ধরা যায়।
+function logAuthDiagnostics(context, err) {
+  console.error(`[DT-Diag] ${context} ব্যর্থ — code: ${err && err.code}, message:`, err && err.message, err);
+  try {
+    firebase.appCheck().getToken(true)
+      .then(() => console.log(`[DT-Diag] App Check টোকেন ঠিক আছে (${context})।`))
+      .catch(acErr => console.error(`[DT-Diag] App Check টোকেন ব্যর্থ (${context}) — এটাই সম্ভবত মূল কারণ:`, acErr));
+  } catch (e) { /* diagnostic কখনো app-flow block করবে না */ }
+}
+
+export { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics };

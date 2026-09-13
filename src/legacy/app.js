@@ -1,4 +1,4 @@
-import { db, auth, analytics, logAnalyticsEvent } from "./firebaseConfig.js";
+import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
@@ -2078,7 +2078,8 @@ function App() {
       setNewMemberEmail("");
       setAddingMember(false);
     } catch (err) {
-      alert("সদস্য যোগ করতে সমস্যা হয়েছে: " + err.message);
+      logAuthDiagnostics("Add Member", err);
+      alert("সদস্য যোগ করতে সমস্যা হয়েছে: " + err.message + (err && err.code ? ` [কোড: ${err.code}]` : ""));
     }
   }
   async function handleRemoveMember(m) {
