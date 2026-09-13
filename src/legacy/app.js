@@ -21,7 +21,9 @@ import {
 // Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
 // দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
 // UI থেকে wire হচ্ছে।
-import { editOwnProfile, leaveFamily, addProxyMemberByAdmin } from "./googleIdentity.js";
+import {
+  editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink
+} from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
   healthCheckFamily, auditAllFamiliesHealthCheck, extractOwnerUidsFromMemberData,
@@ -561,6 +563,7 @@ import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 // harness(নিচে "?googleAuthTest=1" গার্ড দ্রষ্টব্য)। শুধু import — এখনো
 // কোনো normal render-path এই component ব্যবহার করে না।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
+import { InviteJoinGate } from "../components/InviteJoinGate.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
@@ -956,6 +959,10 @@ function App() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
   const [copiedCode, setCopiedCode] = useState(false);
+  // §Public Invite-Link(নতুন, 2_4 §৫.২): family root doc-এর activeInviteToken
+  // field local state-এ mirror করা(existing family-doc fetch/listener থেকে,
+  // নিচে দেখুন — কোনো নতুন read লাগেনি)। null = কখনো generate হয়নি।
+  const [activeInviteToken, setActiveInviteToken] = useState(null);
   const originalEntryRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyList, setHistoryList] = useState([]);
@@ -1040,6 +1047,9 @@ function App() {
         (snap) => {
           const state = snap.exists ? (snap.data().migrationState || "legacy") : "legacy";
           setMigrationState(state);
+          // §Public Invite-Link — একই live listener থেকে mirror(নতুন read
+          // না), যাতে অন্য ডিভাইস থেকে rotate/revoke হলে সাথে সাথে sync হয়।
+          setActiveInviteToken(snap.exists ? (snap.data().activeInviteToken || null) : null);
           // Family Code auto-propagate + notify: সার্ভারের families/{id}.familyCode
           // এই ডিভাইসের local কোড থেকে ভিন্ন হলে (Admin অন্য কোথাও কোড
           // পরিবর্তন করেছেন) — অটো নতুন কোড বসিয়ে, Google-linked হলে
@@ -1101,6 +1111,9 @@ function App() {
         setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
         // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
         setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
+        // §Public Invite-Link — একই boot fetch থেকে initial value(extra
+        // read নেই)।
+        setActiveInviteToken(migFamSnap.exists ? (migFamSnap.data().activeInviteToken || null) : null);
         // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
         // notification(read+unread)-এ live listener, যাতে "seen"(read:true)
         // করার পরও item panel থেকে হারিয়ে না যায়(শুধু explicit delete/Clear-all
@@ -1707,6 +1720,43 @@ function App() {
     navigator.clipboard.writeText(getFamilyCode());
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  }
+  // §Public Invite-Link(নতুন, 2_4 §৫.২, Pending #2 UI): admin বাটনে ক্লিক
+  // করলে সক্রিয় token না থাকলে(বা revoked হলে) নতুন rotate করে, নাহলে
+  // বিদ্যমান token-ই পুনরায় শেয়ার করে(unnecessary rotate এড়িয়ে link
+  // multi-use থাকে, §৫.২ নীতি অনুযায়ী)। Link root-path query-param
+  // ব্যবহার করে(§App() early-return, উপরে দ্রষ্টব্য) — কোনো নতুন Cloudflare
+  // routing config লাগে না।
+  async function handleShareInviteLink() {
+    try {
+      let tokenObj = activeInviteToken;
+      if (!tokenObj || tokenObj.revoked) {
+        const token = await rotateInviteLink(getFamilyId());
+        tokenObj = { token, createdAt: Date.now(), revoked: false };
+        setActiveInviteToken(tokenObj);
+      }
+      const link = `${window.location.origin}/?joinFid=${encodeURIComponent(getFamilyId())}&joinToken=${encodeURIComponent(tokenObj.token)}`;
+      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)-এর পরিবারে যোগ দেওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। নিচের লিংকে ক্লিক করে Google দিয়ে সাইন-ইন করে যোগ দিন।\n${link}`;
+      if (navigator.share) {
+        await navigator.share({ title: "Daily Task", text });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        alert("আমন্ত্রণ লিংক কপি হয়েছে, এখন পাঠিয়ে দিন।");
+      }
+    } catch (err) {
+      if (err && err.name !== "AbortError") {
+        alert("লিংক তৈরি/শেয়ার করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
+      }
+    }
+  }
+  async function handleRevokeInviteLink() {
+    if (!activeInviteToken || activeInviteToken.revoked) return;
+    try {
+      await revokeInviteLink(getFamilyId(), activeInviteToken);
+      setActiveInviteToken(prev => prev ? { ...prev, revoked: true } : prev);
+    } catch (err) {
+      alert("লিংক নিষ্ক্রিয় করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
+    }
   }
   // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
   // loadPendingAccessRequests/decideAccessRequest(Access Approval Gate
@@ -2544,6 +2594,33 @@ function App() {
       })
     );
   }
+  // §Public Invite-Link Join(নতুন, 2_4 §৫.২/Screen D, ১৩ সেপ্টেম্বর ২০২৬):
+  // root path-এ ?joinFid=&joinToken= থাকলে(শেয়ার করা আমন্ত্রণ লিংক থেকে
+  // আসা) পুরো normal render(guest/member/googleAuthTest সব) bypass করে
+  // শুধু InviteJoinGate(Screen D) দেখানো হয়। Cloudflare Pages-এ আলাদা
+  // "/join" path route করতে নতুন _redirects config লাগত(বর্তমানে নেই) —
+  // তাই root query-param ব্যবহার করা হলো(owner-approved deviation, spec-এর
+  // ".../join?fid=...&token=..." থেকে সামান্য ভিন্ন URL-shape, ফাংশনালিটি
+  // অভিন্ন, কোনো নতুন server-config লাগে না)। সম্পূর্ণ additive early-
+  // return — params না থাকলে এই ব্লক কখনো fire করে না, existing routing/
+  // state কিছুই touch হয়নি।
+  let inviteJoinParams = null;
+  try {
+    const qp = new URLSearchParams(window.location.search);
+    const joinFid = qp.get("joinFid");
+    const joinToken = qp.get("joinToken");
+    if (joinFid && joinToken) inviteJoinParams = { joinFid, joinToken };
+  } catch {}
+  if (inviteJoinParams) {
+    return /*#__PURE__*/React.createElement(InviteJoinGate, {
+      familyId: inviteJoinParams.joinFid,
+      token: inviteJoinParams.joinToken,
+      onSuccess: handleGuestSignInSuccess,
+      onBackToMain: () => {
+        window.location.href = window.location.origin;
+      }
+    });
+  }
   // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
   // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
   // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
@@ -2669,6 +2746,7 @@ function App() {
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen pb-20 bg-[#F4F7F1]"
   }, /*#__PURE__*/React.createElement(DashboardHeader, {
+    activeInviteToken: activeInviteToken,
     addingMember: addingMember,
     adminUidsList: adminUidsList,
     copiedCode: copiedCode,
@@ -2686,7 +2764,9 @@ function App() {
     handleReleaseMember: handleReleaseMember,
     handleRemoveAdmin: handleRemoveAdmin,
     handleRemoveMember: handleRemoveMember,
+    handleRevokeInviteLink: handleRevokeInviteLink,
     handleSelfDemote: handleSelfDemote,
+    handleShareInviteLink: handleShareInviteLink,
     isAdmin: isAdmin,
     isLockedForSwitch: isLockedForSwitch,
     isMenuOpen: isMenuOpen,
