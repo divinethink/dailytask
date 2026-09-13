@@ -12,6 +12,7 @@ import { NotificationPanel } from "./NotificationPanel.jsx";
 import { ProfileDropdownGoogle } from "./ProfileDropdownGoogle.jsx";
 
 export function DashboardHeader({
+  activeInviteToken,
   addingMember,
   adminUidsList,
   copiedCode,
@@ -29,7 +30,9 @@ export function DashboardHeader({
   handleReleaseMember,
   handleRemoveAdmin,
   handleRemoveMember,
+  handleRevokeInviteLink,
   handleSelfDemote,
+  handleShareInviteLink,
   isAdmin,
   isLockedForSwitch,
   isMenuOpen,
@@ -161,21 +164,23 @@ export function DashboardHeader({
     handleRemoveAdmin: handleRemoveAdmin,
     handleRemoveMember: handleRemoveMember,
     setAddingMember: setAddingMember
-  }), /*#__PURE__*/React.createElement("button", {
+  }), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: async () => {
-      const text = `আপনাকে Daily Task (দৈনিক আমল ও পারিবারিক ট্রাকার)- পরিবারের নতুন সদস্য হওয়ার জন্য আমন্ত্রণ জানানো হয়েছে। বিদ্যমান Family-তে প্রবেশ করে ফ্যামিলি ইউজারনেম লিখে নতুন সদস্য হোন।\nhttps://dailytask-family.pages.dev/\nFamily Username: ${getFamilyCode()}`;
       try {
-        if (navigator.share) {
-          await navigator.share({ title: "Daily Task", text });
-        } else if (navigator.clipboard) {
-          await navigator.clipboard.writeText(text);
-          alert("বার্তা কপি হয়েছে, এখন পাঠিয়ে দিন।");
-        }
+        await handleShareInviteLink();
       } catch {}
     },
     className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
-  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "নতুন সদস্য হতে আমন্ত্রণ জানান"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "আমন্ত্রণ লিংক শেয়ার করুন"), activeInviteToken && !activeInviteToken.revoked && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: async () => {
+      try {
+        await handleRevokeInviteLink();
+      } catch {}
+    },
+    className: "w-full text-left px-4 py-1.5 text-red-600 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
+  }, "লিংক নিষ্ক্রিয় করুন")), /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 my-1"
   }), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
