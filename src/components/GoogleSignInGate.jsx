@@ -18,6 +18,7 @@ import {
   currentGoogleEmail
 } from "../legacy/googleIdentity.js";
 import { createNewFamilyGoogleOnly } from "../legacy/familyIdentity.js";
+import { logAuthDiagnostics } from "../legacy/firebaseConfig.js";
 
 export function GoogleSignInGate({ onSuccess }) {
   // "idle" | "checking" | "new-user-form" | "creating" | "error"
@@ -43,8 +44,8 @@ export function GoogleSignInGate({ onSuccess }) {
         }
       })
       .catch(err => {
-        console.error("[Google Sign-in] popup ব্যর্থ:", err && err.message);
-        setErrorMsg("সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
+        logAuthDiagnostics("Google Sign-in(GoogleSignInGate)", err);
+        setErrorMsg(`সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন।${err && err.code ? ` [কোড: ${err.code}]` : ""}`);
         setStage("idle");
       });
   }

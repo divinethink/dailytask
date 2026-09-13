@@ -34,6 +34,7 @@
 // সতর্কতা-ব্যানার দেখানো হয় manual "Open in Browser" নির্দেশনা সহ।
 import { useState, useEffect } from "react";
 import { triggerGoogleSignInPopup, joinFamilyViaInviteLink } from "../legacy/googleIdentity.js";
+import { logAuthDiagnostics } from "../legacy/firebaseConfig.js";
 
 function detectInAppBrowser() {
   try {
@@ -120,8 +121,8 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
         }
       })
       .catch(err => {
-        console.error("[Invite-Link Join] ব্যর্থ:", err && err.message);
-        setErrorMsg("সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন। এটি WhatsApp/Facebook-এর ভেতরের ব্রাউজারে হয়ে থাকলে নিচের নির্দেশনা অনুসরণ করুন।");
+        logAuthDiagnostics("Invite-Link Join", err);
+        setErrorMsg(`সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন। এটি WhatsApp/Facebook-এর ভেতরের ব্রাউজারে হয়ে থাকলে নিচের নির্দেশনা অনুসরণ করুন।${err && err.code ? ` [কোড: ${err.code}]` : ""}`);
         setStage("form");
       });
   }
