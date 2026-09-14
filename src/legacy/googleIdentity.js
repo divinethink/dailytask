@@ -130,20 +130,21 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
     if (existingMemberData) {
       throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
     }
-    // Stale(সত্যিই deleted) — same-family হলে এই admin-এর delete-permission
-    // আছে(Rules: isAdminOfFamily(resource.data.familyId)) বলে নিরাপদে
-    // পরিষ্কার করে reuse খোলা যায়। Cross-family stale হলে এই admin-এর সেই
-    // অন্য family-র mapping delete করার permission নেই — fail-safe(আগের
-    // আচরণ) হিসেবে ব্লক-ই থাকল, ভাঙা হয়নি(rare edge-case, data-hygiene
-    // debt মাত্র — reuse অন্তত same-family-তে সম্পূর্ণ কাজ করবে)।
-    if (existing.familyId === familyId) {
-      try {
-        await deleteFamilyMemberEmail(normalizedEmail);
-      } catch (err) {
-        throw new Error("পুরনো তথ্য পরিষ্কার করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
-      }
-    } else {
-      throw new Error("এই ইমেইল ইতিমধ্যে অন্য একজন সদস্যের সাথে যুক্ত আছে।");
+    // Stale(সত্যিই deleted) — same-family ও cross-family উভয় ক্ষেত্রেই
+    // পরিষ্কার করে reuse খোলা হবে।
+    // §Cross-family fix(১৪ সেপ্টেম্বর ২০২৬, owner-reported): আগে এখানে শুধু
+    // same-family(`existing.familyId === familyId`) স্টেল-mapping cleanup
+    // অনুমোদিত ছিল — cross-family stale হলে(অন্য family থেকে remove হওয়া
+    // সদস্যের email) এই admin-এর permission না থাকায় ব্লক-ই থেকে যেত।
+    // firestore.rules-এ orphaned-mapping delete guard যোগ হয়েছে(target
+    // member সত্যিই আর বিদ্যমান না থাকলে যেকোনো authenticated user delete
+    // করতে পারবে, লাইভ mapping অস্পৃশ্য) — তাই এখন same/cross-family
+    // নির্বিশেষে(existingMemberData ইতিমধ্যে null যাচাই হয়ে গেছে উপরে)
+    // একই delete-call নিরাপদে কাজ করবে।
+    try {
+      await deleteFamilyMemberEmail(normalizedEmail);
+    } catch (err) {
+      throw new Error("পুরনো তথ্য পরিষ্কার করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
     }
   }
   const batch = db.batch();
