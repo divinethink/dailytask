@@ -559,7 +559,6 @@ import { PrintReport } from "../components/PrintReport.jsx";
 import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
-import { OnboardingBridge } from "../components/OnboardingBridge.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
 import { InviteJoinGate } from "../components/InviteJoinGate.jsx";
@@ -704,8 +703,7 @@ function App() {
   // render-এ recompute করা নিরাপদ, আলাদা state লাগে না।
   const isGuestMode = !auth.currentUser || !(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
   // §Bottom Navigation(2_4 §৯.২) — App()-এর নতুন top-level routing state।
-  // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে) — নিচের
-  // onbFlow/onbStep lazy-init pattern-এর সাথে সামঞ্জস্যপূর্ণ।
+  // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে)।
   const [activeTab, setActiveTab] = useState(() => {
     try { return sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || TAB_FAMILY; } catch { return TAB_FAMILY; }
   });
@@ -757,73 +755,21 @@ function App() {
   // showRecoveryClaim/recoveryKeyInput/recoveryClaimBusy — Admin Recovery
   // Key UI toggle-গুলো বাদ দেওয়া হয়েছে(নিচে §Member Key state দেখুন)।
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): Member Key
-  // view/copy/change modal state(showMemberKeyModal/memberKeyTarget/
-  // memberKeyValue/memberKeyLoading/memberKeyRevealed/showChangeKeyForm/
-  // memberKeyBusy/copiedMemberKey/manualKeyInput/confirmKeyInput) ও Claim Key
-  // modal-এর claimKeyInput/claimKeyBusy সরানো হয়েছে — MemberKeyModal.jsx
-  // ইতিমধ্যে dead ছিল(কোনো live trigger ছিল না, ProfileDropdown→
-  // ProfileDropdownGoogle swap-এর পর থেকে) ও claim-UI এই সেশনেই
-  // MemberListSection.jsx থেকে সরানো হয়েছে। showClaimKeyModal/claimKeyTarget
-  // এখনো রাখা হয়েছে — OnboardingBridge-এর "keyClaim" step এই দুটো props
-  // হিসেবে নেয়(Phase 3 scope, এই সেশনে touch করা হয়নি); modal নিজে না থাকায়
-  // সেই narrow edge-case step এখন no-op(আগে থেকেই Rules-level ownerUids-claim
-  // path google-only family-তে বন্ধ ছিল বলে কোনো real capability loss নেই)।
-  const [showClaimKeyModal, setShowClaimKeyModal] = useState(false);
-  const [claimKeyTarget, setClaimKeyTarget] = useState(null);
-  const [showBecomeMemberModal, setShowBecomeMemberModal] = useState(false);
-  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved): becomeMemberName/
-  // becomeMemberGender/becomeMemberBusy(BecomeMemberModal-এর ভিতরের ফর্ম-state)
-  // সরানো হয়েছে — BecomeMemberModal নিজেই MemberOnboardingModals.jsx থেকে সরানো
-  // হয়েছে(নিচে দ্রষ্টব্য)। showBecomeMemberModal/myMemberRequestStatus/
-  // myMemberRequestKey এখনো রাখা হয়েছে — OnboardingBridge-এর "becomeMember" step
-  // এই state গুলো props হিসেবে নেয়(Phase 3 scope, এই সেশনে touch করা হয়নি)।
-  const [myMemberRequestStatus, setMyMemberRequestStatus] = useState(null);
-  // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬): pending screen-এ
-  // দেখানোর জন্য — memberRequests/{uid}.presetKey থেকেই আসে(নতুন কোনো
-  // persistence-layer না, memberRequest doc-ই single source of truth)।
-  const [myMemberRequestKey, setMyMemberRequestKey] = useState(null);
-  // §Onboarding Gate reopen-fix(২৩ আগস্ট ২০২৬): নিচের myMemberRequestStatus
-  // effect সম্পন্ন(success/error/bail — যেকোনোভাবে) হওয়ার আগে বুট-loading গেট
-  // ছাড়া হবে না(নিচে দ্রষ্টব্য), যাতে pending status Firestore থেকে confirm
-  // হওয়ার আগেই Dashboard-এর transient bypass না ঘটে। একবার true হলে পরের
-  // re-run-গুলোতে আর false-এ reset হয় না(normal user-দের জন্য flicker এড়াতে)।
-  // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬, একই বাগের অংশ) — guest-এ এই flag
-  // set করার effect-ও skip হয়, তাই সরাসরি true দিয়ে শুরু(কোনো pending
-  // memberRequest-check দরকার নেই, real family-ই নেই)।
-  const [myMemberRequestChecked, setMyMemberRequestChecked] = useState(isGuestMode ? true : false);
-  // §Onboarding continuation — Family Code submit-এর পরে reload হওয়া
-  // সত্ত্বেও Onboarding() flow ধারাবাহিক রাখতে। sessionStorage flag
-  // Onboarding()-এ সেট হয়েছে; এখানে শুধু পড়া+ধাপ-অনুসরণ। কোনো নতুন
-  // Firestore collection/rule নেই — শুধু existing modal/function সঠিক
-  // ক্রমে auto-trigger হয় (OnboardingBridge কম্পোনেন্ট, নিচে render)।
-  const [onbFlow] = useState(() => {
-    try { return sessionStorage.getItem("dt_onboarding_flow"); } catch { return null; }
-  });
-  const [onbStep, setOnbStepRaw] = useState(() => {
-    try { return sessionStorage.getItem("dt_onboarding_step"); } catch { return null; }
-  });
-  function onbAdvance(nextStep) {
-    setOnbStepRaw(nextStep);
-    try {
-      if (nextStep) {
-        sessionStorage.setItem("dt_onboarding_step", nextStep);
-      } else {
-        sessionStorage.removeItem("dt_onboarding_step");
-        sessionStorage.removeItem("dt_onboarding_flow");
-      }
-    } catch {}
-  }
-  useEffect(() => {
-    if (onbFlow && !onbStep) {
-      // বাগ-ফিক্স(২০ আগস্ট ২০২৬): নতুন page-2(Onboarding()) নিজেই
-      // Google/Login/Join-এর choice দেয় বলে "choose"(পুরনো ৩য় পেজ) আর
-      // দরকার নেই — "existingFamily" flow(join-as-new-member ও Google
-      // fallback উভয়ই) সরাসরি "becomeMember"-এ যায়। "choose" definition
-      // এখনো আছে শুধু becomeMember-cancel fallback-এর safety-net হিসেবে(নিচে)।
-      onbAdvance(onbFlow === "newFamily" ? "addMember" : "becomeMember");
-    }
-  }, [onbFlow]);
+  // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬, owner-approved, "সব ক্লিন"):
+  // পুরনো Onboarding Gate সিস্টেমের বাকি অংশ সম্পূর্ণ সরানো হলো — showClaimKeyModal/
+  // claimKeyTarget/showBecomeMemberModal/myMemberRequestStatus/myMemberRequestKey/
+  // myMemberRequestChecked/onbFlow/onbStep/onbAdvance() ও এই সব state ব্যবহারকারী
+  // OnboardingBridge.jsx(delete করা হয়েছে)। এগুলো নিশ্চিতভাবে dead ছিল: এই
+  // state-গুলো যেই component(পুরনো Onboarding.jsx) সেট করত সেটা আগেই delete
+  // হয়ে গিয়েছিল(Phase 3), ফলে sessionStorage flag কখনো লেখা হতো না ও
+  // needsOwnMemberProfile(zero-member admin edge-case)-এর জন্য ব্যবহৃত
+  // OnboardingBridge-এর "addMember" step আসলে পুরনো ownerUids+Member Password
+  // (createMemberWithKey()) সিস্টেম ব্যবহার করত — google-only architecture-এর
+  // সাথে সাংঘর্ষিক, এবং createNewFamilyGoogleOnly() family-creation-এর একই
+  // ধাপে admin-এর নিজের googleUid-member তৈরি করে ফেলে বলে এই edge-case আর
+  // structurally ঘটতেই পারে না। Google Sign-in login flow(GoogleSignInGate)
+  // ও memberRequests/{uid}.presetKey approval-flow — এই দুটো সম্পূর্ণ ভিন্ন,
+  // অক্ষুণ্ণ সিস্টেম, এখানে touch হয়নি।
   // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
   // showMemberRequestsModal/pendingMemberRequests/loadingMemberRequests state
   // সরানো হয়েছে — এই admin-review প্যানেল(ও MemberListSection-এর ভিতরের
@@ -910,9 +856,10 @@ function App() {
   // করে নিশ্চিত হয়েছে এই cluster-এর কোনো live trigger কোনো component-এ কখনো
   // ছিল না(১_৩ ফাইলে আগে থেকেই "unreachable UI" হিসেবে flagged ছিল)।
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
-  // §Approved-member Google welcome(২৩ আগস্ট ২০২৬) — নিচের myMemberRequestStatus
-  // effect-এ trigger হয়(main App render-এ, onboarding gate-এর বাইরে)।
-  const [showApprovedGoogleWelcome, setShowApprovedGoogleWelcome] = useState(false);
+  // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬): showApprovedGoogleWelcome
+  // (myMemberRequestStatus-নির্ভর "approved-member Google welcome" popup) ও
+  // সংশ্লিষ্ট effect/dismiss-function সরানো হয়েছে — memberRequests-approval
+  // flow নিজেই google-only architecture-এ dead(নিচে দ্রষ্টব্য)।
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showBackupOptionsModal, setShowBackupOptionsModal] = useState(false);
   const [showImportOptionsModal, setShowImportOptionsModal] = useState(false);
@@ -1302,51 +1249,10 @@ function App() {
   // person sees a clear message instead of a raw Firestore permission error
   // during the brief "locked" window of a family's Switch.
   const isLockedForSwitch = migrationState === "locked";
-  // §"সদস্য হোন" — নিজের memberRequest status(pending/approved/denied)
-  // জানার জন্য(v2-only)। members বদলালে(নিজের member approve হলে) আবার
-  // চেক হয়, যাতে status স্বয়ংক্রিয়ভাবে আপডেট হয়।
-  useEffect(() => {
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (!myUid || migrationState !== "v2" || !getFamilyId()) {
-      setMyMemberRequestStatus(null);
-      setMyMemberRequestKey(null);
-      setMyMemberRequestChecked(true);
-      return;
-    }
-    db.collection("families").doc(getFamilyId())
-      .collection("memberRequests").doc(myUid).get()
-      .then(snap => {
-        setMyMemberRequestStatus(snap.exists ? snap.data().status : null);
-        setMyMemberRequestKey(snap.exists ? (snap.data().presetKey || null) : null);
-      })
-      .catch(() => {})
-      .finally(() => setMyMemberRequestChecked(true));
-  }, [members, migrationState]);
-  // §Approved-member Google welcome(২৩ আগস্ট ২০২৬): নিজের memberRequest
-  // "approved" হলে ও এখনো Google-linked না হলে, মূল App page-এ একবার
-  // welcome-popup দেখানো হয়(existing GoogleAccountModal/linkGoogleAccount()
-  // reuse, নতুন auth logic নেই)। localStorage flag শুধুই UX "একবার দেখানো"
-  // মনে রাখতে — এটা কোনো access/authorization নির্ধারণ করে না, শুধু
-  // popup আবার দেখানো এড়ায়(worst-case flag miss হলেও শুধু popup আবার
-  // দেখাবে, কোনো নিরাপত্তা-ঝুঁকি নেই)।
-  useEffect(() => {
-    if (myMemberRequestStatus !== "approved") return;
-    if (isGoogleLinked()) return;
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (!myUid) return;
-    const flagKey = "dt_google_welcome_shown_" + myUid;
-    let alreadyShown = false;
-    try { alreadyShown = !!localStorage.getItem(flagKey); } catch {}
-    if (alreadyShown) return;
-    setShowApprovedGoogleWelcome(true);
-  }, [myMemberRequestStatus]);
-  function dismissApprovedGoogleWelcome() {
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (myUid) {
-      try { localStorage.setItem("dt_google_welcome_shown_" + myUid, "1"); } catch {}
-    }
-    setShowApprovedGoogleWelcome(false);
-  }
+  // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬, owner-approved): memberRequest
+  // status-fetch effect ও "Approved-member Google welcome" popup effect+
+  // dismiss-function সম্পূর্ণ সরানো হলো — google-only architecture-এ
+  // memberRequests-approval flow dead(§ উপরের ব্যাখ্যা দ্রষ্টব্য)।
   useEffect(() => {
     // Guard: on first render selectedId is still null (real value loads async).
     // Skip that null write so it never overwrites the previously saved
@@ -2555,7 +2461,7 @@ function App() {
       avgPct: Math.round(avg * 100)
     };
   }, [monthEntries, monthCursor, selectedMember, allFields]);
-  if (members === null || migrationState === undefined || !myMemberRequestChecked) return /*#__PURE__*/React.createElement("div", {
+  if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex items-center justify-center bg-[#F4F7F1]"
   }, /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
@@ -2578,36 +2484,11 @@ function App() {
     linkGoogleAccount: linkGoogleAccount,
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
-  // §Approved-member Google welcome — existing GoogleAccountModal reuse,
-  // শুধু welcomeMode/onLater prop দিয়ে body/বাটন আলাদা। onClose/onLater
-  // দুটোই dismissApprovedGoogleWelcome() কল করে(one-time flag সেট + বন্ধ),
-  // সফল link হলেও একই dismiss হয় onLinked-এ(নিচে)।
-  const approvedGoogleWelcomeNode = showApprovedGoogleWelcome && /*#__PURE__*/React.createElement(GoogleAccountModal, {
-    welcomeMode: true,
-    onClose: dismissApprovedGoogleWelcome,
-    onLater: dismissApprovedGoogleWelcome,
-    onLinked: () => { dismissApprovedGoogleWelcome(); checkDriveBackupAfterLink(); },
-    memberName: selectedMember?.name,
-    auth: auth,
-    claimFirstAdminIfEligible: claimFirstAdminIfEligible,
-    googleProvider: googleProvider,
-    linkGoogleAccount: linkGoogleAccount,
-    syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
-  });
-  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬): claimKeyModalNode(ClaimKeyModal
-  // render) সরানো হয়েছে — ClaimKeyModal.jsx export নিজেই এই সেশনে সরানো হয়েছে
-  // (দেখুন MemberOnboardingModals.jsx)। showClaimKeyModal/setClaimKeyTarget/
-  // setShowClaimKeyModal state এখনো আছে(OnboardingBridge-এর keyClaim step প্রপ
-  // হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে render হয় না।
-  // §Onboarding Gate fix(১৮ আগস্ট ২০২৬, পর্ব-২): becomeMember মোডাল আগে
-  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
-  // becomeMemberModalNode(BecomeMemberModal render) সরানো হয়েছে —
-  // BecomeMemberModal export নিজেই এই সেশনে MemberOnboardingModals.jsx থেকে
-  // সরানো হয়েছে(file এখন খালি, delete করা হয়েছে)। showBecomeMemberModal/
-  // myMemberRequestStatus/myMemberRequestKey state এখনো আছে(OnboardingBridge-
-  // এর "becomeMember" step প্রপ হিসেবে নেয়, Phase 3 scope) কিন্তু modal নিজে
-  // render হয় না — সেই narrow edge-case step এখন no-op(দুটো real family-ই
-  // google-only, approve-path আগে থেকেই Rules-blocked ছিল)।
+  // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬, owner-approved): এই
+  // অংশে আগে "Approved-member Google welcome"(approvedGoogleWelcomeNode)
+  // ও পুরনো Onboarding Gate সিস্টেম(Member Key claim/becomeMember modal
+  // node)-সংক্রান্ত dead-code comment ছিল — সম্পূর্ণ সরানো হলো(§উপরের
+  // ব্যাখ্যা দ্রষ্টব্য, state-লেভেলে আগেই removed)।
   // §Public Invite-Link Join(2_4 §৫.২/Screen D):
   // root path-এ ?joinFid=&joinToken= থাকলে(শেয়ার করা আমন্ত্রণ লিংক থেকে
   // আসা) পুরো normal render(guest/member সব) bypass করে
@@ -2637,32 +2518,6 @@ function App() {
       }
     });
   }
-  // §Onboarding Gate — Family Code submit-এর পর authentication/onboarding
-  // সম্পূর্ণ না হওয়া পর্যন্ত Dashboard(blurred/background সহ) কোনোভাবেই
-  // render হবে না। শুধু OnboardingBridge দেখানো হয়। onAdvance(null) কল
-  // হলেই(সফল Google/Member-Password/approved onboarding) onbStep null
-  // হয়ে স্বাভাবিক Dashboard render হবে।
-  // §Onboarding Gate reopen-fix(২৩ আগস্ট ২০২৬): আগে শুধু onbStep(sessionStorage,
-  // ব্রাউজার-সেশন বন্ধ হলে হারিয়ে যায়) দিয়ে গেট হতো — ফলে "সদস্য হোন" পাঠানোর
-  // পর ব্রাউজার বন্ধ করে আবার খুললে pending থাকা সত্ত্বেও সরাসরি Dashboard
-  // render হয়ে যেত(write অবশ্য Rules-এই block হতো, কিন্তু UX ভুল)। এখন
-  // Firestore-persisted myMemberRequestStatus(session-independent)ও গেট
-  // trigger করে — onbStep না থাকলেও pending হলে একই pending-screen(step:
-  // "becomeMember") reuse হবে। denied/approved flow অপরিবর্তিত(এই condition
-  // শুধু "pending"-এ trigger করে)।
-  // §Onboarding Gate — newFamily/addMember reopen-fix(২৩ আগস্ট ২০২৬, একই
-  // session-independent প্যাটার্ন উপরের myMemberRequestStatus fix-এর মতো):
-  // createNewFamily() family doc+admin-claim কমিট করে reload করে, কিন্তু
-  // creator-এর নিজের members doc addMember-স্টেপ সম্পূর্ণ না হওয়া পর্যন্ত
-  // তৈরিই হয় না। onbStep শুধু sessionStorage-এ থাকায় ব্রাউজার-সেশন হারালে
-  // (refresh/reopen) গেট bypass হয়ে normal Dashboard render হয়ে যেত(Rules-side
-  // admin অনুযায়ী বৈধ কিন্তু নিজের member profile ছাড়াই)। needsOwnMemberProfile
-  // শুধু তখনই true হয় যখন পুরো family-তে একটাও member doc নেই — এই অবস্থা
-  // শুধু family-creation থেকে addMember-সম্পূর্ণ হওয়ার মাঝের window-এই সত্য
-  // (অন্য কোনো legitimate কেস, যেমন Force-Release-এ member doc-ই বিদ্যমান
-  // থাকে, শুধু ownerUids খালি হয় — তাই ভুলভাবে trigger হয় না)।
-  const myUid = auth.currentUser ? auth.currentUser.uid : null;
-  const needsOwnMemberProfile = isAdmin && Array.isArray(members) && members.length === 0 && !!myUid;
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
@@ -2678,27 +2533,10 @@ function App() {
       React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
     );
   }
-  if (onbStep || myMemberRequestStatus === "pending" || needsOwnMemberProfile) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(OnboardingBridge, {
-    flow: onbFlow,
-    step: onbStep || (needsOwnMemberProfile ? "addMember" : "becomeMember"),
-    onAdvance: onbAdvance,
-    isAdmin: isAdmin,
-    myUid: auth.currentUser ? auth.currentUser.uid : null,
-    familyCode: getFamilyCode(),
-    members: members,
-    setMembers: setMembers,
-    setSelectedId: setSelectedId,
-    showGoogleAccountModal: showGoogleAccountModal,
-    setShowGoogleAccountModal: setShowGoogleAccountModal,
-    showBecomeMemberModal: showBecomeMemberModal,
-    setShowBecomeMemberModal: setShowBecomeMemberModal,
-    showClaimKeyModal: showClaimKeyModal,
-    setClaimKeyTarget: setClaimKeyTarget,
-    setShowClaimKeyModal: setShowClaimKeyModal,
-    myMemberRequestStatus: myMemberRequestStatus,
-    myMemberRequestKey: myMemberRequestKey,
-    createMemberWithKey: createMemberWithKey
-  }), googleAccountModalNode);
+  // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬, owner-approved): পুরনো
+  // Onboarding Gate early-return(OnboardingBridge render) সম্পূর্ণ সরানো
+  // হলো — condition-এর তিনটা অংশই(onbStep/myMemberRequestStatus==="pending"/
+  // needsOwnMemberProfile) নিশ্চিতভাবে কখনো true হতে পারত না(§উপরের ব্যাখ্যা)।
   // Access Approval Gate — Step 4: pending accessRequest থাকলে সদস্য/এন্ট্রি
   // UI না দেখিয়ে শুধু এই স্ক্রিন দেখানো হচ্ছে। "রিফ্রেশ করুন" বাটনে সরাসরি
   // page reload — admin approve করলে পরের বার boot flow পাশ করে যাবে।
@@ -2964,7 +2802,7 @@ function App() {
     getFamilyCode,
     handleRenameFamilyCode,
     FAMILY_CODE_MIN_LENGTH
-  }), googleAccountModalNode, approvedGoogleWelcomeNode,
+  }), googleAccountModalNode,
 
   // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): MemberKeyModal
   // render(key view/copy/change) ও claimKeyModalNode(claim modal) সরানো হয়েছে —
