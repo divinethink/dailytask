@@ -13,7 +13,7 @@
 // handleSelfDemote/handleFullLogout) caller(App()) থেকে callback-prop
 // হিসেবে আসে, শুধু presentational + local UI-state(profile-edit ফর্ম
 // টগল)।
-import { CalIcon, LogOutIcon } from "./icons.jsx";
+import { CalIcon, EditIcon, LogOutIcon } from "./icons.jsx";
 import { useState } from "react";
 
 export function ProfileDropdownGoogle({
@@ -22,10 +22,11 @@ export function ProfileDropdownGoogle({
   BN_MONTHS,
   toBn,
   ownMember,          // { name, gender, createdAt, ... } — নিজের member doc
+  userEmail,          // auth.currentUser.email(read-only display)
   isAdmin,
   isFirstAdmin,
   streak,
-  onDemoteSelf,       // () => Promise — এডমিন হতে অব্যাহতি
+  onDemoteSelf,       // () => Promise — এডমিন হতে অব্যাহতি(এই সংস্করণে UI থেকে সরানো, prop রাখা হলো future-use-এর জন্য)
   onEditProfile,      // (name, gender) => Promise<{success}>
   onLeaveFamily,       // () => Promise<{success, aborted, reason}>
   onLogout            // () => void
@@ -87,102 +88,43 @@ export function ProfileDropdownGoogle({
       // "left-0"-ই সঠিক pattern, এখানে reuse করা হলো।
       className: "absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
     },
-      // --- হেডার: নাম+streak+role badge ---
+      // --- হেডার: নাম(+প্রোফাইল-এডিট আইকন)+role badge+ইমেইল+leave-family ---
       /*#__PURE__*/React.createElement("div", {
         className: "px-4 py-2 border-b border-slate-100"
       },
         /*#__PURE__*/React.createElement("div", {
-          className: "flex items-center gap-1.5 flex-wrap"
+          className: "flex items-center gap-1.5"
         },
           /*#__PURE__*/React.createElement("span", {
             className: "font-bold text-emerald-900 text-sm"
           }, ownMember ? ownMember.name : "প্রোফাইল"),
-          /*#__PURE__*/React.createElement("span", {
-            className: "text-[11px] text-slate-500 flex items-center gap-0.5"
-          }, "🔥 ", /*#__PURE__*/React.createElement("b", {
-            className: "text-slate-700 font-semibold"
-          }, "ধারাবাহিকতার ", toBn(streak), " দিন"))
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setEditing(v => !v),
+            className: "text-slate-400 hover:text-emerald-800 shrink-0",
+            title: "প্রোফাইল এডিট"
+          }, /*#__PURE__*/React.createElement(EditIcon, { size: 12 }))
         ),
+        userEmail && /*#__PURE__*/React.createElement("div", {
+          className: "text-[10px] text-slate-500 mt-0.5 truncate"
+        }, userEmail),
         /*#__PURE__*/React.createElement("span", {
           className: `inline-block mt-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 ${isAdmin ? "text-[#8a6a1f] border-slate-200" : "text-slate-500 border-slate-200"}`
         }, isAdmin ? (isFirstAdmin ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য"),
-        isAdmin && /*#__PURE__*/React.createElement("div", {
-          className: "mt-1"
-        }, /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => onDemoteSelf(),
-          className: "text-left text-red-500 text-[9px] font-medium hover:underline"
-        }, "⚠️ এডমিন হতে অব্যাহতি নিন"))
-      ),
-      // --- যোগ দিয়েছেন তারিখ ---
-      sinceText && /*#__PURE__*/React.createElement("div", {
-        className: "px-4 py-2 space-y-1 text-slate-500 border-b border-slate-100"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center gap-1.5"
-      }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
-        className: "text-slate-700 font-normal"
-      }, sinceText))),
-      // --- প্রোফাইল এডিট ---
-      /*#__PURE__*/React.createElement("div", {
-        className: "px-2 pt-1"
-      },
-        !editing
-          ? /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: () => setEditing(true),
-              className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5"
-            }, "✏️ প্রোফাইল এডিট")
-          : /*#__PURE__*/React.createElement("div", {
-              className: "px-2 py-1.5 space-y-1.5"
-            },
-              /*#__PURE__*/React.createElement("input", {
-                type: "text",
-                value: nameInput,
-                onChange: e => setNameInput(e.target.value),
-                className: "w-full border border-slate-200 rounded-lg px-2 py-1 text-xs",
-                placeholder: "নাম"
-              }),
-              /*#__PURE__*/React.createElement("select", {
-                value: genderInput || "",
-                onChange: e => setGenderInput(e.target.value),
-                className: "w-full border border-slate-200 rounded-lg px-2 py-1 text-xs"
-              },
-                /*#__PURE__*/React.createElement("option", { value: "" }, "জেন্ডার বেছে নিন"),
-                /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"),
-                /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")
-              ),
-              /*#__PURE__*/React.createElement("div", {
-                className: "flex gap-1.5"
-              },
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  disabled: saving,
-                  onClick: handleSaveProfile,
-                  className: "flex-1 bg-emerald-700 text-white rounded-lg py-1 text-xs font-semibold disabled:opacity-50"
-                }, saving ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"),
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  onClick: () => setEditing(false),
-                  className: "flex-1 bg-slate-100 text-slate-600 rounded-lg py-1 text-xs"
-                }, "বাতিল")
-              )
-            )
-      ),
-      // --- এই পরিবার ত্যাগ করুন ---
-      /*#__PURE__*/React.createElement("div", {
-        className: "px-2 pt-1"
-      },
+        // --- এই পরিবার ত্যাগ করুন(পূর্বের "এডমিন হতে অব্যাহতি নিন"-এর জায়গায়) ---
         !confirmLeave
-          ? /*#__PURE__*/React.createElement("button", {
+          ? /*#__PURE__*/React.createElement("div", {
+              className: "mt-1"
+            }, /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setConfirmLeave(true),
-              className: "w-full text-left px-2 py-1.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-semibold flex items-center gap-1.5"
-            }, "🚪 এই পরিবার ত্যাগ করুন")
+              className: "text-left text-red-500 text-[9px] font-medium hover:underline"
+            }, "🚪 এই পরিবার ত্যাগ করুন"))
           : /*#__PURE__*/React.createElement("div", {
-              className: "px-2 py-1.5 space-y-1.5"
+              className: "mt-1.5 space-y-1.5"
             },
               /*#__PURE__*/React.createElement("div", {
-                className: "text-red-600 text-[11px]"
+                className: "text-red-600 text-[10px]"
               }, "নিশ্চিত? এই সিদ্ধান্ত পূর্বাবস্থায় ফেরানো যাবে না।"),
               leaveError && /*#__PURE__*/React.createElement("div", {
                 className: "text-red-500 text-[10px]"
@@ -202,6 +144,50 @@ export function ProfileDropdownGoogle({
                 }, "বাতিল")
               )
             )
+      ),
+      // --- যোগ দিয়েছেন তারিখ ---
+      sinceText && /*#__PURE__*/React.createElement("div", {
+        className: "px-4 py-2 space-y-1 text-slate-500 border-b border-slate-100"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex items-center gap-1.5"
+      }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
+        className: "text-slate-700 font-normal"
+      }, sinceText))),
+      // --- প্রোফাইল এডিট ফর্ম(শুধু editing=true হলে দেখা যাবে — টগল এখন হেডারের আইকন থেকে) ---
+      editing && /*#__PURE__*/React.createElement("div", {
+        className: "px-4 py-1.5 space-y-1.5 border-b border-slate-100"
+      },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          value: nameInput,
+          onChange: e => setNameInput(e.target.value),
+          className: "w-full border border-slate-200 rounded-lg px-2 py-1 text-xs",
+          placeholder: "নাম"
+        }),
+        /*#__PURE__*/React.createElement("select", {
+          value: genderInput || "",
+          onChange: e => setGenderInput(e.target.value),
+          className: "w-full border border-slate-200 rounded-lg px-2 py-1 text-xs"
+        },
+          /*#__PURE__*/React.createElement("option", { value: "" }, "জেন্ডার বেছে নিন"),
+          /*#__PURE__*/React.createElement("option", { value: "male" }, "পুরুষ"),
+          /*#__PURE__*/React.createElement("option", { value: "female" }, "নারী")
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          className: "flex gap-1.5"
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            disabled: saving,
+            onClick: handleSaveProfile,
+            className: "flex-1 bg-emerald-700 text-white rounded-lg py-1 text-xs font-semibold disabled:opacity-50"
+          }, saving ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setEditing(false),
+            className: "flex-1 bg-slate-100 text-slate-600 rounded-lg py-1 text-xs"
+          }, "বাতিল")
+        )
       ),
       // --- লগআউট ---
       /*#__PURE__*/React.createElement("div", {

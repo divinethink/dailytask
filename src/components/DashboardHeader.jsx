@@ -172,15 +172,7 @@ export function DashboardHeader({
       } catch {}
     },
     className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
-  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "আমন্ত্রণ লিংক শেয়ার করুন"), activeInviteToken && !activeInviteToken.revoked && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: async () => {
-      try {
-        await handleRevokeInviteLink();
-      } catch {}
-    },
-    className: "w-full text-left px-4 py-1.5 text-red-600 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
-  }, "লিংক নিষ্ক্রিয় করুন")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "আমন্ত্রণ লিংক শেয়ার করুন")), /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 my-1"
   }), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
@@ -243,7 +235,7 @@ export function DashboardHeader({
     }
   }, /*#__PURE__*/React.createElement(User, {
     size: 13
-  }), " ", isGuestMode ? "প্রোফাইল/নন-মেম্বার" : (selectedMember ? selectedMember.name : "সদস্য বেছে নিন"), /*#__PURE__*/React.createElement(ChevronDown, {
+  }), " ", isGuestMode ? "সদস্য প্রোফাইল" : (selectedMember ? selectedMember.name : "সদস্য বেছে নিন"), /*#__PURE__*/React.createElement(ChevronDown, {
     size: 12,
     className: `transition-transform duration-200 ${showProfileDropdown ? "rotate-180" : ""}`
   })), /*#__PURE__*/React.createElement(ProfileDropdownGoogle, {
@@ -256,6 +248,7 @@ export function DashboardHeader({
   // myOwnMember লজিকের(app.js) হুবহু একই derive-pattern, presentational
   // component-এই সীমাবদ্ধ(নতুন state না, শুধু render-time computation)।
   ownMember: (members || []).find(x => x.googleUid === (auth.currentUser ? auth.currentUser.uid : null)) || null,
+  userEmail: auth.currentUser ? auth.currentUser.email : null,
   isAdmin,
   isFirstAdmin: !!(firstAdminUid && auth.currentUser && auth.currentUser.uid === firstAdminUid),
   streak,
