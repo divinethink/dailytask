@@ -50,7 +50,7 @@ function StreakCard({ streak, toBn }) {
 function activityTierColor(pct) {
   if (pct >= 85) return "var(--theme-primary)";
   if (pct >= 60) return "#7C5CBF";
-  if (pct >= 35) return "#64748B";
+  if (pct >= 35) return "#D6A400";
   return "#C1666B";
 }
 const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
@@ -522,7 +522,7 @@ export function MonthlyOverviewSection({
       className: "h-7 w-full rounded-lg flex items-center justify-center text-[10px] font-bold transition-transform active:scale-90 shadow-sm",
       style: {
         background: scoreColor(s),
-        color: s !== null && s >= 0.35 ? "#fff" : "#555",
+        color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : "#555",
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
@@ -537,7 +537,7 @@ export function MonthlyOverviewSection({
   }, [
     { c: "var(--theme-primary)", l: "চমৎকার" },
     { c: "#7C5CBF", l: "ভালো" },
-    { c: "#64748B", l: "মাঝারি" },
+    { c: "#F5D061", l: "মাঝারি" },
     { c: "#C1666B", l: "কম" },
     { c: "#E7EEE3", l: "খালি", border: true }
   ].map(item => /*#__PURE__*/React.createElement("span", {

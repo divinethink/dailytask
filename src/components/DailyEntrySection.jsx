@@ -8,17 +8,22 @@
 // previously module-scope closures (fieldApplies/isExcused/isFieldExcusable/toBn),
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
-import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, TasbihIcon, UsersIcon } from "./icons.jsx";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon } from "./icons.jsx";
 
 // §B৭ Home category-header icon map(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // DEEN_CATEGORY_GROUPS/duniya-bucket-এর id অনুযায়ী emoji("🕌📖🤲🏃")-এর বদলে
 // monochrome outline icon component বেছে নেয়া হয় — appHelpers.js("pure utility",
-// কোনো icon-import নেই) অপরিবর্তিত রেখে এই mapping এখানেই রাখা হলো।
+// কোনো icon-import নেই) অপরিবর্তিত রেখে এই mapping এখানেই রাখা হলো। যিকির ও
+// দাওয়াহ-এর জন্য SparkleIcon(নতুন, filled) — বটম-ন্যাভের "তাসবীহ"(dot-bead
+// circle) থেকে আলাদা রাখতে TasbihIcon পুনর্ব্যবহার করা হয়নি। ব্যক্তিগত ও
+// পারিবারিক অভ্যাস-এর জন্য FamilyIcon(৩-সদস্য abstract mark, UsersIcon-এর
+// ২-জনের human-silhouette-এর বদলে — ধর্মীয় sensitivity-due-to no clear human
+// figure)।
 const CATEGORY_ICON_COMPONENTS = {
   salah: MosqueIcon,
   quranIlm: BookIcon,
-  dhikrDawah: TasbihIcon,
-  duniya: UsersIcon
+  dhikrDawah: SparkleIcon,
+  duniya: FamilyIcon
 };
 
 // §B৭ Haptic feedback(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):

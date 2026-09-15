@@ -679,32 +679,26 @@ export function MosqueIcon({
     color: color,
     className: className,
     style: style
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 2v3"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "2",
+    y1: "21",
+    x2: "22",
+    y2: "21"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 21v-5a7 7 0 0 1 14 0v5"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "9",
+    x2: "12",
+    y2: "5"
   }), /*#__PURE__*/React.createElement("circle", {
     cx: "12",
-    cy: "6.5",
-    r: "1.1",
+    cy: "4",
+    r: "1",
     fill: color,
     stroke: "none"
   }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 21v-6.5c0-2.8 2-5 4-6.5 2 1.5 4 3.7 4 6.5V21"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 21v-6.5c0-2.8 2-5 4-6.5 2 1.5 4 3.7 4 6.5V21"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M2 21h20"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M2 21v-2a2 2 0 0 1 2-2h1M22 21v-2a2 2 0 0 0-2-2h-1"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "12",
-    y1: "12.5",
-    x2: "12",
-    y2: "16"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "10.2",
-    y1: "14.2",
-    x2: "13.8",
-    y2: "14.2"
+    d: "M10 21v-3a2 2 0 0 1 4 0v3"
   }));
 }
 export function BookIcon({
@@ -727,6 +721,67 @@ export function BookIcon({
     y1: "3",
     x2: "12",
     y2: "21"
+  }));
+}
+// §B৭ যিকির ও দাওয়াহ-header icon(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-
+// approved — বটম-ন্যাভের "তাসবীহ"(TasbihIcon, বেড-সার্কেল ডিজাইন) থেকে আলাদা
+// ইউনিক গ্লিফ চাওয়া হয়েছিল): filled-sparkle(এক বড় + দুই ছোট তারা), remembrance/
+// noor-থিমের জন্য প্রচলিত একটি standalone icon-set glyph — stroke-based Icon()
+// wrapper ব্যবহার না করে নিজস্ব filled-shape svg(অন্য filled-glyph, যেমন
+// TasbihIcon-এর bead-circle, একই pattern অনুসরণ করে)।
+export function SparkleIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: color,
+    className: className,
+    style: style
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 2.5c.5 3.2 1 5.4 2.3 6.7 1.3 1.3 3.5 1.8 6.7 2.3-3.2.5-5.4 1-6.7 2.3-1.3 1.3-1.8 3.5-2.3 6.7-.5-3.2-1-5.4-2.3-6.7C8.4 12.5 6.2 12 3 11.5c3.2-.5 5.4-1 6.7-2.3C11 8 11.5 5.7 12 2.5z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M19 15.5c.3 1.4.6 2.2 1.3 2.9.7.7 1.5 1 2.9 1.3-1.4.3-2.2.6-2.9 1.3-.7.7-1 1.5-1.3 2.9-.3-1.4-.6-2.2-1.3-2.9-.7-.7-1.5-1-2.9-1.3 1.4-.3 2.2-.6 2.9-1.3.7-.7 1-1.5 1.3-2.9z"
+  }));
+}
+// §B৭ ব্যক্তিগত ও পারিবারিক অভ্যাস-header icon(2_5 Part B §B৭, ১৫ সেপ্টেম্বর
+// ২০২৬, owner-approved — UsersIcon("দুই মানুষ", human-silhouette outline)-এর
+// বদলে ৩ সদস্যের(মা-বাবা-সন্তান) পরিবার বোঝায় এমন abstract mark চাওয়া হয়েছিল,
+// শর্ত: প্রিমিয়াম দেখাবে এবং ধর্মীয় sensitivity-এর কারণে মানব-অবয়ব/জেন্ডার-
+// নির্দিষ্ট আকৃতি স্পষ্ট থাকবে না): তাই এখানে কোনো head-and-shoulders silhouette
+// নেই — শুধু ৩টা বিমূর্ত বৃত্ত(দুটো বড়=বাবা-মা, একটা ছোট=সন্তান) আর নিচে একটা
+// নরম আলিঙ্গন-আর্ক(নীড়/ছাতার মতো) দিয়ে "family unit" বোঝানো হয়েছে — কোনো মুখ,
+// শরীর বা লিঙ্গ-নির্দেশক অংশ নেই, সম্পূর্ণ geometric/logo-mark স্টাইল।
+export function FamilyIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className,
+    style: style
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M3 20.5c0-4.2 4-7 9-7s9 2.8 9 7"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "7.2",
+    cy: "7.3",
+    r: "3"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "16.8",
+    cy: "7.3",
+    r: "3"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "14.2",
+    r: "2.1",
+    fill: color
   }));
 }
 export function AppLogo({
