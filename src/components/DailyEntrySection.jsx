@@ -49,6 +49,11 @@ function BoolToggle({
   }));
 }
 
+// §Part B Phase ৪(touch-target, 2_5 Part B §B৩.২/§B৬, ১৫ সেপ্টেম্বর ২০২৬):
+// +/− বাটন ৩২→৩৬px(w-9 h-9, interactive-mockup-confirmed spec) — CSS-only,
+// CountStepper ও NumberField উভয়ের +/− বাটনে। ক্যালেন্ডার-নেভ chevron(◀/▶,
+// নিচে date-nav card-এ) ইচ্ছাকৃতভাবে touch করা হয়নি — mockup-এ শুধু
+// stepper-এর কথা বলা হয়েছে, scope-এর বাইরে কিছু বদলানো হয়নি।
 function CountStepper({
   value,
   onChange,
@@ -63,7 +68,7 @@ function CountStepper({
     type: "button",
     disabled: disabled,
     onClick: () => onChange(Math.max(0, v - 1)),
-    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
+    className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
       color: "#16302B"
@@ -78,7 +83,7 @@ function CountStepper({
     type: "button",
     disabled: disabled,
     onClick: () => onChange(Math.min(max, v + 1)),
-    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
+    className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
       color: "#16302B"
@@ -107,7 +112,7 @@ function NumberField({
     type: "button",
     disabled: disabled,
     onClick: () => onChange(Math.max(0, v - 1)),
-    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
+    className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
       color: "#16302B"
@@ -122,7 +127,7 @@ function NumberField({
     type: "button",
     disabled: disabled,
     onClick: () => onChange(v + 1),
-    className: "w-8 h-8 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
+    className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
       color: "#16302B"
