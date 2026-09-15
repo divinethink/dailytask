@@ -163,13 +163,13 @@ const DEFAULT_DEEN_FIELDS = [{
   excusable: true
 }, {
   key: "tahajjud",
-  label: "সিয়াম (ফরজ/নফল) / তাহাজ্জুদ",
-  shortLabel: "সিয়াম/তাহাজ্জুদ",
+  label: "সিয়াম (ফরজ/নফল) / কিয়ামুল লাইল",
+  shortLabel: "সিয়াম/কিয়ামুল লাইল",
   type: "bool",
   excusable: true
 }, {
   key: "morningEveningAzkar",
-  label: "সকাল-সন্ধ্যার ও ঘুমানোর সময়ের আমল",
+  label: "সকাল-সন্ধ্যার আমল",
   shortLabel: "সকাল-সন্ধ্যার আমল",
   type: "bool"
 }, {
@@ -179,7 +179,7 @@ const DEFAULT_DEEN_FIELDS = [{
   type: "bool"
 }, {
   key: "quranPages",
-  label: "কুরআন/তাফসীর ও আরবি শেখা (পৃষ্ঠা)",
+  label: "কুরআন/তাফসীর (পৃষ্ঠা)",
   shortLabel: "কুরআন",
   type: "number",
   target: 2
@@ -267,7 +267,7 @@ const DEFAULT_DUNIYA_FIELDS = [{
 // DailyEntrySection.jsx সরাসরি DEFAULT_DUNIYA_FIELDS ব্যবহার করে ৪র্থ ক্যাটাগরি হিসেবে।
 const DEEN_CATEGORY_GROUPS = [{
   id: "salah",
-  label: "সালাত",
+  label: "সালাত ও সিয়াম",
   icon: "🕌",
   keys: ["fardPrayers", "jamaat", "sunnahNafl", "tahajjud"]
 }, {
