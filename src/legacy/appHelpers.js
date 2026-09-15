@@ -666,6 +666,29 @@ function fieldPercent(field, monthEntries, totalDays, member) {
   let hit = 0;
   if (field.type === "count") {
     let sum = 0;
+    // §Bug fix(owner-reported, ১৬ সেপ্টেম্বর ২০২৬): আগের ফিক্স(৮ সেপ্টেম্বর
+    // ২০২৬, নিচের কমেন্ট) সম্পূর্ণ-খালি দিনকে(`!e`, কোনো entry-ই সেভ হয়নি)
+    // "০ ক্রেডিট" দিত ঠিকই, কিন্তু সেই দিনটা তখনো effectiveDays denominator-এ
+    // থেকে যেত — ফলে fardPrayers-এর ইনভার্টেড হিসাবে সেই দিন "সর্বোচ্চ কাযা"
+    // (সব ওয়াক্ত মিসড) হিসেবে গণনা হয়ে যাচ্ছিল, অথচ খালি দিনের প্রকৃত অর্থ
+    // শুধু "ডেটা নেই"(app-ই খোলা হয়নি সেদিন), "সব ওয়াক্ত কাযা" নয়। বাস্তব
+    // কেস(owner-report): পুরো মাসে একদিনও প্রকৃত কাযা রিপোর্ট না করা সত্ত্বেও
+    // কাযার হার ৫৭% দেখাচ্ছিল — কারণ ফাঁকা/অ-পূরণ দিনগুলো(app না খোলা)
+    // denominator-এ থেকে প্রতিটাই "৫/৫ কাযা" হিসেবে যোগ হচ্ছিল। Fix: শুধু
+    // fardPrayers-এর জন্য সম্পূর্ণ-খালি দিন excused-দিনের মতোই denominator
+    // থেকে বাদ(true N/A, না ০% না ১০০%) — অন্য কোনো count-type field(যেমন
+    // জামায়াতে সালাত)-এর আচরণ অপরিবর্তিত(scope ইচ্ছাকৃতভাবে সীমিত)।
+    let activeDays = effectiveDays;
+    if (field.key === "fardPrayers") {
+      let emptyDays = 0;
+      for (let d = 1; d <= totalDays; d++) {
+        const e2 = monthEntries[pad2(d)];
+        if (excusableHere && isExcused(e2, field.key)) continue;
+        if (!e2) emptyDays += 1;
+      }
+      activeDays = effectiveDays - emptyDays;
+    }
+    if (activeDays <= 0) return null;
     for (let d = 1; d <= totalDays; d++) {
       const e = monthEntries[pad2(d)];
       if (excusableHere && isExcused(e, field.key)) continue;
@@ -678,7 +701,8 @@ function fieldPercent(field, monthEntries, totalDays, member) {
       // "খালি দিন = পূর্ণ ক্রেডিট" হয়ে যাচ্ছিল, যা মাসিক ওভারভিউ ও প্রিন্ট
       // PDF-এর "ফরজ কাযা"-র শতাংশকে কৃত্রিমভাবে বাড়িয়ে দেখাচ্ছিল, বিশেষত
       // যেসব মাসে অনেক দিন পূরণ করা হয়নি। এখন খালি দিনকে বাকি সব ফিল্ডের
-      // মতোই "০ ক্রেডিট" হিসেবে গণনা করা হচ্ছে।
+      // মতোই "০ ক্রেডিট" হিসেবে গণনা করা হচ্ছে(এবং উপরের নতুন fix অনুযায়ী
+      // denominator থেকেও বাদ, §১৬ সেপ্টেম্বর ২০২৬ fix দ্রষ্টব্য)।
       if (field.key === "fardPrayers") {
         // BUG FIX(৮ সেপ্টেম্বর ২০২৬): আগের কোড শুধু entry সম্পূর্ণ অনুপস্থিত
         // (`!e`) থাকা দিনকেই "০ ক্রেডিট" দেওয়ার কথা ছিল(উপরের কমেন্ট অনুযায়ী),
@@ -691,7 +715,8 @@ function fieldPercent(field, monthEntries, totalDays, member) {
         // "সর্বোচ্চ কাযা" হিসেবে গণনা হয়ে কাযার হার কৃত্রিমভাবে বাড়িয়ে
         // দেখাচ্ছিল। Fix: entry(`e`) থাকলেই বাকি ফিল্ডের মতো স্বাভাবিক
         // হিসাব(untouched sub-field → raw ০ → পূর্ণ ক্রেডিট), শুধু সম্পূর্ণ
-        // খালি দিন(`!e`)-এই কিছু যোগ হবে না(০ ক্রেডিট, পুরনো নিয়ম অক্ষুণ্ণ)।
+        // খালি দিন(`!e`)-এই কিছু যোগ হবে না(০ ক্রেডিট, এবং উপরের fix-এ
+        // denominator থেকেও বাদ পড়ে)।
         if (e) {
           const capped = Math.min(field.max, Number(e[field.key]) || 0);
           sum += field.max - capped;
@@ -701,7 +726,7 @@ function fieldPercent(field, monthEntries, totalDays, member) {
         sum += capped;
       }
     }
-    return Math.round(sum / (effectiveDays * field.max) * 100);
+    return Math.round(sum / (activeDays * field.max) * 100);
   }
   if (field.type === "number" && field.target) {
     // BUG FIX: এই শাখায় আগে excused দিনগুলো বাদ দেওয়া হতো না (উপরের
