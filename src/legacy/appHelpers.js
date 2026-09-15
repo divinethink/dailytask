@@ -99,6 +99,47 @@ function useThemeColor() {
   return [themeColor, setThemeColor];
 }
 
+// §B৭ Dark Mode + Sepia Mode(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+// owner-approved — "চোখের সুরক্ষার জন্য সেপিয়া" আলাদাভাবে requested):
+// existing useThemeColor()-এর একই localStorage-persisted pattern reuse।
+// পুরো কোডবেসের প্রতিটা component-এ hardcoded hex-কে token-এ রূপান্তর করা
+// (broad, ১০+ ফাইল, উচ্চ-ঝুঁকি) না করে — global CSS filter(`<html
+// data-display-mode="...">`, index.html-এ সংজ্ঞায়িত) দিয়ে low-risk, single-
+// point বাস্তবায়ন। "light"(ডিফল্ট) attribute-value ফাঁকা রাখা হয় যাতে কোনো
+// CSS selector match না করে(no-op, বর্তমান visual অপরিবর্তিত)।
+const DISPLAY_MODES = [{
+  id: "light",
+  name: "লাইট (ডিফল্ট)"
+}, {
+  id: "sepia",
+  name: "সেপিয়া (চোখের আরাম)"
+}, {
+  id: "dark",
+  name: "ডার্ক"
+}];
+function applyDisplayMode(mode) {
+  document.documentElement.setAttribute("data-display-mode", mode === "light" ? "" : mode);
+}
+function useDisplayMode() {
+  const [displayMode, setDisplayModeState] = useState(() => {
+    try {
+      return localStorage.getItem("display_mode") || "light";
+    } catch {
+      return "light";
+    }
+  });
+  useEffect(() => {
+    applyDisplayMode(displayMode);
+  }, [displayMode]);
+  function setDisplayMode(mode) {
+    setDisplayModeState(mode);
+    try {
+      localStorage.setItem("display_mode", mode);
+    } catch {}
+  }
+  return [displayMode, setDisplayMode];
+}
+
 const DEFAULT_DEEN_FIELDS = [{
   key: "fardPrayers",
   label: "ফরজ কাযা সালাত (কয় ওয়াক্ত?)",
@@ -735,6 +776,8 @@ export {
   getThemeColor,
   applyThemeColor,
   useThemeColor,
+  DISPLAY_MODES,
+  useDisplayMode,
   DEFAULT_DEEN_FIELDS,
   DEFAULT_DUNIYA_FIELDS,
   DEEN_CATEGORY_GROUPS,
