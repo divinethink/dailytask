@@ -526,7 +526,29 @@ export function MonthlyOverviewSection({
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
-  })))), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
+  }))), /* §Part B Phase ৫(heatmap legend, 2_5 Part B §B৩.৪, ১৫ সেপ্টেম্বর ২০২৬):
+       কম্প্যাক্ট রঙ-legend, existing scoreColor()(appHelpers.js) ৫-tier scheme
+       ও InfoModals.jsx-এর ইতিমধ্যে-বিদ্যমান ক্যালেন্ডার-রঙ legend-এর সাথে
+       হুবহু sync(কোনো নতুন formula/threshold না, শুধু presentation) — পূর্ণ
+       percentage-range বিবরণ আগে থেকেই ⓘ-আইকনে আছে, এটা শুধু at-a-glance
+       quick-reference, tap ছাড়াই। */
+  /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-slate-100"
+  }, [
+    { c: "var(--theme-primary)", l: "চমৎকার" },
+    { c: "#7C5CBF", l: "ভালো" },
+    { c: "#64748B", l: "মাঝারি" },
+    { c: "#C1666B", l: "কম" },
+    { c: "#E7EEE3", l: "খালি", border: true }
+  ].map(item => /*#__PURE__*/React.createElement("span", {
+    key: item.l,
+    className: "flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-2.5 h-2.5 rounded-sm" + (item.border ? " border border-slate-300" : ""),
+    style: { background: item.c }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] font-medium text-slate-500"
+  }, item.l))))), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
     monthEntries: monthEntries,
     totalDays: total,
     member: selectedMember,

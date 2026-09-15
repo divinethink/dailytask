@@ -529,18 +529,7 @@ export function DailyEntrySection({
     className: "text-[11px] text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-xl py-2 px-3"
   }, "ভবিষ্যতের তারিখের জন্য আমল টিক দেওয়া যাবে না — আজকের তারিখে ফিরে যান।"), isLockedForThisDevice && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-center text-slate-600 bg-slate-100 border border-slate-200 rounded-xl py-2 px-3"
-  }, "এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে শুধু দেখা যাবে, এডিট করা যাবে না।"), /* §Part B Phase ৩(sticky save bar, 2_5 Part B §B৩.৩, ১৫ সেপ্টেম্বর ২০২৬):
-       বাটন এখন sticky wrapper div-এর ভিতরে — বাকি warning/note/accordion
-       অপরিবর্তিত normal-flow-এ, শুধু বাটন bottom-nav(fixed, BottomNav.jsx)-এর
-       ঠিক উপরে স্ক্রল করার সময় আটকে থাকবে। bottom অফসেট(5rem/80px) app.js-এর
-       existing pb-20 page-padding কনভেনশন থেকেই নেওয়া(নতুন magic-number না,
-       একই safe-clearance মান reuse)। বাটন নিজেই এই section("দৈনন্দিন আমল")-এর
-       শেষ child বলে sticky footer হিসেবে কাজ করবে(CSS-only, কোনো logic/state
-       পরিবর্তন হয়নি)। */
-  /*#__PURE__*/React.createElement("div", {
-    className: "sticky z-30",
-    style: { bottom: "5rem" }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, "এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে শুধু দেখা যাবে, এডিট করা যাবে না।"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSave,
     disabled: isFutureDate(viewDate) || isLockedForThisDevice || isLockedForSwitch,
     className: "w-full h-12 rounded-2xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100",
@@ -550,5 +539,5 @@ export function DailyEntrySection({
   }, saving ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 18
-  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডেটা সেভ করুন"))));
+  }) : savedTick ? "সেভ হয়েছে!" : "আজকের ডেটা সেভ করুন")));
 }
