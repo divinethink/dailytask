@@ -8,7 +8,18 @@
 // previously module-scope closures (fieldApplies/isExcused/isFieldExcusable/toBn),
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
-import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon } from "./icons.jsx";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, TasbihIcon, UsersIcon } from "./icons.jsx";
+
+// §B৭ Home category-header icon map(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
+// DEEN_CATEGORY_GROUPS/duniya-bucket-এর id অনুযায়ী emoji("🕌📖🤲🏃")-এর বদলে
+// monochrome outline icon component বেছে নেয়া হয় — appHelpers.js("pure utility",
+// কোনো icon-import নেই) অপরিবর্তিত রেখে এই mapping এখানেই রাখা হলো।
+const CATEGORY_ICON_COMPONENTS = {
+  salah: MosqueIcon,
+  quranIlm: BookIcon,
+  dhikrDawah: TasbihIcon,
+  duniya: UsersIcon
+};
 
 // §B৭ Haptic feedback(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // native Web Vibration API, silent no-op যদি browser/device সাপোর্ট না করে
@@ -203,9 +214,14 @@ function FieldGroup({
     className: "w-full flex items-center justify-between gap-2" + (open ? " mb-3" : "")
   }, /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1.5 min-w-0"
-  }, icon && /*#__PURE__*/React.createElement("span", {
+  }, icon && (typeof icon === "function" ? /*#__PURE__*/React.createElement("span", {
+    className: "shrink-0 flex items-center"
+  }, /*#__PURE__*/React.createElement(icon, {
+    size: 16,
+    color: "var(--theme-primary)"
+  })) : /*#__PURE__*/React.createElement("span", {
     className: "text-base shrink-0"
-  }, icon), /*#__PURE__*/React.createElement("h3", {
+  }, icon)), /*#__PURE__*/React.createElement("h3", {
     className: "text-sm font-bold text-emerald-950 text-left"
   }, title), onInfoClick && /*#__PURE__*/React.createElement("span", {
     role: "button",
@@ -275,6 +291,58 @@ function FieldGroup({
       toBn: toBn
     })));
   })));
+}
+
+// §B৭ "অন্যান্য" collapsible wrapper(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+// owner-approved — কাস্টম টাস্ক + দিনের নোট, আগে ২টা পৃথক সবসময়-খোলা card,
+// এখন একটাই collapsible card): FieldGroup-এর header/accordion pattern
+// (sessionStorage-persisted open-state, icon+title+chevron) হুবহু reuse করে,
+// কিন্তু arbitrary children নেয় (percent badge নেই — এই দুটো ফ্রি-ফর্ম এন্ট্রি,
+// percentage-বেসড ট্র্যাকযোগ্য আইটেম না)।
+function CollapsibleCard({
+  title,
+  icon,
+  children,
+  defaultOpen,
+  categoryId
+}) {
+  const storageKey = categoryId ? "dt_home_accordion_" + categoryId : null;
+  const [open, setOpen] = React.useState(() => {
+    if (storageKey) {
+      try {
+        const saved = sessionStorage.getItem(storageKey);
+        if (saved !== null) return saved === "1";
+      } catch {}
+    }
+    return !!defaultOpen;
+  });
+  const toggleOpen = () => setOpen(o => {
+    const next = !o;
+    if (storageKey) {
+      try { sessionStorage.setItem(storageKey, next ? "1" : "0"); } catch {}
+    }
+    return next;
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: toggleOpen,
+    className: "w-full flex items-center justify-between gap-2" + (open ? " mb-3" : "")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5 min-w-0"
+  }, icon && /*#__PURE__*/React.createElement("span", {
+    className: "shrink-0 flex items-center"
+  }, /*#__PURE__*/React.createElement(icon, {
+    size: 16,
+    color: "var(--theme-primary)"
+  })), /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-bold text-emerald-950 text-left"
+  }, title)), /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 15,
+    color: "#8A9A8F",
+    className: "transition-transform" + (open ? " rotate-180" : "")
+  })), open && children);
 }
 
 export function DailyEntrySection({
@@ -478,13 +546,13 @@ export function DailyEntrySection({
     [...DEEN_CATEGORY_GROUPS.map(g => ({
       id: g.id,
       title: g.label,
-      icon: g.icon,
+      icon: CATEGORY_ICON_COMPONENTS[g.id] || g.icon,
       fields: DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)),
       showInfo: g.id === "salah"
     })), {
       id: "duniya",
       title: "ব্যক্তিগত ও পারিবারিক অভ্যাস",
-      icon: "🏃",
+      icon: CATEGORY_ICON_COMPONENTS.duniya,
       fields: DEFAULT_DUNIYA_FIELDS,
       showInfo: false
     }].map((c, idx) => {
@@ -510,9 +578,12 @@ export function DailyEntrySection({
         defaultOpen: idx === 0,
         categoryId: c.id
       });
-    }), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
-  }, /*#__PURE__*/React.createElement("div", {
+    }), /*#__PURE__*/React.createElement(CollapsibleCard, {
+    title: "অন্যান্য",
+    icon: ClipboardListIcon,
+    defaultOpen: false,
+    categoryId: "other"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "text-sm font-bold text-emerald-900"
@@ -540,7 +611,7 @@ export function DailyEntrySection({
     onChange: v => updateField(f.key, v),
     disabled: isFutureDate(viewDate) || isLockedForThisDevice
   })))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
+    className: "pt-4 mt-4 border-t border-slate-100"
   }, /*#__PURE__*/React.createElement("label", {
     className: "block text-sm font-bold text-slate-800 mb-2"
   }, "দিনের নোট / আত্ম-সমালোচনা"), /*#__PURE__*/React.createElement("textarea", {
@@ -550,7 +621,7 @@ export function DailyEntrySection({
     placeholder: "আজকের অনুভূতি, অর্জন বা শেখা বিষয় লিখুন...",
     disabled: isFutureDate(viewDate) || isLockedForThisDevice,
     className: "w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
-  })), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
+  }))), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between px-1"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-slate-400 font-medium"

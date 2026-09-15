@@ -662,6 +662,73 @@ export function ClipboardListIcon({
     y2: "14"
   }));
 }
+// §B৭ Home category-header icon set(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+// owner-approved — emoji("🕌📖🏃") এর বদলে নেভ-বার/টুলস-পেজের সাথে সামঞ্জস্যপূর্ণ
+// monochrome outline icon): existing Icon() stroke-convention অনুসরণ করে, নতুন
+// কোনো asset/library ছাড়া। MosqueIcon("সালাত ও সিয়াম") ও BookIcon("কুরআন ও ইলম")
+// — UsersIcon("ব্যক্তিগত ও পারিবারিক অভ্যাস") ও TasbihIcon("যিকির ও দাওয়াহ")
+// আগে থেকেই বিদ্যমান, পুনর্ব্যবহার করা হয়েছে।
+export function MosqueIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className,
+    style: style
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 2v3"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "6.5",
+    r: "1.1",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 21v-6.5c0-2.8 2-5 4-6.5 2 1.5 4 3.7 4 6.5V21"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 21v-6.5c0-2.8 2-5 4-6.5 2 1.5 4 3.7 4 6.5V21"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2 21h20"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2 21v-2a2 2 0 0 1 2-2h1M22 21v-2a2 2 0 0 0-2-2h-1"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "12.5",
+    x2: "12",
+    y2: "16"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "10.2",
+    y1: "14.2",
+    x2: "13.8",
+    y2: "14.2"
+  }));
+}
+export function BookIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className,
+    style: style
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M4 4.5A1.5 1.5 0 0 1 5.5 3H12v18H5.5A1.5 1.5 0 0 1 4 19.5v-15Z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M20 4.5A1.5 1.5 0 0 0 18.5 3H12v18h6.5a1.5 1.5 0 0 0 1.5-1.5v-15Z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "3",
+    x2: "12",
+    y2: "21"
+  }));
+}
 export function AppLogo({
   size = 32,
   className = ""
