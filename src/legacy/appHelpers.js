@@ -216,6 +216,31 @@ const DEFAULT_DUNIYA_FIELDS = [{
   type: "bool"
 }];
 
+// §Part B Home-tab Redesign — Field→Category mapping(2_4_Identity_Simplification_Plan.md
+// Part B §B৩.২, কোড-verified ১৩ সেপ্টেম্বর ২০২৬, চূড়ান্ত)। DEFAULT_DEEN_FIELDS(১২টা)-কে
+// থিম অনুযায়ী ৩ উপ-গ্রুপে ভাগ করা হয়েছে — কোনো field বাদ পড়েনি/duplicate হয়নি, প্রতিটা
+// group-এর ভিতরে DEFAULT_DEEN_FIELDS-এর original array-order অপরিবর্তিত রাখা হয়েছে
+// (এখানে শুধু "কোন key কোন category"-এর তালিকা, নিচে DailyEntrySection.jsx এই তালিকা
+// দিয়ে DEFAULT_DEEN_FIELDS filter করে, তাই order-preservation স্বয়ংক্রিয়)। "ব্যক্তিগত ও
+// পারিবারিক অভ্যাস" ক্যাটাগরি(DEFAULT_DUNIYA_FIELDS, ৯টা) এখানে repeat করা হয়নি —
+// DailyEntrySection.jsx সরাসরি DEFAULT_DUNIYA_FIELDS ব্যবহার করে ৪র্থ ক্যাটাগরি হিসেবে।
+const DEEN_CATEGORY_GROUPS = [{
+  id: "salah",
+  label: "সালাত",
+  icon: "🕌",
+  keys: ["fardPrayers", "jamaat", "sunnahNafl", "tahajjud"]
+}, {
+  id: "quranIlm",
+  label: "কুরআন ও ইলম",
+  icon: "📖",
+  keys: ["quranPages", "seerah", "selfStudy", "taleem"]
+}, {
+  id: "dhikrDawah",
+  label: "যিকির ও দাওয়াহ",
+  icon: "🤲",
+  keys: ["morningEveningAzkar", "dhikr", "dawah", "sadaqah"]
+}];
+
 function fieldApplies(field, member) {
   if (!field.appliesTo) return true;
   if (!member || !member.gender) return true;
@@ -712,6 +737,7 @@ export {
   useThemeColor,
   DEFAULT_DEEN_FIELDS,
   DEFAULT_DUNIYA_FIELDS,
+  DEEN_CATEGORY_GROUPS,
   fieldApplies,
   isExcused,
   isFieldExcusable,

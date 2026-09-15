@@ -2,6 +2,7 @@ import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics } from "./fi
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
+  DEEN_CATEGORY_GROUPS,
   fieldApplies, isExcused, isFieldExcusable, BN_DIGITS, toBn, BN_MONTHS, BN_WEEKDAYS,
   DAILY_INSPIRATIONS, AYAT_LIST, HADITH_LIST, QUOTE_LIST, INSPIRATION_TYPE_CYCLE,
   getDailyInspiration, pad2, dateKey, formatBnDateTime, isFutureDate, monthPrefix,
@@ -2824,6 +2825,16 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     DEFAULT_DEEN_FIELDS: DEFAULT_DEEN_FIELDS,
     DEFAULT_DUNIYA_FIELDS: DEFAULT_DUNIYA_FIELDS,
+    // §Part B Phase ২(category-accordion, ১৫ সেপ্টেম্বর ২০২৬): নতুন prop-দুটো —
+    // DEEN_CATEGORY_GROUPS(field→category mapping) ও dailyScore(single-entry
+    // multi-field aggregate ratio, appHelpers.js-এ আগে থেকেই বিদ্যমান, এতদিন শুধু
+    // calculateStreak()-এ ব্যবহৃত হতো) — ক্যাটাগরি-হেডারের %-badge গণনায়। কোনো নতুন
+    // calculation-logic লেখা হয়নি, existing dailyScore()-ই reuse(owner-approved,
+    // ওজর/N/A ফিল্ড dailyScore()-এর ভিতরেই বাদ পড়ে/গড়ে বাদ যায় — fieldPercent()-এর
+    // মাসিক-লজিকের সাথে সামঞ্জস্যপূর্ণ একই নীতি)।
+    DEEN_CATEGORY_GROUPS: DEEN_CATEGORY_GROUPS,
+    dailyScore: dailyScore,
+    scoreColor: scoreColor,
     dateKey: dateKey,
     formatBnDateTime: formatBnDateTime,
     getDailyInspiration: getDailyInspiration,
