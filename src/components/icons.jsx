@@ -552,6 +552,84 @@ export function ClockIcon({
     points: "12 7 12 12 15 15"
   }));
 }
+// §Bottom Nav icon-set upgrade(2_4_Identity_Simplification_Plan.md §৯.০, ১৫ সেপ্টেম্বর
+// ২০২৬)। এই ৩টা icon(HomeIcon/TasbihIcon/CompassIcon) ইচ্ছাকৃতভাবে উপরের shared
+// Icon() wrapper ব্যবহার করেনি(সেটা fill:"none" hardcoded, ২৬টা বিদ্যমান call-site
+// জুড়ে ব্যবহৃত) — বরং standalone, নিজস্ব "filled" prop-সহ, যাতে shared wrapper-এ কোনো
+// পরিবর্তন না লাগে(zero regression-risk to existing icons)। active/inactive filled
+// আচরণ শুধু এই bottom-nav icon-গুলোর জন্যই প্রযোজ্য।
+export function HomeIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style,
+  filled = false
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: className,
+    style: { fill: filled ? color : "none", stroke: color, ...style }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5Z"
+  }));
+}
+export function TasbihIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style,
+  filled = false
+}) {
+  const beadFill = filled ? color : "none";
+  const beadPositions = [
+    [12, 4.3], [17.6, 6.9], [19.6, 12.5], [17, 18],
+    [11.3, 20], [5.9, 18], [4, 12], [6.4, 6.5]
+  ];
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: className,
+    style: { stroke: color, ...style }
+  },
+    ...beadPositions.map(([cx, cy], i) => /*#__PURE__*/React.createElement("circle", {
+      key: i, cx, cy, r: 1.5, fill: beadFill
+    })),
+    /*#__PURE__*/React.createElement("line", { x1: 11.3, y1: 20, x2: 11.3, y2: 23 })
+  );
+}
+export function CompassIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style,
+  filled = false
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: className,
+    style: { fill: "none", stroke: color, ...style }
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: 12, cy: 12, r: 9 }),
+    /*#__PURE__*/React.createElement("polygon", {
+      points: "16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76",
+      fill: filled ? color : "none"
+    })
+  );
+}
 export function AppLogo({
   size = 32,
   className = ""
