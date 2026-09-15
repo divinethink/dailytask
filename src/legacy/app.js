@@ -2522,6 +2522,41 @@ function App() {
       }
     });
   }
+  // §Bug-fix(১৫ সেপ্টেম্বর ২০২৬, "মেনু" ট্যাব সাদা-পেজ ক্র্যাশ): themeColorPickerEl
+  // আগে নিচে(family-tab render-flow-এর ভিতরে, monthCursor-নির্ভর হিসাব-চালার পরে)
+  // "const" দিয়ে define হতো — কিন্তু TAB_SETTINGS("মেনু") early-return branch(ঠিক
+  // নিচে) সেই ঘোষণার *আগেই* একই ভ্যারিয়েবল ব্যবহার করত(MenuPage prop হিসেবে),
+  // যা প্রতিটা render-এ JS-এর "const" temporal-dead-zone নিয়ম অনুযায়ী
+  // ReferenceError ছুঁড়ত(themeColorPickerEl-এর নিজস্ব dependency — themeColor/
+  // setThemeColor/THEME_PRESETS — সব এর অনেক আগেই সংজ্ঞায়িত, তাই early-move
+  // নিরাপদ, কোনো নতুন dependency তৈরি হয়নি)। কোনো Error Boundary না থাকায়
+  // React পুরো tree unmount করে সাদা পেজ দেখাতো; commit না হওয়ায়
+  // sessionStorage(dt_active_tab)-ও আগের("family") মানেই থেকে যেত — তাই
+  // reload করলে হোম-পেজ ফিরে আসতো(ভুল-fix না, শুধু pre-crash state)। Fix:
+  // এই const-টা এখানে(early-return-এর আগে) move করা হলো, নিচের ব্যবহার-স্থানে
+  // (family-tab render-flow) অপরিবর্তিত রয়ে গেছে(same variable, শুধু
+  // declaration-position বদলেছে)।
+  const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-slate-100 my-1"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "py-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+  }, "থিম কালার"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
+  }, THEME_PRESETS.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    type: "button",
+    onClick: () => setThemeColor(t.color),
+    title: t.name,
+    className: "w-7 h-7 rounded-full flex items-center justify-center transition-transform active:scale-90 border-2",
+    style: {
+      background: t.color,
+      borderColor: themeColor === t.color ? "#16302B" : "transparent"
+    }
+  }, themeColor === t.color && /*#__PURE__*/React.createElement("span", {
+    className: "text-white text-xs font-bold"
+  }, "✓"))))));
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
@@ -2687,27 +2722,8 @@ function App() {
   const total = monthStats.total;
   const firstOfMonth = new Date(monthCursor.year, monthCursor.month0, 1);
   const leadBlanks = firstOfMonth.getDay();
-  const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "থিম কালার"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
-  }, THEME_PRESETS.map(t => /*#__PURE__*/React.createElement("button", {
-    key: t.id,
-    type: "button",
-    onClick: () => setThemeColor(t.color),
-    title: t.name,
-    className: "w-7 h-7 rounded-full flex items-center justify-center transition-transform active:scale-90 border-2",
-    style: {
-      background: t.color,
-      borderColor: themeColor === t.color ? "#16302B" : "transparent"
-    }
-  }, themeColor === t.color && /*#__PURE__*/React.createElement("span", {
-    className: "text-white text-xs font-bold"
-  }, "✓"))))));
+  // (themeColorPickerEl এখন উপরে, early-return-এর আগে define করা হয়েছে — bug-fix
+  // নোট দ্রষ্টব্য। এখানে শুধু ব্যবহার হচ্ছে, নতুন declaration নেই।)
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen pb-20 bg-[#F4F7F1]"
   }, /*#__PURE__*/React.createElement(DashboardHeader, {
