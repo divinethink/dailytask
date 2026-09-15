@@ -556,7 +556,14 @@ import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFam
 import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
 import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
-import { PrintReport } from "../components/PrintReport.jsx";
+// §Part B §B৫(Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
+// শুধু `printMode` true হলেই render হয়(নিচে), কিন্তু আগে static import ছিল
+// বলে প্রতিটা normal home-tab load-এ অপ্রয়োজনে bundle হতো। এখন React.lazy()
+// দিয়ে আলাদা chunk(existing `3_2` §২.১-এর lazy-load pattern reuse, নতুন
+// convention না) — named-export বলে `.then(m => ({default: m.PrintReport}))`
+// wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
+// wrap করা হয়েছে।
+const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
@@ -2718,7 +2725,15 @@ function App() {
     style: { color: "var(--theme-primary)" },
     onClick: () => window.location.reload()
   }, "রিফ্রেশ করুন"));
-  if (printMode) return React.createElement(PrintReport, {
+  if (printMode) return /*#__PURE__*/React.createElement(React.Suspense, {
+    fallback: /*#__PURE__*/React.createElement("div", {
+      className: "min-h-screen flex items-center justify-center bg-[#F4F7F1]"
+    }, /*#__PURE__*/React.createElement(Loader2, {
+      className: "animate-spin",
+      color: "var(--theme-primary)",
+      size: 32
+    }))
+  }, React.createElement(PrintReport, {
     allFields: allFields,
     meetingState: meetingState,
     monthCursor: monthCursor,
@@ -2738,7 +2753,7 @@ function App() {
     isFieldExcusable: isFieldExcusable,
     pad2: pad2,
     toBn: toBn
-  });
+  }));
   const total = monthStats.total;
   const firstOfMonth = new Date(monthCursor.year, monthCursor.month0, 1);
   const leadBlanks = firstOfMonth.getDay();
