@@ -1,7 +1,80 @@
 // A4 G1 — Info modal components (Member/Excuse/Weekly/Meeting), extracted verbatim from
 // legacy App(). Structural-only: original show*/setShow* state names become {show, onClose}
 // props (state ownership stays in App(), per Roadmap A4 Owner Rule). JSX body unchanged.
-import { InfoIcon, X } from "./icons.jsx";
+import { InfoIcon, X, ChevronRight } from "./icons.jsx";
+const { useState } = React;
+
+// §B৭ Onboarding Coach-mark(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
+// প্রথম-লগইনে ৪-ধাপের one-time walkthrough। Anchored/positioned tooltip(nav-icon-এর
+// পাশে ভাসমান) না করে existing centered-modal pattern reuse করা হয়েছে(এই ফাইলের
+// অন্য Info-modal-গুলোর মতোই) — ref-based coordinate-measurement/positioning-logic
+// ছাড়াই low-risk, screen-size-independent বাস্তবায়ন। One-time flag(localStorage,
+// `dt_coachmark_shown_<uid>`) ও trigger-condition app.js-এ(state ownership সেখানেই)।
+const COACH_MARK_STEPS = [{
+  title: "স্বাগতম! 👋",
+  body: "প্রতিদিন এখানে আপনার আমল(সালাত, কুরআন, যিকির ইত্যাদি) রেকর্ড করুন — [+]/[−] বাটনে চেপে সংখ্যা বাড়ান-কমান, টিক দিয়ে সম্পন্ন করুন।"
+}, {
+  title: "নিচের ট্যাব থেকে ঘুরে দেখুন",
+  body: "সময়সূচি, তাসবীহ, সহায়িকা — এই ট্যাবগুলো যে কেউ বিনামূল্যে ব্যবহার করতে পারবেন, কোনো লগইন লাগবে না।"
+}, {
+  title: "মেনু",
+  body: "মেনু ট্যাপ করে সদস্য যোগ, ডেটা ব্যাকআপ, থিম কালার ও ডার্ক/সেপিয়া মোড(চোখের সুরক্ষা) পাবেন।"
+}, {
+  title: "ধারাবাহিকতা 🔥",
+  body: "প্রতিদিন পূরণ করলে স্ট্রিক বাড়বে, এবং মাসিক ওভারভিউ-তে নিজের অগ্রগতি দেখতে পারবেন।"
+}];
+export function CoachMarkModal({
+  show,
+  onClose
+}) {
+  const [step, setStep] = useState(0);
+  if (!show) return false;
+  const isLast = step === COACH_MARK_STEPS.length - 1;
+  const s = COACH_MARK_STEPS[step];
+  function finish() {
+    setStep(0);
+    onClose();
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1"
+  }, COACH_MARK_STEPS.map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "w-1.5 h-1.5 rounded-full",
+    style: {
+      background: i === step ? "#0E4B43" : "#E4E7E2"
+    }
+  }))), /*#__PURE__*/React.createElement("button", {
+    onClick: finish,
+    className: "text-slate-400 hover:text-slate-700",
+    "aria-label": "বন্ধ করুন"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 16
+  }))), /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-base text-slate-800 mb-1.5"
+  }, s.title), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-600 leading-relaxed mb-4"
+  }, s.body), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: finish,
+    className: "text-xs font-bold text-slate-400 hover:text-slate-600 px-2 py-2"
+  }, "এড়িয়ে যান"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => isLast ? finish() : setStep(step + 1),
+    className: "flex items-center gap-1 text-sm font-bold text-white px-4 py-2 rounded-xl",
+    style: {
+      background: "#0E4B43"
+    }
+  }, isLast ? "শুরু করুন" : "পরবর্তী", !isLast && /*#__PURE__*/React.createElement(ChevronRight, {
+    size: 14,
+    color: "#FFFFFF"
+  })))));
+}
 
 export function MemberInfoModal({ show, onClose }) {
   return show && /*#__PURE__*/React.createElement("div", {
