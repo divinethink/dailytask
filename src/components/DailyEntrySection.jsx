@@ -141,11 +141,14 @@ function NumberField({
 // §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
 // FieldGroup এখন সবসময় collapsible(আগে সবসময় খোলা flat card ছিল, নিচের নতুন
 // DailyEntrySection render-এ ৪টা category-ই এই একই FieldGroup ব্যবহার করে)।
-// State শুধু in-memory(useState) — sessionStorage-persistence(2_5 §B৫-এ ভবিষ্যৎ
-// polish হিসেবে flagged) এই Phase-এ ইচ্ছাকৃতভাবে যোগ করা হয়নি(structural-only
-// change, নতুন persistence-layer না)। percent/percentColor না দিলে badge দেখা
-// যাবে না(backward-compatible, ভবিষ্যতে অন্য কোনো caller percent ছাড়া ব্যবহার
-// করলেও ভাঙবে না)।
+// percent/percentColor না দিলে badge দেখা যাবে না(backward-compatible, ভবিষ্যতে
+// অন্য কোনো caller percent ছাড়া ব্যবহার করলেও ভাঙবে না)।
+// §Part B §B৫(Category collapse-state persist, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর
+// ২০২৬): `categoryId` দিলে open/close state sessionStorage-এ(key:
+// `dt_home_accordion_<categoryId>`, existing `dt_`-prefix pattern) persist
+// হয় — একই tab-session-এ tab-বদল/reload-এও accordion-state মনে থাকে।
+// `categoryId` optional(backward-compatible): না দিলে আগের in-memory-only
+// আচরণ অপরিবর্তিত।
 function FieldGroup({
   title,
   icon,
@@ -162,15 +165,32 @@ function FieldGroup({
   toBn,
   percent,
   percentColor,
-  defaultOpen
+  defaultOpen,
+  categoryId
 }) {
-  const [open, setOpen] = React.useState(!!defaultOpen);
+  const storageKey = categoryId ? "dt_home_accordion_" + categoryId : null;
+  const [open, setOpen] = React.useState(() => {
+    if (storageKey) {
+      try {
+        const saved = sessionStorage.getItem(storageKey);
+        if (saved !== null) return saved === "1";
+      } catch {}
+    }
+    return !!defaultOpen;
+  });
+  const toggleOpen = () => setOpen(o => {
+    const next = !o;
+    if (storageKey) {
+      try { sessionStorage.setItem(storageKey, next ? "1" : "0"); } catch {}
+    }
+    return next;
+  });
   const percentLabel = percent === null || percent === undefined ? null : toBn(percent) + "%";
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setOpen(o => !o),
+    onClick: toggleOpen,
     className: "w-full flex items-center justify-between gap-2" + (open ? " mb-3" : "")
   }, /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1.5 min-w-0"
@@ -478,7 +498,8 @@ export function DailyEntrySection({
         toBn: toBn,
         percent: percent,
         percentColor: score === null ? undefined : scoreColor(score),
-        defaultOpen: idx === 0
+        defaultOpen: idx === 0,
+        categoryId: c.id
       });
     }), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
