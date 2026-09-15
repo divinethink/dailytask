@@ -565,7 +565,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
-import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast } from "../components/DashboardSections.jsx";
+import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
@@ -2516,6 +2516,56 @@ function App() {
       avgPct: Math.round(avg * 100)
     };
   }, [monthEntries, monthCursor, selectedMember, allFields]);
+  // §B৭ Weekly Summary Notification(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+  // owner-approved, in-app non-push variant — architecture-review note
+  // অনুযায়ী প্রকৃত push out-of-scope, Blaze লাগবে): app-open-এ, ইতিমধ্যে-
+  // loaded monthEntries থেকে গত("আগের")-সপ্তাহের গড়-স্কোর গণনা(নতুন কোনো
+  // Firestore read না)। Week-definition existing getWeekRanges()(app-এর
+  // নিজস্ব ৭-দিন-চাংক, Weekly Reflection feature-এর সাথে সামঞ্জস্যপূর্ণ)।
+  // সরলীকরণ(ঝুঁকি কমাতে, owner-approved plan অনুযায়ী): শুধু বর্তমান-মাস
+  // দেখা অবস্থায় ও current-week মাসের প্রথম সপ্তাহ না হলেই trigger হয় —
+  // মাস-boundary ক্রস করা সপ্তাহের জন্য আলাদা মাস fetch করা হয় না(স্কিপ,
+  // কোনো error/crash না, শুধু সেই একটা edge-case-এ summary skip হয়)।
+  const [weeklySummaryToast, setWeeklySummaryToast] = useState(null);
+  useEffect(() => {
+    if (isGuestMode || !auth.currentUser || !selectedId || !selectedMember) return;
+    const today = new Date();
+    if (monthCursor.year !== today.getFullYear() || monthCursor.month0 !== today.getMonth()) return;
+    const total = daysInMonth(monthCursor.year, monthCursor.month0);
+    const ranges = getWeekRanges(total);
+    const todayDay = today.getDate();
+    const curIdx = ranges.findIndex(r => todayDay >= r.start && todayDay <= r.end);
+    if (curIdx <= 0) return;
+    const lastWeek = ranges[curIdx - 1];
+    const weekKey = `${monthCursor.year}-${monthCursor.month0}-w${lastWeek.week}`;
+    const flagKey = `dt_weekly_summary_shown_${auth.currentUser.uid}_${selectedId}`;
+    let already;
+    try {
+      already = localStorage.getItem(flagKey);
+    } catch {
+      already = weekKey;
+    }
+    if (already === weekKey) return;
+    let filled = 0;
+    let scoreSum = 0;
+    for (let d = lastWeek.start; d <= lastWeek.end; d++) {
+      const e = monthEntries[pad2(d)];
+      const s = dailyScore(e, selectedMember, allFields);
+      if (s !== null) {
+        filled += 1;
+        scoreSum += s;
+      }
+    }
+    try {
+      localStorage.setItem(flagKey, weekKey);
+    } catch {}
+    if (filled === 0) return;
+    setWeeklySummaryToast({
+      avgPct: Math.round(scoreSum / filled * 100),
+      filled,
+      totalDays: lastWeek.end - lastWeek.start + 1
+    });
+  }, [monthEntries, monthCursor, selectedId, selectedMember, allFields, isGuestMode]);
   if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement(DashboardSkeleton, null);
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
   // মোডাল আগে শুধু Dashboard-এর মূল JSX-এর ভিতরে বাঁধা ছিল, তাই early-
@@ -3059,6 +3109,11 @@ function App() {
   }), /*#__PURE__*/React.createElement(HistoryModal, { show: showHistoryModal, onClose: () => setShowHistoryModal(false), loadingHistory, historyList, restoreHistoryVersion, formatBnDateTime }), React.createElement(MilestoneToast, {
     milestoneToast: milestoneToast,
     setMilestoneToast: setMilestoneToast,
+    toBn: toBn
+  }),
+  /*#__PURE__*/React.createElement(WeeklySummaryToast, {
+    weeklySummaryToast: weeklySummaryToast,
+    setWeeklySummaryToast: setWeeklySummaryToast,
     toBn: toBn
   }),
   // §Guest-mode sign-in popover(১২ সেপ্টেম্বর ২০২৬) — profile-pill/মেনু/যেকোনো
