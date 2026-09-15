@@ -565,6 +565,10 @@ import { InviteJoinGate } from "../components/InviteJoinGate.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
+// §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬): আগে
+// DashboardHeader.jsx-এর হ্যামবার্গার dropdown ছিল, এখন bottom-nav "মেনু"
+// ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
+import { MenuPage } from "../components/MenuPage.jsx";
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_TASBIH, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
@@ -2523,11 +2527,118 @@ function App() {
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
   // gate-logic byte-identical অপরিবর্তিত।
   if (activeTab !== TAB_FAMILY) {
+    // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬):
+    // TAB_SETTINGS("মেনু") এখন আর generic PublicToolsPlaceholder না — আগে
+    // DashboardHeader.jsx-এর হ্যামবার্গার dropdown-এ যা ছিল(family
+    // username/সদস্য-তালিকা/আমন্ত্রণ-লিংক/ডেটা ম্যানেজমেন্ট/ফিডব্যাক/থিম),
+    // সেই একই content এখন এখানে full-page হিসেবে render হয়(structural-only
+    // move, কোনো logic/condition বদলায়নি — MenuPage.jsx দ্রষ্টব্য)। এই
+    // ট্যাব থেকে ট্রিগার হওয়া modal-cluster(Archive/FamilyCodeChoice+
+    // Rename/Backup+Import+DriveRestore/Feedback) পূর্বে শুধু family-tab
+    // tree-এর ভিতরেই mount হতো(নিচে অপরিবর্তিত রাখা হয়েছে) — তাই এখানে
+    // আলাদাভাবে(byte-identical props) mount করা আবশ্যক, নাহলে Menu-ট্যাব
+    // থেকে ট্রিগার করা বাটনগুলো কোনো modal-ই দেখাবে না।
+    if (activeTab === TAB_SETTINGS) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(MenuPage, {
+          isGuestMode: isGuestMode,
+          onGuestSignInTap: () => setShowGuestSignIn(true),
+          members: members || [],
+          selectedId: selectedId,
+          setSelectedId: setSelectedId,
+          onNavigateHome: () => setActiveTab(TAB_FAMILY),
+          entryDirtyRef: entryDirtyRef,
+          weeklyDirtyRef: weeklyDirtyRef,
+          auth: auth,
+          handleReleaseMember: handleReleaseMember,
+          isLockedForSwitch: isLockedForSwitch,
+          isAdmin: isAdmin,
+          adminUidsList: adminUidsList,
+          handleMakeAdmin: handleMakeAdmin,
+          handleRemoveAdmin: handleRemoveAdmin,
+          handleRemoveMember: handleRemoveMember,
+          setAddingMember: setAddingMember,
+          copiedCode: copiedCode,
+          handleCopyCode: handleCopyCode,
+          getFamilyCode: getFamilyCode,
+          setShowFamilyCodeChoiceModal: setShowFamilyCodeChoiceModal,
+          handleShareInviteLink: handleShareInviteLink,
+          setDriveBackupStatus: setDriveBackupStatus,
+          setShowBackupOptionsModal: setShowBackupOptionsModal,
+          setShowImportOptionsModal: setShowImportOptionsModal,
+          setShowArchiveModal: setShowArchiveModal,
+          setArchiveYear: setArchiveYear,
+          setArchiveMonth0: setArchiveMonth0,
+          monthCursor: monthCursor,
+          setShowFeedbackModal: setShowFeedbackModal,
+          themeColorPickerEl: themeColorPickerEl
+        }),
+        React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive}),
+        React.createElement(FamilyCodeChoiceModal, {
+          show: showFamilyCodeChoiceModal,
+          onClose: () => setShowFamilyCodeChoiceModal(false),
+          isAdmin,
+          setRenameFamCodeInput,
+          setShowRenameFamilyCodeModal
+        }),
+        React.createElement(RenameFamilyCodeModal, {
+          show: showRenameFamilyCodeModal,
+          onClose: () => setShowRenameFamilyCodeModal(false),
+          showRenameChangeForm,
+          setShowRenameChangeForm,
+          renameFamCodeInput,
+          setRenameFamCodeInput,
+          renameConfirmInput,
+          setRenameConfirmInput,
+          renameFamCodeBusy,
+          renameCodeRevealed,
+          setRenameCodeRevealed,
+          getFamilyCode,
+          handleRenameFamilyCode,
+          FAMILY_CODE_MIN_LENGTH
+        }),
+        React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick}),
+        /*#__PURE__*/React.createElement("input", {
+          ref: importFileInputRef,
+          type: "file",
+          accept: ".json,application/json,text/plain,text/json,application/octet-stream",
+          onChange: e => {
+            handleImportData(e);
+            setShowImportOptionsModal(false);
+          },
+          className: "hidden"
+        }),
+        React.createElement(ImportOptionsModal, {show: showImportOptionsModal, onClose: () => setShowImportOptionsModal(false), handleManualDriveRestoreClick, driveRestoreChecking, importFileInputRef}),
+        React.createElement(DriveRestoreModal, {show: showDriveRestoreModal, candidate: driveRestoreCandidate, onClose: () => setShowDriveRestoreModal(false), driveRestoreBusy, handleConfirmDriveRestore}),
+        React.createElement(FeedbackModal, {
+          feedbackMsg: feedbackMsg,
+          feedbackSending: feedbackSending,
+          feedbackStatus: feedbackStatus,
+          handleSendFeedback: handleSendFeedback,
+          setFeedbackMsg: setFeedbackMsg,
+          setFeedbackStatus: setFeedbackStatus,
+          setShowFeedbackModal: setShowFeedbackModal,
+          showFeedbackModal: showFeedbackModal
+        }),
+        // §Guest-mode sign-in popover — family-tab tree-এর একই block(নিচে,
+        // byte-identical) থেকে reuse, Menu-ট্যাবেও(guest অবস্থায়)
+        // "🔵 Google দিয়ে সাইন-ইন করুন" ট্যাপে প্রযোজ্য হতে হবে।
+        showGuestSignIn && /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("div", {
+            className: "fixed inset-0 bg-black/40 z-[60]",
+            onClick: () => setShowGuestSignIn(false)
+          }),
+          /*#__PURE__*/React.createElement("div", {
+            className: "fixed inset-x-4 top-24 z-[70] max-w-xs mx-auto bg-white rounded-2xl shadow-xl border border-slate-100"
+          }, /*#__PURE__*/React.createElement(GoogleSignInGate, { onSuccess: handleGuestSignInSuccess }))
+        ),
+        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+      );
+    }
     const placeholderTitle =
       activeTab === TAB_PRAYER_TIMES ? "সময়সূচি" :
       activeTab === TAB_TASBIH ? "তাসবীহ" :
-      activeTab === TAB_TOOLS ? "সহায়িকা" :
-      activeTab === TAB_SETTINGS ? "সেটিং" : "";
+      activeTab === TAB_TOOLS ? "সহায়িকা" : "";
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       React.createElement(PublicToolsPlaceholder, { title: placeholderTitle }),
       React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
