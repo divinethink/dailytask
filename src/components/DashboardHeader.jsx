@@ -1,13 +1,19 @@
-// A4-G6-Part A — Dashboard Header/Nav (logo, greeting, hamburger dropdown menu
-// with MemberListSection, notification+profile wiring, member selector, inline
-// add-member form), extracted verbatim from legacy App() (app.js lines ~6765-7014).
-// Structural-only (Owner Rule 2): no logic/condition change, only moved to its own
-// file. State ownership stays in App() (Owner Rule 2) — all state/handlers passed
+// A4-G6-Part A — Dashboard Header/Nav (logo, greeting, notification+profile
+// wiring, inline add-member form), extracted verbatim from legacy App()
+// (app.js lines ~6765-7014).
+// §Menu→bottom-nav migration(১৫ সেপ্টেম্বর ২০২৬, 2_4 §৯.৫/2_5 Screen E.1
+// owner-approved design): হেডারের হ্যামবার্গার "মেনু" ড্রপডাউন(family
+// username/MemberListSection/invite-link/data-management/feedback/theme)
+// সরানো হয়েছে — এই একই content এখন bottom-nav "মেনু" ট্যাব থেকে
+// full-page হিসেবে MenuPage.jsx-এ render হয়(app.js routing, structural-only
+// move, কোনো logic/condition বদলায়নি)। isMenuOpen/setIsMenuOpen prop এখনো
+// signature-এ থাকতে পারে(app.js call-site অপরিবর্তিত রাখতে) কিন্তু এই
+// ফাইলে আর ব্যবহৃত হয় না।
+// State ownership stays in App() (Owner Rule 2) — all state/handlers passed
 // as explicit props, including module-level helpers (db, auth, toBn, etc.) that
 // are NOT true globals (lesson from G1 toBn prop-miss bug — nothing assumed global
 // except React and icons.jsx imports).
-import { CalIcon, ChevronDown, CopyIcon, DownloadIcon, EditIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon, User, X } from "./icons.jsx";
-import { MemberListSection } from "./MemberListSection.jsx";
+import { ChevronDown, User, X } from "./icons.jsx";
 import { NotificationPanel } from "./NotificationPanel.jsx";
 import { ProfileDropdownGoogle } from "./ProfileDropdownGoogle.jsx";
 
@@ -97,127 +103,7 @@ export function DashboardHeader({
     }
   }, "Daily Task"), /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-emerald-200/80 -mt-1 font-medium"
-  }, "আমল ও পারিবারিক ট্র্যাকার"))), /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (isGuestMode) { onGuestSignInTap(); return; }
-      const next = !isMenuOpen;
-      setIsMenuOpen(next);
-    },
-    className: "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-white/15 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all shadow-sm active:scale-95"
-  }, /*#__PURE__*/React.createElement(MenuIcon, {
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "মেনু"), /*#__PURE__*/React.createElement(ChevronDown, {
-    size: 14,
-    className: `transition-transform duration-200 ${isMenuOpen ? "rotate-180" : ""}`
-  })), isMenuOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 z-40",
-    onClick: () => setIsMenuOpen(false)
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs transition-all"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-2 border-b border-slate-100 bg-slate-50/70"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "ফ্যামিলি ইউজারনেম"), /*#__PURE__*/React.createElement("div", {
-    className: "font-bold text-emerald-900 text-sm flex items-center justify-between mt-1"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "tracking-wide select-none"
-  }, getFamilyCode()), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-2 shrink-0 ml-2"
-  }, copiedCode && /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] text-emerald-600 font-bold shrink-0"
-  }, "কপি হয়েছে!"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => {
-      e.stopPropagation();
-      handleCopyCode();
-    },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0",
-    title: "কপি করুন"
-  }, /*#__PURE__*/React.createElement(CopyIcon, {
-    size: 13
-  })), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setShowFamilyCodeChoiceModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "text-slate-500 hover:text-emerald-800 shrink-0",
-    title: "ফ্যামিলি ইউজারনেম পরিবর্তন করুন"
-  }, /*#__PURE__*/React.createElement(EditIcon, {
-    size: 13
-  }))))), /*#__PURE__*/React.createElement(MemberListSection, {
-    members: members,
-    selectedId: selectedId,
-    setSelectedId: setSelectedId,
-    setIsMenuOpen: setIsMenuOpen,
-    entryDirtyRef: entryDirtyRef,
-    weeklyDirtyRef: weeklyDirtyRef,
-    auth: auth,
-    handleReleaseMember: handleReleaseMember,
-    isLockedForSwitch: isLockedForSwitch,
-    isAdmin: isAdmin,
-    adminUidsList: adminUidsList,
-    handleMakeAdmin: handleMakeAdmin,
-    handleRemoveAdmin: handleRemoveAdmin,
-    handleRemoveMember: handleRemoveMember,
-    setAddingMember: setAddingMember
-  }), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: async () => {
-      try {
-        await handleShareInviteLink();
-      } catch {}
-    },
-    className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
-  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 12 }), "আমন্ত্রণ লিংক শেয়ার করুন")), /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "ডেটা ম্যানেজমেন্ট"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setDriveBackupStatus(null);
-      setShowBackupOptionsModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-  }, /*#__PURE__*/React.createElement(DownloadIcon, {
-    size: 14
-  }), " ডেটা ব্যাকআপ রাখুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowImportOptionsModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-  }, /*#__PURE__*/React.createElement(UploadIcon, {
-    size: 14
-  }), " ইম্পোর্ট ব্যাকআপ ফাইল"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setArchiveYear(monthCursor.year);
-      setArchiveMonth0(monthCursor.month0);
-      setShowArchiveModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-  }, /*#__PURE__*/React.createElement(CalIcon, {
-    size: 14
-  }), " আর্কাইভ দেখুন (মাস/সাল)")), /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowFeedbackModal(true);
-      setIsMenuOpen(false);
-    },
-    className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium text-emerald-800"
-  }, /*#__PURE__*/React.createElement(MessageSquare, {
-    size: 14
-  }), " আমাদের জানান (পরামর্শ বা সমস্যা)")), themeColorPickerEl)))), /*#__PURE__*/React.createElement("div", {
+  }, "আমল ও পারিবারিক ট্র্যাকার")))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
