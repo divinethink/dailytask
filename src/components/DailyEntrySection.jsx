@@ -8,7 +8,7 @@
 // previously module-scope closures (fieldApplies/isExcused/isFieldExcusable/toBn),
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
-import { CalIcon, ChevronLeft, ChevronRight, ClockIcon, Loader2, Plus, X, Check, InfoIcon } from "./icons.jsx";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon } from "./icons.jsx";
 
 function LabelText({
   text
@@ -133,8 +133,17 @@ function NumberField({
   // (which still passes `target: f.target`) needs no change.
 }
 
+// §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
+// FieldGroup এখন সবসময় collapsible(আগে সবসময় খোলা flat card ছিল, নিচের নতুন
+// DailyEntrySection render-এ ৪টা category-ই এই একই FieldGroup ব্যবহার করে)।
+// State শুধু in-memory(useState) — sessionStorage-persistence(2_5 §B৫-এ ভবিষ্যৎ
+// polish হিসেবে flagged) এই Phase-এ ইচ্ছাকৃতভাবে যোগ করা হয়নি(structural-only
+// change, নতুন persistence-layer না)। percent/percentColor না দিলে badge দেখা
+// যাবে না(backward-compatible, ভবিষ্যতে অন্য কোনো caller percent ছাড়া ব্যবহার
+// করলেও ভাঙবে না)।
 function FieldGroup({
   title,
+  icon,
   fields,
   entry,
   onChange,
@@ -145,22 +154,47 @@ function FieldGroup({
   fieldApplies,
   isExcused,
   isFieldExcusable,
-  toBn
+  toBn,
+  percent,
+  percentColor,
+  defaultOpen
 }) {
+  const [open, setOpen] = React.useState(!!defaultOpen);
+  const percentLabel = percent === null || percent === undefined ? null : toBn(percent) + "%";
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 mb-3"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-sm font-bold text-emerald-950"
-  }, title), onInfoClick && /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: onInfoClick,
-    className: "text-slate-400 hover:text-emerald-700",
+    onClick: () => setOpen(o => !o),
+    className: "w-full flex items-center justify-between gap-2" + (open ? " mb-3" : "")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5 min-w-0"
+  }, icon && /*#__PURE__*/React.createElement("span", {
+    className: "text-base shrink-0"
+  }, icon), /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-bold text-emerald-950 text-left"
+  }, title), onInfoClick && /*#__PURE__*/React.createElement("span", {
+    role: "button",
+    tabIndex: 0,
+    onClick: e => { e.stopPropagation(); onInfoClick(); },
+    className: "text-slate-400 hover:text-emerald-700 shrink-0",
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5 shrink-0"
+  }, percentLabel && /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
+    style: {
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
+      color: percentColor || "#5B6B64",
+      background: "var(--color-primary-soft, #E8F0EE)"
+    }
+  }, percentLabel), /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 15,
+    color: "#8A9A8F",
+    className: "transition-transform" + (open ? " rotate-180" : "")
+  }))), open && /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
   }, fields.filter(f => fieldApplies(f, member)).map(f => {
     const fieldExcusable = isFieldExcusable(f, member);
@@ -239,6 +273,9 @@ export function DailyEntrySection({
   BN_MONTHS,
   DEFAULT_DEEN_FIELDS,
   DEFAULT_DUNIYA_FIELDS,
+  DEEN_CATEGORY_GROUPS,
+  dailyScore,
+  scoreColor,
   dateKey,
   formatBnDateTime,
   getDailyInspiration,
@@ -393,31 +430,52 @@ export function DailyEntrySection({
     }, "— ", insp.ref));
   })()), /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-5 space-y-4"
-  }, /*#__PURE__*/React.createElement(FieldGroup, {
-    title: "দৈনন্দিন আমল",
-    fields: DEFAULT_DEEN_FIELDS,
-    entry: entry,
-    onChange: updateField,
-    onToggleExcuse: updateExcuse,
-    onInfoClick: () => setShowExcuseInfoModal(true),
-    member: selectedMember,
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    toBn: toBn
-  }), /*#__PURE__*/React.createElement(FieldGroup, {
-    title: "ব্যক্তিগত ও পারিবারিক অভ্যাস",
-    fields: DEFAULT_DUNIYA_FIELDS,
-    entry: entry,
-    onChange: updateField,
-    member: selectedMember,
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    toBn: toBn
-  }), /*#__PURE__*/React.createElement("div", {
+  }, /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
+       আগে এখানে ২টা flat FieldGroup(দৈনন্দিন আমল = পুরো DEFAULT_DEEN_FIELDS একসাথে,
+       ব্যক্তিগত ও পারিবারিক অভ্যাস = DEFAULT_DUNIYA_FIELDS) ছিল — এখন ৪টা collapsible
+       category(সালাত/কুরআন ও ইলম/যিকির ও দাওয়াহ/ব্যক্তিগত ও পারিবারিক অভ্যাস) হিসেবে,
+       field-list/onChange/fieldApplies ইত্যাদি কোনো logic বদলায়নি(structural-only,
+       DEEN_CATEGORY_GROUPS mapping appHelpers.js-এ)। ওজর-info-বাটন এখন শুধু "সালাত"
+       category-এ(যেহেতু excusable:true ফিল্ড শুধু ঐ ৪টাই — fardPrayers/jamaat/
+       sunnahNafl/tahajjud, appHelpers.js DEFAULT_DEEN_FIELDS দ্রষ্টব্য), আগে পুরো
+       দৈনন্দিন-আমল হেডারে একটাই ছিল যেটা কার্যত এই একই ৪ ফিল্ডের জন্যই প্রযোজ্য ছিল —
+       তাই কোনো functionality হারায়নি, শুধু আরও সুনির্দিষ্ট জায়গায় বসেছে। প্রথম
+       category(সালাত) ডিফল্টে খোলা(defaultOpen), বাকি ৩টা বন্ধ — mockup-অনুযায়ী। */
+    [...DEEN_CATEGORY_GROUPS.map(g => ({
+      id: g.id,
+      title: g.label,
+      icon: g.icon,
+      fields: DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)),
+      showInfo: g.id === "salah"
+    })), {
+      id: "duniya",
+      title: "ব্যক্তিগত ও পারিবারিক অভ্যাস",
+      icon: "🏃",
+      fields: DEFAULT_DUNIYA_FIELDS,
+      showInfo: false
+    }].map((c, idx) => {
+      const score = dailyScore(entry, selectedMember, c.fields);
+      const percent = score === null ? null : Math.round(score * 100);
+      return /*#__PURE__*/React.createElement(FieldGroup, {
+        key: c.id,
+        title: c.title,
+        icon: c.icon,
+        fields: c.fields,
+        entry: entry,
+        onChange: updateField,
+        onToggleExcuse: updateExcuse,
+        onInfoClick: c.showInfo ? () => setShowExcuseInfoModal(true) : undefined,
+        member: selectedMember,
+        disabled: isFutureDate(viewDate) || isLockedForThisDevice,
+        fieldApplies: fieldApplies,
+        isExcused: isExcused,
+        isFieldExcusable: isFieldExcusable,
+        toBn: toBn,
+        percent: percent,
+        percentColor: score === null ? undefined : scoreColor(score),
+        defaultOpen: idx === 0
+      });
+    }), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
