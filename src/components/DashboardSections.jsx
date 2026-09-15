@@ -817,6 +817,41 @@ export function FeedbackModal({
 // শুধু কয়েকটা রঙিন dot-span + একবার-চলা CSS @keyframes।
 const MILESTONE_CONFETTI_COLORS = ["#C89B3C", "#2F9E44", "#0E4B43", "#E0A429", "#D64545"];
 
+// §B৭ Weekly Summary Notification(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+// owner-approved — in-app, non-push variant, বিস্তারিত: architecture-review
+// note অনুযায়ী প্রকৃত push(app বন্ধ অবস্থায় delivery) Cloud Function/Blaze
+// লাগবে, তাই out-of-scope; এই toast শুধু app-open-এ, existing loaded
+// monthEntries থেকে client-side গণনা করে দেখায়, কোনো নতুন Firestore read
+// নেই। week-definition existing getWeekRanges()(app-এর নিজস্ব ৭-দিন-চাংক
+// সংজ্ঞা, Weekly Reflection feature-এর সাথেই সামঞ্জস্যপূর্ণ)।
+export function WeeklySummaryToast({
+  weeklySummaryToast,
+  setWeeklySummaryToast,
+  toBn
+}) {
+  if (!weeklySummaryToast) return false;
+  const { avgPct, filled, totalDays } = weeklySummaryToast;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-x-0 top-4 flex justify-center px-5 z-[55]"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white text-[#16302B] rounded-2xl shadow-xl px-4 py-3 max-w-sm w-full flex items-center gap-3 border border-slate-100"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\ud83d\udcca"), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold",
+    style: { color: "#0E4B43" }
+  }, "\u0997\u09a4 \u09b8\u09aa\u09cd\u09a4\u09be\u09b9\u09c7\u09b0 \u09b8\u09be\u09b0\u09be\u0982\u09b6"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-600 mt-0.5"
+  }, "\u0997\u09a1\u09bc \u09b8\u09cd\u0995\u09cb\u09b0 ", /*#__PURE__*/React.createElement("span", {
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
+  }, toBn(avgPct) + "%"), " \u00b7 ", toBn(filled), "/", toBn(totalDays), " \u09a6\u09bf\u09a8 \u09b8\u09ae\u09cd\u09aa\u09c2\u09b0\u09cd\u09a3")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setWeeklySummaryToast(null),
+    className: "text-slate-400 hover:text-slate-700 shrink-0"
+  }, /*#__PURE__*/React.createElement(X, { size: 16 }))));
+}
+
 export function MilestoneToast({
   milestoneToast,
   setMilestoneToast,
