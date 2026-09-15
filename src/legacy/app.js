@@ -548,7 +548,8 @@ import {
   ExcuseInfoModal,
   WeeklyInfoModal,
   MeetingInfoModal,
-  MonthlyOverviewInfoModal
+  MonthlyOverviewInfoModal,
+  CoachMarkModal
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
@@ -749,6 +750,22 @@ function App() {
   }, [activeTab]);
   const [themeColor, setThemeColor] = useThemeColor();
   const [displayMode, setDisplayMode] = useDisplayMode();
+  // §B৭ Onboarding coach-mark(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
+  // authenticated(non-guest) সদস্যের প্রথম Dashboard-load-এ একবারই ৪-ধাপ
+  // walkthrough — existing one-time-flag pattern(localStorage, uid-keyed,
+  // V1 ফাইল ১.২ §৩-এর dt_google_welcome_shown_<uid>-এর মতোই)। Guest-mode-এ
+  // কখনো trigger হয় না(demo-shell-এ walkthrough অপ্রাসঙ্গিক)।
+  const [showCoachMark, setShowCoachMark] = useState(false);
+  useEffect(() => {
+    if (isGuestMode || !auth.currentUser) return;
+    const flagKey = "dt_coachmark_shown_" + auth.currentUser.uid;
+    try {
+      if (!localStorage.getItem(flagKey)) {
+        localStorage.setItem(flagKey, "1");
+        setShowCoachMark(true);
+      }
+    } catch {}
+  }, [isGuestMode]);
   // §Guest-mode fix: guest অবস্থায় boot-loader effect(নিচে) কখনো চলে না,
   // তাই members কখনো populate হবে না — null থাকলে যেকোনো .map()/.find()
   // যেখানে `|| []` fallback নেই সেখানে crash করতে পারে। শুধু guest-এই
@@ -3023,7 +3040,7 @@ function App() {
     handleDeleteGoogleAccount: handleDeleteGoogleAccount,
     setShowDeleteAccountWarning: setShowDeleteAccountWarning,
     showDeleteAccountWarning: showDeleteAccountWarning
-  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), /*#__PURE__*/React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }), React.createElement(AddCustomFieldModal, {
+  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), /*#__PURE__*/React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }), /*#__PURE__*/React.createElement(CoachMarkModal, { show: showCoachMark, onClose: () => setShowCoachMark(false) }), React.createElement(AddCustomFieldModal, {
     handleAddCustomField: handleAddCustomField,
     isLockedForSwitch: isLockedForSwitch,
     newCustomLabel: newCustomLabel,
