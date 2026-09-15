@@ -630,6 +630,38 @@ export function CompassIcon({
     })
   );
 }
+// §B৭ Empty-state illustration(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
+// কাস্টম-টাস্ক empty-state-এ ব্যবহারের জন্য নতুন icon — existing Icon()
+// wrapper-এর stroke-based convention অনুসরণ করে(নতুন কোনো asset/library না)।
+export function ClipboardListIcon({
+  size,
+  color,
+  className
+}) {
+  return /*#__PURE__*/React.createElement(Icon, {
+    size: size,
+    color: color,
+    className: className
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "6",
+    y: "4",
+    width: "12",
+    height: "16",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 4V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "9",
+    y1: "10",
+    x2: "15",
+    y2: "10"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "9",
+    y1: "14",
+    x2: "15",
+    y2: "14"
+  }));
+}
 export function AppLogo({
   size = 32,
   className = ""

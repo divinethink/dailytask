@@ -8,7 +8,16 @@
 // previously module-scope closures (fieldApplies/isExcused/isFieldExcusable/toBn),
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
-import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon } from "./icons.jsx";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon } from "./icons.jsx";
+
+// §B৭ Haptic feedback(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
+// native Web Vibration API, silent no-op যদি browser/device সাপোর্ট না করে
+// (যেমন iOS Safari-তে navigator.vibrate নেই) — কোনো নতুন library/dependency না।
+function haptic() {
+  try {
+    if (navigator.vibrate) navigator.vibrate(10);
+  } catch {}
+}
 
 function LabelText({
   text
@@ -34,7 +43,7 @@ function BoolToggle({
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: disabled,
-    onClick: () => onChange(!value),
+    onClick: () => { haptic(); onChange(!value); },
     className: "flex items-center justify-center w-11 h-11 rounded-xl border-2 transition-all shrink-0 shadow-sm",
     style: {
       borderColor: value ? "var(--theme-primary)" : "#D8DED3",
@@ -67,7 +76,7 @@ function CountStepper({
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: disabled,
-    onClick: () => onChange(Math.max(0, v - 1)),
+    onClick: () => { haptic(); onChange(Math.max(0, v - 1)); },
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
@@ -82,7 +91,7 @@ function CountStepper({
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: disabled,
-    onClick: () => onChange(Math.min(max, v + 1)),
+    onClick: () => { haptic(); onChange(Math.min(max, v + 1)); },
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
@@ -111,7 +120,7 @@ function NumberField({
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: disabled,
-    onClick: () => onChange(Math.max(0, v - 1)),
+    onClick: () => { haptic(); onChange(Math.max(0, v - 1)); },
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
@@ -126,7 +135,7 @@ function NumberField({
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: disabled,
-    onClick: () => onChange(v + 1),
+    onClick: () => { haptic(); onChange(v + 1); },
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
@@ -512,9 +521,14 @@ export function DailyEntrySection({
     className: "text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
-  }), " নতুন টাস্ক")), customFields.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400 text-center py-2"
-  }, "কোন কাস্টম টাস্ক নেই। উপরে বোতামে ক্লিক করে যোগ করুন।") : customFields.map(f => /*#__PURE__*/React.createElement("div", {
+  }), " নতুন টাস্ক")), customFields.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center gap-2 text-center py-4"
+  }, /*#__PURE__*/React.createElement(ClipboardListIcon, {
+    size: 28,
+    color: "#B9C2B2"
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "কোন কাস্টম টাস্ক নেই। উপরে বোতামে ক্লিক করে যোগ করুন।")) : customFields.map(f => /*#__PURE__*/React.createElement("div", {
     key: f.key,
     className: "flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0" + (isFutureDate(viewDate) || isLockedForThisDevice ? " opacity-40" : "")
   }, /*#__PURE__*/React.createElement("span", {

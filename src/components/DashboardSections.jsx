@@ -811,16 +811,35 @@ export function FeedbackModal({
   }, "বাতিল"))));
 }
 
+// §B৭ Streak-milestone celebration(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
+// owner-approved): existing milestone toast(৭/৩০/১০০/৩৬৫ দিন)-এর উপর
+// CSS-only confetti keyframe-animation — কোনো নতুন library/dependency না,
+// শুধু কয়েকটা রঙিন dot-span + একবার-চলা CSS @keyframes।
+const MILESTONE_CONFETTI_COLORS = ["#C89B3C", "#2F9E44", "#0E4B43", "#E0A429", "#D64545"];
+
 export function MilestoneToast({
   milestoneToast,
   setMilestoneToast,
   toBn
 }) {
-  return milestoneToast && /*#__PURE__*/React.createElement("div", {
+  return milestoneToast && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("style", null, "@keyframes dtConfettiFall{0%{transform:translateY(-12px) rotate(0deg);opacity:1}100%{transform:translateY(52px) rotate(360deg);opacity:0}}"), /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-x-0 bottom-6 flex justify-center px-5 z-[60]"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-[#16302B] text-white rounded-2xl shadow-xl px-5 py-4 max-w-sm w-full flex items-center gap-3 border border-[#C89B3C]/40"
-  }, /*#__PURE__*/React.createElement("span", {
+    className: "relative bg-[#16302B] text-white rounded-2xl shadow-xl px-5 py-4 max-w-sm w-full flex items-center gap-3 border border-[#C89B3C]/40 overflow-hidden"
+  }, MILESTONE_CONFETTI_COLORS.map((c, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    "aria-hidden": "true",
+    style: {
+      position: "absolute",
+      top: 0,
+      left: (12 + i * 18) + "%",
+      width: 6,
+      height: 6,
+      borderRadius: "50%",
+      background: c,
+      animation: "dtConfettiFall " + (0.9 + i * 0.15) + "s ease-in " + (i * 0.08) + "s 1"
+    }
+  })), /*#__PURE__*/React.createElement("span", {
     className: "text-2xl"
   }, "🎉"), /*#__PURE__*/React.createElement("div", {
     className: "flex-1"
@@ -838,5 +857,5 @@ export function MilestoneToast({
     className: "text-slate-400 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
-  }))));
+  })))));
 }
