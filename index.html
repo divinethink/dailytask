@@ -79,12 +79,38 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <style>
-  :root { --theme-primary: #0E4B43; }
+  :root {
+    --theme-primary: #0E4B43;
+    /* §B২.১ Design Tokens(2_5 Part B, ১৫ সেপ্টেম্বর ২০২৬) — additive, visual output অপরিবর্তিত।
+       বিদ্যমান কোনো component এখনো এই token-গুলো reference করে না(Phase ১, foundation-only)। */
+    --color-primary: #0E4B43;
+    --color-accent: #C89B3C;
+    --color-primary-soft: #E8F0EE;
+    --color-success: #2F9E44;
+    --color-warning: #E0A429;
+    --color-danger: #D64545;
+    --color-surface: #FFFFFF;
+    --color-bg: #F6F7F5;
+    --color-border: #E4E7E2;
+    --color-text-primary: #1A2621;
+    --color-text-secondary: #5B6B64;
+  }
   html, body { background: #F4F7F1; margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
   .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-  
+
+  /* §B৭ Dark Mode + Sepia Mode(চোখের সুরক্ষা, owner-requested, ১৫ সেপ্টেম্বর ২০২৬):
+     global CSS filter — প্রতিটা component-এ hex-কে token-এ রূপান্তর(broad, উচ্চ-ঝুঁকি)
+     না করে single-point, low-risk বাস্তবায়ন। `<html data-display-mode>` toggle
+     করে appHelpers.js: useDisplayMode()। "light"(ডিফল্ট) attribute ফাঁকা রাখা হয়
+     বলে এই দুই rule তখন match করে না — বর্তমান visual সম্পূর্ণ অপরিবর্তিত। */
+  html[data-display-mode="sepia"] { filter: sepia(0.35) contrast(0.96) brightness(0.98); }
+  html[data-display-mode="dark"] { filter: invert(1) hue-rotate(180deg); background: #F4F7F1; }
+  html[data-display-mode="dark"] img,
+  html[data-display-mode="dark"] svg { filter: invert(1) hue-rotate(180deg); }
+
   @media print {
+    html { filter: none !important; }
     @page { 
       size: A4 portrait; 
       margin: 10mm 10mm 10mm 15mm !important;
