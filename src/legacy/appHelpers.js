@@ -645,9 +645,9 @@ function dailyScore(entry, member, allFields) {
 function scoreColor(score) {
   if (score === null || score === undefined) return "#E7EEE3";
   if (score >= 0.85) return "var(--theme-primary)";
-  if (score >= 0.6) return "#7C5CBF";
+  if (score >= 0.6) return "#2563A8";
   if (score >= 0.35) return "#F5D061";
-  if (score > 0) return "#C1666B";
+  if (score > 0) return "#8B1E1E";
   return "#E7EEE3";
 }
 

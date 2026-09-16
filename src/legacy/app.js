@@ -565,7 +565,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
-import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast } from "../components/DashboardSections.jsx";
+import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
@@ -2631,7 +2631,29 @@ function App() {
   // এই const-টা এখানে(early-return-এর আগে) move করা হলো, নিচের ব্যবহার-স্থানে
   // (family-tab render-flow) অপরিবর্তিত রয়ে গেছে(same variable, শুধু
   // declaration-position বদলেছে)।
+  // §Order swap(১৬ সেপ্টেম্বর ২০২৬, owner-approved): ডিসপ্লে মোড এখন থিম
+  // কালার-এর উপরে — শুধু render-order বদলেছে, দুই ব্লকের ভিতরের
+  // logic/structure/props অপরিবর্তিত(byte-identical, শুধু অবস্থান বদল)।
   const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-slate-100 my-1"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "py-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+  }, "ডিসপ্লে মোড (চোখের সুরক্ষা)"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
+  }, DISPLAY_MODES.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m.id,
+    type: "button",
+    onClick: () => setDisplayMode(m.id),
+    className: "px-3 h-8 rounded-full text-xs font-bold border-2 transition-transform active:scale-95",
+    style: {
+      borderColor: displayMode === m.id ? "#16302B" : "#E4E7E2",
+      background: displayMode === m.id ? "#16302B" : "#FFFFFF",
+      color: displayMode === m.id ? "#FFFFFF" : "#5B6B64"
+    }
+  }, m.name)))),
+  /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 my-1"
   }), /*#__PURE__*/React.createElement("div", {
     className: "py-1"
@@ -2651,31 +2673,7 @@ function App() {
     }
   }, themeColor === t.color && /*#__PURE__*/React.createElement("span", {
     className: "text-white text-xs font-bold"
-  }, "✓"))))),
-  // §B৭ Display Mode picker(Dark/Sepia, owner-requested eye-protection,
-  // ১৫ সেপ্টেম্বর ২০২৬) — একই Fragment-এ থিম-কালার-এর ঠিক নিচে, existing
-  // button-picker pattern reuse। MenuPage.jsx touch করার দরকার নেই, কারণ
-  // ওটা শুধু {themeColorPickerEl} render করে(single prop, structure change
-  // MenuPage-এ propagate হয় না)।
-  /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "ডিসপ্লে মোড (চোখের সুরক্ষা)"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
-  }, DISPLAY_MODES.map(m => /*#__PURE__*/React.createElement("button", {
-    key: m.id,
-    type: "button",
-    onClick: () => setDisplayMode(m.id),
-    className: "px-3 h-8 rounded-full text-xs font-bold border-2 transition-transform active:scale-95",
-    style: {
-      borderColor: displayMode === m.id ? "#16302B" : "#E4E7E2",
-      background: displayMode === m.id ? "#16302B" : "#FFFFFF",
-      color: displayMode === m.id ? "#FFFFFF" : "#5B6B64"
-    }
-  }, m.name)))));
+  }, "✓"))))));
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
@@ -2970,6 +2968,9 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable
+  }), /*#__PURE__*/React.createElement(StreakCard, {
+    streak: streak,
+    toBn: toBn
   }), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
