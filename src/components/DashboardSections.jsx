@@ -213,8 +213,8 @@ function TopBottomActivityRanking({
   }), /*#__PURE__*/React.createElement("div", {
     className: "border-l border-slate-200 pl-4"
   }, /*#__PURE__*/React.createElement(TierColumn, {
-    heading: "সর্বনিম্ন ৩ এক্টিভিটি",
-    headingColor: "#C1666B",
+    heading: "আরও মনোযোগ প্রয়োজন",
+    headingColor: "#B8860B",
     tiers: bottomTiers,
     rankPrefix: "সর্বনিম্ন",
     toBn: toBn
@@ -312,6 +312,10 @@ export function WeeklyReflectionSection({
   BN_MONTHS
 }) {
   const [openWeeks, setOpenWeeks] = useState({});
+  // §Section-level accordion(১৬ সেপ্টেম্বর ২০২৬, owner-approved): পুরো সেকশন
+  // ডিফল্টে বন্ধ থাকবে — ভিতরের প্রতিটা সপ্তাহের নিজস্ব collapse(openWeeks,
+  // অপরিবর্তিত) থেকে আলাদা, এক স্তর উপরে।
+  const [sectionOpen, setSectionOpen] = useState(false);
   useEffect(() => {
     setOpenWeeks({});
   }, [monthCursor.year, monthCursor.month0]);
@@ -319,17 +323,26 @@ export function WeeklyReflectionSection({
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 mb-2"
+    onClick: () => setSectionOpen(o => !o),
+    className: "flex items-center justify-between mb-2 cursor-pointer select-none"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "font-bold text-base text-slate-800"
   }, "সাপ্তাহিক রিফ্লেকশন"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setShowWeeklyInfoModal(true),
+    onClick: e => {
+      e.stopPropagation();
+      setShowWeeklyInfoModal(true);
+    },
     className: "text-slate-400 hover:text-emerald-700",
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 18,
+    className: "text-slate-400 transition-transform" + (sectionOpen ? " rotate-180" : "")
+  })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, weeklyRowCount < getWeekRanges(monthStats.total).length ? /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -411,7 +424,7 @@ export function WeeklyReflectionSection({
   }, savingWeekly ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
-  }) : weeklySavedTick ? "সেভ হয়েছে!" : "সাপ্তাহিক রিফ্লেকশন সেভ করুন")));
+  }) : weeklySavedTick ? "সেভ হয়েছে!" : "সাপ্তাহিক রিফ্লেকশন সেভ করুন"))));
 }
 
 export function MonthlyOverviewSection({
@@ -576,6 +589,10 @@ export function MeetingMinutesSection({
   meetingDirtyRef
 }) {
   const [openRows, setOpenRows] = useState({});
+  // §Section-level accordion(১৬ সেপ্টেম্বর ২০২৬, owner-approved): Weekly
+  // Reflection-এর মতোই, পুরো সেকশন ডিফল্টে বন্ধ — ভিতরের প্রতিটা row-এর
+  // নিজস্ব collapse(openRows, অপরিবর্তিত) থেকে আলাদা স্তর।
+  const [sectionOpen, setSectionOpen] = useState(false);
   useEffect(() => {
     setOpenRows({});
   }, [monthCursor.year, monthCursor.month0]);
@@ -584,14 +601,18 @@ export function MeetingMinutesSection({
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
+    onClick: () => setSectionOpen(o => !o),
+    className: "flex items-center justify-between mb-2 cursor-pointer select-none"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "font-bold text-base text-slate-800"
   }, "মাসিক পারিবারিক সভা ও সিদ্ধান্ত"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setShowMeetingInfoModal(true),
+    onClick: e => {
+      e.stopPropagation();
+      setShowMeetingInfoModal(true);
+    },
     className: "text-slate-400 hover:text-emerald-700",
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
@@ -600,7 +621,10 @@ export function MeetingMinutesSection({
     className: "text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 10
-  }), "লাইভ সিংক"))), /*#__PURE__*/React.createElement("div", {
+  }), "লাইভ সিংক")), /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 18,
+    className: "text-slate-400 transition-transform" + (sectionOpen ? " rotate-180" : "")
+  })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -684,7 +708,7 @@ export function MeetingMinutesSection({
   }, savingMeeting ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 16
-  }) : meetingSavedTick ? "সেভ ও সিংক হয়েছে!" : "মাসিক সভা ও সিদ্ধান্ত সেভ করুন"));
+  }) : meetingSavedTick ? "সেভ ও সিংক হয়েছে!" : "মাসিক সভা ও সিদ্ধান্ত সেভ করুন")));
 }
 
 export function DeleteAccountWarningModal({
