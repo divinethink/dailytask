@@ -254,7 +254,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#F0DFB4] px-2 py-1 rounded-xl border border-[#C89B3C]/50 shadow-sm text-emerald-950"
+    className: "flex items-center gap-1.5 bg-[#E3C17A] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -532,7 +532,7 @@ export function MonthlyOverviewSection({
       className: "h-7 w-full rounded-lg flex items-center justify-center text-[10px] font-bold transition-transform active:scale-90 shadow-sm",
       style: {
         background: scoreColor(s),
-        color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : "#555",
+        color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
       }
     }, toBn(d));
