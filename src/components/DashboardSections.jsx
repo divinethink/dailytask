@@ -10,7 +10,7 @@ import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, Chev
 
 // React itself is a true runtime global (established pattern — no file in this
 // codebase imports it). app.js locally destructures hooks from it the same way.
-const { useEffect, useState } = React;
+const { useState } = React;
 
 // StreakCard — ProgressChart(Chart.js লাইন-গ্রাফ)-এর প্রতিস্থাপন(৮ সেপ্টেম্বর
 // ২০২৬, owner-approved: "গ্রাফ কাজে লাগছে না, আগ্রহ তৈরি হয় এমন কিছু আনা
@@ -18,19 +18,22 @@ const { useEffect, useState } = React;
 // আগে থেকেই তৈরি ও app.js-এ প্রতি রেন্ডারে গণনা হচ্ছিল, শুধু এতদিন কোথাও
 // প্রধানভাবে দেখানো হতো না(শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
 // (৭/৩০/১০০/৩৬৫ দিন) toast system-ও আগে থেকেই আছে, অপরিবর্তিত।
-export function StreakCard({ streak, toBn }) {
+export function StreakCard({ streak, toBn, todayPercent }) {
   const n = streak || 0;
   const caption = n === 0 ? "আজ থেকে ধারাবাহিকতা শুরু করুন!" : "চালিয়ে যান, মাশাআল্লাহ!";
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full mt-2 rounded-xl bg-[#f0ede4] p-4 flex items-center gap-3"
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] p-4 flex flex-col items-center text-center gap-0.5"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "text-3xl leading-none"
-  }, "🔥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-3xl leading-none mb-1"
+  }, "🔥"), /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, "ধারাবাহিকতার ", toBn(n), " দিন"), /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-slate-500 mt-0.5"
-  }, caption)));
+  }, caption), todayPercent !== null && todayPercent !== undefined && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-emerald-900 mt-2 bg-white/70 rounded-lg px-3 py-1",
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
+  }, "আজকের সার্বিক অগ্রগতি: ", toBn(todayPercent), "%"));
 }
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
@@ -184,7 +187,7 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
   return { topTiers, bottomTiers, overallPct, badgeTier, qazaJamaatBlock };
 }
 
-function TopBottomActivityRanking({
+export function TopBottomActivityRanking({
   monthEntries,
   totalDays,
   member,
@@ -311,15 +314,11 @@ export function WeeklyReflectionSection({
   meetingDirtyRef,
   BN_MONTHS
 }) {
-  const [openWeeks, setOpenWeeks] = useState({});
   // §Section-level accordion(১৬ সেপ্টেম্বর ২০২৬, owner-approved): পুরো সেকশন
-  // ডিফল্টে বন্ধ থাকবে — ভিতরের প্রতিটা সপ্তাহের নিজস্ব collapse(openWeeks,
-  // অপরিবর্তিত) থেকে আলাদা, এক স্তর উপরে।
+  // ডিফল্টে বন্ধ থাকবে। ভিতরের প্রতি-সপ্তাহ আলাদা accordion(openWeeks)
+  // owner-অনুরোধে(১৬ সেপ্টেম্বর, দ্বিতীয় দফা) সরানো হয়েছে — সেকশন খোলা
+  // থাকলে প্রতিটা সপ্তাহ এখন সবসময় দেখা যাবে, দ্বিতীয়-স্তর টগল আর নেই।
   const [sectionOpen, setSectionOpen] = useState(false);
-  useEffect(() => {
-    setOpenWeeks({});
-  }, [monthCursor.year, monthCursor.month0]);
-  const toggleWeek = w => setOpenWeeks(prev => ({ ...prev, [w]: !prev[w] }));
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -345,11 +344,7 @@ export function WeeklyReflectionSection({
   })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, weeklyRowCount < getWeekRanges(monthStats.total).length ? /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      const nextWeek = weeklyRowCount + 1;
-      addWeeklyRow();
-      setOpenWeeks(prev => ({ ...prev, [nextWeek]: true }));
-    },
+    onClick: addWeeklyRow,
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
@@ -369,25 +364,18 @@ export function WeeklyReflectionSection({
     start,
     end
   }) => {
-    const isOpen = !!openWeeks[w];
     return /*#__PURE__*/React.createElement("div", {
       key: w,
       className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden"
     }, /*#__PURE__*/React.createElement("div", {
-      onClick: () => toggleWeek(w),
-      className: "flex items-center justify-between px-3.5 py-2.5 cursor-pointer select-none"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-2"
+      className: "flex items-center gap-2 px-3.5 py-2.5"
     }, /*#__PURE__*/React.createElement("span", {
       className: "bg-emerald-900 text-white text-xs font-bold px-2.5 py-1 rounded-full",
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "সপ্তাহ ", toBn(w)), /*#__PURE__*/React.createElement("span", {
       className: "text-[11px] text-slate-400 font-semibold",
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-    }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement(ChevronDown, {
-      size: 16,
-      className: "text-slate-400 transition-transform" + (isOpen ? " rotate-180" : "")
-    })), isOpen && /*#__PURE__*/React.createElement("div", {
+    }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement("div", {
       className: "px-3.5 pb-3.5 space-y-2.5"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       className: "text-[11px] font-bold text-slate-500 mb-1"
@@ -452,11 +440,6 @@ export function MonthlyOverviewSection({
   toBn,
   streak
 }) {
-  // Rating badge("উৎকৃষ্ট"/"উন্নতি প্রয়োজন" ইত্যাদি) — এতদিন শুধু নিচের
-  // "সর্বোচ্চ-সর্বনিম্ন এক্টিভিটি" বক্সে ছিল, এখন এখানে(গড় স্কোরের ঠিক
-  // নিচে) আনা হয়েছে(owner-approved, ৮ সেপ্টেম্বর ২০২৬) — যেহেতু গড় স্কোর
-  // এই বক্সেই দেখানো হয়, ডুপ্লিকেট এড়াতে নিচের বক্স থেকে সরানো হয়েছে।
-  const activityStats = computeActivityStats({ monthEntries, totalDays: total, member: selectedMember, allFields, fieldPercent, pad2, toBn, monthCursor });
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -500,13 +483,7 @@ export function MonthlyOverviewSection({
     className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
-  }), " PDF / প্রিন্ট (২ পেজ)")), activityStats && /*#__PURE__*/React.createElement("div", {
-    className: "mb-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-bold text-slate-700"
-  }, activityStats.badgeTier.emoji, " ", activityStats.badgeTier.label), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-500 mt-1"
-  }, activityStats.badgeTier.caption)), /*#__PURE__*/React.createElement("div", {
+  }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-7 gap-1.5"
@@ -558,16 +535,7 @@ export function MonthlyOverviewSection({
     style: { background: item.c }
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-medium text-slate-500"
-  }, item.l))))), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
-    monthEntries: monthEntries,
-    totalDays: total,
-    member: selectedMember,
-    allFields: allFields,
-    fieldPercent: fieldPercent,
-    pad2: pad2,
-    toBn: toBn,
-    monthCursor: monthCursor
-  }));
+  }, item.l))))));
 }
 
 export function MeetingMinutesSection({
@@ -588,15 +556,11 @@ export function MeetingMinutesSection({
   weeklyDirtyRef,
   meetingDirtyRef
 }) {
-  const [openRows, setOpenRows] = useState({});
   // §Section-level accordion(১৬ সেপ্টেম্বর ২০২৬, owner-approved): Weekly
-  // Reflection-এর মতোই, পুরো সেকশন ডিফল্টে বন্ধ — ভিতরের প্রতিটা row-এর
-  // নিজস্ব collapse(openRows, অপরিবর্তিত) থেকে আলাদা স্তর।
+  // Reflection-এর মতোই, পুরো সেকশন ডিফল্টে বন্ধ। ভিতরের প্রতিটা row-এর
+  // আলাদা accordion(openRows) owner-অনুরোধে(১৬ সেপ্টেম্বর, দ্বিতীয় দফা)
+  // সরানো হয়েছে — সেকশন খোলা থাকলে প্রতিটা row এখন সবসময় দেখা যাবে।
   const [sectionOpen, setSectionOpen] = useState(false);
-  useEffect(() => {
-    setOpenRows({});
-  }, [monthCursor.year, monthCursor.month0]);
-  const toggleRow = idx => setOpenRows(prev => ({ ...prev, [idx]: !prev[idx] }));
   const rows = meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : [];
   return React.createElement("div", {
     className: "px-5 mt-8"
@@ -627,11 +591,7 @@ export function MeetingMinutesSection({
   })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      const nextIdx = rows.length;
-      addMeetingRow();
-      setOpenRows(prev => ({ ...prev, [nextIdx]: true }));
-    },
+    onClick: addMeetingRow,
     className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
@@ -647,13 +607,11 @@ export function MeetingMinutesSection({
   })), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2 mb-4"
   }, rows.map((row, idx) => {
-    const isOpen = !!openRows[idx];
     return /*#__PURE__*/React.createElement("div", {
       key: row.id || idx,
       className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden"
     }, /*#__PURE__*/React.createElement("div", {
-      onClick: () => toggleRow(idx),
-      className: "flex items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer select-none"
+      className: "flex items-center justify-between gap-2 px-3.5 py-2.5"
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-2 min-w-0"
     }, /*#__PURE__*/React.createElement("span", {
@@ -661,20 +619,12 @@ export function MeetingMinutesSection({
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "ক্র. ", toBn(idx + 1)), row.topic && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-500 truncate"
-    }, row.topic)), /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-2 flex-shrink-0"
-    }, rows.length > 1 && /*#__PURE__*/React.createElement("button", {
-      onClick: e => {
-        e.stopPropagation();
-        removeMeetingRow(idx);
-      },
-      className: "text-red-400 hover:text-red-600 p-1"
+    }, row.topic)), rows.length > 1 && /*#__PURE__*/React.createElement("button", {
+      onClick: () => removeMeetingRow(idx),
+      className: "text-red-400 hover:text-red-600 p-1 flex-shrink-0"
     }, /*#__PURE__*/React.createElement(Trash, {
       size: 14
-    })), /*#__PURE__*/React.createElement(ChevronDown, {
-      size: 16,
-      className: "text-slate-400 transition-transform" + (isOpen ? " rotate-180" : "")
-    }))), isOpen && /*#__PURE__*/React.createElement("div", {
+    }))), /*#__PURE__*/React.createElement("div", {
       className: "px-3.5 pb-3.5 space-y-2.5"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       className: "text-[11px] font-bold text-slate-500 mb-1"
