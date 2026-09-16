@@ -44,21 +44,20 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 
 <!-- Preconnect: origin-এর DNS/TLS আগে থেকে parallel শুরু করার জন্য (execution order/dependency অপরিবর্তিত) -->
-<!-- A3 note: unpkg.com/jsdelivr.net/gstatic.com preconnect সরানো হয়েছে — React/Chart.js/Firebase এখন npm-bundled, ওই CDN থেকে আর কিছু লোড হয় না। cdn.tailwindcss.com ও accounts.google.com (GIS, Drive backup) অপরিবর্তিত — এই দুইটা A3 scope-এর বাইরে। -->
-<link rel="preconnect" href="https://cdn.tailwindcss.com" />
+<!-- A3 note: unpkg.com/jsdelivr.net/gstatic.com preconnect সরানো হয়েছে — React/Chart.js/Firebase এখন npm-bundled, ওই CDN থেকে আর কিছু লোড হয় না। -->
+<!-- লোড-স্পিড ট্রিটমেন্ট(১৫ সেপ্টেম্বর ২০২৬): cdn.tailwindcss.com preconnect+script সরানো — Tailwind এখন
+     build-time static CSS(src/tailwind.css → main.jsx, tailwind.config.js/postcss.config.js), আর কোনো
+     runtime CDN-request/JIT-compile হয় না। accounts.google.com(GIS, Drive backup) অপরিবর্তিত। -->
 <link rel="preconnect" href="https://accounts.google.com" />
 
-<!-- Tailwind CSS -->
 <script>
-  // Suppresses two known-safe, cosmetic console warnings:
-  // 1) Tailwind's "should not be used in production" CDN notice.
-  // 2) Firestore's enableIndexedDbPersistence() deprecation notice
-  //    (app.js intentionally keeps using this proven API; only the
-  //    console noise is hidden here, behavior is unchanged).
+  // Suppresses a known-safe, cosmetic console warning:
+  // Firestore's enableIndexedDbPersistence() deprecation notice
+  // (app.js intentionally keeps using this proven API; only the
+  // console noise is hidden here, behavior is unchanged).
   (function () {
     const _origWarn = console.warn;
     const SUPPRESSED_SUBSTRINGS = [
-      "cdn.tailwindcss.com",
       "enableIndexedDbPersistence",
       "Failed to obtain exclusive access to the persistence layer",
     ];
@@ -71,7 +70,6 @@
     };
   })();
 </script>
-<script src="https://cdn.tailwindcss.com" defer></script>
 
 <!-- Google Identity Services (GIS) — শুধুমাত্র Google Drive ব্যাকআপ ফিচারের
      জন্য ব্যবহৃত হয় (drive.file স্কোপ, token client)। Firebase Auth-এর
