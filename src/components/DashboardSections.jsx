@@ -49,7 +49,7 @@ export function StreakCard({ streak, toBn }) {
 // অভিন্ন রাখা হয়েছে(visual language consistency)।
 function activityTierColor(pct) {
   if (pct >= 85) return "var(--theme-primary)";
-  if (pct >= 60) return "#7C5CBF";
+  if (pct >= 60) return "#2563A8";
   if (pct >= 35) return "#D6A400";
   return "#C1666B";
 }
@@ -546,7 +546,7 @@ export function MonthlyOverviewSection({
     className: "flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-slate-100"
   }, [
     { c: "var(--theme-primary)", l: "চমৎকার" },
-    { c: "#7C5CBF", l: "ভালো" },
+    { c: "#2563A8", l: "ভালো" },
     { c: "#F5D061", l: "মাঝারি" },
     { c: "#C1666B", l: "কম" },
     { c: "#E7EEE3", l: "খালি", border: true }
