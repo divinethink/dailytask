@@ -12,6 +12,7 @@
 // সম্পূর্ণ নতুন, additive ফাইল — app.js এখনো এটা import/use করে না
 // (wiring পরের ধাপে)। createElement-style(existing codebase convention)।
 import { useState } from "react";
+import { GoogleGIcon } from "./icons.jsx";
 import {
   triggerGoogleSignInPopup,
   signInExistingMemberByGoogle,
@@ -85,13 +86,21 @@ export function GoogleSignInGate({ onSuccess }) {
       }, currentGoogleEmail()
           ? `${currentGoogleEmail()} — এই মেইল দিয়ে আগে কোনো পরিবার পাওয়া যায়নি। নতুন পরিবার তৈরি করতে নিচের তথ্য দিন।`
           : "নতুন পরিবার তৈরি করতে নিচের তথ্য দিন।"),
-      /*#__PURE__*/React.createElement("input", {
-        type: "text",
-        value: familyCode,
-        onChange: e => setFamilyCode(e.target.value),
-        placeholder: "পরিবারের নাম (Family Code)",
-        className: "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-      }),
+      /*#__PURE__*/React.createElement("div", {
+        className: "relative w-full"
+      },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          value: familyCode,
+          onChange: e => setFamilyCode(e.target.value),
+          placeholder: "পরিবারের নাম (Family Code)",
+          className: "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm pr-24"
+        }),
+        !familyCode && /*#__PURE__*/React.createElement("span", {
+          className: "absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none",
+          "aria-hidden": "true"
+        }, "যেমনঃ Hasan-Family")
+      ),
       /*#__PURE__*/React.createElement("input", {
         type: "text",
         value: name,
@@ -130,7 +139,7 @@ export function GoogleSignInGate({ onSuccess }) {
       type: "button",
       disabled: stage === "checking",
       onClick: handleSignInClick,
-      className: "w-full bg-white border border-slate-300 rounded-lg py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-    }, stage === "checking" ? "চেক করা হচ্ছে..." : "🔵 Google দিয়ে সাইন-ইন করুন")
+      className: "w-full bg-white border border-slate-300 rounded-xl py-2.5 text-sm font-semibold text-slate-700 flex items-center justify-center gap-3 shadow-sm hover:shadow-md active:scale-[0.99] transition-all disabled:opacity-50"
+    }, /*#__PURE__*/React.createElement(GoogleGIcon, { size: 20 }), stage === "checking" ? "চেক করা হচ্ছে..." : "Google দিয়ে সাইন-ইন করুন")
   );
 }

@@ -8,7 +8,7 @@
 // positioning(absolute/fixed backdrop)→normal in-flow layout।
 // Non-member(unauthenticated/guest, §৯.৫): শুধু একটাই "🔵 Google দিয়ে সাইন-ইন করুন"
 // বাটন — বাকি সব content(family username/সদস্য/ডেটা ম্যানেজমেন্ট ইত্যাদি) hidden।
-import { CalIcon, CopyIcon, DownloadIcon, EditIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon } from "./icons.jsx";
+import { CalIcon, CopyIcon, DownloadIcon, EditIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon, GoogleGIcon } from "./icons.jsx";
 import { MemberListSection } from "./MemberListSection.jsx";
 
 export function MenuPage({
@@ -72,10 +72,15 @@ export function MenuPage({
             {
               type: "button",
               onClick: onGuestSignInTap,
-              className: "px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm active:scale-95 transition-transform",
+              className: "px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm hover:shadow-md active:scale-95 transition-all flex items-center gap-2.5",
               style: { background: "#1A73E8" }
             },
-            "🔵 Google দিয়ে সাইন-ইন করুন"
+            React.createElement(
+              "span",
+              { className: "bg-white rounded-full p-0.5 flex items-center justify-center", "aria-hidden": "true" },
+              React.createElement(GoogleGIcon, { size: 16 })
+            ),
+            "Google দিয়ে সাইন-ইন করুন"
           )
         )
       : React.createElement(
