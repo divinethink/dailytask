@@ -567,6 +567,11 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
+// §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
+// rotating card। selectDailyInsight() pure-compute(কোনো নতুন Firestore read/
+// schema লাগেনি, existing monthEntries/streak reuse) — বিস্তারিত dailyInsight.js।
+import { selectDailyInsight } from "./dailyInsight.js";
+import { DailyInsightCard } from "../components/DailyInsightCard.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
@@ -2486,6 +2491,16 @@ function App() {
     }
   }
   const streak = useMemo(() => calculateStreak(monthEntries, selectedMember, allFields, monthCursor.year, monthCursor.month0), [monthEntries, selectedMember, allFields, monthCursor]);
+  // §Motivational Layer — Phase 1: প্রতিদিন একটাই smart-selected insight।
+  // নতুন কোনো Firestore read না — সবই এই render-এ আগে থেকে-loaded data থেকে।
+  const dailyInsight = useMemo(() => selectDailyInsight({
+    monthEntries,
+    member: selectedMember,
+    allFields,
+    cursorYear: monthCursor.year,
+    cursorMonth0: monthCursor.month0,
+    streak
+  }), [monthEntries, selectedMember, allFields, monthCursor, streak]);
   const [milestoneToast, setMilestoneToast] = useState(null);
   useEffect(() => {
     if (!selectedId || !streak) return;
@@ -2986,6 +3001,9 @@ function App() {
       const s = dailyScore(todayEntry_, selectedMember, allFields);
       return s === null || s === undefined ? null : Math.round(s * 100);
     })()
+  }), /*#__PURE__*/React.createElement(DailyInsightCard, {
+    insight: dailyInsight,
+    toBn: toBn
   }), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
     monthEntries: monthEntries,
     totalDays: total,
