@@ -565,7 +565,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
-import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard } from "../components/DashboardSections.jsx";
+import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
@@ -2970,7 +2970,31 @@ function App() {
     isFieldExcusable: isFieldExcusable
   }), /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
-    toBn: toBn
+    toBn: toBn,
+    // §Streak-box একলাইন আজকের সার্বিক অগ্রগতি(১৬ সেপ্টেম্বর ২০২৬, owner-
+    // অনুরোধ): নতুন hesab/listener লাগেনি — monthEntries ইতিমধ্যে চলতি
+    // viewCursor-এর মাস fetch করা থাকে; সেই মাস আজকের প্রকৃত মাসের সাথে না
+    // মিললে(owner অন্য মাস browse করছেন) today's entry পাওয়া যায় না বলে
+    // null রাখা হয়েছে(নতুন আলাদা listener না বাড়িয়ে, existing data-ই reuse)।
+    // ক্যালেন্ডারে ব্যবহৃত একই dailyScore()(overall, সব ফিল্ড একসাথে) reuse
+    // করা হয়েছে — নতুন ক্যাটাগরি-গড় formula বানানো হয়নি(owner-confirmed)।
+    todayPercent: (() => {
+      const now_ = new Date();
+      const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
+      if (!isCurrentMonth) return null;
+      const todayEntry_ = monthEntries[pad2(now_.getDate())];
+      const s = dailyScore(todayEntry_, selectedMember, allFields);
+      return s === null || s === undefined ? null : Math.round(s * 100);
+    })()
+  }), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
+    monthEntries: monthEntries,
+    totalDays: total,
+    member: selectedMember,
+    allFields: allFields,
+    fieldPercent: fieldPercent,
+    pad2: pad2,
+    toBn: toBn,
+    monthCursor: monthCursor
   }), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
