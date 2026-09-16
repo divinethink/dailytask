@@ -18,7 +18,7 @@ const { useEffect, useState } = React;
 // আগে থেকেই তৈরি ও app.js-এ প্রতি রেন্ডারে গণনা হচ্ছিল, শুধু এতদিন কোথাও
 // প্রধানভাবে দেখানো হতো না(শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
 // (৭/৩০/১০০/৩৬৫ দিন) toast system-ও আগে থেকেই আছে, অপরিবর্তিত।
-function StreakCard({ streak, toBn }) {
+export function StreakCard({ streak, toBn }) {
   const n = streak || 0;
   const caption = n === 0 ? "আজ থেকে ধারাবাহিকতা শুরু করুন!" : "চালিয়ে যান, মাশাআল্লাহ!";
   return /*#__PURE__*/React.createElement("div", {
@@ -28,7 +28,7 @@ function StreakCard({ streak, toBn }) {
   }, "🔥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(n), " দিন ধারাবাহিক"), /*#__PURE__*/React.createElement("div", {
+  }, "ধারাবাহিকতার ", toBn(n), " দিন"), /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-slate-500 mt-0.5"
   }, caption)));
 }
@@ -254,7 +254,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#F5E6C8] px-2 py-1 rounded-xl border border-[#C89B3C]/50 shadow-sm text-emerald-950"
+    className: "flex items-center gap-1.5 bg-[#F0DFB4] px-2 py-1 rounded-xl border border-[#C89B3C]/50 shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -493,10 +493,7 @@ export function MonthlyOverviewSection({
     className: "text-sm font-bold text-slate-700"
   }, activityStats.badgeTier.emoji, " ", activityStats.badgeTier.label), /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-slate-500 mt-1"
-  }, activityStats.badgeTier.caption)), /*#__PURE__*/React.createElement(StreakCard, {
-    streak: streak,
-    toBn: toBn
-  }), /*#__PURE__*/React.createElement("div", {
+  }, activityStats.badgeTier.caption)), /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-7 gap-1.5"
