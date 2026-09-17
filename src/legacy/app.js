@@ -588,6 +588,11 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
 import { MenuPage } from "../components/MenuPage.jsx";
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
+// §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
+// PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো(3_2 §১-এর নীতি
+// অনুযায়ী শুধু import বদল, routing-switch touch হয়নি)। lazy-load(3_2 §২.১ standing
+// rule, PrintReport-এর একই pattern reuse) — prayerTimes ট্যাপ না করলে chunk লোড হবে না।
+const PrayerTimes = React.lazy(() => import("../components/PublicTools/PrayerTimes.jsx").then(m => ({ default: m.PrayerTimes })));
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
 
@@ -2824,8 +2829,19 @@ function App() {
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
     }
+    // §Public Tools Phase A, item ২: TAB_PRAYER_TIMES এখন actual PrayerTimes.jsx
+    // render করে(lazy+Suspense, উপরের import-নোট দ্রষ্টব্য) — PublicToolsPlaceholder
+    // fallback শুধু Suspense-loading window-এ দেখায়(chunk লোড হওয়া পর্যন্ত), তারপর
+    // actual UI বসে। TAB_AMOL/TAB_TOOLS আগের মতোই placeholder(Phase A বাকি অংশ)।
+    if (activeTab === TAB_PRAYER_TIMES) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
+          React.createElement(PrayerTimes, null)
+        ),
+        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+      );
+    }
     const placeholderTitle =
-      activeTab === TAB_PRAYER_TIMES ? "সময়সূচি" :
       activeTab === TAB_AMOL ? "আমল" :
       activeTab === TAB_TOOLS ? "সহায়িকা" : "";
     return /*#__PURE__*/React.createElement(React.Fragment, null,
