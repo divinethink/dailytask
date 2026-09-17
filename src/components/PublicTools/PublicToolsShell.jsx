@@ -1,0 +1,157 @@
+// PublicToolsShell.jsx — "সহায়িকা" bottom-nav ট্যাব(Phase A item ৫)। ৬-ক্যাটাগরি
+// grid(3_1 গ্রুপিং-টেবিল/3_2 §২.২/3_3 §৭)। প্রতিটা item এই ধাপে "শীঘ্রই আসছে"
+// sub-screen নির্দেশ করে(azkar-এর মতোই internal-navigation pattern, AmolHub.jsx-এর
+// একই approach reuse) — actual calculator/content/কুইজ/ব্লগ পরের Phase-এ বসবে।
+// 🔍 অনুসন্ধান ও ⚡ দ্রুত ব্যবহার(3_2 §১০) ইচ্ছাকৃতভাবে এই ধাপে বাদ — কোনো actual
+// tool এখনো লাইভ না বলে এই মুহূর্তে ফাংশনহীন হতো, content বসার পরে যোগ হবে।
+// React global(window.React, globals.js)।
+
+import { ChevronRight, ChevronLeft } from "../icons.jsx";
+
+const { useState } = React;
+
+// প্রতিটা ক্যাটাগরির item-list(3_1 "সহায়িকা ট্যাবের ভিতরে গ্রুপিং" টেবিল অনুযায়ী)।
+// কুইজ/ব্লগ(single-entry ক্যাটাগরি) আলাদাভাবে নিচে handle হয়েছে(§renderCategory)।
+const CATEGORIES = [
+  {
+    id: "salah",
+    icon: "🕌",
+    label: "সালাত ও পবিত্রতা",
+    items: [
+      { key: "learnSalah", label: "নামাজ শেখা" },
+      { key: "prayerImportance", label: "নামাজের গুরুত্ব" },
+      { key: "sahuSijdah", label: "সাহু সিজদার নিয়ম" },
+      { key: "qasrPrayer", label: "কসর নামাজের নিয়ম" },
+      { key: "janazah", label: "জানাজার নামাজের নিয়ম" },
+      { key: "wudu", label: "অযুর নিয়ম" },
+      { key: "ghusl", label: "ফরজ গোসলের নিয়ম" },
+      { key: "tayammum", label: "তায়াম্মুমের নিয়ম" },
+      { key: "istikhara", label: "ইস্তিখারার সালাতের নিয়ম" },
+    ],
+  },
+  {
+    id: "quran",
+    icon: "📖",
+    label: "কুরআন",
+    items: [
+      { key: "paraIndex", label: "৩০ পারার সূচি" },
+      { key: "khatmTracker", label: "কুরআন খতম ট্র্যাকিং" },
+    ],
+  },
+  {
+    id: "toolsTracking",
+    icon: "🧰",
+    label: "ইসলামি টুলস ও ট্র্যাকিং",
+    items: [
+      { key: "qibla", label: "কিবলা" },
+      { key: "monthlySchedule", label: "মাসিক নামাজ-সময়সূচি" },
+      { key: "zakat", label: "যাকাত ক্যালকুলেটর" },
+      { key: "fitra", label: "ফিতরা ক্যালকুলেটর" },
+      { key: "sadaqaLog", label: "সদকা লগ" },
+      { key: "otherTracking", label: "অন্যান্য আমল/অগ্রগতি ট্র্যাকিং" },
+    ],
+  },
+  {
+    id: "specialDays",
+    icon: "🌙",
+    label: "বিশেষ দিন ও উপলক্ষ",
+    items: [
+      { key: "jumuahAmol", label: "জুমার দিনের বিশেষ আমল" },
+      { key: "ramadanPrep", label: "রমজান প্রস্তুতি" },
+      { key: "eidCountdown", label: "রমজান/ঈদ কাউন্টডাউন" },
+      { key: "eidPrayer", label: "ঈদের নামাজের নিয়ম" },
+      { key: "qurbani", label: "কুরবানির নিয়ম" },
+      { key: "hajj", label: "হজের নিয়ম" },
+      { key: "hijriDates", label: "হিজরি ও গুরুত্বপূর্ণ দিন" },
+    ],
+  },
+];
+
+// একক-বাটন ক্যাটাগরি(কুইজ/ব্লগ) — কোনো sub-item-list না, একটাই CTA card।
+const SINGLE_ENTRY_CATEGORIES = [
+  { id: "quiz", icon: "🧠", label: "ইসলামি কুইজ", ctaLabel: "কুইজ খেলুন" },
+  { id: "blog", icon: "📚", label: "ব্লগ", ctaLabel: "দ্বীনি ব্লগ পড়ুন" },
+];
+
+export function PublicToolsShell() {
+  const [activeItem, setActiveItem] = useState(null); // { label } | null
+
+  if (activeItem) {
+    return /*#__PURE__*/React.createElement(
+      "div",
+      { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
+      /*#__PURE__*/React.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: () => setActiveItem(null),
+          className: "flex items-center gap-1 px-4 pt-4 pb-2 text-sm font-semibold text-emerald-950",
+        },
+        /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+        "সহায়িকা"
+      ),
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "text-lg font-semibold", style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" } },
+          activeItem.label
+        ),
+        /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+      )
+    );
+  }
+
+  return /*#__PURE__*/React.createElement(
+    "div",
+    { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
+    CATEGORIES.map((cat) =>
+      /*#__PURE__*/React.createElement(
+        "div",
+        { key: cat.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "px-4 py-2.5 text-sm font-bold text-emerald-950 border-b border-slate-100" },
+          cat.icon + " " + cat.label
+        ),
+        cat.items.map((item, idx) =>
+          /*#__PURE__*/React.createElement(
+            "button",
+            {
+              key: item.key,
+              type: "button",
+              onClick: () => setActiveItem(item),
+              className:
+                "w-full px-4 py-3 flex items-center justify-between text-left " +
+                (idx < cat.items.length - 1 ? "border-b border-slate-100" : ""),
+            },
+            /*#__PURE__*/React.createElement("span", { className: "text-sm text-slate-700" }, item.label),
+            /*#__PURE__*/React.createElement(ChevronRight, { size: 16, color: "#8A9A8F" })
+          )
+        )
+      )
+    ),
+    SINGLE_ENTRY_CATEGORIES.map((cat) =>
+      /*#__PURE__*/React.createElement(
+        "div",
+        { key: cat.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "px-4 py-2.5 text-sm font-bold text-emerald-950 border-b border-slate-100" },
+          cat.icon + " " + cat.label
+        ),
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => setActiveItem({ label: cat.label }),
+            className: "w-full px-4 py-4 flex items-center justify-center gap-2 font-semibold text-sm",
+            style: { color: "var(--theme-primary, #0E4B43)" },
+          },
+          cat.icon + "  " + cat.ctaLabel + "  →"
+        )
+      )
+    )
+  );
+}
