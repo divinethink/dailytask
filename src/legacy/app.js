@@ -40,7 +40,8 @@ import {
   createMemberWithKey,
   migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
-  fetchEntryHistory
+  fetchEntryHistory,
+  updateBestScoreIfNeeded, saveTomorrowFocus
 } from "./memberData.js";
 import {
   isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
@@ -570,8 +571,11 @@ import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
 // rotating card। selectDailyInsight() pure-compute(কোনো নতুন Firestore read/
 // schema লাগেনি, existing monthEntries/streak reuse) — বিস্তারিত dailyInsight.js।
-import { selectDailyInsight } from "./dailyInsight.js";
+import { selectDailyInsight, suggestTomorrowFocus } from "./dailyInsight.js";
 import { DailyInsightCard } from "../components/DailyInsightCard.jsx";
+// §Motivational Layer — Phase 2(নতুন, owner-approved): "আগামীকালের Focus"
+// — DailyInsightCard থেকে ইচ্ছাকৃতভাবে আলাদা component(isolated rollback)।
+import { TomorrowFocusPicker } from "../components/TomorrowFocusPicker.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
@@ -2462,6 +2466,16 @@ function App() {
       setEntry(toSave);
       entryDirtyRef.current = false;
       localStorage.setItem("last_active_date", dateKey(new Date()));
+      // §Motivational Layer — Phase 1.5: শুধু "আজ"-এর save-এই ট্রিগার হয়(পুরনো
+      // দিনের backfill-edit বাদ, dailyInsight.js-এর মতোই "আজ"-কেন্দ্রিক scope)।
+      // Best-effort, non-blocking(await না) — মূল save-flow/UI-tick-কে ধীর করবে
+      // না, ব্যর্থ হলেও silently ignore হয়(memberData.js-এ try/catch আছে)।
+      if (key === dateKey(new Date())) {
+        const pct = dailyScore(toSave, selectedMember, allFields);
+        if (pct !== null) {
+          updateBestScoreIfNeeded(migrationState, selectedId, Math.round(pct * 100));
+        }
+      }
       setSavedTick(true);
       setTimeout(() => setSavedTick(false), 1600);
     } catch (err) {
@@ -2501,6 +2515,14 @@ function App() {
     cursorMonth0: monthCursor.month0,
     streak
   }), [monthEntries, selectedMember, allFields, monthCursor, streak]);
+  // §Motivational Layer — Phase 2: আগামীকালের auto-suggested Focus(শুধু আজ
+  // real-month-এ browse করলে অর্থবহ — dailyInsight-এর একই month-scope guard)।
+  const tomorrowKey = useMemo(() => dateKey(new Date(Date.now() + 86400000)), []);
+  const suggestedFocusKey = useMemo(() => {
+    const now = new Date();
+    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
+    return suggestTomorrowFocus(monthEntries, selectedMember, allFields, now.getDate());
+  }, [monthEntries, selectedMember, allFields, monthCursor]);
   const [milestoneToast, setMilestoneToast] = useState(null);
   useEffect(() => {
     if (!selectedId || !streak) return;
@@ -3004,7 +3026,15 @@ function App() {
   }), /*#__PURE__*/React.createElement(DailyInsightCard, {
     insight: dailyInsight,
     toBn: toBn
-  }), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
+  }), (suggestedFocusKey || selectedMember?.tomorrowFocus) && /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+  }, /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
+    member: selectedMember,
+    allFields: allFields,
+    tomorrowKey: tomorrowKey,
+    suggestedFieldKey: suggestedFocusKey,
+    onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
+  })), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
     monthEntries: monthEntries,
     totalDays: total,
     member: selectedMember,

@@ -586,6 +586,49 @@ function entryDocId(memberId, key) {
   return `entry:${memberId}:${key}`;
 }
 
+// §Motivational Layer — Phase 1.5(owner-approved, নতুন): bestScoreEver
+// denormalized field — dailyInsight.js-এর "সেরা দিন" insight-কে পুরো ইতিহাস
+// scan না করে O(1) read-এ "সর্বকালের সেরা" বলতে দেয়। pushEntryHistory()-এর
+// একই "best-effort convenience layer" pattern(নিচে দেখুন) — saveEntry()/
+// stampLastActive()-এর মূল batch সম্পূর্ণ অপরিবর্তিত, ইচ্ছাকৃতভাবে সম্পূর্ণ
+// আলাদা, independent write। ব্যর্থ হলে মূল entry-save-কে প্রভাবিত করে না —
+// dailyInsight তখন শুধু "এই মাসে"-স্কোপ fallback-এ ফিরে যাবে(নিচে dailyInsight.js
+// দ্রষ্টব্য)। Rules-এ monotonic guard(bestScoreEver কখনো কমতে পারবে না) থাকায়
+// দেরি-হওয়া/out-of-order কল থেকেও data-corruption ঝুঁকি নেই।
+async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) {
+  try {
+    const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+    const memberRef = ctx.membersRef.doc(ctx.memberDocId(memberId));
+    const snap = await memberRef.get();
+    const current = snap.exists && typeof snap.data().bestScoreEver === "number" ? snap.data().bestScoreEver : 0;
+    if (todayScorePct > current) {
+      await memberRef.set({ bestScoreEver: todayScorePct, updatedAt: Date.now() }, { merge: true });
+    }
+  } catch {
+    // Best-effort convenience layer — ব্যর্থ হলে silently ignore(pushEntryHistory()-এর
+    // মতোই), মূল entry-save flow-কে কখনো block/fail করাবে না।
+  }
+}
+
+// §Motivational Layer — Phase 2(owner-approved, নতুন): tomorrowFocus —
+// সদস্য নিজে(বা admin, unclaimed proxy member-এর জন্য) পরদিনের Focus বেছে
+// নেন/বদলান। saveEntry()-এর batch-এর অংশ না, সরাসরি explicit user-action-এ
+// (TomorrowFocusPicker.jsx) ট্রিগার হয় — তাই ব্যর্থ হলে caller নিজেই error
+// দেখাবে(entry-save flow-এর সাথে কোনো সম্পর্ক নেই)।
+async function saveTomorrowFocus(migrationState, memberId, focus) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = ctx.membersRef.doc(ctx.memberDocId(memberId));
+  await memberRef.set({
+    tomorrowFocus: {
+      fieldKey: focus.fieldKey,
+      targetDateKey: focus.targetDateKey,
+      source: focus.source,
+      setAt: Date.now()
+    },
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -652,5 +695,7 @@ export {
   saveEntry,
   entryDocId,
   pushEntryHistory,
-  fetchEntryHistory
+  fetchEntryHistory,
+  updateBestScoreIfNeeded,
+  saveTomorrowFocus
 };

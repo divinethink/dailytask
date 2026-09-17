@@ -50,14 +50,27 @@ function candidateNearMilestone(streak) {
   return null;
 }
 
-// ২) এই মাসে এ পর্যন্ত সেরা দিন(সততার সাথে scope-সীমিত — শুধু চলতি মাসের
-// cached data থেকে, তাই "Personal Best"(সর্বকালের) না বলে "মাসের সেরা দিন"
-// বলা হচ্ছে — ভুল claim এড়াতে)
+// ২) সেরা দিন। Phase 1.5(bestScoreEver denormalized field, memberData.js:
+// updateBestScoreIfNeeded())-এর পরে member.bestScoreEver থাকলে "সর্বকালের
+// সেরা" বলা যায়(field না থাকলে — পুরনো/not-yet-synced member — আগের মতোই
+// শুধু চলতি মাস-স্কোপে fallback, কোনো regression না)।
 function candidateBestDaySoFar(monthEntries, member, allFields, todayNum) {
-  if (todayNum <= 1) return null;
   const todayEntry = monthEntries[pad2(todayNum)];
   const todayScore = dailyScore(todayEntry, member, allFields);
   if (todayScore === null) return null;
+  const todayPct = Math.round(todayScore * 100);
+
+  if (member && typeof member.bestScoreEver === "number") {
+    // bestScoreEver ইতিমধ্যে আজকের score include করেই থাকতে পারে(handleSave()-এর
+    // পরে best-effort আপডেট হয়) — তাই "আজই নতুন সর্বোচ্চ" বলতে হলে todayPct
+    // ঠিক bestScoreEver-এর সমান হতে হবে(আজই সেট হয়েছে, ০ বাদ দিয়ে)।
+    if (todayPct > 0 && todayPct === member.bestScoreEver) {
+      return { type: "bestDay", todayPct, prevPct: null, allTime: true };
+    }
+    return null;
+  }
+
+  if (todayNum <= 1) return null;
   let prevBest = null;
   for (let d = 1; d < todayNum; d++) {
     const e = monthEntries[pad2(d)];
@@ -67,7 +80,7 @@ function candidateBestDaySoFar(monthEntries, member, allFields, todayNum) {
     if (prevBest === null || s > prevBest) prevBest = s;
   }
   if (prevBest === null || todayScore <= prevBest) return null;
-  return { type: "bestDay", todayPct: Math.round(todayScore * 100), prevPct: Math.round(prevBest * 100) };
+  return { type: "bestDay", todayPct, prevPct: Math.round(prevBest * 100), allTime: false };
 }
 
 // ৩) সবচেয়ে বেশি উন্নতি(আজ vs এই মাসে এখন পর্যন্ত সেই field-এর গড়, অন্তত ৩
@@ -166,6 +179,18 @@ function pickWithAntiRepeat(candidates, memberId, todayKey) {
   } catch (e) { /* ignore */ }
 
   return chosen;
+}
+
+// §Motivational Layer — Phase 2: "আগামীকালের Focus" অটো-সাজেশন(আজকের
+// সবচেয়ে দুর্বল applicable field) — TomorrowFocusPicker.jsx-এ ব্যবহৃত,
+// শুধু তখনই যখন সদস্য নিজে এখনো manually override করেননি।
+export function suggestTomorrowFocus(monthEntries, member, allFields, todayNum) {
+  const todayEntry = monthEntries[pad2(todayNum)];
+  if (!todayEntry) return null;
+  const list = applicableFieldsToday(todayEntry, member, allFields);
+  if (list.length === 0) return null;
+  const sorted = [...list].sort((a, b) => a.ratio - b.ratio);
+  return sorted[0].field.key;
 }
 
 // প্রধান entry-point। App()-এ StreakCard-এর ঠিক পরে, TopBottomActivityRanking-এর
