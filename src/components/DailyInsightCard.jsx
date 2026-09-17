@@ -20,9 +20,9 @@ function InsightBody({ insight, toBn }) {
       );
     case "bestDay":
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-slate-500 mb-2" }, "এই মাসে এ পর্যন্ত সেরা দিন"),
+        /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-slate-500 mb-2" }, insight.allTime ? "সর্বকালের সেরা দিন" : "এই মাসে এ পর্যন্ত সেরা দিন"),
         /*#__PURE__*/React.createElement("div", { className: "text-2xl font-bold text-emerald-950" }, toBn(insight.todayPct), "%"),
-        /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "এর আগের সেরা ছিল ", toBn(insight.prevPct), "%")
+        insight.prevPct != null && /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "এর আগের সেরা ছিল ", toBn(insight.prevPct), "%")
       );
     case "mostImproved":
       return /*#__PURE__*/React.createElement(React.Fragment, null,
