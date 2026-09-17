@@ -69,8 +69,8 @@ export function DailyInsightCard({ insight, toBn }) {
   if (!insight) return null;
   const isAchievement = ACHIEVEMENT_INSIGHT_TYPES.has(insight.type);
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+    className: "bg-white rounded-2xl p-4 shadow border border-slate-300 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800 mb-3"
+    className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, isAchievement ? "🏆 আজকের অর্জন" : "⭐ আজকের বিশেষ দিক"), /*#__PURE__*/React.createElement(InsightBody, { insight, toBn }));
 }

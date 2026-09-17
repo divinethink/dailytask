@@ -30,16 +30,15 @@ export function StreakCard({ streak, toBn, todayPercent, yesterdayPercent }) {
   const hasDelta = yesterdayPercent !== null && yesterdayPercent !== undefined;
   const delta = hasDelta ? todayPercent - yesterdayPercent : null;
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-2.5 flex items-center justify-between flex-wrap gap-1"
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center flex-wrap gap-x-2 gap-y-0.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-emerald-900"
-  }, "আজকের অগ্রগতি"), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-emerald-900",
+    className: "text-sm font-bold text-emerald-900"
+  }, "আজকের অগ্রগতি:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-base font-bold text-emerald-900",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(todayPercent), "%", hasDelta && /*#__PURE__*/React.createElement("span", {
-    className: delta >= 0 ? "text-emerald-700 font-medium" : "text-red-700 font-medium",
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
-  }, " · গতকালের চেয়ে ", toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓")));
+  }, toBn(todayPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
+    className: delta >= 0 ? "text-xs text-emerald-700 font-medium" : "text-xs text-red-700 font-medium"
+  }, "· গতকালের চেয়ে ", toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
 }
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
@@ -263,7 +262,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#E3C17A] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
+    className: "flex items-center gap-1.5 bg-[#F5E6C8] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -444,7 +443,11 @@ export function MonthlyOverviewSection({
   pad2,
   scoreColor,
   toBn,
-  streak
+  streak,
+  // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking-
+  // এর already-rendered element এখানে prop হিসেবে আসে(component নিজে অপরিবর্তিত,
+  // শুধু render-tree-এর অবস্থান বদলেছে — app.js দ্রষ্টব্য)।
+  rankingSlot
 }) {
   // §Heatmap legend day-count(১৭ সেপ্টেম্বর ২০২৬, owner-approved): scoreColor()
   // -এর হুবহু একই ৪-threshold branching reuse করে প্রতিটা tier-এ কতদিন পড়ে তার
@@ -485,7 +488,7 @@ export function MonthlyOverviewSection({
     BN_MONTHS: BN_MONTHS,
     toBn: toBn
   })), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80"
+    className: "bg-white rounded-2xl p-4 shadow border border-slate-300"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 pb-3 border-b border-slate-100"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -503,7 +506,7 @@ export function MonthlyOverviewSection({
     className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
-  }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
+  }), " PDF / প্রিন্ট (২ পেজ)")), rankingSlot, /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-7 gap-1.5"

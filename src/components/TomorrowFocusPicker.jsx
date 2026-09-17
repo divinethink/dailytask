@@ -34,7 +34,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey, suggestedF
   }
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
-    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2" }, "🎯 আগামীকালের Focus"),
+    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, "🎯 আগামীকালের Focus"),
     editing
       ? /*#__PURE__*/React.createElement("div", { className: "flex gap-2 items-center" },
           /*#__PURE__*/React.createElement("select", {
