@@ -587,7 +587,7 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // DashboardHeader.jsx-এর হ্যামবার্গার dropdown ছিল, এখন bottom-nav "মেনু"
 // ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
 import { MenuPage } from "../components/MenuPage.jsx";
-import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_TASBIH, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
+import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
 
@@ -2826,7 +2826,7 @@ function App() {
     }
     const placeholderTitle =
       activeTab === TAB_PRAYER_TIMES ? "সময়সূচি" :
-      activeTab === TAB_TASBIH ? "তাসবীহ" :
+      activeTab === TAB_AMOL ? "আমল" :
       activeTab === TAB_TOOLS ? "সহায়িকা" : "";
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       React.createElement(PublicToolsPlaceholder, { title: placeholderTitle }),

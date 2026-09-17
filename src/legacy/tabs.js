@@ -5,7 +5,7 @@
 // লেখা হবে না।
 export const TAB_FAMILY = "family";
 export const TAB_PRAYER_TIMES = "prayerTimes";
-export const TAB_TASBIH = "tasbih";
+export const TAB_AMOL = "amol"; // পূর্বে TAB_TASBIH("tasbih") — ১৬ সেপ্টেম্বর ২০২৬ redesign(3_1 §"আমল হাব")
 export const TAB_TOOLS = "tools";
 export const TAB_SETTINGS = "settings";
 
