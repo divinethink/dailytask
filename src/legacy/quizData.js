@@ -1,0 +1,142 @@
+// quizData.js — "ইসলামি কুইজ"(Public Tools, Phase F) — CRUD(question list/
+// create/update/delete, Firestore) + category-তালিকা constant + client-side
+// shuffle utility + personal-best(localStorage)। 3_5_Quiz_Feature_Plan.md
+// §২/§৩/§৫-এর সাথে সামঞ্জস্যপূর্ণ — top-level `quizQuestions` collection,
+// single-owner(App-Creator-only), ব্লগের চেয়ে সরল(কোনো writer-allowlist না)।
+import { db, auth } from "./firebaseConfig.js";
+
+// §১.১ — ব্লগ-ক্যাটাগরির(3_4 §১.১, ১৬ সেপ্টেম্বর ২০২৬ সংস্করণ) সাথে হুবহু
+// মেলানো, ইচ্ছাকৃতভাবে হার্ডকোডেড(3_5 §১.১ অনুযায়ী — স্বতন্ত্র কালেকশন, blogData.js
+// থেকে import করা হয়নি, কোনো cross-file dependency না)।
+const QUIZ_CATEGORIES = [
+  "আকীদা",
+  "কুরআন",
+  "হাদিস",
+  "ইবাদত, আমল ও শরয়ি নির্দেশনা",
+  "হালাল-হারাম",
+  "আখলাক ও তাযকিয়াহ",
+  "সীরাত(নবীজি ﷺ-এর জীবনী)",
+  "ইসলামী ইতিহাস",
+  "পরকাল",
+  "পরিবার, সমাজ ও সন্তান প্রতিপালন",
+  "ইসলামী অর্থনীতি",
+  "সমসাময়িক প্রসঙ্গ",
+  "প্রচলিত ভুল",
+  "তুলনামূলক ধর্মতত্ত্ব ও নাস্তিকতা",
+  "ইসলামী দর্শন ও চিন্তাধারা",
+  "ইসলামী সাহিত্য",
+  "বিশেষ দিবস/উপলক্ষ",
+  "অন্যান্য",
+];
+
+// UI-level virtual অপশন(§১.১) — প্রশ্নের নিজস্ব field না, category-filter ছাড়া
+// পুরো bank থেকে pool করতে ব্যবহৃত হয়(fetchAllQuestions())।
+const ALL_TOPICS = "★ সকল বিষয়(মিক্স কুইজ)";
+
+// §৬ Non-Goals — fixed default, v1-এ configurable না।
+const QUESTIONS_PER_SESSION = 10;
+
+// §৩ Data Storage Strategy — personal-best per-device, একটাই localStorage key,
+// ভিতরে topic(category বা ALL_TOPICS)-কী দিয়ে JSON object।
+const BEST_SCORE_KEY = "dt_pt_quiz_bestscore";
+
+function questionsRef() {
+  return db.collection("quizQuestions");
+}
+
+// --- Questions(§২.১) ---
+async function fetchAllQuestions() {
+  const snap = await questionsRef().get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function fetchQuestionsByCategory(category) {
+  const snap = await questionsRef().where("category", "==", category).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function createQuestion({ category, question, options, correctIndex, explanation }) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("সাইন-ইন প্রয়োজন");
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const payload = {
+    category,
+    question: (question || "").trim(),
+    options: Array.isArray(options) ? options.map((o) => (o || "").trim()) : [],
+    correctIndex: Number(correctIndex),
+    explanation: explanation ? explanation.trim() : null,
+    createdBy: user.uid,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const ref = await questionsRef().add(payload);
+  return ref.id;
+}
+
+async function updateQuestion(questionId, { category, question, options, correctIndex, explanation }) {
+  await questionsRef().doc(questionId).update({
+    category,
+    question: (question || "").trim(),
+    options: Array.isArray(options) ? options.map((o) => (o || "").trim()) : [],
+    correctIndex: Number(correctIndex),
+    explanation: explanation ? explanation.trim() : null,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function deleteQuestion(questionId) {
+  await questionsRef().doc(questionId).delete();
+}
+
+// --- Random selection(§১, Fisher-Yates) ---
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = a[i];
+    a[i] = a[j];
+    a[j] = tmp;
+  }
+  return a;
+}
+
+function pickSessionQuestions(pool, count = QUESTIONS_PER_SESSION) {
+  return shuffleArray(pool).slice(0, count);
+}
+
+// --- Personal-best(per-device, localStorage, §৬ — কোনো leaderboard/global-sync না) ---
+function getBestScore(topicKey) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BEST_SCORE_KEY) || "{}");
+    return typeof raw[topicKey] === "number" ? raw[topicKey] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setBestScoreIfHigher(topicKey, score) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BEST_SCORE_KEY) || "{}");
+    if (typeof raw[topicKey] !== "number" || score > raw[topicKey]) {
+      raw[topicKey] = score;
+      localStorage.setItem(BEST_SCORE_KEY, JSON.stringify(raw));
+    }
+  } catch (e) {
+    // localStorage best-effort — কখনো throw না, quiz-flow ব্লক করবে না।
+  }
+}
+
+export {
+  QUIZ_CATEGORIES,
+  ALL_TOPICS,
+  QUESTIONS_PER_SESSION,
+  fetchAllQuestions,
+  fetchQuestionsByCategory,
+  createQuestion,
+  updateQuestion,
+  deleteQuestion,
+  shuffleArray,
+  pickSessionQuestions,
+  getBestScore,
+  setBestScoreIfHigher,
+};
