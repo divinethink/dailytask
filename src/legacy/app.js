@@ -3040,7 +3040,7 @@ function App() {
     insight: dailyInsight,
     toBn: toBn
   }), (suggestedFocusKey || selectedMember?.tomorrowFocus) && /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow border border-slate-300 mt-4"
+    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
   }, /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
     member: selectedMember,
     allFields: allFields,
