@@ -143,6 +143,11 @@ export function DashboardHeader({
   onLeaveFamily: handleLeaveFamily,
   onLogout: handleFullLogout
 })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, streak > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white/10 border border-white/10 text-white",
+    title: "ধারাবাহিকতা"
+  }, "🔥 ", toBn(streak), " দিন"), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -180,7 +185,7 @@ export function DashboardHeader({
     className: "text-sm leading-none"
   }, "🔔"), notifications.filter(n => !n.read).length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
-  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, db, getFamilyId }))), addingMember && /*#__PURE__*/React.createElement("div", {
+  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, db, getFamilyId })))), addingMember && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"

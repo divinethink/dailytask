@@ -58,11 +58,19 @@ function InsightBody({ insight, toBn }) {
   }
 }
 
+// §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-approved): সব insight-type-এ
+// "অর্জন" বসালে ভুল বোঝাবে(bottom3/nearMilestone কোনো অর্জন না) — তাই শুধু
+// সত্যিকারের achievement-টাইপ-এ "🏆 আজকের অর্জন", বাকি(pending/neutral)-এ আগের
+// "⭐ আজকের বিশেষ দিক"-ই থাকছে। insight.type-ভ্যালু dailyInsight.js-এর
+// selectDailyInsight()-এর সাথে হুবহু sync(কোনো নতুন type যোগ হয়নি)।
+const ACHIEVEMENT_INSIGHT_TYPES = new Set(["milestoneHit", "bestDay", "mostImproved", "comeback", "top3"]);
+
 export function DailyInsightCard({ insight, toBn }) {
   if (!insight) return null;
+  const isAchievement = ACHIEVEMENT_INSIGHT_TYPES.has(insight.type);
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3"
-  }, "⭐ আজকের বিশেষ দিক"), /*#__PURE__*/React.createElement(InsightBody, { insight, toBn }));
+  }, isAchievement ? "🏆 আজকের অর্জন" : "⭐ আজকের বিশেষ দিক"), /*#__PURE__*/React.createElement(InsightBody, { insight, toBn }));
 }

@@ -18,22 +18,28 @@ const { useState } = React;
 // আগে থেকেই তৈরি ও app.js-এ প্রতি রেন্ডারে গণনা হচ্ছিল, শুধু এতদিন কোথাও
 // প্রধানভাবে দেখানো হতো না(শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
 // (৭/৩০/১০০/৩৬৫ দিন) toast system-ও আগে থেকেই আছে, অপরিবর্তিত।
-export function StreakCard({ streak, toBn, todayPercent }) {
-  const n = streak || 0;
-  const caption = n === 0 ? "আজ থেকে ধারাবাহিকতা শুরু করুন!" : "চালিয়ে যান, মাশাআল্লাহ!";
+// §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-approved): streak-সংখ্যা এখন
+// DashboardHeader.jsx-এর compact chip-এ(bell-এর পাশে) দেখানো হয় — তাই এই
+// component থেকে বড় streak-box সরিয়ে শুধু "আজকের অগ্রগতি" এক-লাইন compact
+// row রাখা হলো(component/prop-নাম অপরিবর্তিত রাখা হয়েছে, শুধু presentation)।
+// yesterdayPercent(নতুন, ঐচ্ছিক prop) দিলে গতকালের তুলনায় বৃদ্ধি/হ্রাস দেখাবে —
+// app.js-এর call-site-এ একই মাসের ভিতরে(cross-month fetch ছাড়াই) নিরাপদে
+// derive করা হয়েছে, না মিললে(যেমন মাসের ১ তারিখ) silently বাদ যায়।
+export function StreakCard({ streak, toBn, todayPercent, yesterdayPercent }) {
+  if (todayPercent === null || todayPercent === undefined) return null;
+  const hasDelta = yesterdayPercent !== null && yesterdayPercent !== undefined;
+  const delta = hasDelta ? todayPercent - yesterdayPercent : null;
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full mt-2 rounded-xl bg-[#f0ede4] p-4 flex flex-col items-center text-center gap-0.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-3xl leading-none mb-1"
-  }, "🔥"), /*#__PURE__*/React.createElement("div", {
-    className: "text-xl font-bold text-emerald-950",
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-2.5 flex items-center justify-between flex-wrap gap-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-emerald-900"
+  }, "আজকের অগ্রগতি"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-emerald-900",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, "ধারাবাহিকতার ", toBn(n), " দিন"), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-500 mt-0.5"
-  }, caption), todayPercent !== null && todayPercent !== undefined && /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-bold text-emerald-900 mt-2 bg-white/70 rounded-lg px-3 py-1",
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, "আজকের সার্বিক অগ্রগতি: ", toBn(todayPercent), "%"));
+  }, toBn(todayPercent), "%", hasDelta && /*#__PURE__*/React.createElement("span", {
+    className: delta >= 0 ? "text-emerald-700 font-medium" : "text-red-700 font-medium",
+    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+  }, " · গতকালের চেয়ে ", toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓")));
 }
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
@@ -440,6 +446,20 @@ export function MonthlyOverviewSection({
   toBn,
   streak
 }) {
+  // §Heatmap legend day-count(১৭ সেপ্টেম্বর ২০২৬, owner-approved): scoreColor()
+  // -এর হুবহু একই ৪-threshold branching reuse করে প্রতিটা tier-এ কতদিন পড়ে তার
+  // tally — নতুন calculation/read নয়, existing dailyScore()-ই আলাদাভাবে(calendar
+  // -cell render loop থেকে independent) আরেকবার লুপ করা হচ্ছে।
+  const tierCounts = { excellent: 0, good: 0, medium: 0, low: 0, empty: 0 };
+  for (let d = 1; d <= total; d++) {
+    const s = dailyScore(monthEntries[pad2(d)], selectedMember, allFields);
+    if (s === null || s === undefined) tierCounts.empty += 1;
+    else if (s >= 0.85) tierCounts.excellent += 1;
+    else if (s >= 0.6) tierCounts.good += 1;
+    else if (s >= 0.35) tierCounts.medium += 1;
+    else if (s > 0) tierCounts.low += 1;
+    else tierCounts.empty += 1;
+  }
   return React.createElement("div", {
     className: "px-5 mt-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -522,11 +542,11 @@ export function MonthlyOverviewSection({
   /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-slate-100"
   }, [
-    { c: "var(--theme-primary)", l: "চমৎকার" },
-    { c: "#2563A8", l: "ভালো" },
-    { c: "#F5D061", l: "মাঝারি" },
-    { c: "#C1666B", l: "কম" },
-    { c: "#E7EEE3", l: "খালি", border: true }
+    { c: "var(--theme-primary)", l: "চমৎকার", n: tierCounts.excellent },
+    { c: "#2563A8", l: "ভালো", n: tierCounts.good },
+    { c: "#F5D061", l: "মাঝারি", n: tierCounts.medium },
+    { c: "#C1666B", l: "কম", n: tierCounts.low },
+    { c: "#E7EEE3", l: "খালি", n: tierCounts.empty, border: true }
   ].map(item => /*#__PURE__*/React.createElement("span", {
     key: item.l,
     className: "flex items-center gap-1"
@@ -535,7 +555,7 @@ export function MonthlyOverviewSection({
     style: { background: item.c }
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-medium text-slate-500"
-  }, item.l))))));
+  }, item.l, "(", toBn(item.n), ")"))))));
 }
 
 export function MeetingMinutesSection({
