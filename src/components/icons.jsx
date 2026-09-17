@@ -606,6 +606,32 @@ export function TasbihIcon({
     /*#__PURE__*/React.createElement("line", { x1: 11.3, y1: 20, x2: 11.3, y2: 23 })
   );
 }
+// §Amol tab icon(2_4 §৯.০, ১৬ সেপ্টেম্বর ২০২৬, owner-approved): বটম-নেভ "তাসবীহ"→
+// "আমল" hub পুনর্গঠনের সাথে নতুন icon — দু'হাত-তোলা দোয়ার ভঙ্গি, TasbihIcon(bead-circle)
+// থেকে আলাদা রাখা হয়েছে যাতে TasbihIcon future-এ AmolHub-এর ভিতরের তাসবীহ-counter
+// item-এ reuse করা যায়(TasbihIcon অপরিবর্তিত, কোথাও edit হয়নি)।
+export function AmolIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style,
+  filled = false
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: className,
+    style: { fill: filled ? color : "none", stroke: color, ...style }
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M6 14c-.5-3 .5-6 2-8" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 14c-1.8.6-3 1.8-3 3.2 0 1 .8 1.8 2 1.8h14c1.2 0 2-.8 2-1.8 0-1.4-1.2-2.6-3-3.2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M18 14c.5-3-.5-6-2-8" })
+  );
+}
 export function CompassIcon({
   size = 18,
   color = "currentColor",
