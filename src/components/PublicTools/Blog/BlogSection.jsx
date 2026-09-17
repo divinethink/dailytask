@@ -22,7 +22,11 @@ const { useState, useEffect } = React;
 
 const ALL_CATEGORY = "সব";
 
-export function BlogSection() {
+// onBack — PublicToolsShell.jsx থেকে পাস করা(§সহায়িকায় ফেরত, mockup 3_3 §৮.১
+// "← সহায়িকা")। আগে এই list-view header-এ কোনো শেল-লেভেল back-control ছিল না
+// (শুধু ভিতরের detail/form/admin view "← ব্লগ" দিয়ে list-এ ফিরত) — এই fix
+// সেই gap পূরণ করে, mockup-এর সাথে সামঞ্জস্যপূর্ণ করতে।
+export function BlogSection({ onBack }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -184,9 +188,19 @@ export function BlogSection() {
       "div",
       { className: "flex items-center justify-between px-4 pt-4 pb-2" },
       /*#__PURE__*/React.createElement(
-        "button",
-        { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরি" },
-        /*#__PURE__*/React.createElement(MenuIcon, { size: 20, color: "#0E4B43" })
+        "div",
+        { className: "flex items-center gap-3" },
+        /*#__PURE__*/React.createElement(
+          "button",
+          { type: "button", onClick: onBack, className: "flex items-center gap-1 text-sm font-semibold text-emerald-950" },
+          /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+          "সহায়িকা"
+        ),
+        /*#__PURE__*/React.createElement(
+          "button",
+          { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরি" },
+          /*#__PURE__*/React.createElement(MenuIcon, { size: 20, color: "#0E4B43" })
+        )
       ),
       /*#__PURE__*/React.createElement(
         "div",
