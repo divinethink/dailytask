@@ -597,6 +597,9 @@ const PrayerTimes = React.lazy(() => import("../components/PublicTools/PrayerTim
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual hub component(তাসবীহ inline + বাকি
 // ৭ item "শীঘ্রই আসছে" sub-screen, content pending) বসানো হলো, একই lazy pattern।
 const AmolHub = React.lazy(() => import("../components/PublicTools/AmolHub.jsx").then(m => ({ default: m.AmolHub })));
+// §Public Tools Phase A, item ৫(3_1/3_2 §২.২, ১৮ সেপ্টেম্বর ২০২৬): "সহায়িকা" ট্যাব —
+// PublicToolsPlaceholder প্রতিস্থাপন করে ৬-ক্যাটাগরি shell বসানো হলো, একই lazy pattern।
+const PublicToolsShell = React.lazy(() => import("../components/PublicTools/PublicToolsShell.jsx").then(m => ({ default: m.PublicToolsShell })));
 
 // ---- Theme color (per-device display preference, kept in localStorage only) ----
 
@@ -2836,7 +2839,7 @@ function App() {
     // §Public Tools Phase A, item ২: TAB_PRAYER_TIMES এখন actual PrayerTimes.jsx
     // render করে(lazy+Suspense, উপরের import-নোট দ্রষ্টব্য) — PublicToolsPlaceholder
     // fallback শুধু Suspense-loading window-এ দেখায়(chunk লোড হওয়া পর্যন্ত), তারপর
-    // actual UI বসে। TAB_AMOL এখন AmolHub(নিচে), TAB_TOOLS আগের মতোই placeholder(Phase A বাকি অংশ)।
+    // actual UI বসে। TAB_AMOL এখন AmolHub, TAB_TOOLS এখন PublicToolsShell(দুটোই নিচে)।
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
@@ -2853,9 +2856,16 @@ function App() {
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
     }
-    const placeholderTitle = activeTab === TAB_TOOLS ? "সহায়িকা" : "";
+    if (activeTab === TAB_TOOLS) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
+          React.createElement(PublicToolsShell, null)
+        ),
+        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+      );
+    }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      React.createElement(PublicToolsPlaceholder, { title: placeholderTitle }),
+      React.createElement(PublicToolsPlaceholder, { title: "" }),
       React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
     );
   }
