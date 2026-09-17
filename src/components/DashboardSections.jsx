@@ -207,7 +207,7 @@ export function TopBottomActivityRanking({
   const { topTiers, bottomTiers, qazaJamaatBlock } = stats;
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
@@ -507,7 +507,12 @@ export function MonthlyOverviewSection({
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
   }), " PDF / প্রিন্ট (২ পেজ)")), rankingSlot, /*#__PURE__*/React.createElement("div", {
-    className: "mt-4"
+    className: "flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-4 mb-2"
+  }, /*#__PURE__*/React.createElement(CalIcon, {
+    size: 13,
+    color: "var(--theme-primary)"
+  }), "এক্টিভিটি ক্যালেন্ডার"), /*#__PURE__*/React.createElement("div", {
+    className: "mt-0"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-7 gap-1.5"
   }, BN_WEEKDAYS.map(w => /*#__PURE__*/React.createElement("div", {
@@ -558,7 +563,10 @@ export function MonthlyOverviewSection({
     style: { background: item.c }
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-medium text-slate-500"
-  }, item.l, "(", toBn(item.n), ")"))))));
+  }, item.l, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-slate-700",
+    style: { fontFamily: "'IBM Plex Mono', monospace" }
+  }, "(", toBn(item.n), ")")))))));
 }
 
 export function MeetingMinutesSection({
