@@ -207,7 +207,7 @@ export function TopBottomActivityRanking({
   const { topTiers, bottomTiers, qazaJamaatBlock } = stats;
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
+    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
@@ -262,7 +262,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#F5E6C8] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
+    className: "flex items-center gap-1.5 bg-[#FDFBF5] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -488,7 +488,7 @@ export function MonthlyOverviewSection({
     BN_MONTHS: BN_MONTHS,
     toBn: toBn
   })), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow border border-slate-300"
+    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 pb-3 border-b border-slate-100"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
