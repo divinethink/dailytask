@@ -3005,7 +3005,15 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable
-  }), /*#__PURE__*/React.createElement(StreakCard, {
+  }), /*#__PURE__*/React.createElement("div", {
+    // §Layout fix(১৭ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): এই তিনটা card আগে
+    // কোনো horizontal-padding wrapper ছাড়াই top-level sibling ছিল বলে সরাসরি
+    // স্ক্রিন-edge-এ লেগে যাচ্ছিল(checklist card-গুলো DailyEntrySection.jsx-এর
+    // নিজস্ব "px-5" wrapper-এর ভিতরে থাকায় তাদের সঠিক margin ছিল, কিন্তু এই
+    // তিনটা তা পায়নি)। MonthlyOverviewSection নিজেই নিজের "px-5 mt-8" রাখে
+    // বলে touch করা হয়নি — শুধু এই gap-টুকু পূরণ করা হলো, presentation-only।
+    className: "px-5"
+  }, /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
     toBn: toBn,
     // §Streak-box একলাইন আজকের সার্বিক অগ্রগতি(১৬ সেপ্টেম্বর ২০২৬, owner-
@@ -3047,7 +3055,7 @@ function App() {
     tomorrowKey: tomorrowKey,
     suggestedFieldKey: suggestedFocusKey,
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
-  })), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+  }))), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
