@@ -1,9 +1,10 @@
 // PublicToolsShell.jsx — "সহায়িকা" bottom-nav ট্যাব(Phase A item ৫)। ৬-ক্যাটাগরি
-// grid(3_1 গ্রুপিং-টেবিল/3_2 §২.২/3_3 §৭)। প্রতিটা item এই ধাপে "শীঘ্রই আসছে"
-// sub-screen নির্দেশ করে(azkar-এর মতোই internal-navigation pattern, AmolHub.jsx-এর
-// একই approach reuse) — actual calculator/content/কুইজ/ব্লগ পরের Phase-এ বসবে।
-// 🔍 অনুসন্ধান ও ⚡ দ্রুত ব্যবহার(3_2 §১০) ইচ্ছাকৃতভাবে এই ধাপে বাদ — কোনো actual
-// tool এখনো লাইভ না বলে এই মুহূর্তে ফাংশনহীন হতো, content বসার পরে যোগ হবে।
+// grid(3_1 গ্রুপিং-টেবিল/3_2 §২.২/3_3 §৭)। সাধারণ item(Qibla/ZakatCalculator
+// ইত্যাদি) ট্যাপে এই শেল নিজেই back+title header দেখিয়ে ActiveComponent বসায়।
+// একক-এন্ট্রি ক্যাটাগরি(কুইজ/ব্লগ) ব্যতিক্রম — এরা নিজস্ব পূর্ণাঙ্গ
+// header+back-navigation বহন করে(BlogSection.jsx/QuizSection.jsx), তাই শেল
+// generic wrapper না বসিয়ে সরাসরি component render করে, শুধু onBack prop
+// দিয়ে(SINGLE_ENTRY_COMPONENTS, নিচে)।
 // React global(window.React, globals.js)।
 
 import { ChevronRight, ChevronLeft } from "../icons.jsx";
@@ -12,6 +13,8 @@ import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { ZakatCalculator } from "./ZakatCalculator.jsx";
 import { FitraCalculator } from "./FitraCalculator.jsx";
 import { SadaqaLog } from "./SadaqaLog.jsx";
+import { QuizSection } from "./Quiz/QuizSection.jsx";
+import { BlogSection } from "../Blog/BlogSection.jsx";
 
 const { useState } = React;
 
@@ -24,6 +27,13 @@ const ACTIVE_ITEM_COMPONENTS = {
   zakat: ZakatCalculator,
   fitra: FitraCalculator,
   sadaqaLog: SadaqaLog,
+};
+
+// একক-এন্ট্রি ক্যাটাগরি(কুইজ/ব্লগ) — id দিয়ে lookup, নিজস্ব header/back বহন করে
+// বলে ACTIVE_ITEM_COMPONENTS-এর generic wrapped-header pattern এখানে প্রযোজ্য না।
+const SINGLE_ENTRY_COMPONENTS = {
+  quiz: QuizSection,
+  blog: BlogSection,
 };
 
 // প্রতিটা ক্যাটাগরির item-list(3_1 "সহায়িকা ট্যাবের ভিতরে গ্রুপিং" টেবিল অনুযায়ী)।
@@ -90,9 +100,15 @@ const SINGLE_ENTRY_CATEGORIES = [
 ];
 
 export function PublicToolsShell() {
-  const [activeItem, setActiveItem] = useState(null); // { label } | null
+  const [activeItem, setActiveItem] = useState(null); // { key, label } | { id, label } | null
 
   if (activeItem) {
+    // কুইজ/ব্লগ — নিজস্ব header/back, শেল-wrapper ছাড়াই সরাসরি render।
+    const SingleComponent = activeItem.id ? SINGLE_ENTRY_COMPONENTS[activeItem.id] : null;
+    if (SingleComponent) {
+      return /*#__PURE__*/React.createElement(SingleComponent, { onBack: () => setActiveItem(null) });
+    }
+
     const ActiveComponent = ACTIVE_ITEM_COMPONENTS[activeItem.key];
     return /*#__PURE__*/React.createElement(
       "div",
@@ -164,7 +180,7 @@ export function PublicToolsShell() {
           "button",
           {
             type: "button",
-            onClick: () => setActiveItem({ label: cat.label }),
+            onClick: () => setActiveItem({ id: cat.id, label: cat.label }),
             className: "w-full px-4 py-4 flex items-center justify-center gap-2 font-semibold text-sm",
             style: { color: "var(--theme-primary, #0E4B43)" },
           },
