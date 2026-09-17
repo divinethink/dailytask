@@ -3040,23 +3040,14 @@ function App() {
     insight: dailyInsight,
     toBn: toBn
   }), (suggestedFocusKey || selectedMember?.tomorrowFocus) && /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+    className: "bg-white rounded-2xl p-4 shadow border border-slate-300 mt-4"
   }, /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
     member: selectedMember,
     allFields: allFields,
     tomorrowKey: tomorrowKey,
     suggestedFieldKey: suggestedFocusKey,
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
-  })), /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
-    monthEntries: monthEntries,
-    totalDays: total,
-    member: selectedMember,
-    allFields: allFields,
-    fieldPercent: fieldPercent,
-    pad2: pad2,
-    toBn: toBn,
-    monthCursor: monthCursor
-  }), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+  })), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
@@ -3079,7 +3070,23 @@ function App() {
     pad2: pad2,
     scoreColor: scoreColor,
     toBn: toBn,
-    streak: streak
+    streak: streak,
+    // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking
+    // আগে আলাদা sibling card হিসেবে Monthly Overview-এর উপরে ছিল — এখন এখানে
+    // prop হিসেবে দেওয়া হচ্ছে, MonthlyOverviewSection নিজে এটাকে stats-row-এর
+    // নিচে ও heatmap grid-এর উপরে বসায়(DashboardSections.jsx দ্রষ্টব্য)।
+    // TopBottomActivityRanking component-এর নিজস্ব calculation+presentation
+    // সম্পূর্ণ অপরিবর্তিত(props হুবহু আগেরই) — শুধু render-tree-এর অবস্থান বদলেছে।
+    rankingSlot: /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
+      monthEntries: monthEntries,
+      totalDays: total,
+      member: selectedMember,
+      allFields: allFields,
+      fieldPercent: fieldPercent,
+      pad2: pad2,
+      toBn: toBn,
+      monthCursor: monthCursor
+    })
   }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
     addWeeklyRow: addWeeklyRow,
     handleSaveWeekly: handleSaveWeekly,
