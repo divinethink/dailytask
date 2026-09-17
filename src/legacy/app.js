@@ -3022,6 +3022,19 @@ function App() {
       const todayEntry_ = monthEntries[pad2(now_.getDate())];
       const s = dailyScore(todayEntry_, selectedMember, allFields);
       return s === null || s === undefined ? null : Math.round(s * 100);
+    })(),
+    // §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): "গতকালের চেয়ে
+    // X% কম/বেশি" — ইচ্ছাকৃতভাবে শুধু same-month(now_.getDate() > 1) হলেই
+    // derive করা হয়, কারণ monthEntries শুধু চলতি viewCursor-এর মাস-scoped —
+    // মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে, যা load করা নেই। সেই edge-case-এ
+    // নতুন fetch না করে silently null(StreakCard delta-লাইন বাদ দেয়)।
+    yesterdayPercent: (() => {
+      const now_ = new Date();
+      const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
+      if (!isCurrentMonth || now_.getDate() <= 1) return null;
+      const yEntry_ = monthEntries[pad2(now_.getDate() - 1)];
+      const s = dailyScore(yEntry_, selectedMember, allFields);
+      return s === null || s === undefined ? null : Math.round(s * 100);
     })()
   }), /*#__PURE__*/React.createElement(DailyInsightCard, {
     insight: dailyInsight,
