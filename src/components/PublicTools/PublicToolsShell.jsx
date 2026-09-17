@@ -7,8 +7,24 @@
 // React global(window.React, globals.js)।
 
 import { ChevronRight, ChevronLeft } from "../icons.jsx";
+import { Qibla } from "./Qibla.jsx";
+import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
+import { ZakatCalculator } from "./ZakatCalculator.jsx";
+import { FitraCalculator } from "./FitraCalculator.jsx";
+import { SadaqaLog } from "./SadaqaLog.jsx";
 
 const { useState } = React;
+
+// "ইসলামি টুলস ও ট্র্যাকিং" ক্যাটাগরির যে ৫টা item এখন actual component পেয়েছে
+// (৬ষ্ঠ item "অন্যান্য আমল/অগ্রগতি ট্র্যাকিং" এখনো scope-নির্ধারণ-পেন্ডিং, বাদ)।
+// key → component map, "শীঘ্রই আসছে" fallback-এর বদলে এই map-এ থাকলে actual UI বসে।
+const ACTIVE_ITEM_COMPONENTS = {
+  qibla: Qibla,
+  monthlySchedule: MonthlyPrayerSchedule,
+  zakat: ZakatCalculator,
+  fitra: FitraCalculator,
+  sadaqaLog: SadaqaLog,
+};
 
 // প্রতিটা ক্যাটাগরির item-list(3_1 "সহায়িকা ট্যাবের ভিতরে গ্রুপিং" টেবিল অনুযায়ী)।
 // কুইজ/ব্লগ(single-entry ক্যাটাগরি) আলাদাভাবে নিচে handle হয়েছে(§renderCategory)।
@@ -77,6 +93,7 @@ export function PublicToolsShell() {
   const [activeItem, setActiveItem] = useState(null); // { label } | null
 
   if (activeItem) {
+    const ActiveComponent = ACTIVE_ITEM_COMPONENTS[activeItem.key];
     return /*#__PURE__*/React.createElement(
       "div",
       { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
@@ -92,14 +109,16 @@ export function PublicToolsShell() {
       ),
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "text-lg font-semibold", style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" } },
-          activeItem.label
-        ),
-        /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
-      )
+        { className: "px-4 pb-2 text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
+        activeItem.label
+      ),
+      ActiveComponent
+        ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+        : /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
+            /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+          )
     );
   }
 
