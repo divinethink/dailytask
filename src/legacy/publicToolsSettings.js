@@ -12,13 +12,11 @@ const MADHAB_KEY = "dt_pt_madhab";
 // বলে default Hanafi রাখা হলো।
 const DEFAULT_MADHAB = 1;
 
-// §Scope-নোট(owner-decision pending): 3_2 §৪.২-এর "manual location-override
-// dropdown" এই মুহূর্তে একটা curated বাংলাদেশ বিভাগীয় শহর-তালিকা হিসেবে
-// বাস্তবায়িত হয়েছে(কোনো free-text/geocoding না) — কারণ geocoding-এর জন্য
-// নতুন external service(যেমন BigDataCloud) লাগত, যেটা 3_2-তে approved
-// architecture-এর বাইরে(শুধু Aladhan API approved, Dev Rule ২: unrelated
-// external service অনুমতি ছাড়া যোগ করা যাবে না)। প্রয়োজনে ভবিষ্যতে owner-approval
-// নিয়ে geocoding যোগ করা যাবে।
+// §Update(১৮ সেপ্টেম্বর ২০২৬): উপজেলা/এলাকা-level accuracy-র জন্য এখন
+// publicToolsGeocode.js(Nominatim/OSM free geocoding, owner-instruction অনুযায়ী
+// যোগ করা হয়েছে, বিস্তারিত সেই ফাইলের নোট দ্রষ্টব্য) মূল location-selection পথ —
+// নিচের তালিকা এখন শুধু "দ্রুত ব্যবহার" quick-shortcut(বিভাগীয় শহর), সার্চ-বক্সের
+// পাশে দেখানো হয়, একমাত্র পথ না।
 const MANUAL_LOCATIONS = [
   { id: "dhaka", name: "ঢাকা", lat: 23.8103, lon: 90.4125 },
   { id: "chittagong", name: "চট্টগ্রাম", lat: 22.3569, lon: 91.7832 },
