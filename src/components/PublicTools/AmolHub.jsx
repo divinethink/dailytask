@@ -10,6 +10,7 @@
 
 import { ChevronRight, ChevronLeft } from "../icons.jsx";
 import { TasbihCounter } from "./TasbihCounter.jsx";
+import { MorningEveningAzkar } from "./MorningEveningAzkar.jsx";
 
 const { useState } = React;
 
@@ -27,6 +28,10 @@ const HUB_ITEMS = [
 
 export function AmolHub() {
   const [activeItem, setActiveItem] = useState(null);
+
+  if (activeItem === "azkar") {
+    return /*#__PURE__*/React.createElement(MorningEveningAzkar, { onBack: () => setActiveItem(null) });
+  }
 
   if (activeItem) {
     const item = HUB_ITEMS.find((i) => i.key === activeItem);
