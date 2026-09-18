@@ -93,10 +93,16 @@ const CATEGORIES = [
   },
 ];
 
-// একক-বাটন ক্যাটাগরি(কুইজ/ব্লগ) — কোনো sub-item-list না, একটাই CTA card।
+// একক-বাটন ক্যাটাগরি(কুইজ) — কোনো sub-item-list না, একটাই CTA card।
 const SINGLE_ENTRY_CATEGORIES = [
   { id: "quiz", icon: "🧠", label: "ইসলামি কুইজ", ctaLabel: "কুইজ খেলুন" },
-  { id: "blog", icon: "📚", label: "ব্লগ", ctaLabel: "দ্বীনি ব্লগ পড়ুন" },
+];
+
+// একক-সারি সরাসরি-ক্লিকযোগ্য এন্ট্রি(ব্লগ, ১৮ সেপ্টেম্বর ২০২৬ owner-request) —
+// আলাদা header+CTA-button দুই-ধাপ প্যাটার্নের বদলে CATEGORIES-item-এর মতোই
+// একটাই সারি, ক্লিকেই সরাসরি BlogSection খোলে।
+const SINGLE_ROW_ENTRIES = [
+  { id: "blog", icon: "📚", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
 ];
 
 export function PublicToolsShell() {
@@ -185,6 +191,36 @@ export function PublicToolsShell() {
             style: { color: "var(--theme-primary, #0E4B43)" },
           },
           cat.icon + "  " + cat.ctaLabel + "  →"
+        )
+      )
+    ),
+    SINGLE_ROW_ENTRIES.map((entry) =>
+      /*#__PURE__*/React.createElement(
+        "div",
+        { key: entry.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => setActiveItem({ id: entry.id, label: entry.label }),
+            className: "w-full px-4 py-3 flex items-center justify-between text-left",
+          },
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex flex-col" },
+            /*#__PURE__*/React.createElement(
+              "span",
+              { className: "text-sm font-bold text-emerald-950" },
+              entry.icon + " " + entry.label
+            ),
+            entry.subtitle &&
+              /*#__PURE__*/React.createElement(
+                "span",
+                { className: "text-xs text-slate-500 mt-0.5" },
+                "(" + entry.subtitle + ")"
+              )
+          ),
+          /*#__PURE__*/React.createElement(ChevronRight, { size: 16, color: "#8A9A8F" })
         )
       )
     )
