@@ -12,6 +12,7 @@
 // accuracy-সমস্যা রিপোর্ট করে সমাধান চেয়েছেন, তাই সরাসরি সমাধানযোগ্য বলে যোগ
 // করা হলো, কিন্তু owner review-এর জন্য এই নোট রাখা আবশ্যক)।
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE_BASE = "https://nominatim.openstreetmap.org/reverse";
 
 // display_name সাধারণত "এলাকা, উপজেলা, জেলা, বিভাগ, বাংলাদেশ" ফরম্যাটে আসে —
 // প্রথম ৩ অংশ(এলাকা/উপজেলা/জেলা) রেখে বাকি(বিভাগ/দেশ) বাদ দেওয়া হয়, UI-তে
@@ -37,4 +38,23 @@ async function searchBangladeshLocation(query) {
   }));
 }
 
-export { searchBangladeshLocation };
+// §GPS reverse-geocode(নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction) — GPS-এ শুধু
+// "GPS অবস্থান" জেনেরিক লেবেলের বদলে "এলাকা, জেলা"(owner-উদাহরণ: "গুলশান, ঢাকা")
+// দেখানোর জন্য। একই Nominatim service(উপরের search-এর মতোই), শুধু reverse endpoint।
+async function reverseGeocodeBangladesh(lat, lon) {
+  const url = `${NOMINATIM_REVERSE_BASE}?format=json&lat=${lat}&lon=${lon}&zoom=14&accept-language=bn,en`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("reverse geocode failed");
+  const json = await res.json();
+  const addr = (json && json.address) || {};
+  const area = addr.suburb || addr.neighbourhood || addr.city_district || addr.town || addr.village || addr.city || addr.municipality || "";
+  const district = addr.county || addr.state_district || "";
+  let name;
+  if (area && district && area !== district) name = `${area}, ${district}`;
+  else if (district) name = district;
+  else if (area) name = area;
+  else name = shortenDisplayName(json.display_name, "GPS অবস্থান");
+  return name;
+}
+
+export { searchBangladeshLocation, reverseGeocodeBangladesh };
