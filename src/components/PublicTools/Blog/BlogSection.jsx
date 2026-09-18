@@ -186,31 +186,31 @@ export function BlogSection({ onBack }) {
     { className: "min-h-screen pb-24 bg-[#F4F7F1] relative" },
     /*#__PURE__*/React.createElement(
       "div",
-      { className: "flex items-center justify-between gap-1.5 px-3 pt-3 pb-2" },
+      { className: "flex items-center justify-between gap-3 px-4 pt-4 pb-2" },
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex items-center gap-1 min-w-0" },
+        { className: "flex items-center gap-2 min-w-0" },
         /*#__PURE__*/React.createElement(
           "button",
           { type: "button", onClick: onBack, "aria-label": "সহায়িকা", className: "flex items-center flex-shrink-0" },
-          /*#__PURE__*/React.createElement(ChevronLeft, { size: 18, color: "#0E4B43" })
+          /*#__PURE__*/React.createElement(ChevronLeft, { size: 20, color: "#0E4B43" })
         ),
         /*#__PURE__*/React.createElement(
           "button",
           { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরি", className: "flex items-center flex-shrink-0" },
-          /*#__PURE__*/React.createElement(MenuIcon, { size: 16, color: "#0E4B43" })
+          /*#__PURE__*/React.createElement(MenuIcon, { size: 20, color: "#0E4B43" })
         ),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "ml-0.5 min-w-0" },
+          { className: "min-w-0" },
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "text-[13px] font-bold text-emerald-950 truncate leading-tight", style: { fontFamily: "'Noto Serif Bengali', serif" } },
+            { className: "text-base font-bold text-emerald-950 truncate", style: { fontFamily: "'Noto Serif Bengali', serif" } },
             "📚 ডিভাইন ব্লগ"
           ),
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "text-[9px] text-slate-500 truncate leading-tight" },
+            { className: "text-[11px] text-slate-500 truncate" },
             "(ইসলামি লেখার সমাহার)"
           )
         )
@@ -245,10 +245,6 @@ export function BlogSection({ onBack }) {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "fixed inset-0 z-40 flex" },
-        /*#__PURE__*/React.createElement("div", {
-          className: "flex-1 bg-black/40",
-          onClick: () => setSidebarOpen(false),
-        }),
         /*#__PURE__*/React.createElement(
           "div",
           { className: "w-64 bg-white h-full overflow-y-auto shadow-xl" },
@@ -279,7 +275,11 @@ export function BlogSection({ onBack }) {
               c
             )
           )
-        )
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          className: "flex-1 bg-black/40",
+          onClick: () => setSidebarOpen(false),
+        })
       ),
 
     loading
