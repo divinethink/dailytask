@@ -15,6 +15,22 @@ import { FitraCalculator } from "./FitraCalculator.jsx";
 import { SadaqaLog } from "./SadaqaLog.jsx";
 import { QuizSection } from "./Quiz/QuizSection.jsx";
 import { BlogSection } from "./Blog/BlogSection.jsx";
+import { LearnSalahGuide } from "./LearnSalahGuide.jsx";
+import { PrayerImportance } from "./PrayerImportance.jsx";
+import { SahuSijdahGuide } from "./SahuSijdahGuide.jsx";
+import { QasrPrayerGuide } from "./QasrPrayerGuide.jsx";
+import { JanazahPrayerGuide } from "./JanazahPrayerGuide.jsx";
+import { WuduGuide } from "./WuduGuide.jsx";
+import { GhuslGuide } from "./GhuslGuide.jsx";
+import { TayammumGuide } from "./TayammumGuide.jsx";
+import { IstikharaGuide } from "./IstikharaGuide.jsx";
+import { ParaIndex } from "./ParaIndex.jsx";
+import { JumuahAmol } from "./JumuahAmol.jsx";
+import { RamadanPrep } from "./RamadanPrep.jsx";
+import { EidPrayerGuide } from "./EidPrayerGuide.jsx";
+import { QurbaniGuide } from "./QurbaniGuide.jsx";
+import { HajjGuide } from "./HajjGuide.jsx";
+import { HijriImportantDays } from "./HijriImportantDays.jsx";
 
 const { useState } = React;
 
@@ -27,6 +43,22 @@ const ACTIVE_ITEM_COMPONENTS = {
   zakat: ZakatCalculator,
   fitra: FitraCalculator,
   sadaqaLog: SadaqaLog,
+  learnSalah: LearnSalahGuide,
+  prayerImportance: PrayerImportance,
+  sahuSijdah: SahuSijdahGuide,
+  qasrPrayer: QasrPrayerGuide,
+  janazah: JanazahPrayerGuide,
+  wudu: WuduGuide,
+  ghusl: GhuslGuide,
+  tayammum: TayammumGuide,
+  istikhara: IstikharaGuide,
+  paraIndex: ParaIndex,
+  jumuahAmol: JumuahAmol,
+  ramadanPrep: RamadanPrep,
+  eidPrayer: EidPrayerGuide,
+  qurbani: QurbaniGuide,
+  hajj: HajjGuide,
+  hijriDates: HijriImportantDays,
 };
 
 // একক-এন্ট্রি ক্যাটাগরি(কুইজ/ব্লগ) — id দিয়ে lookup, নিজস্ব header/back বহন করে
@@ -44,7 +76,7 @@ const CATEGORIES = [
     icon: "🕌",
     label: "সালাত ও পবিত্রতা",
     items: [
-      { key: "learnSalah", label: "নামাজ শেখা" },
+      { key: "learnSalah", label: "নামাজ শিক্ষা" },
       { key: "prayerImportance", label: "নামাজের গুরুত্ব" },
       { key: "sahuSijdah", label: "সাহু সিজদার নিয়ম" },
       { key: "qasrPrayer", label: "কসর নামাজের নিয়ম" },
