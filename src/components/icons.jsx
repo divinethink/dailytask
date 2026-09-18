@@ -606,10 +606,15 @@ export function TasbihIcon({
     /*#__PURE__*/React.createElement("line", { x1: 11.3, y1: 20, x2: 11.3, y2: 23 })
   );
 }
-// §Amol tab icon(2_4 §৯.০, ১৬ সেপ্টেম্বর ২০২৬, owner-approved): বটম-নেভ "তাসবীহ"→
-// "আমল" hub পুনর্গঠনের সাথে নতুন icon — দু'হাত-তোলা দোয়ার ভঙ্গি, TasbihIcon(bead-circle)
-// থেকে আলাদা রাখা হয়েছে যাতে TasbihIcon future-এ AmolHub-এর ভিতরের তাসবীহ-counter
-// item-এ reuse করা যায়(TasbihIcon অপরিবর্তিত, কোথাও edit হয়নি)।
+// §Amol tab icon — পরিবর্তিত(১৮ সেপ্টেম্বর ২০২৬, owner-feedback, 2_4 §৯.০-এর
+// পূর্ববর্তী decision-এর উপর)। আগের "দু'হাত-তোলা দোয়ার ভঙ্গি" ডিজাইন ছোট সাইজে(১৮px
+// bottom-nav) অস্পষ্ট/torso-র মতো দেখাচ্ছিল(owner-reported, ছবি-verified) — তাই
+// owner-এর সুপারিশ অনুযায়ী তাসবীহ/গোল-পুঁতির loop-এ পরিবর্তন করা হলো। ছোট সাইজেও
+// clearly পড়া যায় বলে(dot-ring pattern) এবং আগে থেকেই TasbihIcon(নিচে/উপরে)-এ
+// প্রমাণিত+ব্যবহৃত ডিজাইন বলে সেই একই bead-loop pattern এখানে reuse করা হলো(নতুন
+// অপরীক্ষিত SVG path রিস্ক এড়াতে)। TasbihIcon নিজে অপরিবর্তিত(আলাদা export, কোথাও
+// touch হয়নি) — শুধু AmolIcon-এর ভিতরের shape বদলেছে, নাম/export/import signature
+// একই থাকায় BottomNav.jsx-এ কোনো change লাগেনি।
 export function AmolIcon({
   size = 18,
   color = "currentColor",
@@ -617,6 +622,11 @@ export function AmolIcon({
   style,
   filled = false
 }) {
+  const beadFill = filled ? color : "none";
+  const beadPositions = [
+    [12, 4.3], [17.6, 6.9], [19.6, 12.5], [17, 18],
+    [11.3, 20], [5.9, 18], [4, 12], [6.4, 6.5]
+  ];
   return /*#__PURE__*/React.createElement("svg", {
     width: size,
     height: size,
@@ -625,11 +635,12 @@ export function AmolIcon({
     strokeLinecap: "round",
     strokeLinejoin: "round",
     className: className,
-    style: { fill: filled ? color : "none", stroke: color, ...style }
+    style: { stroke: color, ...style }
   },
-    /*#__PURE__*/React.createElement("path", { d: "M6 14c-.5-3 .5-6 2-8" }),
-    /*#__PURE__*/React.createElement("path", { d: "M6 14c-1.8.6-3 1.8-3 3.2 0 1 .8 1.8 2 1.8h14c1.2 0 2-.8 2-1.8 0-1.4-1.2-2.6-3-3.2" }),
-    /*#__PURE__*/React.createElement("path", { d: "M18 14c.5-3-.5-6-2-8" })
+    ...beadPositions.map(([cx, cy], i) => /*#__PURE__*/React.createElement("circle", {
+      key: i, cx, cy, r: 1.5, fill: beadFill
+    })),
+    /*#__PURE__*/React.createElement("line", { x1: 11.3, y1: 20, x2: 11.3, y2: 23 })
   );
 }
 export function CompassIcon({
