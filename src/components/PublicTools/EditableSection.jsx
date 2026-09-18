@@ -67,7 +67,7 @@ function SaveCancelRow({ onSave, onCancel, busy }) {
   );
 }
 
-export function EditableSection({ sectionId, format, defaultContent }) {
+export function EditableSection({ sectionId, format, defaultContent, filterItems }) {
   const isCreator = isCreatorAuth();
   const [doc, setDoc] = useState(null); // fetched raw Firestore data, null = none/not-yet
   const [error, setError] = useState("");
@@ -123,6 +123,7 @@ export function EditableSection({ sectionId, format, defaultContent }) {
   return /*#__PURE__*/React.createElement(AccordionBlock, {
     sectionId,
     defaultContent,
+    filterItems,
     doc,
     isCreator,
     busy,
@@ -191,9 +192,10 @@ function RichtextBlock({ defaultContent, doc, isCreator, busy, error, withBusy, 
 }
 
 // ---------- accordion ----------
-function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy, sectionId, onSaved }) {
+function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy, sectionId, onSaved, filterItems }) {
   const items =
     doc && doc.accordion && Array.isArray(doc.accordion.items) ? doc.accordion.items : defaultContent || [];
+  const displayItems = filterItems ? filterItems(items) : items;
   const [expanded, setExpanded] = useState({});
   const [editingId, setEditingId] = useState(null); // null | "new" | itemId
   const [formTitle, setFormTitle] = useState("");
@@ -249,7 +251,7 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "flex flex-col gap-2" },
-    items.map((item) =>
+    displayItems.map((item) =>
       /*#__PURE__*/React.createElement(
         "div",
         { key: item.itemId, className: CARD + " overflow-hidden" },
