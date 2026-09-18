@@ -186,39 +186,38 @@ export function BlogSection({ onBack }) {
     { className: "min-h-screen pb-24 bg-[#F4F7F1] relative" },
     /*#__PURE__*/React.createElement(
       "div",
-      { className: "flex items-center justify-between px-4 pt-4 pb-2" },
+      { className: "flex items-center justify-between gap-1.5 px-3 pt-3 pb-2" },
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex items-center gap-3" },
+        { className: "flex items-center gap-1 min-w-0" },
         /*#__PURE__*/React.createElement(
           "button",
-          { type: "button", onClick: onBack, className: "flex items-center gap-1 text-sm font-semibold text-emerald-950" },
-          /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
-          "সহায়িকা"
+          { type: "button", onClick: onBack, "aria-label": "সহায়িকা", className: "flex items-center flex-shrink-0" },
+          /*#__PURE__*/React.createElement(ChevronLeft, { size: 18, color: "#0E4B43" })
         ),
         /*#__PURE__*/React.createElement(
           "button",
-          { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরি" },
-          /*#__PURE__*/React.createElement(MenuIcon, { size: 20, color: "#0E4B43" })
+          { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরি", className: "flex items-center flex-shrink-0" },
+          /*#__PURE__*/React.createElement(MenuIcon, { size: 16, color: "#0E4B43" })
+        ),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "ml-0.5 min-w-0" },
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "text-[13px] font-bold text-emerald-950 truncate leading-tight", style: { fontFamily: "'Noto Serif Bengali', serif" } },
+            "📚 ডিভাইন ব্লগ"
+          ),
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "text-[9px] text-slate-500 truncate leading-tight" },
+            "(ইসলামি লেখার সমাহার)"
+          )
         )
       ),
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex flex-col items-center" },
-        /*#__PURE__*/React.createElement(
-          "span",
-          { className: "text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-          "📚 ডিভাইন ব্লগ"
-        ),
-        /*#__PURE__*/React.createElement(
-          "span",
-          { className: "text-[11px] text-slate-500" },
-          "(ইসলামি লেখার সমাহার)"
-        )
-      ),
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "flex items-center gap-3" },
+        { className: "flex items-center gap-2 flex-shrink-0" },
         isCreator &&
           /*#__PURE__*/React.createElement(
             "button",
