@@ -204,8 +204,17 @@ export function BlogSection({ onBack }) {
       ),
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-        "📚 ডিভাইন ব্লগ"
+        { className: "flex flex-col items-center" },
+        /*#__PURE__*/React.createElement(
+          "span",
+          { className: "text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
+          "📚 ডিভাইন ব্লগ"
+        ),
+        /*#__PURE__*/React.createElement(
+          "span",
+          { className: "text-[11px] text-slate-500" },
+          "(ইসলামি লেখার সমাহার)"
+        )
       ),
       /*#__PURE__*/React.createElement(
         "div",

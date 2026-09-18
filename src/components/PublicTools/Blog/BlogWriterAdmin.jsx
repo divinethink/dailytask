@@ -40,7 +40,7 @@ export function BlogWriterAdmin({ onBack }) {
       setNewEmail("");
       await reload();
     } catch (e) {
-      setError("যোগ করা যায়নি — email সঠিক কিনা যাচাই করুন।");
+      setError((e && e.message) || "যোগ করা যায়নি — email সঠিক কিনা যাচাই করুন।");
     } finally {
       setBusy(false);
     }
