@@ -14,7 +14,7 @@ import { ZakatCalculator } from "./ZakatCalculator.jsx";
 import { FitraCalculator } from "./FitraCalculator.jsx";
 import { SadaqaLog } from "./SadaqaLog.jsx";
 import { QuizSection } from "./Quiz/QuizSection.jsx";
-import { BlogSection } from "../Blog/BlogSection.jsx";
+import { BlogSection } from "./Blog/BlogSection.jsx";
 
 const { useState } = React;
 
