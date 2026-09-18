@@ -66,9 +66,12 @@ async function isCurrentUserWriter() {
   return doc.exists;
 }
 
+const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function addWriter(email) {
   const emailKey = normalizeEmail(email);
   if (!emailKey) throw new Error("email প্রয়োজন");
+  if (!EMAIL_FORMAT_PATTERN.test(emailKey)) throw new Error("সঠিক ইমেইল ফরম্যাট দিন(যেমন name@example.com)");
   await writersRef().doc(emailKey).set({
     addedAt: firebase.firestore.FieldValue.serverTimestamp(),
     addedBy: auth.currentUser ? auth.currentUser.uid : null,
