@@ -15,7 +15,7 @@ import {
   MANUAL_LOCATIONS,
 } from "../../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes } from "../../legacy/publicToolsPrayerApi.js";
-import { searchBangladeshLocation } from "../../legacy/publicToolsGeocode.js";
+import { searchBangladeshLocation, reverseGeocodeBangladesh } from "../../legacy/publicToolsGeocode.js";
 import { ChevronDown, Loader2 } from "../icons.jsx";
 
 const { useState, useEffect, useMemo, useRef } = React;
@@ -88,6 +88,30 @@ function MosqueSilhouette() {
   );
 }
 
+// §লোকেশন-রো vs GPS-পিল — আলাদা icon(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬): আগে
+// দুই জায়গাতেই একই 📍 emoji ছিল, বিভ্রান্তিকর। এখন GPS-পিলে crosshair/target(GpsIcon)
+// ও এলাকা-রো-তে classic map-pin/teardrop(PinIcon) — দুটো visually স্পষ্ট আলাদা।
+function PinIcon({ size = 14, className }) {
+  return /*#__PURE__*/React.createElement(
+    "svg",
+    { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className },
+    /*#__PURE__*/React.createElement("path", { d: "M12 22s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12z" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 12, cy: 10, r: 2.5 })
+  );
+}
+
+function GpsIcon({ size = 12, className }) {
+  return /*#__PURE__*/React.createElement(
+    "svg",
+    { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className },
+    /*#__PURE__*/React.createElement("circle", { cx: 12, cy: 12, r: 3 }),
+    /*#__PURE__*/React.createElement("line", { x1: 12, y1: 2, x2: 12, y2: 5 }),
+    /*#__PURE__*/React.createElement("line", { x1: 12, y1: 19, x2: 12, y2: 22 }),
+    /*#__PURE__*/React.createElement("line", { x1: 2, y1: 12, x2: 5, y2: 12 }),
+    /*#__PURE__*/React.createElement("line", { x1: 19, y1: 12, x2: 22, y2: 12 })
+  );
+}
+
 function WaqtIconChip({ emoji, bg }) {
   return /*#__PURE__*/React.createElement(
     "span",
@@ -119,6 +143,13 @@ export function PrayerTimes() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  // §জেলা/উপজেলা ফিল্টার(নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction) — bangladeshGeoData.js
+  // lazy-load হয়(শুধু panel খোলার পরে, ৪১KB dataset PrayerTimes-এর মূল chunk-কে ভারী না করতে)।
+  const [geoData, setGeoData] = useState(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [filterDistrictId, setFilterDistrictId] = useState("");
+  const [filterUpazilaId, setFilterUpazilaId] = useState("");
+  const [filterBusy, setFilterBusy] = useState(false);
   const reqIdRef = useRef(0);
   const searchReqIdRef = useRef(0);
 
@@ -180,18 +211,41 @@ export function PrayerTimes() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // §জেলা/উপজেলা geo-dataset lazy-load — panel প্রথমবার খোলার সময়ে, অথবা
+  // location এখনো সেট-না-থাকা প্রথমবার(initial no-location screen-ও একই
+  // renderLocationPicker() ব্যবহার করে) — দুই ক্ষেত্রেই একবার fetch, cache(state)।
+  useEffect(() => {
+    if ((!locationPanelOpen && location) || geoData || geoLoading) return;
+    setGeoLoading(true);
+    import("../../legacy/bangladeshGeoData.js")
+      .then((mod) => setGeoData({ districts: mod.BD_DISTRICTS, upazilas: mod.BD_UPAZILAS }))
+      .catch(() => setGeoData(null))
+      .finally(() => setGeoLoading(false));
+  }, [locationPanelOpen, location, geoData, geoLoading]);
+
   function applyLocation(loc) {
     setLocationState(loc);
     saveLocation(loc);
     setLocationPanelOpen(false);
     setSearchQuery("");
     setSearchResults([]);
+    setFilterDistrictId("");
+    setFilterUpazilaId("");
   }
 
+  // §GPS reverse-geocode(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬): শুধু lat/lon
+  // পাওয়ার পর Nominatim reverse দিয়ে "এলাকা, জেলা" নাম বের করা হয়(উদাহরণ:
+  // "গুলশান, ঢাকা") — জেনেরিক "GPS অবস্থান" লেবেলের বদলে। reverse-geocode fail
+  // করলেও lat/lon সঠিক থাকে বলে generic label-এ gracefully fallback করে(সময়সূচি
+  // ভুল হয় না, শুধু লেবেল কম-informative থাকে)।
   function handleUseGps() {
     setGpsBusy(true);
     detectGpsLocation()
-      .then((loc) => applyLocation(loc))
+      .then((loc) =>
+        reverseGeocodeBangladesh(loc.lat, loc.lon)
+          .then((name) => applyLocation({ ...loc, name }))
+          .catch(() => applyLocation(loc))
+      )
       .catch((err) => {
         setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি");
       })
@@ -202,6 +256,32 @@ export function PrayerTimes() {
     setMadhabState(m);
     saveMadhab(m);
     setMadhabPanelOpen(false);
+  }
+
+  // §জেলা/উপজেলা ফিল্টার প্রয়োগ(নতুন, owner-instruction) — জেলা-শুধু বাছাই হলে
+  // সরকারি DC-office lat/lon(bangladeshGeoData.js) সরাসরি ব্যবহার হয়(কোনো extra
+  // API-call লাগে না); উপজেলা-সহ বাছাই হলে Nominatim দিয়ে সেই নির্দিষ্ট উপজেলার
+  // সঠিক lat/lon আনা হয়(fail করলে জেলা-কেন্দ্রের coordinate-এ gracefully fallback,
+  // ইউজার কখনো আটকে যাবে না)।
+  function applyFilterSelection() {
+    if (!geoData || !filterDistrictId) return;
+    const district = geoData.districts.find((d) => d.id === filterDistrictId);
+    if (!district) return;
+    if (!filterUpazilaId) {
+      applyLocation({ lat: district.lat, lon: district.lon, name: district.name, source: "filter" });
+      return;
+    }
+    const upazila = geoData.upazilas.find((u) => u.id === filterUpazilaId);
+    if (!upazila) return;
+    const combinedName = `${upazila.name}, ${district.name}`;
+    setFilterBusy(true);
+    searchBangladeshLocation(`${upazila.name}, ${district.name}`)
+      .then((results) => {
+        if (results.length > 0) applyLocation({ ...results[0], name: combinedName });
+        else applyLocation({ lat: district.lat, lon: district.lon, name: combinedName, source: "filter" });
+      })
+      .catch(() => applyLocation({ lat: district.lat, lon: district.lon, name: combinedName, source: "filter" }))
+      .finally(() => setFilterBusy(false));
   }
 
   // §৪.১ bonus-derive — পূর্ণ schedule(আজকের সব ওয়াক্ত+সংশ্লিষ্ট time)
@@ -243,6 +323,23 @@ export function PrayerTimes() {
     if (upcoming) return { name: upcoming.name, label: "শুরু হতে বাকি", target: upcoming.start, currentKey: null };
     return { name: "ফজর", label: "শুরু হতে বাকি", target: nextFajr, currentKey: null };
   }, [schedule, now]);
+
+  // §রমজান সেহরি/ইফতার countdown — data-layer/schema(owner-instruction, ১৮
+  // সেপ্টেম্বর ২০২৬): "রমজান মাস আসলে এই পেজেই ইফতার ও সেহরি কাউন্টডাউন দেখানোর
+  // অপশন রাখতে হবে, পর্যাপ্ত data layer/schema রাখবেন"। হিজরি মাস "রমজান"(existing
+  // getHijriDate()/HIJRI_MONTHS_BN reuse, appHelpers.js) হলেই স্বয়ংক্রিয়ভাবে সক্রিয়
+  // হবে — কোনো manual toggle/flag লাগে না, এখন(hijri মাস রমজান না) কিছুই render
+  // করবে না(null), তাই বর্তমান UI অপরিবর্তিত থাকে। রমজান মাস এলে schedule.fajr/
+  // schedule.maghrib থেকেই সরাসরি derive হবে(নতুন API/storage লাগবে না)।
+  const hijriNow = useMemo(() => getHijriDate(now), [now]);
+  const isRamadan = hijriNow.month === "রমজান";
+  const ramadanCountdown = useMemo(() => {
+    if (!isRamadan || !schedule) return null;
+    const { fajr, maghrib, nextFajr } = schedule;
+    if (now < fajr) return { label: "সেহরি শেষ হতে বাকি", target: fajr };
+    if (now < maghrib) return { label: "ইফতার হতে বাকি", target: maghrib };
+    return { label: "সেহরি শেষ হতে বাকি", target: nextFajr };
+  }, [isRamadan, schedule, now]);
 
   // নিষিদ্ধ সময় — সূর্যোদয়/মধ্যাহ্ন/সূর্যাস্ত window(§৪.১ bonus-derive)
   const forbiddenWindows = useMemo(() => {
@@ -304,6 +401,64 @@ export function PrayerTimes() {
         gpsBusy && /*#__PURE__*/React.createElement(Loader2, { size: 15, className: "animate-spin" }),
         "📍 GPS দিয়ে সঠিক অবস্থান নিন"
       ),
+      // §জেলা/উপজেলা ফিল্টার(নতুন) — cascading dropdown, geoData lazy-loaded
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "border-t border-slate-100 pt-2 flex flex-col gap-1.5" },
+        /*#__PURE__*/React.createElement("div", { className: "text-[11px] text-slate-400 px-1" }, "ফিল্টার করে বাছাই করুন:"),
+        geoLoading &&
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "text-xs text-slate-500 flex items-center gap-1.5 px-1" },
+            /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" }),
+            "জেলার তালিকা আনা হচ্ছে..."
+          ),
+        geoData &&
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex gap-1.5" },
+            /*#__PURE__*/React.createElement(
+              "select",
+              {
+                value: filterDistrictId,
+                onChange: (e) => {
+                  setFilterDistrictId(e.target.value);
+                  setFilterUpazilaId("");
+                },
+                className: "flex-1 h-9 px-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white",
+              },
+              /*#__PURE__*/React.createElement("option", { value: "" }, "জেলা বাছাই করুন"),
+              geoData.districts.map((d) => /*#__PURE__*/React.createElement("option", { key: d.id, value: d.id }, d.name))
+            ),
+            /*#__PURE__*/React.createElement(
+              "select",
+              {
+                value: filterUpazilaId,
+                disabled: !filterDistrictId,
+                onChange: (e) => setFilterUpazilaId(e.target.value),
+                className: "flex-1 h-9 px-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white disabled:opacity-50",
+              },
+              /*#__PURE__*/React.createElement("option", { value: "" }, "উপজেলা(ঐচ্ছিক)"),
+              geoData.upazilas
+                .filter((u) => u.districtId === filterDistrictId)
+                .map((u) => /*#__PURE__*/React.createElement("option", { key: u.id, value: u.id }, u.name))
+            )
+          ),
+        geoData &&
+          filterDistrictId &&
+          /*#__PURE__*/React.createElement(
+            "button",
+            {
+              type: "button",
+              disabled: filterBusy,
+              onClick: applyFilterSelection,
+              className: "h-9 rounded-lg bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50",
+            },
+            filterBusy && /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" }),
+            "এই এলাকা নির্বাচন করুন"
+          )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "text-[11px] text-slate-400 px-1 pt-1" }, "অথবা লিখে সার্চ করুন:"),
       /*#__PURE__*/React.createElement("input", {
         type: "text",
         value: searchQuery,
@@ -386,17 +541,22 @@ export function PrayerTimes() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "flex flex-col gap-1.5 items-end" },
+        // §GPS পিল — এখন ফিল্টার/সার্চ-সহ একই panel খোলে(owner-instruction: "জিপিএস
+        // চিহ্নেই ফিল্টার অপশন যুক্ত করা হোক", আগে এটা সরাসরি GPS-detect ট্রিগার
+        // করত, লোকেশন-রো থেকে আলাদা ছিল — এখন দুটোই একই একক panel-এ consolidate)।
         /*#__PURE__*/React.createElement(
           "button",
           {
             type: "button",
-            disabled: gpsBusy,
-            onClick: handleUseGps,
+            onClick: () => {
+              setLocationPanelOpen((v) => !v);
+              setMadhabPanelOpen(false);
+            },
             className:
               "text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-sm flex items-center gap-1 " +
               (location.source === "gps" ? "text-emerald-700 font-bold" : "text-slate-500"),
           },
-          gpsBusy ? /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" }) : "📍",
+          /*#__PURE__*/React.createElement(GpsIcon, { size: 12 }),
           location.source === "gps" ? "GPS চালু" : "GPS"
         ),
         /*#__PURE__*/React.createElement(
@@ -434,7 +594,10 @@ export function PrayerTimes() {
         )
       )
     ),
-    // §Location row(3_2 §৪.২ item ২, GPS-pill থেকে আলাদা) — ট্যাপে search+quick-list panel খোলে
+    // §Location row(3_2 §৪.২ item ২) — GPS-পিলের একই panel খোলে(consolidated)।
+    // ২-লাইন প্রদর্শন(owner-instruction): নাম কমা দিয়ে split করে প্রথম অংশ(এলাকা)
+    // বড়+বোল্ড লাইনে, বাকি অংশ(উপজেলা/জেলা) ছোট ধূসর লাইনে — যেমন "গুলশান" /
+    // "ঢাকা"। কমা না থাকলে(যেমন quick-shortcut শহরের নাম) স্বাভাবিকভাবে এক-লাইনই থাকে।
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4 pb-1.5 relative" },
@@ -446,16 +609,26 @@ export function PrayerTimes() {
             setLocationPanelOpen((v) => !v);
             setMadhabPanelOpen(false);
           },
-          className: "text-sm text-emerald-950 font-semibold flex items-center gap-1",
+          className: "flex items-center gap-1.5 text-left",
         },
-        "📍 ",
-        location.name,
+        /*#__PURE__*/React.createElement(PinIcon, { size: 15, className: "text-emerald-800 shrink-0" }),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "leading-tight" },
+          /*#__PURE__*/React.createElement("div", { className: "text-sm text-emerald-950 font-semibold" }, (location.name || "").split(",")[0].trim()),
+          (location.name || "").split(",").length > 1 &&
+            /*#__PURE__*/React.createElement(
+              "div",
+              { className: "text-[11px] text-slate-500" },
+              (location.name || "").split(",").slice(1).join(",").trim()
+            )
+        ),
         /*#__PURE__*/React.createElement(ChevronDown, { size: 13, style: { transform: locationPanelOpen ? "rotate(180deg)" : "none" } })
       ),
       locationPanelOpen &&
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-md border border-slate-200 p-3 z-20" },
+          { className: "absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-md border border-slate-200 p-3 z-20 max-h-[70vh] overflow-y-auto" },
           renderLocationPicker()
         )
     ),
@@ -493,6 +666,23 @@ export function PrayerTimes() {
           "div",
           { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'IBM Plex Mono', monospace" } },
           formatCountdown(waqtInfo.target.getTime() - now.getTime())
+        )
+      ),
+    // §রমজান সেহরি/ইফতার countdown(schema উপরে, isRamadan true হলেই সক্রিয় —
+    // এখন hijri মাস রমজান না বলে null, কিছুই render হয় না)। ভিন্ন gradient(সোনালী/
+    // বেগুনি) দিয়ে মূল ওয়াক্ত-banner থেকে visually আলাদা রাখা হয়েছে।
+    ramadanCountdown &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        {
+          className: "mx-4 mb-2 rounded-2xl p-4 text-white shadow-sm relative overflow-hidden min-h-[80px] flex flex-col justify-center border border-[#C89B3C]/60 shadow-[0_0_12px_rgba(200,155,60,0.4)]",
+          style: { background: "linear-gradient(135deg, #4A2E6B, #2B1A45)" },
+        },
+        /*#__PURE__*/React.createElement("div", { className: "relative text-sm opacity-90" }, `🌙 রমজান · ${ramadanCountdown.label}`),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+          formatCountdown(ramadanCountdown.target.getTime() - now.getTime())
         )
       ),
     // §Owner-instruction(১৮ সেপ্টেম্বর): সালাতের সময়সূচি কার্ড চওড়া(col-span-3)+

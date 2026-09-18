@@ -7,7 +7,8 @@
 // দিয়ে(SINGLE_ENTRY_COMPONENTS, নিচে)।
 // React global(window.React, globals.js)।
 
-import { ChevronRight, ChevronLeft } from "../icons.jsx";
+import { ChevronLeft } from "../icons.jsx";
+import { ToolGridSection } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { ZakatCalculator } from "./ZakatCalculator.jsx";
@@ -73,54 +74,54 @@ const SINGLE_ENTRY_COMPONENTS = {
 const CATEGORIES = [
   {
     id: "salah",
-    icon: "🕌",
+    icon: "mosque",
     label: "সালাত ও পবিত্রতা",
     items: [
-      { key: "learnSalah", label: "নামাজ শিক্ষা" },
-      { key: "prayerImportance", label: "নামাজের গুরুত্ব" },
-      { key: "sahuSijdah", label: "সাহু সিজদার নিয়ম" },
-      { key: "qasrPrayer", label: "কসর নামাজের নিয়ম" },
-      { key: "janazah", label: "জানাজার নামাজের নিয়ম" },
-      { key: "wudu", label: "অযুর নিয়ম" },
-      { key: "ghusl", label: "ফরজ গোসলের নিয়ম" },
-      { key: "tayammum", label: "তায়াম্মুমের নিয়ম" },
-      { key: "istikhara", label: "ইস্তিখারার সালাতের নিয়ম" },
+      { key: "learnSalah", icon: "cap", label: "নামাজ শিক্ষা" },
+      { key: "prayerImportance", icon: "mosque", label: "নামাজের গুরুত্ব" },
+      { key: "sahuSijdah", icon: "repeat", label: "সাহু সিজদার নিয়ম" },
+      { key: "qasrPrayer", icon: "suitcase", label: "কসর নামাজের নিয়ম" },
+      { key: "janazah", icon: "leaf", label: "জানাজার নামাজের নিয়ম" },
+      { key: "wudu", icon: "drop", label: "অযুর নিয়ম" },
+      { key: "ghusl", icon: "drops", label: "ফরজ গোসলের নিয়ম" },
+      { key: "tayammum", icon: "palm", label: "তায়াম্মুমের নিয়ম" },
+      { key: "istikhara", icon: "moonStar", label: "ইস্তিখারার সালাতের নিয়ম" },
     ],
   },
   {
     id: "quran",
-    icon: "📖",
+    icon: "bookmarkCheck",
     label: "কুরআন",
     items: [
-      { key: "paraIndex", label: "৩০ পারার সূচি" },
-      { key: "khatmTracker", label: "কুরআন খতম ট্র্যাকিং" },
+      { key: "paraIndex", icon: "list", label: "৩০ পারার সূচি" },
+      { key: "khatmTracker", icon: "bookmarkCheck", label: "কুরআন খতম ট্র্যাকিং" },
     ],
   },
   {
     id: "toolsTracking",
-    icon: "🧰",
+    icon: "calculator",
     label: "ইসলামি টুলস ও ট্র্যাকিং",
     items: [
-      { key: "qibla", label: "কিবলা" },
-      { key: "monthlySchedule", label: "মাসিক নামাজ-সময়সূচি" },
-      { key: "zakat", label: "যাকাত ক্যালকুলেটর" },
-      { key: "fitra", label: "ফিতরা ক্যালকুলেটর" },
-      { key: "sadaqaLog", label: "সদকা লগ" },
-      { key: "otherTracking", label: "অন্যান্য আমল/অগ্রগতি ট্র্যাকিং" },
+      { key: "qibla", icon: "compass", label: "কিবলা" },
+      { key: "monthlySchedule", icon: "calendar", label: "মাসিক নামাজ-সময়সূচি" },
+      { key: "zakat", icon: "calculator", label: "যাকাত ক্যালকুলেটর" },
+      { key: "fitra", icon: "wheat", label: "ফিতরা ক্যালকুলেটর" },
+      { key: "sadaqaLog", icon: "heart", label: "সদকা লগ" },
+      { key: "otherTracking", icon: "chart", label: "অন্যান্য আমল/অগ্রগতি ট্র্যাকিং" },
     ],
   },
   {
     id: "specialDays",
-    icon: "🌙",
+    icon: "moon",
     label: "বিশেষ দিন ও উপলক্ষ",
     items: [
-      { key: "jumuahAmol", label: "জুমার দিনের বিশেষ আমল" },
-      { key: "ramadanPrep", label: "রমজান প্রস্তুতি" },
-      { key: "eidCountdown", label: "রমজান/ঈদ কাউন্টডাউন" },
-      { key: "eidPrayer", label: "ঈদের নামাজের নিয়ম" },
-      { key: "qurbani", label: "কুরবানির নিয়ম" },
-      { key: "hajj", label: "হজের নিয়ম" },
-      { key: "hijriDates", label: "হিজরি ও গুরুত্বপূর্ণ দিন" },
+      { key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল" },
+      { key: "ramadanPrep", icon: "moon", label: "রমজান প্রস্তুতি" },
+      { key: "eidCountdown", icon: "timer", label: "রমজান/ঈদ কাউন্টডাউন" },
+      { key: "eidPrayer", icon: "star", label: "ঈদের নামাজের নিয়ম" },
+      { key: "qurbani", icon: "gift", label: "কুরবানির নিয়ম" },
+      { key: "hajj", icon: "kaaba", label: "হজের নিয়ম" },
+      { key: "hijriDates", icon: "calendarMoon", label: "হিজরি ও গুরুত্বপূর্ণ দিন" },
     ],
   },
 ];
@@ -138,8 +139,8 @@ const SINGLE_ENTRY_CATEGORIES = [];
 // header("🧠 ইসলামি কুইজ")+আলাদা CTA-বাটন("কুইজ খেলুন") দুই-অংশে ছিল, এখন
 // ব্লগের মতোই একটাই combined row।
 const SINGLE_ROW_ENTRIES = [
-  { id: "quiz", icon: "🧠", label: "ইসলামি কুইজ খেলুন" },
-  { id: "blog", icon: "📚", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
+  { id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },
+  { id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
 ];
 
 export function PublicToolsShell() {
@@ -185,81 +186,19 @@ export function PublicToolsShell() {
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     CATEGORIES.map((cat) =>
-      /*#__PURE__*/React.createElement(
-        "div",
-        { key: cat.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "px-4 py-2.5 text-sm font-bold text-emerald-950 border-b border-slate-100" },
-          cat.icon + " " + cat.label
-        ),
-        cat.items.map((item, idx) =>
-          /*#__PURE__*/React.createElement(
-            "button",
-            {
-              key: item.key,
-              type: "button",
-              onClick: () => setActiveItem(item),
-              className:
-                "w-full px-4 py-3 flex items-center justify-between text-left " +
-                (idx < cat.items.length - 1 ? "border-b border-slate-100" : ""),
-            },
-            /*#__PURE__*/React.createElement("span", { className: "text-sm text-slate-700" }, item.label),
-            /*#__PURE__*/React.createElement(ChevronRight, { size: 16, color: "#8A9A8F" })
-          )
-        )
-      )
+      /*#__PURE__*/React.createElement(ToolGridSection, {
+        key: cat.id,
+        title: cat.label,
+        icon: cat.icon,
+        items: cat.items,
+        onSelect: (item) => setActiveItem(item),
+      })
     ),
-    SINGLE_ENTRY_CATEGORIES.map((cat) =>
-      /*#__PURE__*/React.createElement(
-        "div",
-        { key: cat.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "px-4 py-2.5 text-sm font-bold text-emerald-950 border-b border-slate-100" },
-          cat.icon + " " + cat.label
-        ),
-        /*#__PURE__*/React.createElement(
-          "button",
-          {
-            type: "button",
-            onClick: () => setActiveItem({ id: cat.id, label: cat.label }),
-            className: "w-full px-4 py-4 flex items-center justify-center gap-2 font-semibold text-sm",
-            style: { color: "var(--theme-primary, #0E4B43)" },
-          },
-          cat.icon + "  " + cat.ctaLabel + "  →"
-        )
-      )
-    ),
-    SINGLE_ROW_ENTRIES.map((entry) =>
-      /*#__PURE__*/React.createElement(
-        "div",
-        { key: entry.id, className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
-        /*#__PURE__*/React.createElement(
-          "button",
-          {
-            type: "button",
-            onClick: () => setActiveItem({ id: entry.id, label: entry.label }),
-            className: "w-full px-4 py-3 flex items-center justify-between text-left",
-          },
-          /*#__PURE__*/React.createElement(
-            "div",
-            { className: "flex flex-col" },
-            /*#__PURE__*/React.createElement(
-              "span",
-              { className: "text-sm font-bold text-emerald-950" },
-              entry.icon + " " + entry.label
-            ),
-            entry.subtitle &&
-              /*#__PURE__*/React.createElement(
-                "span",
-                { className: "text-xs text-slate-500 mt-0.5" },
-                "(" + entry.subtitle + ")"
-              )
-          ),
-          /*#__PURE__*/React.createElement(ChevronRight, { size: 16, color: "#8A9A8F" })
-        )
-      )
-    )
+    /*#__PURE__*/React.createElement(ToolGridSection, {
+      title: "কুইজ ও ব্লগ",
+      icon: "help",
+      items: SINGLE_ROW_ENTRIES,
+      onSelect: (entry) => setActiveItem({ id: entry.id, label: entry.label }),
+    })
   );
 }
