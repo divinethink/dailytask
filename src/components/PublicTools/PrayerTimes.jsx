@@ -1,8 +1,9 @@
 // PrayerTimes.jsx — "সময়সূচি" bottom-nav ট্যাব(Public Tools Phase A, item ২)।
 // UI layout 3_2_Public_Tools_Architecture_Plan.md §৪.২ ও visual reference
-// 3_3_Public_Tools_Final_Mockup.md §৫ অনুযায়ী। data/lib separation(Dev Rule
-// ২): এই ফাইল কখনো সরাসরি fetch() করে না — publicToolsPrayerApi.js(data-layer)
-// ব্যবহার করে। React global(window.React, globals.js)।
+// 3_3_Public_Tools_Final_Mockup.md §৫ ভিত্তিতে, ১৮ সেপ্টেম্বর ২০২৬-এ owner-feedback
+// অনুযায়ী premium-redesign + accuracy fix। data/lib separation(Dev Rule ২): এই
+// ফাইল কখনো সরাসরি fetch() করে না — publicToolsPrayerApi.js/publicToolsGeocode.js
+// (data-layer) ব্যবহার করে। React global(window.React, globals.js)।
 
 import { toBn, BN_MONTHS, getHijriDate } from "../../legacy/appHelpers.js";
 import {
@@ -14,6 +15,7 @@ import {
   MANUAL_LOCATIONS,
 } from "../../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes } from "../../legacy/publicToolsPrayerApi.js";
+import { searchBangladeshLocation } from "../../legacy/publicToolsGeocode.js";
 import { ChevronDown, Loader2 } from "../icons.jsx";
 
 const { useState, useEffect, useMemo, useRef } = React;
@@ -31,11 +33,16 @@ function addMinutes(date, mins) {
   return date ? new Date(date.getTime() + mins * 60000) : null;
 }
 
+// ১২-ঘণ্টা AM/PM ফরম্যাট(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬) — app-এর existing
+// formatBnDateTime()(appHelpers.js)-এর একই AM/PM-কনভেনশন reuse(বাংলা সংখ্যা+English AM/PM)।
 function formatHHMM(date) {
   if (!date) return "--:--";
-  const h = String(date.getHours()).padStart(2, "0");
+  let h = date.getHours();
   const m = String(date.getMinutes()).padStart(2, "0");
-  return toBn(`${h}:${m}`);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${toBn(h)}:${toBn(m)} ${ampm}`;
 }
 
 function formatCountdown(ms) {
@@ -56,6 +63,47 @@ function formatHijriDate(date) {
   return `${toBn(h.day)} ${h.month} ${toBn(h.year)}`;
 }
 
+// প্রিমিয়াম countdown-banner-এর পেছনে সাজসজ্জামূলক মসজিদ-সিলুয়েট(pure inline
+// SVG vector — কোনো image asset না, app-এর "হালকা/দ্রুত" নীতি অক্ষুণ্ণ রাখতে)।
+function MosqueSilhouette() {
+  return /*#__PURE__*/React.createElement(
+    "svg",
+    {
+      viewBox: "0 0 400 160",
+      preserveAspectRatio: "xMaxYMax slice",
+      className: "absolute inset-0 w-full h-full pointer-events-none",
+      style: { opacity: 0.16 },
+      "aria-hidden": "true",
+    },
+    /*#__PURE__*/React.createElement("circle", { cx: 356, cy: 26, r: 2.5, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 312, cy: 14, r: 1.8, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 268, cy: 34, r: 1.8, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("rect", { x: 226, y: 64, width: 7, height: 96, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 229.5, cy: 60, r: 5.5, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("rect", { x: 372, y: 74, width: 7, height: 86, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 375.5, cy: 70, r: 5.5, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("path", { d: "M258,160 L258,112 Q258,72 300,72 Q342,72 342,112 L342,160 Z", fill: "#fff" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 300, cy: 64, r: 4, fill: "#fff" }),
+    /*#__PURE__*/React.createElement("rect", { x: 292, y: 54, width: 3, height: 12, fill: "#fff" })
+  );
+}
+
+function WaqtIconChip({ emoji, bg }) {
+  return /*#__PURE__*/React.createElement(
+    "span",
+    { className: "w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0", style: { background: bg } },
+    emoji
+  );
+}
+
+const WAQT_CHIP = {
+  fajr: { emoji: "🌅", bg: "#DCEEFB" },
+  dhuhr: { emoji: "☀️", bg: "#FFF3D6" },
+  asr: { emoji: "🔆", bg: "#FFE9CC" },
+  maghrib: { emoji: "🌇", bg: "#FFE1D6" },
+  isha: { emoji: "🌙", bg: "#E3ECE8" },
+};
+
 export function PrayerTimes() {
   const [location, setLocationState] = useState(() => getSavedLocation());
   const [madhab, setMadhabState] = useState(() => getSavedMadhab());
@@ -64,11 +112,15 @@ export function PrayerTimes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [now, setNow] = useState(() => new Date());
-  const [otherOpen, setOtherOpen] = useState(false);
-  const [gpsPanelOpen, setGpsPanelOpen] = useState(false);
+  const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [madhabPanelOpen, setMadhabPanelOpen] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const reqIdRef = useRef(0);
+  const searchReqIdRef = useRef(0);
 
   // প্রতি সেকেন্ডে countdown আপডেট(existing timer-pattern reuse, 3_2 §৪.২ item ৩)
   useEffect(() => {
@@ -76,7 +128,7 @@ export function PrayerTimes() {
     return () => clearInterval(id);
   }, []);
 
-  // Location/madhab বদলালেই দৈনিক সময়সূচি নতুন করে fetch(cache-fallback data-layer-এই হয়)
+  // Location/মাযহাব বদলালেই দৈনিক সময়সূচি নতুন করে fetch(cache-fallback data-layer-এই হয়)
   useEffect(() => {
     if (!location) return;
     const myReqId = ++reqIdRef.current;
@@ -99,18 +151,47 @@ export function PrayerTimes() {
       });
   }, [location, madhab]);
 
+  // §এলাকা-সার্চ(debounced, ৫০০ms) — Nominatim usage-policy-সৌজন্যে অকারণ
+  // request এড়াতে ২ অক্ষরের কম হলে বা typing চলাকালীন call হয় না।
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+    const myReqId = ++searchReqIdRef.current;
+    const timer = setTimeout(() => {
+      setSearchLoading(true);
+      setSearchError(null);
+      searchBangladeshLocation(searchQuery)
+        .then((results) => {
+          if (myReqId !== searchReqIdRef.current) return;
+          setSearchResults(results);
+        })
+        .catch(() => {
+          if (myReqId !== searchReqIdRef.current) return;
+          setSearchError("এলাকা খুঁজে পাওয়া যায়নি, আবার চেষ্টা করুন");
+        })
+        .finally(() => {
+          if (myReqId !== searchReqIdRef.current) return;
+          setSearchLoading(false);
+        });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   function applyLocation(loc) {
     setLocationState(loc);
     saveLocation(loc);
-    setGpsPanelOpen(false);
+    setLocationPanelOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
   }
 
   function handleUseGps() {
     setGpsBusy(true);
     detectGpsLocation()
-      .then((loc) => {
-        applyLocation(loc);
-      })
+      .then((loc) => applyLocation(loc))
       .catch((err) => {
         setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি");
       })
@@ -123,8 +204,7 @@ export function PrayerTimes() {
     setMadhabPanelOpen(false);
   }
 
-  // §৪.১ bonus-derive — পূর্ণ schedule(আজকের সব ওয়াক্ত+সংশ্লিষ্ট time), fetch করা
-  // timings থেকে একবারই গণনা(re-render-এ পুনরায় গণনা এড়াতে useMemo)।
+  // §৪.১ bonus-derive — পূর্ণ schedule(আজকের সব ওয়াক্ত+সংশ্লিষ্ট time)
   const schedule = useMemo(() => {
     if (!timings) return null;
     const today = new Date();
@@ -137,13 +217,13 @@ export function PrayerTimes() {
     const maghrib = get("Maghrib");
     const isha = get("Isha");
     if (!fajr || !sunrise || !dhuhr || !asr || !maghrib || !isha) return null;
-    // পরদিনের ফজর — নতুন API-call এড়াতে আজকের ফজর-সময়ই পরদিনের জন্য
-    // approximate হিসেবে ব্যবহৃত(কয়েক মিনিটের farok থাকতে পারে, "আনুমানিক" স্পিরিট)।
+    // পরদিনের ফজর — নতুন API-call এড়াতে আজকের ফজর-সময়ই পরদিনের জন্য approximate
+    // হিসেবে ব্যবহৃত(কয়েক মিনিটের farok থাকতে পারে, "আনুমানিক" স্পিরিট)।
     const nextFajr = addMinutes(fajr, 24 * 60);
     return { fajr, sunrise, dhuhr, asr, sunset, maghrib, isha, nextFajr };
   }, [timings]);
 
-  // বর্তমান/পরবর্তী ওয়াক্ত(countdown banner, §৪.২ item ৩) + list-highlight(item ৪)
+  // বর্তমান/পরবর্তী ওয়াক্ত(countdown banner) + list-highlight
   const waqtInfo = useMemo(() => {
     if (!schedule) return null;
     const { fajr, sunrise, dhuhr, asr, maghrib, isha, nextFajr } = schedule;
@@ -175,15 +255,21 @@ export function PrayerTimes() {
     ];
   }, [schedule]);
 
-  // তাহাজ্জুদ/দুহা/আওয়াবিন — bonus-derive(§৪.১), collapsible section
+  // §Owner-instruction(১৮ সেপ্টেম্বর): তাহাজ্জুদ+ইশরাক+চাশত+আওয়াবিন — কলাপসিবল
+  // বাদ, সবসময় visible। ইশরাক(সূর্যোদয়ের অল্প পরে, ছোট window) ও চাশত(তার পরে
+  // যোহরের আগ পর্যন্ত) আলাদা করে দেখানো হচ্ছে(আগে একত্রে "দুহা" ছিল)।
   const otherTimes = useMemo(() => {
     if (!schedule) return null;
     const { sunrise, dhuhr, maghrib, isha, nextFajr } = schedule;
     const nightMs = nextFajr.getTime() - isha.getTime();
     const tahajjudStart = new Date(isha.getTime() + nightMs * (2 / 3));
+    const ishraqStart = addMinutes(sunrise, 20);
+    const ishraqEnd = addMinutes(sunrise, 40);
+    const chashtEnd = addMinutes(dhuhr, -10);
     return {
       tahajjud: { start: tahajjudStart, end: nextFajr },
-      duha: { start: addMinutes(sunrise, 20), end: addMinutes(dhuhr, -10) },
+      ishraq: { start: ishraqStart, end: ishraqEnd },
+      chasht: { start: ishraqEnd, end: chashtEnd },
       awabin: { start: maghrib, end: isha },
     };
   }, [schedule]);
@@ -200,31 +286,60 @@ export function PrayerTimes() {
     ];
   }, [schedule]);
 
-  // ---- Location/মাযহাব সেটআপ এখনো করা হয়নি(প্রথমবার) ----
-  if (!location) {
+  // ---- এলাকা-সার্চ+quick-shortcut+GPS — একই panel initial-state ও header দুই
+  // জায়গাতেই reuse হয়(§Nominatim-নোট, publicToolsGeocode.js) ----
+  function renderLocationPicker() {
     return /*#__PURE__*/React.createElement(
       "div",
-      { className: "min-h-screen pb-24 bg-[#F4F7F1] flex flex-col items-center justify-center px-6 text-center gap-4" },
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "text-lg font-semibold", style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" } },
-        "নামাজের সময়সূচি দেখতে অবস্থান লাগবে"
-      ),
+      { className: "flex flex-col gap-2 w-full" },
       /*#__PURE__*/React.createElement(
         "button",
         {
           type: "button",
           disabled: gpsBusy,
           onClick: handleUseGps,
-          className: "h-11 px-5 rounded-2xl font-bold text-white text-sm bg-emerald-900 flex items-center gap-2 shadow-sm disabled:opacity-50",
+          className:
+            "h-10 px-4 rounded-xl font-bold text-white text-sm bg-emerald-900 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50",
         },
-        gpsBusy && /*#__PURE__*/React.createElement(Loader2, { size: 16, className: "animate-spin" }),
-        "📍 GPS দিয়ে অবস্থান নিন"
+        gpsBusy && /*#__PURE__*/React.createElement(Loader2, { size: 15, className: "animate-spin" }),
+        "📍 GPS দিয়ে সঠিক অবস্থান নিন"
       ),
-      /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500" }, "অথবা"),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        value: searchQuery,
+        onChange: (e) => setSearchQuery(e.target.value),
+        placeholder: "এলাকা/উপজেলা/জেলার নাম লিখুন...",
+        className: "h-10 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700",
+      }),
+      searchLoading &&
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "text-xs text-slate-500 flex items-center gap-1.5 px-1" },
+          /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" }),
+          "খোঁজা হচ্ছে..."
+        ),
+      searchError && /*#__PURE__*/React.createElement("div", { className: "text-xs text-red-600 px-1" }, searchError),
+      searchResults.length > 0 &&
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "flex flex-col gap-0.5 max-h-40 overflow-y-auto border border-slate-100 rounded-xl" },
+          searchResults.map((r, i) =>
+            /*#__PURE__*/React.createElement(
+              "button",
+              {
+                key: i,
+                type: "button",
+                onClick: () => applyLocation(r),
+                className: "text-left text-xs px-3 py-2 hover:bg-slate-50 border-b border-slate-50 last:border-b-0",
+              },
+              r.name
+            )
+          )
+        ),
+      /*#__PURE__*/React.createElement("div", { className: "text-[11px] text-slate-400 px-1" }, "অথবা জনপ্রিয় শহর:"),
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex flex-wrap gap-2 justify-center max-w-xs" },
+        { className: "flex flex-wrap gap-1.5" },
         MANUAL_LOCATIONS.map((loc) =>
           /*#__PURE__*/React.createElement(
             "button",
@@ -232,13 +347,27 @@ export function PrayerTimes() {
               key: loc.id,
               type: "button",
               onClick: () => applyLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, source: "manual" }),
-              className: "px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-sm text-emerald-900 shadow-sm",
+              className: "px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs text-emerald-900",
             },
             loc.name
           )
         )
+      )
+    );
+  }
+
+  // ---- Location সেটআপ এখনো করা হয়নি(প্রথমবার) ----
+  if (!location) {
+    return /*#__PURE__*/React.createElement(
+      "div",
+      { className: "min-h-screen pb-24 bg-[#F4F7F1] flex flex-col items-center justify-center px-6 text-center gap-4" },
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "text-lg font-semibold", style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" } },
+        "সালাতের সময়সূচি দেখতে অবস্থান লাগবে"
       ),
-      error && /*#__PURE__*/React.createElement("p", { className: "text-xs text-red-600 mt-2" }, error)
+      /*#__PURE__*/React.createElement("div", { className: "w-full max-w-xs" }, renderLocationPicker()),
+      error && /*#__PURE__*/React.createElement("p", { className: "text-xs text-red-600 mt-1" }, error)
     );
   }
 
@@ -258,50 +387,17 @@ export function PrayerTimes() {
         "div",
         { className: "flex flex-col gap-1.5 items-end" },
         /*#__PURE__*/React.createElement(
-          "div",
-          { className: "relative" },
-          /*#__PURE__*/React.createElement(
-            "button",
-            {
-              type: "button",
-              onClick: () => {
-                setGpsPanelOpen((v) => !v);
-                setMadhabPanelOpen(false);
-              },
-              className: "text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-sm flex items-center gap-1 text-emerald-950",
-            },
-            "📍 ",
-            location.source === "gps" ? "GPS চালু" : location.name,
-            /*#__PURE__*/React.createElement(ChevronDown, { size: 12 })
-          ),
-          gpsPanelOpen &&
-            /*#__PURE__*/React.createElement(
-              "div",
-              { className: "absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-md border border-slate-200 p-2 z-20" },
-              /*#__PURE__*/React.createElement(
-                "button",
-                {
-                  type: "button",
-                  disabled: gpsBusy,
-                  onClick: handleUseGps,
-                  className: "w-full text-left text-xs px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center gap-1",
-                },
-                gpsBusy ? "GPS নেওয়া হচ্ছে..." : "📍 GPS দিয়ে অবস্থান নিন"
-              ),
-              /*#__PURE__*/React.createElement("div", { className: "h-px bg-slate-100 my-1" }),
-              MANUAL_LOCATIONS.map((loc) =>
-                /*#__PURE__*/React.createElement(
-                  "button",
-                  {
-                    key: loc.id,
-                    type: "button",
-                    onClick: () => applyLocation({ lat: loc.lat, lon: loc.lon, name: loc.name, source: "manual" }),
-                    className: "w-full text-left text-xs px-2 py-1.5 rounded-lg hover:bg-slate-50",
-                  },
-                  loc.name
-                )
-              )
-            )
+          "button",
+          {
+            type: "button",
+            disabled: gpsBusy,
+            onClick: handleUseGps,
+            className:
+              "text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-sm flex items-center gap-1 " +
+              (location.source === "gps" ? "text-emerald-700 font-bold" : "text-slate-500"),
+          },
+          gpsBusy ? /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" }) : "📍",
+          location.source === "gps" ? "GPS চালু" : "GPS"
         ),
         /*#__PURE__*/React.createElement(
           "div",
@@ -312,7 +408,7 @@ export function PrayerTimes() {
               type: "button",
               onClick: () => {
                 setMadhabPanelOpen((v) => !v);
-                setGpsPanelOpen(false);
+                setLocationPanelOpen(false);
               },
               className: "text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-sm flex items-center gap-1 text-emerald-950",
             },
@@ -337,6 +433,31 @@ export function PrayerTimes() {
             )
         )
       )
+    ),
+    // §Location row(3_2 §৪.২ item ২, GPS-pill থেকে আলাদা) — ট্যাপে search+quick-list panel খোলে
+    /*#__PURE__*/React.createElement(
+      "div",
+      { className: "px-4 pb-2 relative" },
+      /*#__PURE__*/React.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setLocationPanelOpen((v) => !v);
+            setMadhabPanelOpen(false);
+          },
+          className: "text-sm text-emerald-950 font-semibold flex items-center gap-1",
+        },
+        "📍 ",
+        location.name,
+        /*#__PURE__*/React.createElement(ChevronDown, { size: 13, style: { transform: locationPanelOpen ? "rotate(180deg)" : "none" } })
+      ),
+      locationPanelOpen &&
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-md border border-slate-200 p-3 z-20" },
+          renderLocationPicker()
+        )
     ),
     approximate &&
       /*#__PURE__*/React.createElement(
@@ -363,104 +484,119 @@ export function PrayerTimes() {
       /*#__PURE__*/React.createElement(
         "div",
         {
-          className: "mx-4 mb-3 rounded-2xl p-4 text-white shadow-sm relative overflow-hidden",
+          className: "mx-4 mb-3 rounded-2xl p-5 text-white shadow-sm relative overflow-hidden min-h-[132px] flex flex-col justify-center",
           style: { background: "linear-gradient(135deg, #0E4B43, #16302B)" },
         },
-        /*#__PURE__*/React.createElement("div", { className: "text-sm opacity-90" }, `🌙 ${waqtInfo.name} ${waqtInfo.label}`),
+        /*#__PURE__*/React.createElement(MosqueSilhouette, null),
+        /*#__PURE__*/React.createElement("div", { className: "relative text-sm opacity-90" }, `🌙 ${waqtInfo.name} ${waqtInfo.label}`),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+          { className: "relative text-3xl font-bold tracking-wide mt-1.5", style: { fontFamily: "'IBM Plex Mono', monospace" } },
           formatCountdown(waqtInfo.target.getTime() - now.getTime())
         )
       ),
+    // §Owner-instruction(১৮ সেপ্টেম্বর): সালাতের সময়সূচি কার্ড চওড়া(col-span-3)+
+    // বড় ফন্ট, নিষিদ্ধ সময় কার্ড সরু(col-span-2)
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "px-4 grid grid-cols-2 gap-3 mb-3" },
+        { className: "px-4 grid grid-cols-5 gap-2.5 mb-3" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80" },
-          /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-emerald-950 mb-1.5" }, "🕌 নামাজের সময়সূচি"),
+          { className: "col-span-3 bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80" },
+          /*#__PURE__*/React.createElement("div", { className: "text-sm font-bold text-emerald-950 mb-2" }, "🕌 সালাতের সময়সূচি"),
           rows.map((r) =>
             /*#__PURE__*/React.createElement(
               "div",
               {
                 key: r.key,
                 className:
-                  "flex items-center justify-between text-xs py-1 px-1.5 rounded-lg " +
-                  (waqtInfo && waqtInfo.currentKey === r.key ? "bg-[#E8F0EE] font-bold text-emerald-950" : "text-slate-600"),
+                  "flex items-center gap-2 text-sm py-1.5 px-1.5 rounded-lg " +
+                  (waqtInfo && waqtInfo.currentKey === r.key ? "bg-[#E8F0EE] font-bold text-emerald-950" : "text-slate-700"),
               },
-              /*#__PURE__*/React.createElement("span", null, r.label),
+              /*#__PURE__*/React.createElement(WaqtIconChip, WAQT_CHIP[r.key]),
+              /*#__PURE__*/React.createElement("span", { className: "flex-1" }, r.label),
               /*#__PURE__*/React.createElement(
                 "span",
-                { style: { fontFamily: "'IBM Plex Mono', monospace" } },
-                r.end ? `${formatHHMM(r.start)}–${formatHHMM(r.end)}` : formatHHMM(r.start)
+                { className: "text-xs", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+                r.end ? `${formatHHMM(r.start)} – ${formatHHMM(r.end)}` : formatHHMM(r.start)
               )
             )
           )
         ),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80" },
+          { className: "col-span-2 bg-white rounded-2xl p-2.5 shadow-sm border border-slate-200/80" },
           /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-emerald-950 mb-1.5" }, "⛔ নিষিদ্ধ সময়"),
           forbiddenWindows.map((w) =>
             /*#__PURE__*/React.createElement(
               "div",
-              { key: w.label, className: "text-xs py-1 px-1.5 text-slate-600" },
+              { key: w.label, className: "text-[11px] py-1 px-1 text-slate-600" },
               /*#__PURE__*/React.createElement("div", null, w.label),
               /*#__PURE__*/React.createElement(
                 "div",
                 { style: { fontFamily: "'IBM Plex Mono', monospace" } },
-                `${formatHHMM(w.start)}–${formatHHMM(w.end)}`
+                `${formatHHMM(w.start)} – ${formatHHMM(w.end)}`
               )
             )
           )
         )
       ),
+    // §Owner-instruction: কলাপসিবল বাদ, সবসময় visible, ইশরাক+চাশত যোগ
     otherTimes &&
       /*#__PURE__*/React.createElement(
         "div",
         { className: "mx-4 mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden" },
         /*#__PURE__*/React.createElement(
-          "button",
-          {
-            type: "button",
-            onClick: () => setOtherOpen((v) => !v),
-            className: "w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-emerald-950",
-          },
-          "✨ অন্যান্য নামাজের সময়সূচি",
-          /*#__PURE__*/React.createElement(ChevronDown, { size: 14, style: { transform: otherOpen ? "rotate(180deg)" : "none" } })
+          "div",
+          { className: "px-3.5 pt-3 pb-1.5 text-sm font-bold text-emerald-950" },
+          "✨ অন্যান্য সালাতের সময়সূচি"
         ),
-        otherOpen &&
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "px-3.5 pb-3 flex flex-col gap-1.5" },
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "px-3 pb-2 border-t border-slate-100 pt-2 flex flex-col gap-1" },
-            /*#__PURE__*/React.createElement(
-              "div",
-              { className: "flex items-center justify-between text-xs text-slate-600" },
-              /*#__PURE__*/React.createElement("span", null, "🌙 তাহাজ্জুদ"),
-              /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.tahajjud.start)} – ${formatHHMM(otherTimes.tahajjud.end)}`)
-            ),
-            /*#__PURE__*/React.createElement(
-              "div",
-              { className: "flex items-center justify-between text-xs text-slate-600" },
-              /*#__PURE__*/React.createElement("span", null, "☀️ দুহা"),
-              /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.duha.start)} – ${formatHHMM(otherTimes.duha.end)}`)
-            ),
-            /*#__PURE__*/React.createElement(
-              "div",
-              { className: "flex items-center justify-between text-xs text-slate-600" },
-              /*#__PURE__*/React.createElement("span", null, "🌤️ আওয়াবিন"),
-              /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.awabin.start)} – ${formatHHMM(otherTimes.awabin.end)}`)
-            )
+            { className: "flex items-center justify-between text-xs text-slate-600" },
+            /*#__PURE__*/React.createElement("span", null, "🌙 তাহাজ্জুদ"),
+            /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.tahajjud.start)} – ${formatHHMM(otherTimes.tahajjud.end)}`)
+          ),
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex items-center justify-between text-xs text-slate-600" },
+            /*#__PURE__*/React.createElement("span", null, "🌤️ ইশরাক"),
+            /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.ishraq.start)} – ${formatHHMM(otherTimes.ishraq.end)}`)
+          ),
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex items-center justify-between text-xs text-slate-600" },
+            /*#__PURE__*/React.createElement("span", null, "☀️ চাশত"),
+            /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.chasht.start)} – ${formatHHMM(otherTimes.chasht.end)}`)
+          ),
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "flex items-center justify-between text-xs text-slate-600" },
+            /*#__PURE__*/React.createElement("span", null, "🌤️ আওয়াবিন"),
+            /*#__PURE__*/React.createElement("span", null, `${formatHHMM(otherTimes.awabin.start)} – ${formatHHMM(otherTimes.awabin.end)}`)
           )
+        )
       ),
+    // §Owner-instruction: "সেহরির শেষ সময়:"/"আজকের ইফতার:" wording
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 px-4 py-3 flex items-center justify-between text-xs" },
-        /*#__PURE__*/React.createElement("span", { className: "text-slate-600" }, `🍽️ সেহরি শেষ ${formatHHMM(schedule.fajr)}`),
-        /*#__PURE__*/React.createElement("span", { className: "text-slate-600" }, `🌆 ইফতার ${formatHHMM(schedule.maghrib)}`)
+        { className: "mx-4 rounded-2xl shadow-sm border border-slate-200/80 px-4 py-3.5 flex items-center justify-between text-xs overflow-hidden relative",
+          style: { background: "linear-gradient(90deg, #E8F0EE, #FDF1E4)" } },
+        /*#__PURE__*/React.createElement(
+          "span",
+          { className: "text-emerald-900 font-semibold" },
+          `🍽️ সেহরির শেষ সময়: ${formatHHMM(schedule.fajr)}`
+        ),
+        /*#__PURE__*/React.createElement(
+          "span",
+          { className: "text-amber-800 font-semibold" },
+          `🌆 আজকের ইফতার: ${formatHHMM(schedule.maghrib)}`
+        )
       )
   );
 }
