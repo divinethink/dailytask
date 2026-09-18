@@ -11,6 +11,8 @@
 
 import { isCreatorAuth } from "../../legacy/familyIdentity.js";
 import { EditIcon, Trash } from "../icons.jsx";
+import { GripIcon } from "./ToolIcons.jsx";
+import { useDragReorder } from "./dragReorder.js";
 import {
   fetchSection,
   saveRichtext,
@@ -197,6 +199,7 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
     doc && doc.accordion && Array.isArray(doc.accordion.items) ? doc.accordion.items : defaultContent || [];
   const displayItems = filterItems ? filterItems(items) : items;
   const [expanded, setExpanded] = useState({});
+  const [reorderError, setReorderError] = useState("");
   const [editingId, setEditingId] = useState(null); // null | "new" | itemId
   const [formTitle, setFormTitle] = useState("");
   const [formBody, setFormBody] = useState("");
@@ -246,7 +249,30 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
     });
   }
 
+  // ড্র্যাগ-রিঅর্ডার(creator-only): filterItems-এর দৃশ্যমান অংশের নতুন ক্রম পূর্ণ
+  // তালিকায় ফিরিয়ে বসানো হয় — লুকানো(অন্য ট্যাবের) item নিজ নিজ অবস্থানেই থাকে।
+  // Optimistic update, save ব্যর্থ হলে আগের ক্রমে ফেরত।
+  async function commitReorder(newIds) {
+    const byId = {};
+    items.forEach((it) => {
+      byId[it.itemId] = it;
+    });
+    const shown = new Set(displayItems.map((it) => it.itemId));
+    let k = 0;
+    const next = items.map((it) => (shown.has(it.itemId) ? byId[newIds[k++]] : it));
+    setReorderError("");
+    onSaved(next);
+    try {
+      await saveAccordion(sectionId, next);
+    } catch (e) {
+      onSaved(items);
+      setReorderError("ক্রম সেভ করা যায়নি। আবার চেষ্টা করুন।");
+    }
+  }
+
   const formOpen = editingId !== null;
+  const canReorder = isCreator && !formOpen && !busy && displayItems.length > 1;
+  const drag = useDragReorder(displayItems.map((it) => it.itemId), commitReorder);
 
   return /*#__PURE__*/React.createElement(
     "div",
@@ -254,10 +280,27 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
     displayItems.map((item) =>
       /*#__PURE__*/React.createElement(
         "div",
-        { key: item.itemId, className: CARD + " overflow-hidden" },
+        {
+          key: item.itemId,
+          ref: drag.setNode(item.itemId),
+          style: drag.itemStyle(item.itemId),
+          className: CARD + " overflow-hidden",
+        },
         /*#__PURE__*/React.createElement(
           "div",
           { className: "flex items-center justify-between px-4 py-3" },
+          canReorder &&
+            /*#__PURE__*/React.createElement(
+              "button",
+              {
+                type: "button",
+                "aria-label": "টেনে অবস্থান বদলান",
+                className: "p-1.5 -ml-2 mr-1 rounded-lg",
+                ...drag.handleProps(item.itemId),
+                style: { ...drag.handleProps(item.itemId).style, color: MUTED },
+              },
+              /*#__PURE__*/React.createElement(GripIcon, { size: 16, color: MUTED })
+            ),
           /*#__PURE__*/React.createElement(
             "button",
             {
@@ -288,6 +331,7 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
           )
       )
     ),
+    reorderError && /*#__PURE__*/React.createElement("p", { className: "text-xs text-red-500" }, reorderError),
     formOpen &&
       /*#__PURE__*/React.createElement(
         "div",
