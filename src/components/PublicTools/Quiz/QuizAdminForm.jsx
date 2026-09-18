@@ -11,6 +11,7 @@ import {
   createQuestion,
   updateQuestion,
   deleteQuestion,
+  importSeedQuestions,
 } from "../../../legacy/quizData.js";
 import { ChevronLeft, Trash, EditIcon, Loader2 } from "../../icons.jsx";
 
@@ -28,6 +29,8 @@ export function QuizAdminForm({ onBack }) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(() => emptyForm(QUIZ_CATEGORIES[0]));
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
 
   async function reload(category) {
     setLoading(true);
@@ -93,6 +96,22 @@ export function QuizAdminForm({ onBack }) {
     }
   }
 
+  async function handleImportSeed() {
+    if (!window.confirm("৫ বিষয় × ৫০ = ২৫০টি ডিফল্ট প্রশ্ন যোগ হবে। আগে থেকে থাকা প্রশ্ন অপরিবর্তিত থাকবে। এগিয়ে যাবেন?")) return;
+    setImporting(true);
+    setImportMsg("");
+    setError("");
+    try {
+      const r = await importSeedQuestions();
+      setImportMsg("যোগ হয়েছে: " + r.added + "টি, আগে থেকেই ছিল: " + r.skipped + "টি।");
+      await reload(filterCategory);
+    } catch (e) {
+      setError("ইম্পোর্ট ব্যর্থ। সাইন-ইন ও Firestore Rules(quizQuestions) নিশ্চিত করে আবার চেষ্টা করুন।");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleDelete(id) {
     if (!window.confirm("এই প্রশ্ন মুছে ফেলবেন?")) return;
     try {
@@ -123,6 +142,24 @@ export function QuizAdminForm({ onBack }) {
       "✍️ প্রশ্ন ব্যবস্থাপনা"
     ),
     error && /*#__PURE__*/React.createElement("div", { className: "mx-4 mb-2 text-xs text-red-600" }, error),
+    /*#__PURE__*/React.createElement(
+      "div",
+      { className: "mx-4 mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 flex flex-col gap-2" },
+      /*#__PURE__*/React.createElement("div", { className: "text-sm font-bold text-emerald-950" }, "ডিফল্ট প্রশ্ন-ব্যাংক"),
+      /*#__PURE__*/React.createElement("p", { className: "text-xs text-slate-500" }, "প্রতি বিষয়ে ৫০টি করে মোট ২৫০টি প্রশ্ন একবারে যোগ করুন। এরপর প্রয়োজনমতো এডিট করতে পারবেন।"),
+      /*#__PURE__*/React.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: handleImportSeed,
+          disabled: importing,
+          className: "self-start px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60",
+          style: { background: "var(--theme-primary, #0E4B43)" },
+        },
+        importing ? "যোগ হচ্ছে..." : "ডিফল্ট প্রশ্ন ইম্পোর্ট করুন"
+      ),
+      importMsg && /*#__PURE__*/React.createElement("p", { className: "text-xs text-emerald-700" }, importMsg)
+    ),
 
     /*#__PURE__*/React.createElement(
       "div",
