@@ -125,6 +125,40 @@ async function deletePost(postId) {
   await postsRef().doc(postId).delete();
 }
 
+// --- ডিফল্ট পোস্ট ইম্পোর্ট(App Creator-only, লেখক-তালিকাভুক্ত হতে হবে — Rules-এ create-এ
+// isBlogWriter() লাগে) ---
+// Idempotent: স্থির doc-id(seed_blog_NN) — আগে থেকে থাকা(এডিট-করা সহ) পোস্ট skip হয়,
+// overwrite হয় না। seed ফাইল dynamic import — main bundle-এ যায় না।
+async function importSeedPosts() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("সাইন-ইন প্রয়োজন");
+  if (!isCreatorAuth()) throw new Error("শুধু App Creator");
+  if (!(await isCurrentUserWriter())) {
+    throw new Error("NOT_WRITER");
+  }
+  const { BLOG_SEED_POSTS } = await import("./blogSeedData.js");
+  const existing = new Set((await fetchPosts()).map((p) => p.id));
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  let added = 0;
+  for (let i = 0; i < BLOG_SEED_POSTS.length; i++) {
+    const id = "seed_blog_" + String(i + 1).padStart(2, "0");
+    if (existing.has(id)) continue;
+    const p = BLOG_SEED_POSTS[i];
+    await postsRef().doc(id).set({
+      category: p.category,
+      title: p.title,
+      body: p.body,
+      tags: p.tags || [],
+      sourceNote: p.sourceNote || null,
+      createdBy: user.uid,
+      createdAt: now,
+      updatedAt: now,
+    });
+    added += 1;
+  }
+  return { added, skipped: BLOG_SEED_POSTS.length - added };
+}
+
 function canEditPost(post) {
   const user = auth.currentUser;
   if (!user || !post) return false;
@@ -142,5 +176,6 @@ export {
   createPost,
   updatePost,
   deletePost,
+  importSeedPosts,
   canEditPost,
 };

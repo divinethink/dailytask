@@ -75,6 +75,36 @@ async function deleteQuestion(questionId) {
   await questionsRef().doc(questionId).delete();
 }
 
+// --- ডিফল্ট প্রশ্ন-ব্যাংক ইম্পোর্ট(App Creator-only, Rules-এ create শুধু creator-এর) ---
+// Idempotent: স্থির doc-id(seed_<বিষয়>_<নং>) — আগে থেকে থাকা(এডিট-করা সহ) প্রশ্ন skip
+// হয়, overwrite হয় না। seed ফাইল dynamic import — main bundle-এ যায় না।
+async function importSeedQuestions() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("সাইন-ইন প্রয়োজন");
+  const { buildSeedQuestions } = await import("./quizSeedData.js");
+  const seed = buildSeedQuestions();
+  const existing = new Set((await fetchAllQuestions()).map((q) => q.id));
+  const missing = seed.filter((q) => !existing.has(q.id));
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  for (let i = 0; i < missing.length; i += 400) {
+    const batch = db.batch();
+    missing.slice(i, i + 400).forEach((q) => {
+      batch.set(questionsRef().doc(q.id), {
+        category: q.category,
+        question: q.question,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
+        createdBy: user.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await batch.commit();
+  }
+  return { added: missing.length, skipped: seed.length - missing.length };
+}
+
 // --- Random selection(§১, Fisher-Yates) ---
 function shuffleArray(arr) {
   const a = arr.slice();
@@ -122,6 +152,7 @@ export {
   createQuestion,
   updateQuestion,
   deleteQuestion,
+  importSeedQuestions,
   shuffleArray,
   pickSessionQuestions,
   getBestScore,
