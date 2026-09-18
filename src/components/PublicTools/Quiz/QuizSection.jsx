@@ -147,10 +147,10 @@ export function QuizSection({ onBack }) {
         {
           type: "button",
           onClick: onBack,
+          "aria-label": "সহায়িকা",
           className: "flex items-center gap-1 text-sm font-semibold text-emerald-950",
         },
-        /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
-        "সহায়িকা"
+        /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 })
       ),
       /*#__PURE__*/React.createElement(
         "div",
