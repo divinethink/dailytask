@@ -93,15 +93,20 @@ const CATEGORIES = [
   },
 ];
 
-// একক-বাটন ক্যাটাগরি(কুইজ) — কোনো sub-item-list না, একটাই CTA card।
-const SINGLE_ENTRY_CATEGORIES = [
-  { id: "quiz", icon: "🧠", label: "ইসলামি কুইজ", ctaLabel: "কুইজ খেলুন" },
-];
+// একক-বাটন ক্যাটাগরি(header+CTA দুই-ধাপ প্যাটার্ন) — বর্তমানে খালি(কুইজ নিচের
+// SINGLE_ROW_ENTRIES-এ সরানো হয়েছে, ১৮ সেপ্টেম্বর ২০২৬)। খালি array harmless
+// no-op হিসেবে রাখা হলো(map কিছু render করবে না) — future single-entry
+// ক্যাটাগরির জন্য pattern অক্ষুণ্ণ রাখতে সম্পূর্ণ সরানো হয়নি।
+const SINGLE_ENTRY_CATEGORIES = [];
 
 // একক-সারি সরাসরি-ক্লিকযোগ্য এন্ট্রি(ব্লগ, ১৮ সেপ্টেম্বর ২০২৬ owner-request) —
 // আলাদা header+CTA-button দুই-ধাপ প্যাটার্নের বদলে CATEGORIES-item-এর মতোই
-// একটাই সারি, ক্লিকেই সরাসরি BlogSection খোলে।
+// একটাই সারি, ক্লিকেই সরাসরি BlogSection/QuizSection খোলে।
+// কুইজ(১৮ সেপ্টেম্বর ২০২৬, owner-request) — আগে SINGLE_ENTRY_CATEGORIES-এ
+// header("🧠 ইসলামি কুইজ")+আলাদা CTA-বাটন("কুইজ খেলুন") দুই-অংশে ছিল, এখন
+// ব্লগের মতোই একটাই combined row।
 const SINGLE_ROW_ENTRIES = [
+  { id: "quiz", icon: "🧠", label: "ইসলামি কুইজ খেলুন" },
   { id: "blog", icon: "📚", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
 ];
 
