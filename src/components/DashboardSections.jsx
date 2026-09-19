@@ -25,20 +25,26 @@ const { useState } = React;
 // yesterdayPercent(নতুন, ঐচ্ছিক prop) দিলে গতকালের তুলনায় বৃদ্ধি/হ্রাস দেখাবে —
 // app.js-এর call-site-এ একই মাসের ভিতরে(cross-month fetch ছাড়াই) নিরাপদে
 // derive করা হয়েছে, না মিললে(যেমন মাসের ১ তারিখ) silently বাদ যায়।
-export function StreakCard({ streak, toBn, todayPercent, yesterdayPercent }) {
-  if (todayPercent === null || todayPercent === undefined) return null;
-  const hasDelta = yesterdayPercent !== null && yesterdayPercent !== undefined;
-  const delta = hasDelta ? todayPercent - yesterdayPercent : null;
+export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPercent }) {
+  if (primaryPercent === null || primaryPercent === undefined) return null;
+  const hasDelta = comparisonPercent !== null && comparisonPercent !== undefined;
+  const delta = hasDelta ? primaryPercent - comparisonPercent : null;
+  // §Stable card(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): রাত ১২টার পর আজকের
+  // এন্ট্রি এখনো না থাকলে card পুরোপুরি অদৃশ্য না হয়ে "গতকালের অগ্রগতি"-তে
+  // fallback করে(call-site/app.js-এ mode নির্ধারিত হয়) — লেবেল/তুলনা-টেক্সট
+  // mode অনুযায়ী বদলায়, বাকি presentation অপরিবর্তিত।
+  const label = mode === "yesterday" ? "গতকালের অগ্রগতি:" : "আজকের অগ্রগতি:";
+  const deltaPrefix = mode === "yesterday" ? "· আগের দিনের চেয়ে " : "· গতকালের চেয়ে ";
   return /*#__PURE__*/React.createElement("div", {
     className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center flex-wrap gap-x-2 gap-y-0.5"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-bold text-emerald-900"
-  }, "আজকের অগ্রগতি:"), /*#__PURE__*/React.createElement("span", {
+  }, label), /*#__PURE__*/React.createElement("span", {
     className: "text-base font-bold text-emerald-900",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(todayPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
+  }, toBn(primaryPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
     className: delta >= 0 ? "text-xs text-emerald-700 font-medium" : "text-xs text-red-700 font-medium"
-  }, "· গতকালের চেয়ে ", toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
+  }, deltaPrefix, toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
 }
 
 // hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
@@ -56,7 +62,9 @@ export function StreakCard({ streak, toBn, todayPercent, yesterdayPercent }) {
 // অনুরোধ, ৬ সেপ্টেম্বর ২০২৬)। ৮৫/৬০/৩৫% থ্রেশহোল্ড ও রঙ scoreColor()-এর সাথেই
 // অভিন্ন রাখা হয়েছে(visual language consistency)।
 function activityTierColor(pct) {
-  if (pct >= 85) return "var(--theme-primary)";
+  // §Fix(১৯ সেপ্টেম্বর ২০২৬): scoreColor()-এর সাথে সামঞ্জস্যপূর্ণ fixed-green fix,
+  // একই কারণ(থিম-color-এর সাথে performance-semantics মিশে যাওয়া প্রতিরোধ)।
+  if (pct >= 85) return "#0E4B43";
   if (pct >= 60) return "#2563A8";
   if (pct >= 35) return "#D6A400";
   return "#C1666B";
@@ -558,7 +566,7 @@ export function MonthlyOverviewSection({
   /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-slate-100"
   }, [
-    { c: "var(--theme-primary)", l: "চমৎকার", n: tierCounts.excellent },
+    { c: "#0E4B43", l: "চমৎকার", n: tierCounts.excellent },
     { c: "#2563A8", l: "ভালো", n: tierCounts.good },
     { c: "#F5D061", l: "মাঝারি", n: tierCounts.medium },
     { c: "#C1666B", l: "কম", n: tierCounts.low },

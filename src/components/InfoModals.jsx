@@ -211,7 +211,7 @@ export function MonthlyOverviewInfoModal({ show, onClose }) {
     className: "text-xs text-slate-700 leading-relaxed mb-4 space-y-2"
   },
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
-    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "var(--theme-primary)" } }),
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#0E4B43" } }),
     "৮৫% বা তার বেশি — চমৎকার"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
