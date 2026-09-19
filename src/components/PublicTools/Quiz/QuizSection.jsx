@@ -99,7 +99,7 @@ export function QuizSection({ onBack }) {
         "div",
         {
           className: "text-xl font-bold text-emerald-950",
-          style: { fontFamily: "'IBM Plex Mono', monospace" },
+          style: { fontFamily: "'Hind Siliguri', sans-serif" },
         },
         "স্কোর: " + resultScore + "/" + total
       ),
