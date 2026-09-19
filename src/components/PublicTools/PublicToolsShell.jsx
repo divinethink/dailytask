@@ -8,7 +8,7 @@
 // React global(window.React, globals.js)।
 
 import { ChevronLeft } from "../icons.jsx";
-import { ToolGridSection, PageHeader, VerseCard } from "./ToolGrid.jsx";
+import { ToolGridSection, PageHeader, VerseCard, DetailHeader } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { ZakatCalculator } from "./ZakatCalculator.jsx";
@@ -166,16 +166,16 @@ export function PublicToolsShell() {
       ),
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "px-4 pb-2 text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-        view.tool.label
-      ),
-      ActiveComponent
-        ? /*#__PURE__*/React.createElement(ActiveComponent, null)
-        : /*#__PURE__*/React.createElement(
-            "div",
-            { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
-            /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
-          )
+        { className: "px-4 pb-4" },
+        /*#__PURE__*/React.createElement(DetailHeader, { icon: view.tool.icon, title: view.tool.label }),
+        ActiveComponent
+          ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+          : /*#__PURE__*/React.createElement(
+              "div",
+              { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },
+              /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+            )
+      )
     );
   }
 
@@ -199,16 +199,16 @@ export function PublicToolsShell() {
         ),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "px-4 pb-2 text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-          view.item.label
-        ),
-        ActiveComponent
-          ? /*#__PURE__*/React.createElement(ActiveComponent, null)
-          : /*#__PURE__*/React.createElement(
-              "div",
-              { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
-              /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
-            )
+          { className: "px-4 pb-4" },
+          /*#__PURE__*/React.createElement(DetailHeader, { icon: view.item.icon, title: view.item.label, subtitle: cat.label }),
+          ActiveComponent
+            ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+            : /*#__PURE__*/React.createElement(
+                "div",
+                { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },
+                /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+              )
+        )
       );
     }
 
@@ -225,9 +225,9 @@ export function PublicToolsShell() {
         /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
         "সহায়িকা"
       ),
+      /*#__PURE__*/React.createElement(DetailHeader, { icon: cat.icon, title: cat.label }),
       /*#__PURE__*/React.createElement(ToolGridSection, {
-        title: cat.label,
-        icon: cat.icon,
+        variant: "list",
         items: cat.items,
         onSelect: (item) => setView({ category: cat, item }),
       })

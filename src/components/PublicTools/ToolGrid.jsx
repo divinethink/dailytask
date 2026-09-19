@@ -37,6 +37,35 @@ function Tile({ icon, label, onClick }) {
   );
 }
 
+// --- list variant("সহায়িকা" ক্যাটাগরি-সাব-লিস্ট, owner-request ১৯ সেপ্টেম্বর
+// ২০২৬: বাংলা টাইটেল লম্বা/অসম-দৈর্ঘ্যের বলে ৪-কলাম গ্রিডে ভেঙে বিশ্রী দেখাত,
+// তাই পুরো-width রো+চেভরন লিস্টে) ---
+function ListRow({ icon, label, subtitle, onClick }) {
+  return React.createElement(
+    "button",
+    {
+      type: "button",
+      onClick,
+      className: "w-full flex items-center gap-3 py-3 active:bg-slate-50 transition-colors text-left",
+    },
+    React.createElement(
+      "div",
+      {
+        className: "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+        style: { background: "#E8F0EE" },
+      },
+      React.createElement(ToolIcon, { name: icon, size: 18, color: PRIMARY })
+    ),
+    React.createElement(
+      "div",
+      { className: "flex-1 min-w-0" },
+      React.createElement("div", { className: "text-sm font-semibold text-slate-800 truncate" }, label),
+      subtitle && React.createElement("div", { className: "text-xs text-slate-500 mt-0.5 truncate" }, subtitle)
+    ),
+    React.createElement(ToolIcon, { name: "chevronRight", size: 15, color: GOLD })
+  );
+}
+
 // --- premium variants ---
 const PREMIUM = {
   compact3: { cols: "grid-cols-3", height: "clamp(92px, 12vh, 108px)", disc: 40, icon: 20, font: 12.5, chevron: false },
@@ -95,6 +124,22 @@ function PremiumTile({ icon, label, onClick, cfg }) {
 }
 
 export function ToolGridSection({ title, icon, items, onSelect, variant }) {
+  if (variant === "list") {
+    return React.createElement(
+      "section",
+      { className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 px-4 divide-y divide-slate-100" },
+      items.map((item) =>
+        React.createElement(ListRow, {
+          key: item.key || item.id,
+          icon: item.icon,
+          label: item.label,
+          subtitle: item.subtitle,
+          onClick: () => onSelect(item),
+        })
+      )
+    );
+  }
+
   const cfg = PREMIUM[variant];
 
   if (cfg) {
@@ -164,6 +209,41 @@ export function PageHeader({ title, subtitle }) {
     },
     React.createElement("h1", { className: "text-[19px] leading-tight", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } }, title),
     subtitle && React.createElement("p", { className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle)
+  );
+}
+
+// আইটেম/টুল-ডিটেইল পেজের হেডার(owner-request, ১৯ সেপ্টেম্বর ২০২৬: "ভিতরের পেজ
+// প্রিমিয়াম লাগে না") — আগে শুধু plain bold টেক্সট ছিল, এখন hero-টাইলের মতো
+// আইকন-ডিস্ক + gradient ব্যান্ড, cat.label ব্রেডক্রাম্ব হিসেবে সাবটাইটেলে।
+export function DetailHeader({ icon, title, subtitle }) {
+  return React.createElement(
+    "header",
+    {
+      className: "mb-3 rounded-2xl border px-4 py-3.5 flex items-center gap-3",
+      style: { background: "linear-gradient(135deg, #E8F0EE 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
+    },
+    icon &&
+      React.createElement(
+        "div",
+        {
+          className: "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+          style: {
+            background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, #E3EEEA 100%)",
+            boxShadow: "inset 0 0 0 1px #D3E3DD",
+          },
+        },
+        React.createElement(ToolIcon, { name: icon, size: 22, color: PRIMARY })
+      ),
+    React.createElement(
+      "div",
+      { className: "min-w-0" },
+      React.createElement(
+        "h1",
+        { className: "text-[17px] leading-tight truncate", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } },
+        title
+      ),
+      subtitle && React.createElement("p", { className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle)
+    )
   );
 }
 

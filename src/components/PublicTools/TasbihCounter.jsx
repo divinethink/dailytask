@@ -56,12 +56,29 @@ export function TasbihCounter() {
         React.createElement(ToolIcon, { name: "beads", size: 16, color: PRIMARY }),
         "তাসবীহ"
       ),
-      rounds > 0 &&
+      // §রিসেট বাটন(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): আগে বৃত্তের নিচে
+      // শুধু আইকন ছিল, এখন উপরে ডানপাশে লেবেল-সহ("রিসেট করুন" + আইকন)।
+      React.createElement(
+        "div",
+        { className: "flex items-center gap-2" },
+        rounds > 0 &&
+          React.createElement(
+            "span",
+            { className: "text-xs font-semibold px-2.5 py-1 rounded-full", style: { background: "#FBF3E0", color: "#8A6A1E" } },
+            "রাউন্ড " + toBn(rounds)
+          ),
         React.createElement(
-          "span",
-          { className: "text-xs font-semibold px-2.5 py-1 rounded-full", style: { background: "#FBF3E0", color: "#8A6A1E" } },
-          "রাউন্ড " + toBn(rounds)
+          "button",
+          {
+            type: "button",
+            onClick: () => setCount(0),
+            "aria-label": "রিসেট করুন",
+            className: "flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-200 text-slate-600",
+          },
+          React.createElement(RefreshIcon, { size: 13 }),
+          "রিসেট করুন"
         )
+      )
     ),
     React.createElement(
       "button",
@@ -107,33 +124,19 @@ export function TasbihCounter() {
     ),
     React.createElement(
       "div",
-      { className: "w-full flex items-center justify-between gap-2 mt-3" },
-      React.createElement(
-        "div",
-        { className: "flex-1 flex bg-[#F4F7F1] rounded-full p-1" },
-        TASBIH_TARGET_OPTIONS.map((t) =>
-          React.createElement(
-            "button",
-            {
-              key: t,
-              type: "button",
-              onClick: () => handleSelectTarget(t),
-              className: "flex-1 text-xs font-semibold py-1.5 rounded-full transition-colors",
-              style: t === target ? { background: "#0E4B43", color: "#fff" } : { color: "#5B6B64" },
-            },
-            toBn(t)
-          )
+      { className: "w-full flex bg-[#F4F7F1] rounded-full p-1 mt-3" },
+      TASBIH_TARGET_OPTIONS.map((t) =>
+        React.createElement(
+          "button",
+          {
+            key: t,
+            type: "button",
+            onClick: () => handleSelectTarget(t),
+            className: "flex-1 text-xs font-semibold py-1.5 rounded-full transition-colors",
+            style: t === target ? { background: "#0E4B43", color: "#fff" } : { color: "#5B6B64" },
+          },
+          toBn(t)
         )
-      ),
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          onClick: () => setCount(0),
-          "aria-label": "রিসেট",
-          className: "w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 shrink-0",
-        },
-        React.createElement(RefreshIcon, { size: 16 })
       )
     )
   );

@@ -150,6 +150,10 @@ export function PrayerTimes() {
   const [filterDistrictId, setFilterDistrictId] = useState("");
   const [filterUpazilaId, setFilterUpazilaId] = useState("");
   const [filterBusy, setFilterBusy] = useState(false);
+  // §জেলা-সার্চ(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): native <select>-এ সার্চ
+  // করা যায় না, তাই জেলা তালিকার উপরে আলাদা সার্চ-বক্স সহ custom dropdown।
+  const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
+  const [districtSearchQuery, setDistrictSearchQuery] = useState("");
   const reqIdRef = useRef(0);
   const searchReqIdRef = useRef(0);
 
@@ -405,7 +409,7 @@ export function PrayerTimes() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "border-t border-slate-100 pt-2 flex flex-col gap-1.5" },
-        /*#__PURE__*/React.createElement("div", { className: "text-[11px] text-slate-400 px-1" }, "ফিল্টার করে বাছাই করুন:"),
+        /*#__PURE__*/React.createElement("div", { className: "text-[11px] text-slate-400 px-1" }, "ম্যানুয়ালি এলাকা নির্বাচন করুন:"),
         geoLoading &&
           /*#__PURE__*/React.createElement(
             "div",
@@ -418,17 +422,62 @@ export function PrayerTimes() {
             "div",
             { className: "flex gap-1.5" },
             /*#__PURE__*/React.createElement(
-              "select",
-              {
-                value: filterDistrictId,
-                onChange: (e) => {
-                  setFilterDistrictId(e.target.value);
-                  setFilterUpazilaId("");
+              "div",
+              { className: "flex-1 relative" },
+              /*#__PURE__*/React.createElement(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setDistrictPickerOpen((v) => !v),
+                  className:
+                    "w-full h-9 px-2 rounded-lg border border-slate-200 text-xs bg-white flex items-center justify-between " +
+                    (filterDistrictId ? "text-slate-800" : "text-slate-400"),
                 },
-                className: "flex-1 h-9 px-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white",
-              },
-              /*#__PURE__*/React.createElement("option", { value: "" }, "জেলা বাছাই করুন"),
-              geoData.districts.map((d) => /*#__PURE__*/React.createElement("option", { key: d.id, value: d.id }, d.name))
+                filterDistrictId
+                  ? geoData.districts.find((d) => d.id === filterDistrictId).name
+                  : "জেলা বাছাই করুন",
+                /*#__PURE__*/React.createElement(ChevronDown, { size: 12 })
+              ),
+              districtPickerOpen &&
+                /*#__PURE__*/React.createElement(
+                  "div",
+                  { className: "absolute left-0 right-0 mt-1 bg-white rounded-xl shadow-md border border-slate-200 p-1.5 z-30 flex flex-col gap-1" },
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "text",
+                    autoFocus: true,
+                    value: districtSearchQuery,
+                    onChange: (e) => setDistrictSearchQuery(e.target.value),
+                    placeholder: "জেলার নাম লিখে খুঁজুন...",
+                    className: "h-8 px-2 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700",
+                  }),
+                  /*#__PURE__*/React.createElement(
+                    "div",
+                    { className: "flex flex-col max-h-40 overflow-y-auto" },
+                    geoData.districts
+                      .filter((d) => d.name.includes(districtSearchQuery.trim()))
+                      .map((d) =>
+                        /*#__PURE__*/React.createElement(
+                          "button",
+                          {
+                            key: d.id,
+                            type: "button",
+                            onClick: () => {
+                              setFilterDistrictId(d.id);
+                              setFilterUpazilaId("");
+                              setDistrictPickerOpen(false);
+                              setDistrictSearchQuery("");
+                            },
+                            className:
+                              "text-left text-xs px-2 py-1.5 rounded-lg hover:bg-slate-50 " +
+                              (d.id === filterDistrictId ? "text-emerald-800 font-bold" : "text-slate-700"),
+                          },
+                          d.name
+                        )
+                      ),
+                    geoData.districts.filter((d) => d.name.includes(districtSearchQuery.trim())).length === 0 &&
+                      /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-400 px-2 py-1.5" }, "কোনো জেলা পাওয়া যায়নি")
+                  )
+                )
             ),
             /*#__PURE__*/React.createElement(
               "select",
@@ -594,7 +643,10 @@ export function PrayerTimes() {
         )
       )
     ),
-    // §Location row(3_2 §৪.২ item ২) — GPS-পিলের একই panel খোলে(consolidated)।
+    // §Location row(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): এখন শুধু GPS-পিলে
+    // ক্লিক করলেই panel খোলে(consolidated ট্রিগার একটাই); এই row এখন শুধু
+    // নির্বাচিত এলাকার নাম দেখায়, ক্লিক-non-interactive(আগে দুই জায়গাতেই একই
+    // panel খুলত যা বিভ্রান্তিকর ছিল)।
     // ২-লাইন প্রদর্শন(owner-instruction): নাম কমা দিয়ে split করে প্রথম অংশ(এলাকা)
     // বড়+বোল্ড লাইনে, বাকি অংশ(উপজেলা/জেলা) ছোট ধূসর লাইনে — যেমন "গুলশান" /
     // "ঢাকা"। কমা না থাকলে(যেমন quick-shortcut শহরের নাম) স্বাভাবিকভাবে এক-লাইনই থাকে।
@@ -602,15 +654,8 @@ export function PrayerTimes() {
       "div",
       { className: "px-4 pb-1.5 relative" },
       /*#__PURE__*/React.createElement(
-        "button",
-        {
-          type: "button",
-          onClick: () => {
-            setLocationPanelOpen((v) => !v);
-            setMadhabPanelOpen(false);
-          },
-          className: "flex items-center gap-1.5 text-left",
-        },
+        "div",
+        { className: "flex items-center gap-1.5" },
         /*#__PURE__*/React.createElement(PinIcon, { size: 15, className: "text-emerald-800 shrink-0" }),
         /*#__PURE__*/React.createElement(
           "div",
@@ -622,8 +667,7 @@ export function PrayerTimes() {
               { className: "text-[11px] text-slate-500" },
               (location.name || "").split(",").slice(1).join(",").trim()
             )
-        ),
-        /*#__PURE__*/React.createElement(ChevronDown, { size: 13, style: { transform: locationPanelOpen ? "rotate(180deg)" : "none" } })
+        )
       ),
       locationPanelOpen &&
         /*#__PURE__*/React.createElement(
