@@ -33,7 +33,16 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey, suggestedF
     }
   }
 
-  return /*#__PURE__*/React.createElement(React.Fragment, null,
+  // §Bug fix(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): কার্ড-wrapper আগে app.js-এ
+  // আলাদা শর্তে(`suggestedFocusKey || selectedMember?.tomorrowFocus`) বসানো
+  // ছিল, যা এই component-এর নিজস্ব `activeField` null-check-এর সাথে sync
+  // ছিল না — stale `tomorrowFocus`(পুরনো targetDateKey) থাকলে বাইরের শর্ত
+  // true থাকত অথচ এই component null রিটার্ন করত, ফলে খালি সাদা কার্ড(border+
+  // shadow-সহ) দেখা যেত। Fix: card-wrapper এখন এই component-এর ভিতরেই, তাই
+  // একই null-check card-সহ পুরোটাই covers করে — কোনো blank-card সম্ভব না।
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
+  },
     /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, "🎯 আগামীকালের Focus"),
     editing
       ? /*#__PURE__*/React.createElement("div", { className: "flex gap-2 items-center" },

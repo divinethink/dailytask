@@ -66,22 +66,27 @@ const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
 // একটা tier-row: "১ম সর্বোচ্চ: ১০০%" + ঐ শতাংশ-এ থাকা সবগুলো আমলের নাম(comma
 // দিয়ে একসাথে, owner-এর প্ল্যান অনুযায়ী) + একটা পাতলা প্রোগ্রেস-বার(দ্রুত visual
 // scan-এর জন্য)।
-function TierRow({ rankLabel, pct, labels, toBn }) {
+function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
   const color = activityTierColor(pct);
   return /*#__PURE__*/React.createElement("div", {
-    className: "mb-2.5 last:mb-0"
+    className: "mb-3 last:mb-0"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between text-[10px] text-slate-500 mb-1"
-  }, /*#__PURE__*/React.createElement("span", null, rankLabel), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold",
+    className: "flex items-center gap-1.5 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 shadow-sm",
+    style: { background: color }
+  }, toBn(rank)), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 flex-1"
+  }, rankPrefix), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-[11px]",
     style: { fontFamily: "'IBM Plex Mono', monospace", color }
   }, toBn(pct), "%")), /*#__PURE__*/React.createElement("div", {
-    className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1"
+    className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1 shadow-inner"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "h-full rounded-full",
-    style: { width: `${pct}%`, background: color }
+    className: "h-full rounded-full transition-all duration-500",
+    style: { width: `${pct}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
   })), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-700 leading-snug"
+    className: "text-xs text-slate-700 leading-snug pl-6"
   }, labels.join(", ")));
 }
 
@@ -91,11 +96,12 @@ function TierRow({ rankLabel, pct, labels, toBn }) {
 function TierColumn({ heading, headingColor, tiers, rankPrefix, toBn }) {
   if (tiers.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-bold mb-2 text-center",
+    className: "text-xs font-bold mb-2.5 text-center",
     style: { color: headingColor }
   }, heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
     key: t.pct,
-    rankLabel: `${ORDINAL_BN[i]} ${rankPrefix}`,
+    rank: i + 1,
+    rankPrefix: `${ORDINAL_BN[i]} ${rankPrefix}`,
     pct: t.pct,
     labels: t.labels,
     toBn: toBn
@@ -207,10 +213,10 @@ export function TopBottomActivityRanking({
   const { topTiers, bottomTiers, qazaJamaatBlock } = stats;
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mt-4"
+    className: "bg-white rounded-2xl p-4 shadow-[0_3px_12px_-3px_rgba(30,41,59,0.12)] border border-slate-200/70 mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
-  }, "চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
+  }, "📊 চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-4 mb-4"
   }, /*#__PURE__*/React.createElement(TierColumn, {
     heading: "সর্বোচ্চ ৩ এক্টিভিটি",
@@ -219,7 +225,7 @@ export function TopBottomActivityRanking({
     rankPrefix: "সর্বোচ্চ",
     toBn: toBn
   }), /*#__PURE__*/React.createElement("div", {
-    className: "border-l border-slate-200 pl-4"
+    className: "border-l border-slate-200/70 pl-4"
   }, /*#__PURE__*/React.createElement(TierColumn, {
     heading: "আরও মনোযোগ প্রয়োজন",
     headingColor: "#B8860B",
@@ -506,7 +512,7 @@ export function MonthlyOverviewSection({
     className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
-  }), " PDF / প্রিন্ট (২ পেজ)")), rankingSlot, /*#__PURE__*/React.createElement("div", {
+  }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-4 mb-2"
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 13,
@@ -528,17 +534,19 @@ export function MonthlyOverviewSection({
     const e = monthEntries[pad2(d)];
     const s = dailyScore(e, selectedMember, allFields);
     const cellDate = new Date(monthCursor.year, monthCursor.month0, d);
+    const isToday = cellDate.toDateString() === new Date().toDateString();
     return /*#__PURE__*/React.createElement("button", {
       key: d,
       onClick: () => {
         if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
         setViewDate(cellDate);
       },
-      className: "h-7 w-full rounded-lg flex items-center justify-center text-[10px] font-bold transition-transform active:scale-90 shadow-sm",
+      className: "h-7 w-full rounded-xl flex items-center justify-center text-[10px] font-bold transition-transform active:scale-90",
       style: {
         background: scoreColor(s),
         color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
-        fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
+        fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
+        boxShadow: isToday ? "0 0 0 2px var(--theme-primary), 0 2px 5px -1px rgba(0,0,0,0.15)" : "0 1px 2px rgba(0,0,0,0.06)"
       }
     }, toBn(d));
   }))), /* §Part B Phase ৫(heatmap legend, 2_5 Part B §B৩.৪, ১৫ সেপ্টেম্বর ২০২৬):
@@ -548,7 +556,7 @@ export function MonthlyOverviewSection({
        percentage-range বিবরণ আগে থেকেই ⓘ-আইকনে আছে, এটা শুধু at-a-glance
        quick-reference, tap ছাড়াই। */
   /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-slate-100"
+    className: "flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-slate-100"
   }, [
     { c: "var(--theme-primary)", l: "চমৎকার", n: tierCounts.excellent },
     { c: "#2563A8", l: "ভালো", n: tierCounts.good },
@@ -557,16 +565,16 @@ export function MonthlyOverviewSection({
     { c: "#E7EEE3", l: "খালি", n: tierCounts.empty, border: true }
   ].map(item => /*#__PURE__*/React.createElement("span", {
     key: item.l,
-    className: "flex items-center gap-1"
+    className: "flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full bg-slate-50 border border-slate-100"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2.5 h-2.5 rounded-sm" + (item.border ? " border border-slate-300" : ""),
+    className: "w-2.5 h-2.5 rounded-full" + (item.border ? " border border-slate-300" : ""),
     style: { background: item.c }
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px] font-medium text-slate-500"
   }, item.l, /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-slate-700",
     style: { fontFamily: "'IBM Plex Mono', monospace" }
-  }, "(", toBn(item.n), ")")))))));
+  }, "(", toBn(item.n), ")"))))), rankingSlot));
 }
 
 export function MeetingMinutesSection({
