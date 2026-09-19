@@ -13,10 +13,10 @@ function Tile({ icon, label, onClick }) {
     React.createElement(
       "div",
       {
-        className: "w-14 h-14 rounded-full flex items-center justify-center border border-emerald-900/10",
+        className: "w-11 h-11 rounded-full flex items-center justify-center border border-emerald-900/10",
         style: { background: "#E8F0EE" },
       },
-      React.createElement(ToolIcon, { name: icon, size: 24, color: PRIMARY })
+      React.createElement(ToolIcon, { name: icon, size: 20, color: PRIMARY })
     ),
     React.createElement(
       "span",
@@ -32,7 +32,7 @@ function Tile({ icon, label, onClick }) {
 export function ToolGridSection({ title, icon, items, onSelect }) {
   return React.createElement(
     "section",
-    { className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4" },
+    { className: "mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3" },
     title &&
       React.createElement(
         "div",
@@ -42,7 +42,7 @@ export function ToolGridSection({ title, icon, items, onSelect }) {
       ),
     React.createElement(
       "div",
-      { className: "grid grid-cols-4 gap-x-2 gap-y-4" },
+      { className: "grid grid-cols-4 gap-x-2 gap-y-3" },
       items.map((item) =>
         React.createElement(Tile, {
           key: item.key || item.id,

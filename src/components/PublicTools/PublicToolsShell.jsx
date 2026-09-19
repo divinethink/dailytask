@@ -102,7 +102,6 @@ const CATEGORIES = [
     icon: "calculator",
     label: "ইসলামি টুলস ও ট্র্যাকিং",
     items: [
-      { key: "qibla", icon: "compass", label: "কিবলা" },
       { key: "monthlySchedule", icon: "calendar", label: "মাসিক নামাজ-সময়সূচি" },
       { key: "zakat", icon: "calculator", label: "যাকাত ক্যালকুলেটর" },
       { key: "fitra", icon: "wheat", label: "ফিতরা ক্যালকুলেটর" },
@@ -115,7 +114,6 @@ const CATEGORIES = [
     icon: "moon",
     label: "বিশেষ দিন ও উপলক্ষ",
     items: [
-      { key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল" },
       { key: "ramadanPrep", icon: "moon", label: "রমজান প্রস্তুতি" },
       { key: "eidCountdown", icon: "timer", label: "রমজান/ঈদ কাউন্টডাউন" },
       { key: "eidPrayer", icon: "star", label: "ঈদের নামাজের নিয়ম" },
@@ -126,34 +124,33 @@ const CATEGORIES = [
   },
 ];
 
-// একক-বাটন ক্যাটাগরি(header+CTA দুই-ধাপ প্যাটার্ন) — বর্তমানে খালি(কুইজ নিচের
-// SINGLE_ROW_ENTRIES-এ সরানো হয়েছে, ১৮ সেপ্টেম্বর ২০২৬)। খালি array harmless
-// no-op হিসেবে রাখা হলো(map কিছু render করবে না) — future single-entry
-// ক্যাটাগরির জন্য pattern অক্ষুণ্ণ রাখতে সম্পূর্ণ সরানো হয়নি।
-const SINGLE_ENTRY_CATEGORIES = [];
-
-// একক-সারি সরাসরি-ক্লিকযোগ্য এন্ট্রি(ব্লগ, ১৮ সেপ্টেম্বর ২০২৬ owner-request) —
-// আলাদা header+CTA-button দুই-ধাপ প্যাটার্নের বদলে CATEGORIES-item-এর মতোই
-// একটাই সারি, ক্লিকেই সরাসরি BlogSection/QuizSection খোলে।
-// কুইজ(১৮ সেপ্টেম্বর ২০২৬, owner-request) — আগে SINGLE_ENTRY_CATEGORIES-এ
-// header("🧠 ইসলামি কুইজ")+আলাদা CTA-বাটন("কুইজ খেলুন") দুই-অংশে ছিল, এখন
-// ব্লগের মতোই একটাই combined row।
-const SINGLE_ROW_ENTRIES = [
-  { id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },
-  { id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
+// front-level flat grid(owner-request, ১৯ সেপ্টেম্বর ২০২৬) — কিবলা ও জুমার
+// দিনের বিশেষ আমল নিজ নিজ ক্যাটাগরি(toolsTracking/specialDays, উপরে) থেকে
+// বের করে সরাসরি front-এ আনা হয়েছে। বাকি ৪টা ক্যাটাগরি + কুইজ/ব্লগ একই
+// সারিতে, একটাই ToolGridSection দিয়ে(কোনো section-title ছাড়া, flat)।
+const FRONT_ITEMS = [
+  { kind: "tool", key: "qibla", icon: "compass", label: "কিবলা" },
+  { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
+  { kind: "tool", key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল" },
+  { kind: "category", id: "quran", icon: "bookmarkCheck", label: "কুরআন" },
+  { kind: "category", id: "toolsTracking", icon: "calculator", label: "ইসলামি টুলস ও ট্র্যাকিং" },
+  { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
+  { kind: "single", id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },
+  { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
 ];
 
 export function PublicToolsShell() {
-  const [activeItem, setActiveItem] = useState(null); // { key, label } | { id, label } | null
+  // "front" | { tool: {key,label} } | { single: {id,label} } |
+  // { category: catObj } | { category: catObj, item: {key,label} }
+  const [view, setView] = useState("front");
 
-  if (activeItem) {
-    // কুইজ/ব্লগ — নিজস্ব header/back, শেল-wrapper ছাড়াই সরাসরি render।
-    const SingleComponent = activeItem.id ? SINGLE_ENTRY_COMPONENTS[activeItem.id] : null;
-    if (SingleComponent) {
-      return /*#__PURE__*/React.createElement(SingleComponent, { onBack: () => setActiveItem(null) });
-    }
+  if (view !== "front" && view.single) {
+    const SingleComponent = SINGLE_ENTRY_COMPONENTS[view.single.id];
+    return /*#__PURE__*/React.createElement(SingleComponent, { onBack: () => setView("front") });
+  }
 
-    const ActiveComponent = ACTIVE_ITEM_COMPONENTS[activeItem.key];
+  if (view !== "front" && view.tool) {
+    const ActiveComponent = ACTIVE_ITEM_COMPONENTS[view.tool.key];
     return /*#__PURE__*/React.createElement(
       "div",
       { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
@@ -161,7 +158,7 @@ export function PublicToolsShell() {
         "button",
         {
           type: "button",
-          onClick: () => setActiveItem(null),
+          onClick: () => setView("front"),
           className: "flex items-center gap-1 px-4 pt-4 pb-2 text-sm font-semibold text-emerald-950",
         },
         /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
@@ -170,7 +167,7 @@ export function PublicToolsShell() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "px-4 pb-2 text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-        activeItem.label
+        view.tool.label
       ),
       ActiveComponent
         ? /*#__PURE__*/React.createElement(ActiveComponent, null)
@@ -182,23 +179,75 @@ export function PublicToolsShell() {
     );
   }
 
-  return /*#__PURE__*/React.createElement(
-    "div",
-    { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
-    CATEGORIES.map((cat) =>
+  if (view !== "front" && view.category) {
+    const cat = view.category;
+
+    if (view.item) {
+      const ActiveComponent = ACTIVE_ITEM_COMPONENTS[view.item.key];
+      return /*#__PURE__*/React.createElement(
+        "div",
+        { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => setView({ category: cat }),
+            className: "flex items-center gap-1 px-4 pt-4 pb-2 text-sm font-semibold text-emerald-950",
+          },
+          /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+          cat.label
+        ),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "px-4 pb-2 text-base font-bold text-emerald-950", style: { fontFamily: "'Noto Serif Bengali', serif" } },
+          view.item.label
+        ),
+        ActiveComponent
+          ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+          : /*#__PURE__*/React.createElement(
+              "div",
+              { className: "flex-1 flex flex-col items-center justify-center px-6 text-center gap-2 py-16" },
+              /*#__PURE__*/React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+            )
+      );
+    }
+
+    return /*#__PURE__*/React.createElement(
+      "div",
+      { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
+      /*#__PURE__*/React.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: () => setView("front"),
+          className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950",
+        },
+        /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+        "সহায়িকা"
+      ),
       /*#__PURE__*/React.createElement(ToolGridSection, {
-        key: cat.id,
         title: cat.label,
         icon: cat.icon,
         items: cat.items,
-        onSelect: (item) => setActiveItem(item),
+        onSelect: (item) => setView({ category: cat, item }),
       })
-    ),
+    );
+  }
+
+  return /*#__PURE__*/React.createElement(
+    "div",
+    { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     /*#__PURE__*/React.createElement(ToolGridSection, {
-      title: "কুইজ ও ব্লগ",
-      icon: "help",
-      items: SINGLE_ROW_ENTRIES,
-      onSelect: (entry) => setActiveItem({ id: entry.id, label: entry.label }),
+      items: FRONT_ITEMS,
+      onSelect: (item) => {
+        if (item.kind === "category") {
+          setView({ category: CATEGORIES.find((c) => c.id === item.id) });
+        } else if (item.kind === "tool") {
+          setView({ tool: item });
+        } else {
+          setView({ single: item });
+        }
+      },
     })
   );
 }

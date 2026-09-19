@@ -46,7 +46,7 @@ export function TasbihCounter() {
 
   return React.createElement(
     "section",
-    { className: "mb-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 flex flex-col items-center" },
+    { className: "mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 flex flex-col items-center" },
     React.createElement(
       "div",
       { className: "w-full flex items-center justify-between mb-3" },
@@ -69,7 +69,7 @@ export function TasbihCounter() {
         type: "button",
         onClick: handleTap,
         "aria-label": "তাসবীহ গণনা করুন",
-        className: "relative w-52 h-52 rounded-full flex items-center justify-center active:scale-[0.97] transition-transform select-none",
+        className: "relative w-40 h-40 rounded-full flex items-center justify-center active:scale-[0.97] transition-transform select-none",
         style: { background: "#F4F7F1", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" },
       },
       React.createElement(
@@ -94,7 +94,7 @@ export function TasbihCounter() {
         { className: "relative flex flex-col items-center" },
         React.createElement(
           "span",
-          { className: "text-5xl font-bold leading-none", style: { fontFamily: "'IBM Plex Mono', monospace", color: PRIMARY } },
+          { className: "text-4xl font-bold leading-none", style: { fontFamily: "'IBM Plex Mono', monospace", color: PRIMARY } },
           toBn(progress)
         ),
         React.createElement("span", { className: "text-xs text-slate-500 mt-2" }, "/ " + toBn(target)),
@@ -107,7 +107,7 @@ export function TasbihCounter() {
     ),
     React.createElement(
       "div",
-      { className: "w-full flex items-center justify-between gap-2 mt-4" },
+      { className: "w-full flex items-center justify-between gap-2 mt-3" },
       React.createElement(
         "div",
         { className: "flex-1 flex bg-[#F4F7F1] rounded-full p-1" },
