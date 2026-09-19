@@ -708,7 +708,7 @@ export function PrayerTimes() {
         /*#__PURE__*/React.createElement("div", { className: "relative text-sm opacity-90" }, `🌙 ${waqtInfo.name} ${waqtInfo.label}`),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+          { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
           formatCountdown(waqtInfo.target.getTime() - now.getTime())
         )
       ),
@@ -725,7 +725,7 @@ export function PrayerTimes() {
         /*#__PURE__*/React.createElement("div", { className: "relative text-sm opacity-90" }, `🌙 রমজান · ${ramadanCountdown.label}`),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+          { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
           formatCountdown(ramadanCountdown.target.getTime() - now.getTime())
         )
       ),
@@ -752,7 +752,7 @@ export function PrayerTimes() {
               /*#__PURE__*/React.createElement("span", { className: "flex-1" }, r.label),
               /*#__PURE__*/React.createElement(
                 "span",
-                { className: "text-xs whitespace-nowrap", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+                { className: "text-xs whitespace-nowrap", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
                 r.end ? `${formatHHMM(r.start)}–${formatHHMM(r.end)}` : formatHHMM(r.start)
               )
             )
@@ -769,7 +769,7 @@ export function PrayerTimes() {
               /*#__PURE__*/React.createElement("div", null, w.label),
               /*#__PURE__*/React.createElement(
                 "div",
-                { className: "whitespace-nowrap", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+                { className: "whitespace-nowrap", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
                 `${formatHHMM(w.start)}–${formatHHMM(w.end)}`
               )
             )

@@ -242,7 +242,7 @@ export function Qibla() {
       { className: "text-center" },
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "text-3xl font-bold", style: { fontFamily: "'IBM Plex Mono', monospace", color: "var(--theme-primary, #0E4B43)" } },
+        { className: "text-3xl font-bold", style: { fontFamily: "'Hind Siliguri', sans-serif", color: "var(--theme-primary, #0E4B43)" } },
         toBn(Math.round(bearing)) + "°"
       ),
       /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "উত্তর থেকে কাবামুখী কোণ")

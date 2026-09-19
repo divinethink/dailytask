@@ -108,7 +108,7 @@ export function SadaqaLog() {
       /*#__PURE__*/React.createElement("span", { className: "text-sm font-semibold text-emerald-950" }, "মোট সদকা"),
       /*#__PURE__*/React.createElement(
         "span",
-        { className: "text-lg font-bold", style: { fontFamily: "'IBM Plex Mono', monospace", color: "var(--theme-primary, #0E4B43)" } },
+        { className: "text-lg font-bold", style: { fontFamily: "'Hind Siliguri', sans-serif", color: "var(--theme-primary, #0E4B43)" } },
         "৳" + formatTaka(total)
       )
     ),
@@ -126,7 +126,7 @@ export function SadaqaLog() {
                 { className: "min-w-0" },
                 /*#__PURE__*/React.createElement(
                   "div",
-                  { className: "text-sm font-semibold text-emerald-950", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+                  { className: "text-sm font-semibold text-emerald-950", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
                   "৳" + formatTaka(e.amount)
                 ),
                 /*#__PURE__*/React.createElement(

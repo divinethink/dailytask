@@ -126,7 +126,7 @@ export function ZakatCalculator() {
             ),
             /*#__PURE__*/React.createElement(
               "div",
-              { className: "text-2xl font-bold", style: { fontFamily: "'IBM Plex Mono', monospace", color: "var(--theme-primary, #0E4B43)" } },
+              { className: "text-2xl font-bold", style: { fontFamily: "'Hind Siliguri', sans-serif", color: "var(--theme-primary, #0E4B43)" } },
               "৳" + formatTaka(result.zakatDue)
             ),
             /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-400" }, "(মোট সম্পদের ২.৫%)")

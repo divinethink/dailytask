@@ -111,7 +111,7 @@ export function TasbihCounter() {
         { className: "relative flex flex-col items-center" },
         React.createElement(
           "span",
-          { className: "text-4xl font-bold leading-none", style: { fontFamily: "'IBM Plex Mono', monospace", color: PRIMARY } },
+          { className: "text-4xl font-bold leading-none", style: { fontFamily: "'Hind Siliguri', sans-serif", color: PRIMARY } },
           toBn(progress)
         ),
         React.createElement("span", { className: "text-xs text-slate-500 mt-2" }, "/ " + toBn(target)),

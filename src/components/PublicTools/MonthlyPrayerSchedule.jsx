@@ -186,7 +186,7 @@ export function MonthlyPrayerSchedule() {
               ROW_KEYS.map((r) =>
                 /*#__PURE__*/React.createElement(
                   "td",
-                  { key: r.key, className: "py-1.5 px-2 text-center", style: { fontFamily: "'IBM Plex Mono', monospace" } },
+                  { key: r.key, className: "py-1.5 px-2 text-center", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
                   toBn(cleanTimeStr(d && d.timings ? d.timings[r.key] : "--:--"))
                 )
               )
