@@ -1,0 +1,1457 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // অ্যাপের নিজস্ব কালেকশন যাচাই করার ফাংশন।
+    // M-1 fix: আগে শুধু '^data_.*' চেক হতো (যেকোনো দৈর্ঘ্য/ক্যারেক্টার),
+    // ফলে UI বাইপাস করে সরাসরি SDK দিয়ে যেকোনো নামের data_* কালেকশনে
+    // read/write সম্ভব ছিল। এখন app.js-এর client-side নিয়মের (৬-৩০
+    // ক্যারেক্টার, space/slash/backslash/quotation চিহ্নবিহীন — দেখুন
+    // FAMILY_CODE_MIN_LENGTH/MAX_LENGTH ও FAMILY_CODE_CHARSET_PATTERN)
+    // সাথে সামঞ্জস্যপূর্ণ একটি সীমা রাখা হয়েছে। Firestore rules-এর regex
+    // ইঞ্জিনে (RE2) lookahead সাপোর্ট নেই, তাই client-side-এর পুরো নিয়ম
+    // (pure-dot/reserved-pattern প্রত্যাখ্যান) হুবহু প্রতিলিপি করা যায়নি —
+    // এটি ইচ্ছাকৃতভাবে একটি নিরাপদ superset, যেন কোনো বিদ্যমান বৈধ
+    // ফ্যামিলি কোড ভেঙে না যায়।
+    // L-cleanup: আগে এখানে '|| name == 'daily_task_data'' নামে একটি লিগ্যাসি
+    // এলাউয়েন্স ছিল। app.js/backup — কোনো ফাইলেই এই কালেকশন নামটা আর
+    // ব্যবহৃত হয় না (getCollectionName() সবসময় `data_${code}` প্যাটার্নই
+    // রিটার্ন করে) — তাই এটি কোনো কার্যকারিতা ছাড়াই শুধু অতিরিক্ত attack
+    // surface তৈরি করছিল (কেউ চাইলে এই নির্দিষ্ট নামে সরাসরি read/write
+    // করতে পারত)। সরিয়ে ফেলা হলো — কোনো ব্রেকিং চেঞ্জ নয়।
+    // §Item(২১ আগস্ট ২০২৬): client-side FAMILY_CODE_MIN_LENGTH ৯→৬ সমন্বয়ে
+    // এই নিম্নসীমাও ৯→৬ করা হয়েছে (নিচের familyCode rename clause-এর সাথেও
+    // সামঞ্জস্যপূর্ণ)।
+    // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): charset
+    // English letter/digit/underscore/hyphen-এ সংকুচিত(client-side
+    // FAMILY_CODE_CHARSET_PATTERN-এর সাথে সামঞ্জস্যপূর্ণ)। RE2-তে lookahead
+    // সাপোর্ট নেই বলে "__...__$" reserved-prefix guard এখানে প্রতিলিপি করা
+    // যায়নি — আগের মতোই ইচ্ছাকৃত নিরাপদ superset।
+    function isAppCollection(name) {
+      return name.matches('^data_[A-Za-z0-9_-]{6,30}$');
+    }
+
+    // একটা ownerUid ফাঁকা (unclaimed) অথবা বর্তমান ইউজারের কিনা
+    function isUnownedOrMine(uid) {
+      return uid == null || uid == request.auth.uid;
+    }
+
+    // --- §Multi-device(v2-only) — ownerUid(string) → ownerUids(array,max 3) ---
+    // Migration-window transient fallback: পুরনো doc-এ এখনো শুধু single
+    // ownerUid থাকতে পারে(migration script না চলা পর্যন্ত) — তাই null-safe
+    // array-normalize করা হচ্ছে। Migration সম্পন্ন ও verified হওয়ার পরে এই
+    // fallback সরিয়ে ফেলা হবে(স্থায়ী নয়, শুধু transition bridge)।
+    function isUnownedOrMineArray(uids) {
+      return uids == null || uids.size() == 0 || uids.hasAny([request.auth.uid]);
+    }
+
+    // entry:<memberId>:<date> এবং weekly:<memberId>:<yyyy-mm> — এই দুই
+    // ধরনের ডকুমেন্ট আইডি চেনা (memberId সবসময় দ্বিতীয় অংশ)
+    function isMemberScopedDoc(docId) {
+      return docId.matches('^(entry|weekly):.*');
+    }
+
+    // entry/weekly ডকুমেন্টের নিজের ভেতরের ownerUid না দেখে, সংশ্লিষ্ট
+    // member:<id> ডকুমেন্টের *বর্তমান* ownerUid দেখে অনুমতি দেওয়া হয় —
+    // এতে কোনো সদস্যের দায়িত্ব হাতবদল হলে (নতুন ফোন, ব্রাউজার ডাটা মোছা,
+    // অন্য ডিভাইসে re-claim) নতুন owner পুরনো সব এন্ট্রি/সাপ্তাহিক
+    // রিফ্লেকশনও সমস্যা ছাড়াই এডিট করতে পারে।
+    function currentMemberOwner(collectionName, docId) {
+      let memberId = docId.split(':')[1];
+      let memberPath = /databases/$(database)/documents/$(collectionName)/$('member:' + memberId);
+      // C-2 fix: get().data on a nonexistent document throws in Firestore
+      // Rules (per official docs, get() returns null if the doc doesn't
+      // exist), which fails the whole rule closed — permanently locking
+      // out writes to entry:/weekly: docs whose member: doc was deleted.
+      // Guarding with exists() first and returning null (unowned) instead
+      // restores the same "unclaimed member" access level already used
+      // elsewhere in this ruleset, rather than an unintended hard lock.
+      return exists(memberPath) ? get(memberPath).data.ownerUid : null;
+    }
+
+    // --- Phase C rollback safety fix (আজকের সিদ্ধান্ত) ---
+    // সমস্যা: legacy top-level collection (data_<code>) এর write-rule-এ
+    // কোনো admin-bypass ছিল না (শুধু নতুন families/{id}/members|entries|
+    // weekly subcollection rules-এ ছিল)। ফলে Flip-পরবর্তী rollback-এর
+    // সময় (reverseSyncPhaseCData()) যদি admin-কে অন্য সদস্যের owned
+    // entry/member touch করতে হয় (batch-এ একটাও mismatch থাকলে পুরো
+    // batch reject হয়), সেটা "Missing or insufficient permissions" দিয়ে
+    // ব্যর্থ হয় — বাস্তব real-family টেস্টে (দুই সদস্য, দুই ডিভাইস) এই
+    // সমস্যা ধরা পড়েছে।
+    //
+    // সমাধান (approved): broad/permanent admin-bypass না দিয়ে, শুধু
+    // migrationState == "locked" অবস্থায় সীমাবদ্ধ (time-boxed) bypass —
+    // "locked" state ইতিমধ্যেই Switch-এর transient window হিসেবে approved
+    // concept, তাই কোনো নতুন permission surface তৈরি হচ্ছে না। state
+    // locked থেকে সরে গেলে (v2/legacy-তে ফিরলে) bypass নিজে থেকেই বন্ধ
+    // হয়ে যায় — কোনো manual cleanup লাগে না, স্থায়ী attack-surface তৈরি
+    // হয় না। শুধু rollback-এর প্রকৃত প্রয়োজনের সময়টুকুতেই কার্যকর।
+    //
+    // legacyCollectionMap/{collectionName} থেকে familyId lookup করে,
+    // families/{familyId}-এর migrationState ও adminUids একই get() কলে
+    // চেক করা হয় (read-quota সাশ্রয়ের জন্য পৃথক isAdminOfFamily() কল না
+    // করে একটিমাত্র families doc read-এ দুটো শর্তই যাচাই করা হচ্ছে)।
+    function isFamilyLockedForAdmin(familyId) {
+      let familyPath = /databases/$(database)/documents/families/$(familyId);
+      return exists(familyPath)
+        && get(familyPath).data.migrationState == 'locked'
+        && get(familyPath).data.adminUids.hasAny([request.auth.uid]);
+    }
+    function isLegacyRollbackBypass(collectionName) {
+      let mapPath = /databases/$(database)/documents/legacyCollectionMap/$(collectionName);
+      return exists(mapPath) && isFamilyLockedForAdmin(get(mapPath).data.familyId);
+    }
+
+    // --- Locked-state normal-write deny(নতুন, ২৪ আগস্ট ২০২৬, migration-audit fix) ---
+    // পূর্বের অবস্থা: migrationState == "locked" শুধু admin-এর জন্য
+    // অতিরিক্ত bypass permission যোগ করত(isLegacyRollbackBypass, উপরে) —
+    // কিন্তু normal(non-admin/owner) write সেই সময়েও ঠিক আগের মতোই
+    // অনুমোদিত থেকে যেত(কোনো state-based deny ছিল না); client-side UI
+    // gate(isLockedForSwitch) ছিল, কিন্তু Rules-level backstop ছিল না —
+    // stale/cached tab থেকে locked-window-এ write হলে Copy-ধাপের
+    // consistency নষ্ট হতে পারত। এই ফাংশন শুধু deny-এর জন্য: family
+    // locked হলে true, adminUids-নির্বিশেষে(isFamilyLockedForAdmin থেকে
+    // ইচ্ছাকৃতভাবে আলাদা — এখানে admin-check নেই, শুধু state-check)।
+    function isLegacyCollectionLocked(collectionName) {
+      let mapPath = /databases/$(database)/documents/legacyCollectionMap/$(collectionName);
+      return exists(mapPath)
+        && exists(/databases/$(database)/documents/families/$(get(mapPath).data.familyId))
+        && get(/databases/$(database)/documents/families/$(get(mapPath).data.familyId)).data.migrationState == 'locked';
+    }
+
+    // একটা ডকুমেন্ট এই ইউজার লিখতে পারবে কিনা — centralized permission check
+    // Phase C rollback fix: প্রাথমিক (owner-based) শর্ত false হলেও, যদি
+    // families.migrationState == "locked" এবং এই ইউজার সেই family-এর
+    // admin হন, তাহলে লেখা অনুমোদিত (isLegacyRollbackBypass, উপরে দেখুন)।
+    // || হওয়ায় প্রাথমিক শর্ত true হলে দ্বিতীয় (get()-নির্ভর) শর্ত মূল্যায়িতই
+    // হয় না (Firestore Rules lazy evaluation) — normal/non-locked ব্যবহারে
+    // কোনো অতিরিক্ত read-cost নেই।
+    // Locked-state fix(২৪ আগস্ট ২০২৬): normal-owner branch এখন
+    // !isLegacyCollectionLocked(...) দিয়ে অতিরিক্ত-গেটেড — family locked
+    // থাকলে normal owner আর লিখতে পারবে না, শুধু isLegacyRollbackBypass
+    // (admin, locked-scoped) দিয়েই লেখা সম্ভব। legacy/v2 state(non-locked)
+    // অপরিবর্তিত — normal owner আগের মতোই লিখতে পারবে, কোনো নতুন গেট
+    // মূল্যায়িত হবে না-এমন না(get() হবে, কিন্তু ফলাফল অনুমতি না-ও কেড়ে
+    // নেয়), শুধুমাত্র সেই family-এর জন্য যেটার legacyCollectionMap আছে।
+    function isWritable(collectionName, docId, data) {
+      return (!isLegacyCollectionLocked(collectionName)
+        && (isMemberScopedDoc(docId)
+          ? isUnownedOrMine(currentMemberOwner(collectionName, docId))
+          : (!('ownerUid' in data) || isUnownedOrMine(data.ownerUid))))
+        || isLegacyRollbackBypass(collectionName);
+    }
+
+    // --- Phase C prep: families/<familyId>/entries|weekly এর জন্য owner
+    // lookup (currentMemberOwner()-এর নতুন-subcollection সংস্করণ) ---
+    // ডকুমেন্ট আইডি কনভেনশন: "<memberId>_<date>" / "<memberId>_<yyyy-mm>"
+    // (Technical Design Document অনুযায়ী; colon-এর বদলে underscore, কারণ
+    // memberId নিজে hyphen ব্যবহার করে কিন্তু underscore নয় — তাই প্রথম
+    // "_"-এ split করলে memberId নিরাপদে আলাদা হয়ে যায়)। এই মুহূর্তে কোনো
+    // app code এই path পড়ে/লেখে না — শুধু future migration-এর জন্য rules
+    // আগে থেকে প্রস্তুত রাখা হচ্ছে।
+    //
+    // §Google-Login fix(Critical #1, security-audit ৯ সেপ্টেম্বর ২০২৬):
+    // 'googleUid' field থাকা member(নতুন Google-login identity model,
+    // 2_4 §৩/§৫)-এ এটাই authoritative owner — এই field একেবারেই না
+    // থাকলে(পুরনো ownerUids-based legacy family) আগের fallback অপরিবর্তিত।
+    //
+    // Root-cause(fix-এর আগে): নতুন Google-login member doc-এ শুধু
+    // googleUid থাকে, ownerUids/ownerUid কোনোটাই না — আগের এই function
+    // তখন empty array([]) রিটার্ন করত, এবং isUnownedOrMineArray([])
+    // definition অনুযায়ী(uids.size()==0 → true) সবসময় true হতো — ফলে
+    // যেকোনো authenticated user(family-র সদস্যও না) সেই member-এর
+    // entries/weekly write/delete করতে পারত(open-write hole)।
+    //
+    // এখন branch-লজিক:
+    //   - googleUid non-null(claimed member) → [googleUid]-ই একমাত্র owner,
+    //     আগের ownerUids-pattern-এর মতোই isUnownedOrMineArray() দিয়ে
+    //     সঠিকভাবে গেটেড হবে।
+    //   - googleUid field আছে কিন্তু null(unclaimed proxy member, admin
+    //     কর্তৃক তৈরি, 2_4 §৫.১) → কোনো real uid এখনো owner না, তাই empty
+    //     array/null না দিয়ে(যেগুলো isUnownedOrMineArray()-এ true হয়ে
+    //     open-write তৈরি করত) একটা কখনো-না-মেলা sentinel uid রিটার্ন করা
+    //     হচ্ছে — এতে isUnownedOrMineArray() নিশ্চিতভাবে false হয়, শুধু
+    //     entries/weekly rule-এর পাশের isAdminOfFamily() OR-clause দিয়েই
+    //     admin লিখতে পারবেন(§৬-এর নীতি: unclaimed = admin read+write,
+    //     non-admin কেউ না)।
+    // §Google-Login fix(Critical #4, security-audit ৯ সেপ্টেম্বর ২০২৬,
+    // 2_4_1 §৬ dual-path cross-check): আগের সংস্করণ(শুধু Critical #1-এর
+    // fix) googleUid field থাকা member-এ পুরনো ownerUids সম্পূর্ণ ignore
+    // করত — কিন্তু 2_4_1(Old→New Identity Migration Protocol)-এর
+    // "transitioning" state-এ পুরনো ownerUids-based path ও নতুন googleUid
+    // path দুটোই একসাথে(OR-logic) সচল থাকার কথা(safety-net, কোনো সদস্য
+    // মাঝপথে lock-out হবেন না)। Phase-2-এ admin কোনো সদস্যের email/
+    // googleUid:null field বসানোর সাথে সাথেই আগের fix তার পুরনো
+    // ownerUids ignore করে ফেলত — protocol-এর কেন্দ্রীয় নিরাপত্তা-নীতি
+    // ভাঙত। এখন legacy ownerUids ও claimed googleUid উভয়ই combine করা
+    // হচ্ছে — googleUid field একেবারেই না-থাকা(pure legacy) member-এর
+    // জন্য behavior অপরিবর্তিত(byte-identical পুরনো logic)।
+    function currentMemberOwnerV2(familyId, docId) {
+      let memberId = docId.split('_')[0];
+      let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
+      let m = exists(memberPath) ? get(memberPath).data : null;
+      let legacyOwners = (m == null) ? [] : (('ownerUids' in m) ? m.ownerUids : (('ownerUid' in m && m.ownerUid != null) ? [m.ownerUid] : []));
+      let hasGoogleField = (m != null) && ('googleUid' in m);
+      let googleOwner = (hasGoogleField && m.googleUid != null) ? [m.googleUid] : [];
+      let combined = legacyOwners.concat(googleOwner);
+      return (m == null) ? null
+        : (!hasGoogleField) ? legacyOwners
+        : (combined.size() > 0 ? combined : ['__unclaimed_no_owner__']);
+    }
+
+    // --- §Multi-device — সরাসরি memberId দিয়ে ownerUids array বের করা
+    // (currentMemberOwnerV2 docId-থেকে-split করে, কিন্তু এখানে memberId
+    // আগে থেকেই জানা থাকে — যেমন private/key subcollection rule-এ)।
+    // একই migration-window fallback(ownerUids না থাকলে ownerUid থেকে) ---
+    // নোট: এই function ইচ্ছাকৃতভাবে googleUid-priority fix থেকে আলাদা
+    // রাখা হয়েছে — এটা শুধু legacy ownerUids-based member-subcollection
+    // rules(Member Key, ownerUids-swap ইত্যাদি, সব যা এখনো ownerUids-model
+    // ব্যবহার করে)-এ ব্যবহৃত হয়, googleUid-model member-এ এই path-গুলো
+    // আদৌ প্রযোজ্য হবে না(googleUid-model member-এর নিজস্ব আলাদা clause
+    // আছে, নিচে দেখুন)। তাই এখানে change করলে unrelated legacy path
+    // ভাঙার ঝুঁকি ছিল — scope শুধু entries/weekly(Critical #1-এর
+    // প্রকৃত bug-site)-এ সীমাবদ্ধ রাখা হয়েছে।
+    function memberOwnerUids(familyId, memberId) {
+      let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
+      let m = exists(memberPath) ? get(memberPath).data : null;
+      return (m == null) ? [] : (('ownerUids' in m) ? m.ownerUids : (('ownerUid' in m && m.ownerUid != null) ? [m.ownerUid] : []));
+    }
+
+    // --- Phase C: Admin-bypass (শুধু bulk migration-এর জন্য) ---
+    // request.auth.uid যদি families/<familyId>-এর adminUids array-তে থাকে,
+    // তাহলে সেই ব্যক্তি migration/Copy ধাপে ownerUid-নির্বিশেষে members/
+    // entries/weekly-তে লিখতে পারবে। এটি *শুধু* Admin-এর জন্য অতিরিক্ত
+    // permission — সাধারণ (non-Admin) ব্যবহারকারীর জন্য বিদ্যমান
+    // isUnownedOrMine()-ভিত্তিক per-owner write-lock সম্পূর্ণ অপরিবর্তিত
+    // থাকছে (নিচের rules-এ isUnownedOrMine(...) || isAdminOfFamily(...)
+    // — দুটোর যেকোনো একটা true হলেই যথেষ্ট)।
+    function isAdminOfFamily(familyId) {
+      let familyPath = /databases/$(database)/documents/families/$(familyId);
+      return exists(familyPath)
+        && get(familyPath).data.adminUids.hasAny([request.auth.uid]);
+    }
+
+    // --- Access Approval Gate — Step 3: read enforcement (v2 only) ---
+    // Admin সবসময় approved (isAdminOfFamily)। Non-admin-এর জন্য
+    // families/{familyId}/accessRequests/{uid}.status == "approved" লাগবে —
+    // এটা grandfather migration script (migrateApprovedGrandfatherAccess())
+    // দিয়ে backfill করা হয় অথবা ভবিষ্যতে admin approve করলে তৈরি হয়।
+    // ইচ্ছাকৃতভাবে শুধু v2 (families/{familyId}/members|entries|weekly)
+    // subcollection-এ প্রয়োগ করা হচ্ছে — legacy top-level data_<code>
+    // collection এখনো touch করা হয়নি (আলাদা approval লাগবে)।
+    // --- §Google-Login Identity Migration(2_4 §৯, list-access) ---
+    // isApprovedMember()-এ নতুন googleUid-claimed সদস্যদের জন্য additive OR
+    // যোগ করার helper। Trust anchor member-doc-এর নিজস্ব googleUid field
+    // (isClaimedByGoogle, উপরে সংজ্ঞায়িত) — users/{uid} doc নিজে
+    // self-writable(forge-যোগ্য) বলে শুধু route-hint হিসেবে ব্যবহার হয়,
+    // চূড়ান্ত সত্যতা সবসময় member-doc থেকেই cross-verify হয়।
+    function isClaimedFamilyMember(familyId) {
+      let uPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(uPath)
+        && get(uPath).data.familyId == familyId
+        && isClaimedByGoogle(familyId, get(uPath).data.memberId);
+    }
+
+    function isApprovedMember(familyId) {
+      let reqPath = /databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid);
+      return isAdminOfFamily(familyId)
+        || isAppCreator()
+        || isClaimedFamilyMember(familyId)
+        || (exists(reqPath) && get(reqPath).data.status == 'approved');
+    }
+
+    // --- Legacy read-rule gate (নতুন) ---
+    // legacyCollectionMap/{collectionName} থেকে familyId বের করে, সেই
+    // familyId-এর জন্য isApprovedMember() একই চেক প্রয়োগ করা হচ্ছে — v2-এর
+    // সাথে সামঞ্জস্যপূর্ণ। mapPath না থাকলে (backfill এখনো হয়নি এমন কোনো
+    // family) fail-closed — read block, কোনো silent bypass না। Deploy করার
+    // আগে app.js-এর ensureLegacyCollectionMap() দিয়ে backfill নিশ্চিত করা
+    // হয়েছে (উভয় real family verified) — তাই এই মুহূর্তে কোনো real family
+    // lock out হবে না।
+    // Cosmetic fix: path inline রাখা হয়েছে (let-bound variable নয়) —
+    // Rules Playground simulator-এ let+exists()/get() combo মাঝেমধ্যে ভুল
+    // "Function not found"/"Invalid argument" error দেখায় (production
+    // engine-এ সমস্যা হয় না, কিন্তু Playground-এ পরিষ্কার টেস্ট করার জন্য
+    // inline রাখা হলো)।
+    function isApprovedLegacyMember(collectionName) {
+      return exists(/databases/$(database)/documents/legacyCollectionMap/$(collectionName))
+        && isApprovedMember(get(/databases/$(database)/documents/legacyCollectionMap/$(collectionName)).data.familyId);
+    }
+
+    // --- §Google-Login Identity Migration(2_4/2_4_1, dual-path, transitioning) ---
+    // সম্পূর্ণ additive — বিদ্যমান ownerUids/Member-Password-ভিত্তিক কোনো
+    // rule/function স্পর্শ করা হয়নি। শুধু নতুন googleUid-ভিত্তিক দাবির
+    // জন্য একটা helper: এই memberId-তে request.auth.uid ঠিক তার
+    // claimed googleUid হিসেবে match করে কিনা।
+    function isClaimedByGoogle(familyId, memberId) {
+      let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
+      return exists(memberPath)
+        && ('googleUid' in get(memberPath).data)
+        && get(memberPath).data.googleUid == request.auth.uid;
+    }
+
+    // --- §Google-Login Identity Migration(2_4_1 §৫ Phase-4, cutover) ---
+    // family google-only অবস্থায় পৌঁছালে পুরনো Member-Password/ownerUids
+    // device-claim path Rules-level বন্ধ করার জন্য centralized helper।
+    // শুধু সেই নির্দিষ্ট old-model-specific clause-গুলোতেই ব্যবহার হয়
+    // (নিচে চিহ্নিত) — adminUids/firstAdminUid role-management(Make/Remove
+    // Admin ইত্যাদি) ও admin-triggered proxy member create/delete googleUid-
+    // model-এও reused বলে ইচ্ছাকৃতভাবে অপরিবর্তিত রাখা হয়েছে।
+    function isGoogleOnly(familyId) {
+      let familyPath = /databases/$(database)/documents/families/$(familyId);
+      return exists(familyPath) && get(familyPath).data.identityModel == 'google-only';
+    }
+
+    // --- App creator-only delete permission (স্থায়ী) ---
+    // এই ক্ষমতা কোনো family-র adminUids-এর সাথে কখনো coupled না — এটা
+    // family-membership থেকে সম্পূর্ণ স্বাধীন, app-wide, single-uid-ভিত্তিক
+    // permission। কোনো family admin (যত বড় family-র হোক) এই তিনটা
+    // metadata collection-এ কখনো delete করতে পারবে না — শুধু এই uid।
+    function isAppCreator() {
+      return request.auth.uid == "yiirNJKJHlM27guiiS10zsp2FYT2";
+    }
+
+    // ============================================================
+    // §Public Tools — Phase E(ব্লগ)/F(কুইজ)/G(Editable Content)
+    // ============================================================
+    // তিনটাই family-Firestore(families/{familyId}/..., data_<code>) থেকে
+    // সম্পূর্ণ independent, নতুন top-level collection — উপরের/নিচের কোনো
+    // বিদ্যমান match-block স্পর্শ করা হয়নি(সম্পূর্ণ additive)। isAppCreator()
+    // ছাড়া বাকি সব(isBlogWriter() ও এই তিনটা match-block) নতুন।
+    // সহায়ক ফাইল: 3_4_Blog_Feature_Plan.md §৩, 3_5_Quiz_Feature_Plan.md §৩,
+    // 3_6_Editable_Content_Plan.md §৩।
+
+    // --- Phase E: ব্লগ(multi-writer, owner-curated) ---
+    function isBlogWriter() {
+      return request.auth.token.email is string
+        && exists(/databases/$(database)/documents/blogWriters/$(request.auth.token.email.lower()));
+    }
+
+    match /blogWriters/{emailKey} {
+      allow read: if request.auth != null;
+      allow create, delete: if request.auth != null && isAppCreator();
+      allow update: if false;
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && isBlogWriter()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && (resource.data.createdBy == request.auth.uid || isAppCreator());
+    }
+
+    // --- Phase F: কুইজ(single-owner — App Creator-only, ব্লগের চেয়ে সরল) ---
+    match /quizQuestions/{questionId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && isAppCreator();
+    }
+
+    // --- Phase G: Editable Content(single-owner — App Creator-only) ---
+    match /publicToolsContent/{sectionId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && isAppCreator();
+    }
+
+    match /{collectionName}/{docId} {
+
+      // রিড: শুধু approved member (admin অথবা accessRequests-এ approved)
+      // — আগে শুধু auth!=null চেক হতো, ফলে শুধু Family Code জানলেই সব
+      // প্রাইভেট ডাটা পড়া যেত। v2-এর isApprovedMember() gate-এর সাথে
+      // সামঞ্জস্যপূর্ণ করে এখন legacy-তেও একই সুরক্ষা প্রয়োগ করা হলো।
+      allow read: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isApprovedLegacyMember(collectionName);
+
+      // ক্রিয়েট: unowned অথবা নিজেকে owner বসাতে হবে
+      allow create: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, request.resource.data);
+
+      // আপডেট: আগের ও নতুন — দুটোই unowned/নিজের হতে হবে
+      allow update: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, resource.data)
+                    && isWritable(collectionName, docId, request.resource.data);
+
+      // ডিলিট: শুধু unowned/নিজের ডকুমেন্ট
+      allow delete: if request.auth != null
+                    && isAppCollection(collectionName)
+                    && isWritable(collectionName, docId, resource.data);
+
+      // এন্ট্রির এডিট-হিস্ট্রি সাবকালেকশন — প্যারেন্ট এন্ট্রির member-ভিত্তিক
+      // একই (বর্তমান-owner) নিয়ম প্রযোজ্য
+      match /history/{historyId} {
+        allow read: if request.auth != null
+          && isAppCollection(collectionName)
+          && isApprovedLegacyMember(collectionName);
+        allow create, update, delete: if request.auth != null
+          && isAppCollection(collectionName)
+          && isWritable(collectionName, docId, {});
+      }
+    }
+
+    // --- users/{uid}: Google-linked uid <-> familyCode mapping ---
+    // শুধুমাত্র নিজ uid-এর ডকুমেন্ট নিজে read/write করতে পারবে। এটি কোনো
+    // family/member ডাটা নয় — শুধু account-ভিত্তিক recovery mapping।
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // --- §Google-Login Identity Migration(2_4 §3/§10.2): familyMemberEmails ---
+    // Uniqueness-enforcing collection: doc-id = normalizeEmail(email)(trim+
+    // lowercase, 2_4 §১০.২ — client এই একই normalization প্রয়োগ করেই doc-id
+    // বানাবে, Rules নিজে normalize করে না, শুধু shape/uniqueness নিশ্চিত করে)।
+    // { familyId, memberId } — reverse-cleanup(family-leave)-এর জন্য
+    // composite(familyId+memberId) index client-side দরকার, Rules-এ প্রভাব
+    // নেই।
+    match /familyMemberEmails/{emailKey} {
+      // get: doc-id জানা থাকলে(email-match লগইন চেষ্টার সময়) যেকোনো
+      // authenticated user existence+টার্গেট familyId/memberId দেখতে পারবে
+      // — এটা email নিজে exposed করে না(doc-id already client-known), শুধু
+      // routing তথ্য। list বন্ধ(পুরো email-directory enumeration প্রতিরোধ)।
+      allow get: if request.auth != null;
+      allow list: if false;
+      // create — দুই বৈধ পথ, দুটোতেই doc-id(emailKey) 2_4 §১০.২-এর
+      // normalizeEmail()-এর সাথে explicitly cross-verified(আগে শুধু
+      // client-discipline-নির্ভর ছিল, এখন Rules-level enforced)। Critical
+      // #2 fix(claim-update clause)-এর একই কনভেনশন অনুসরণ করে শুধু
+      // .lower() ব্যবহার হয়েছে(trim দরকার নেই — Google account email-এ
+      // leading/trailing space থাকে না):
+      //   (ক) claimed-self(googleUid==request.auth.uid ঠিক সেই memberId-এ)
+      //       — emailKey অবশ্যই Firebase Auth-এর server-verified
+      //       token-email(request.auth.token.email, client দাবির উপর না)
+      //       এর normalize-করা রূপের সমান হতে হবে।
+      //   (খ) admin(proxy member যোগ করার সময়, একই batch-এ member.email
+      //       set হচ্ছে) — getAfter() দিয়ে সেই memberId-এর পোস্ট-transaction
+      //       email field পড়ে emailKey-এর সাথে মেলানো হয়(member.email
+      //       ইতিমধ্যে normalizeEmail()-প্রয়োগ করা থাকে, §১০.২)।
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'memberId'])
+        && request.resource.data.familyId is string
+        && request.resource.data.memberId is string
+        && (
+             (isClaimedByGoogle(request.resource.data.familyId, request.resource.data.memberId)
+               && request.auth.token.email is string
+               && emailKey == request.auth.token.email.lower())
+             || (isAdminOfFamily(request.resource.data.familyId)
+               && emailKey == getAfter(/databases/$(database)/documents/families/$(request.resource.data.familyId)/members/$(request.resource.data.memberId)).data.email)
+           );
+      allow update: if false;
+      // delete: family-leave/remove(§৫.৩) — admin অথবা নিজে(claimed
+      // owner) — mapping doc-এর familyId/memberId দিয়েই সংশ্লিষ্ট family
+      // যাচাই হয়(resource.data ব্যবহার, request না — delete-এ
+      // request.resource থাকে না)।
+      // §Cross-family stale-mapping fix(১৪ সেপ্টেম্বর ২০২৬, owner-reported):
+      // আগে শুধু isAdminOfFamily(resource.data.familyId)(mapping যে family-র,
+      // সেই family-র admin) অথবা isClaimedByGoogle() দিয়েই delete অনুমোদিত
+      // ছিল — admin কাউকে remove করলে(claimed member, email field ততক্ষণে
+      // claim-মুহূর্তেই মুছে গেছে বলে admin জানেনই না) এই mapping doc dangling
+      // থেকে যেত, এবং সেই email দিয়ে **অন্য** family-তে admin proxy-member
+      // যোগ করতে গেলে(addProxyMemberByAdmin()) block হতো(admin সেই পুরনো
+      // family-র admin না বলে delete করতে পারতেন না)। নতুন orphan-check:
+      // resource-এ উল্লিখিত familyId/memberId-এ member doc সত্যিই আর
+      // বিদ্যমান না থাকলে(exists()==false, অর্থাৎ mapping সত্যিকারের dead/
+      // orphaned), যেকোনো authenticated user সেটা delete করতে পারবে —
+      // কোনো লাইভ/active mapping এতে touch হয় না(exists()==true হলে এই
+      // arm সবসময় false, পুরনো দুই শর্তই তখনো একমাত্র পথ), তাই কোনো নতুন
+      // security-surface তৈরি হয় না — শুধু dead-index self-heal সহজ হলো।
+      allow delete: if request.auth != null
+        && (
+             isAdminOfFamily(resource.data.familyId)
+             || isClaimedByGoogle(resource.data.familyId, resource.data.memberId)
+             || !exists(/databases/$(database)/documents/families/$(resource.data.familyId)/members/$(resource.data.memberId))
+           );
+    }
+
+    // --- Phase A (Family ID Foundation) prep: familyCode -> familyId lookup ---
+    // শুধু প্রস্তুতিমূলক, additive collection — বিদ্যমান data_<familyCode>
+    // rules/logic এর কোনো অংশ বদলানো হয়নি। এই মুহূর্তে app শুধু create করে
+    // (একবারই, ensureFamilyCodeMapping()); update/delete এই Phase-এ বন্ধ
+    // রাখা হলো, কারণ Family Code migration (Phase D) এখনো implement হয়নি।
+    match /familyCodes/{code} {
+      // Audit-fix(enumeration, ১৫ আগস্ট ২০২৬): আগে `allow read` (get+list
+      // দুটোই কভার করে) থাকায় যেকোনো authenticated user পুরো collection
+      // list করে সব family code দেখতে পারত। app.js grep-verify করে
+      // নিশ্চিত হওয়া গেছে যে কোনো collection-wide query ব্যবহৃত হয় না
+      // (শুধু .doc(code).get()) — তাই get আলাদা রেখে list বন্ধ করা হলো,
+      // existing lookup আচরণ অক্ষুণ্ণ।
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt'])
+        && request.resource.data.familyId is string
+        && request.resource.data.familyId.size() > 0;
+      allow update: if false;
+      // §Fix(২১ আগস্ট ২০২৬, Family Username): আগে শুধু isAppCreator() delete
+      // করতে পারত, কিন্তু changeFamilyCodeForExistingFamily() স্বাভাবিক
+      // family admin দ্বারা পুরনো mapping doc (normalized+raw) delete করে —
+      // ফলে rename permission-denied দিয়ে fail করত। Fix: resource.data.familyId
+      // -এর admin হলেও delete অনুমোদিত (isAppCreator() ফলব্যাক হিসেবে থাকল)।
+      // §Fix-২(২১ আগস্ট ২০২৬): app.js dual-delete চেষ্টা করে normalized-key ও
+      // raw oldCode উভয় doc-id-তে — কিন্তু normalized-key doc যদি এই family-র
+      // জন্য কখনো তৈরিই না হয়ে থাকে (প্রথমবার rename), তাহলে non-existent doc
+      // delete-এ resource == null হয়, আর resource.data অ্যাক্সেস error ছুঁড়ে পুরো
+      // transaction deny করে দিত। resource == null (no-op delete, harmless)
+      // ক্ষেত্রে আলাদাভাবে allow করা হলো।
+      allow delete: if request.auth != null
+        && (resource == null || isAppCreator() || isAdminOfFamily(resource.data.familyId));
+    }
+
+    // --- legacyCollectionMap/{collectionName}: data_<code> কালেকশন থেকে
+    // familyId-এ reverse lookup (copyPhaseCData()-এর guard, ও
+    // healthCheckFamily()/auditAllFamiliesHealthCheck()-এর consistency
+    // check এখান থেকেই পড়ে; আজকের rollback fix-এও isLegacyRollbackBypass()
+    // এই একই collection থেকে familyId lookup করে)। আগে এই match ব্লক
+    // rules ফাইলে ছিল না বলে Firestore default-deny করছিল —
+    // "Missing or insufficient permissions" এর root cause এটাই। setOnce
+    // pattern: create শুধু একবারই (doc আগে থেকে না থাকলে), update/delete
+    // বন্ধ — ভুল entry হলে শুধু owner Firebase Console থেকে ম্যানুয়ালি
+    // ঠিক করবেন, client থেকে সম্ভব না (ইচ্ছাকৃত, owner-approved)।
+    match /legacyCollectionMap/{collectionName} {
+      // Audit-fix(enumeration, ১৫ আগস্ট ২০২৬): familyCodes-এর মতো একই
+      // কারণে — app.js grep-verify করে নিশ্চিত (শুধু .doc(name).get()/
+      // isApprovedLegacyMember()-এর ভেতরের get(), কোনো collection-query
+      // নেই) — get আলাদা রেখে list বন্ধ।
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt'])
+        && request.resource.data.familyId is string
+        && request.resource.data.familyId.size() > 0;
+      allow update: if false;
+      allow delete: if request.auth != null && isAppCreator();
+    }
+
+    // --- Phase A-2: families/{familyId} root/meta ডকুমেন্ট ---
+    // এই মুহূর্তে শুধু background prep — কোনো live UI feature এখনো এর ওপর
+    // নির্ভর করে না। "প্রথম Admin" নিয়ম এখানেই server-side enforce করা
+    // হচ্ছে (শুধু client-side check নয়): adminUids একবার ফাঁকা থেকে
+    // ফাঁকা-নয় হতে পারবে, শুধু তখনই যদি নতুন array-তে ঠিক request করা uid
+    // থাকে — এভাবে দুইজন প্রায় একইসাথে claim করার চেষ্টা করলেও (race
+    // condition) Firestore-এর atomic write guarantee-র কারণে মাত্র
+    // একজনই সফল হবে, দ্বিতীয়জনের request reject হবে (rules পুনরায় নতুন
+    // state দেখে দ্বিতীয়বার true হবে না)।
+    match /families/{familyId} {
+      // Audit-fix(Critical #1) — RE-ENABLED(১৫ আগস্ট ২০২৬) + PERFORMANCE FIX
+      // (একই দিন, পারফরম্যান্স রিগ্রেশনের পর): আগে এখানে isApprovedMember()
+      // ব্যবহার হতো, যেটা ভেতরে isAdminOfFamily() কল করে get(familyPath)
+      // দিয়ে এই *একই* ডকুমেন্ট আবার fetch করত (redundant self-read) —
+      // প্রতিটি listen/read-এ অতিরিক্ত round-trip, ফলে load time ২০-৩০
+      // সেকেন্ড পর্যন্ত বেড়ে যায় (spouse-এর ডিভাইসে observed)। Fix: admin
+      // check-এ get() না করে সরাসরি resource.data (already available,
+      // extra read লাগে না) ব্যবহার করা হলো। Security logic অভিন্ন — শুধু
+      // redundant read বাদ। accessRequests lookup (non-admin approval)-এর
+      // জন্য এক get() লাগবেই, সেটা অপরিবর্তিত।
+      // §Member Key Direct-Identify bug-fix(২০ আগস্ট ২০২৬): আগে এখানে
+      // একটিমাত্র "allow read"(get+list একসাথে) ছিল, isApprovedMember-এর
+      // মতোই গেটেড — ফলে admin member নতুন/আগে-কখনো-approve-না-হওয়া
+      // device থেকে claimMemberWithKey()-এর transaction-ভিতরে
+      // tx.get(famRef)(adminUids sync-এর জন্য, isAdminRole হলে) করার সময়
+      // permission-denied পেত(পুরো transaction fail, generic "Missing or
+      // insufficient permissions")। Fix: members/{memberId}-এর "get"-এর
+      // মতোই একই pattern — single-doc "get" pre-approval-open(শুধু
+      // authenticated), "list"(collection-wide, যেমন
+      // auditGrandfatherCandidates()/auditOrphanFamilies()) আগের শর্তেই
+      // গেটেড থাকে। isAppCreator() শুধু auth.uid-নির্ভর(document-data
+      // independent) বলে App Creator-এর জন্য list আগের মতোই কাজ করবে।
+      // family-root doc-এ কোনো secret নেই(memberKey hash আলাদা
+      // private/ subcollection-এ) — real authorization update rules-এর
+      // hash-check-এই হয়, এই "get" শুধু pre-approval routing।
+      allow get: if request.auth != null;
+      allow list: if request.auth != null
+        && (
+             resource.data.adminUids.hasAny([request.auth.uid])
+             || isAppCreator()
+             || (exists(/databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid))
+                 && get(/databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid)).data.status == 'approved')
+           );
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['familyId', 'familyCode', 'isCustomCode', 'createdAt',
+              'createdByUid', 'schemaVersion', 'adminUids', 'dataCollectionName',
+              'migrationState'])
+        // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): আগে
+        // creation-এ familyCode-এর নিজস্ব charset/length সরাসরি চেক হতো না
+        // (শুধু dataCollectionName দেওয়া হলে পরোক্ষভাবে বাঁধা পড়ত) — এখন
+        // client-side FAMILY_CODE_CHARSET_PATTERN/MIN/MAX-LENGTH-এর সাথে
+        // সামঞ্জস্যপূর্ণ সরাসরি চেক যোগ করা হয়েছে(নিচের rename clause-এর
+        // regex-এর সাথেই মিল)।
+        && request.resource.data.familyCode is string
+        && request.resource.data.familyCode.matches('^[A-Za-z0-9_-]{6,30}$')
+        // বাগ-ফিক্স(২৭.৩): createNewFamily() এখন creation-এই migrationState
+        // পাঠায়(নইলে joinExistingFamily() field-না-থাকা অবস্থায় "legacy"
+        // ধরে ব্লক করে দিত) — দেওয়া হলে অবশ্যই "v2" হতে হবে, অন্য কোনো মান
+        // দিয়ে forge করা যাবে না।
+        && (!('migrationState' in request.resource.data)
+            || request.resource.data.migrationState == 'v2')
+        && request.resource.data.adminUids == []
+        // §৫ fix: dataCollectionName ঐচ্ছিক নয় বলে জোর করা হয়নি (পুরনো
+        // client version সাময়িক সময়ের জন্য এই field ছাড়াই create করতে
+        // পারে), তবে দেওয়া হলে অবশ্যই ঠিক familyCode থেকে deterministic-ভাবে
+        // derive করা হতে হবে — forge করে ভিন্ন কোনো কালেকশনে redirect করা
+        // যাবে না।
+        && (!('dataCollectionName' in request.resource.data)
+            || request.resource.data.dataCollectionName == 'data_' + request.resource.data.familyCode);
+      // §First Admin Protection — claim-মুহূর্তেই firstAdminUid একবার সেট
+      // হয়(immutable — এই clause শুধু adminUids শূন্য থেকে অ-শূন্য হওয়ার
+      // সময়েই fire করে, তাই দ্বিতীয়বার আর কখনো ছোঁয়া যায় না)। নিচের
+      // Remove-Admin clause এই field ব্যবহার করে প্রথম Admin-কে অন্যদের
+      // দ্বারা বাদ পড়া থেকে রক্ষা করে।
+      allow update: if request.auth != null
+        && resource.data.adminUids.size() == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'firstAdminUid', 'updatedAt'])
+        && request.resource.data.adminUids == [request.auth.uid]
+        && request.resource.data.firstAdminUid == request.auth.uid;
+      // §First Admin Protection — one-time backfill (backfillFirstAdminUid()):
+      // বিদ্যমান family(adminUids already non-empty)-তে firstAdminUid না
+      // থাকলে, বর্তমান কোনো admin একবার নিজেকে(বা অন্য কোনো বিদ্যমান
+      // admin-কে) firstAdminUid হিসেবে সেট করতে পারবেন। একবার সেট হলে এই
+      // clause আর কখনো match করবে না (immutable-once-set)।
+      allow update: if request.auth != null
+        && resource.data.adminUids.hasAny([request.auth.uid])
+        && !('firstAdminUid' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstAdminUid', 'updatedAt'])
+        && resource.data.adminUids.hasAny([request.resource.data.firstAdminUid]);
+      // §৫ fix — dataCollectionName one-time backfill (ensureDataCollectionName()):
+      // শুধু তখনই অনুমতি যখন এই field আগে থেকে ছিলই না (একবার সেট হলে আর
+      // কখনো এই clause দিয়ে বদলানো যাবে না — immutable-once-set) এবং নতুন
+      // মান অবশ্যই resource-এর *বর্তমান* familyCode থেকে deterministic-ভাবে
+      // derive করা হতে হবে (forge করে অন্য কালেকশনে redirect করা অসম্ভব)।
+      allow update: if request.auth != null
+        && !('dataCollectionName' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dataCollectionName', 'updatedAt'])
+        && request.resource.data.dataCollectionName == 'data_' + resource.data.familyCode;
+      // §৫ fix — controlled familyCode change (changeFamilyCodeForExistingFamily()):
+      // শুধু বিদ্যমান Admin-রা পারবেন, শুধু familyCode+updatedAt affected
+      // হতে পারবে (dataCollectionName এই clause দিয়ে কখনো বদলানো যায় না —
+      // তাই আসল ডাটা কালেকশন সবসময় অপরিবর্তিত থাকে), এবং নতুন কোড
+      // client-side চার্সেট/দৈর্ঘ্যের সাথে সামঞ্জস্যপূর্ণ হতে হবে।
+      // §Item(২১ আগস্ট ২০২৬): min-length ৯→৬ (client FAMILY_CODE_MIN_LENGTH-এর
+      // সাথে সমন্বয়ে, isAppCollection()-এর সাথেও মিল রাখা হয়েছে)।
+      // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): charset
+      // English letter/digit/underscore/hyphen-এ সংকুচিত, creation-rule ও
+      // isAppCollection()-এর regex-এর সাথে সামঞ্জস্যপূর্ণ।
+      allow update: if request.auth != null
+        && resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['familyCode', 'updatedAt'])
+        && request.resource.data.familyCode is string
+        && request.resource.data.familyCode.matches('^[A-Za-z0-9_-]{6,30}$');
+      allow delete: if request.auth != null && isAppCreator();
+
+      // §Admin Visibility UI — Make Admin (add): বিদ্যমান admin-ই শুধু
+      // আরেকজনকে admin করতে পারবে। নতুন adminUids অবশ্যই পুরনো array-কে
+      // সম্পূর্ণ ধরে রাখবে (hasAll)। §Multi-device: একজন member-এর সব
+      // ownerUids(max 3) একসাথে admin করা যায়, তাই ১-৩টা নতুন uid যোগ
+      // অনুমোদিত(কোনো বিদ্যমান uid সরানো এই clause দিয়ে সম্ভব না)।
+      allow update: if request.auth != null
+        && resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'updatedAt'])
+        && request.resource.data.adminUids.hasAll(resource.data.adminUids)
+        && request.resource.data.adminUids.size() > resource.data.adminUids.size()
+        && request.resource.data.adminUids.size() <= resource.data.adminUids.size() + 3;
+
+      // §Admin Visibility UI — Remove Admin (demote, নিজেকে বা অন্য
+      // admin-কে): বিদ্যমান admin-ই শুধু পারবে। নতুন adminUids অবশ্যই
+      // পুরনো array-এর subset হবে (কোনো নতুন uid যোগ করা যাবে না)।
+      // §Multi-device: একজন member-এর সব ownerUids(max 3) একসাথে বাদ
+      // দেওয়া যায়, তাই ১-৩টা uid কমা অনুমোদিত, আর ফলাফলে অন্তত ১ জন
+      // admin অবশিষ্ট থাকতে হবে (কখনো পুরো family admin-হীন হয়ে lockout
+      // হবে না)।
+      // §First Admin Protection(নতুন শর্ত): resource.data-এ firstAdminUid
+      // ট্র্যাক করা থাকলে, সেই uid নতুন array থেকে বাদ পড়তে পারবে শুধু
+      // তখনই যখন requester নিজেই firstAdminUid(অর্থাৎ শুধু নিজেকে নিজে
+      // demote করা যায়, অন্য কোনো admin firstAdminUid-কে বাদ দিতে পারবে
+      // না)। পুরনো family(firstAdminUid field নেই)-এ এই শর্ত স্বয়ংক্রিয়ভাবে
+      // bypass হয় — backward-compatible, backfill না হওয়া পর্যন্ত আগের
+      // আচরণ অপরিবর্তিত থাকে।
+      allow update: if request.auth != null
+        && resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'updatedAt'])
+        && resource.data.adminUids.hasAll(request.resource.data.adminUids)
+        && request.resource.data.adminUids.size() < resource.data.adminUids.size()
+        && request.resource.data.adminUids.size() >= resource.data.adminUids.size() - 3
+        && request.resource.data.adminUids.size() >= 1
+        && (!('firstAdminUid' in resource.data)
+            || request.resource.data.adminUids.hasAny([resource.data.firstAdminUid])
+            || request.auth.uid == resource.data.firstAdminUid);
+
+      // §Hybrid Admin Role Model — self-claim index-sync(নতুন device থেকে
+      // Member Key দিয়ে claim করা হচ্ছে, member আগে থেকেই role:"admin")।
+      // memberId family-root match-এ path-variable হিসেবে available না,
+      // তাই request payload-এর lastAdminClaimMemberId(technical
+      // verification field, audit/UI feature না) দিয়ে সঠিক member path
+      // dynamically বানানো হয় এবং getAfter() দিয়ে একই atomic
+      // transaction-এর *পরের* state verify করা হয়।
+      // Privilege-escalation guard(গুরুত্বপূর্ণ):
+      //   (ক) caller আগে থেকে admin না হলেই এই clause প্রযোজ্য(already-admin
+      //       caller normal Case 1 clause ব্যবহার করবে) — এই শর্ত + size==+1
+      //       + hasAll(old) + hasAny(request.auth.uid) একসাথে নিশ্চিত করে
+      //       নতুন array-তে যোগ হওয়া একমাত্র uid অবশ্যই request.auth.uid,
+      //       অন্য কারো uid না(arbitrary-uid injection সম্ভব না)।
+      //   (খ) getAfter() দিয়ে lastAdminClaimMemberId-নির্দেশিত member-এর
+      //       role=="admin" ও ownerUids-এ ঠিক এই request.auth.uid থাকা
+      //       verify করা হয় — অর্থাৎ পুরনো/অন্য কোনো memberId দিয়ে(যেখানে
+      //       এই uid claim করেনি) forge করা অসম্ভব, কারণ সেই member-এর
+      //       ownerUids-এ এই uid থাকবে না।
+      // role field এই clause দিয়ে কখনো বদলানো যায় না(শুধু adminUids
+      // index-sync)। entries/weekly high-frequency rules path অপরিবর্তিত।
+      // §Google-Login cutover(নতুন guard): google-only family-তে এই
+      // ownerUids-device-claim path আর প্রযোজ্য না(নতুন সদস্য googleUid
+      // দিয়েই claim করে, §৬ দ্রষ্টব্য) — Rules-level বন্ধ।
+      allow update: if request.auth != null
+        && !isGoogleOnly(familyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'updatedAt', 'lastAdminClaimMemberId'])
+        && !resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.adminUids.hasAll(resource.data.adminUids)
+        && request.resource.data.adminUids.size() == resource.data.adminUids.size() + 1
+        && request.resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.lastAdminClaimMemberId is string
+        && getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.role == "admin"
+        && getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.ownerUids.hasAny([request.auth.uid]);
+
+      // §Admin FIFO index-sync(১৮ আগস্ট ২০২৬, swap variant): উপরের
+      // self-claim clause শুধু additive(size+1) কভার করে। Admin FIFO
+      // eviction-এ adminUids-এর আকার অপরিবর্তিত থাকে(১জন বাদ + ১জন যোগ)
+      // — তাই আলাদা clause। caller আগে থেকে admin না(নতুন device), ঠিক
+      // caller uid যোগ হয়েছে, ঠিক ১টি পুরনো uid(R) বাদ পড়েছে — এবং R
+      // সত্যিই lastAdminClaimMemberId-নির্দেশিত member doc-এর ownerUids-এ
+      // *আগে* ছিল(get(), transaction-শুরুর state) কিন্তু transaction-এর
+      // *পরে*(getAfter()) আর নেই। এই before/after জোড়া নিশ্চিত করে যে R
+      // সত্যিই সেই একই, নির্দিষ্ট member doc থেকে বৈধভাবে evict হয়েছে —
+      // যা নিজেই উপরের member-subcollection rule-এর শর্ত(সঠিক
+      // claimKeyHashAttempt password, এবং R ≠ firstAdminUid হলেই) pass
+      // করেই সম্ভব হয়েছে(নাহলে সেই write আগেই reject হতো এবং পুরো
+      // transaction fail করত; ৭-দিন staleness-শর্ত ১৯ আগস্ট ২০২৬-এ তুলে
+      // দেওয়া হয়েছে)। শুধু R-কে
+      // এলোমেলো অন্য কোনো(তার সাথে অসম্পর্কিত) member doc-এ point করে এই
+      // check bypass করা যায় না, কারণ R সেই doc-এর *pre-transaction*
+      // ownerUids-এও থাকতে হবে।
+      // §Google-Login cutover(নতুন guard): উপরের মতোই, google-only-তে
+      // ownerUids-based FIFO eviction আর প্রযোজ্য না।
+      allow update: if request.auth != null
+        && !isGoogleOnly(familyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'updatedAt', 'lastAdminClaimMemberId'])
+        && !resource.data.adminUids.hasAny([request.auth.uid])
+        && request.resource.data.adminUids.size() == resource.data.adminUids.size()
+        && request.resource.data.adminUids.hasAny([request.auth.uid])
+        && resource.data.adminUids.removeAll(request.resource.data.adminUids).size() == 1
+        && (!('firstAdminUid' in resource.data)
+            || !resource.data.adminUids.removeAll(request.resource.data.adminUids).hasAny([resource.data.firstAdminUid]))
+        && request.resource.data.lastAdminClaimMemberId is string
+        && getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.role == "admin"
+        && getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.ownerUids.hasAny([request.auth.uid])
+        && get(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.ownerUids.hasAny(resource.data.adminUids.removeAll(request.resource.data.adminUids))
+        && !getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.lastAdminClaimMemberId)).data.ownerUids.hasAny(resource.data.adminUids.removeAll(request.resource.data.adminUids));
+
+      // §Recovery Key — key জানা যেকোনো authenticated user নিজেকে
+      // adminUids-এ যোগ করতে পারবে, শুধু যদি সঠিক hash পাঠায়(client নিজেই
+      // entered key hash করে পাঠায় — plaintext কখনো Firestore-এ যায় না)।
+      // hidden private/recovery doc-এর সাথে get() দিয়ে compare। Rules
+      // all-or-nothing গেট — hash না মিললে পুরো write-ই reject হয়(কিছুই
+      // persist হয় না), তাই ভুল guess-এর কোনো ছাপ document-এ থাকে না।
+      // adminUids শুধু পুরনো array + ঠিক নিজের uid যোগ হতে পারবে(অন্য
+      // কিছু বদলানো/সরানো যাবে না)।
+      allow update: if request.auth != null
+        && exists(/databases/$(database)/documents/families/$(familyId)/private/recovery)
+        && request.resource.data.recoveryHashAttempt
+             == get(/databases/$(database)/documents/families/$(familyId)/private/recovery).data.hash
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'recoveryHashAttempt', 'updatedAt'])
+        && request.resource.data.adminUids.hasAll(resource.data.adminUids)
+        && request.resource.data.adminUids.size() == resource.data.adminUids.size() + 1
+        && request.resource.data.adminUids.hasAny([request.auth.uid]);
+
+      // §Phase E prep — lastActiveAt stamp (scope-সীমিত, revised):
+      // Data Lifecycle Policy-এর জন্য family-level activity stamp। এই write
+      // stampLastActive() থেকে member/entry write-এর *একই atomic batch*-এ
+      // bundled হয় (app.js) — Firestore batch all-or-nothing, তাই এই
+      // clause-এর permission member/entry write-rule-এর সাথে সামঞ্জস্যপূর্ণ
+      // হতে হবে, নাহলে unapproved/unclaimed member-এর বৈধ save-ও পুরোপুরি
+      // fail করবে। member/entry write rule-এ isApprovedMember() লাগে না
+      // (শুধু ownership) — তাই এখানেও isApprovedMember বাদ দেওয়া হলো;
+      // security boundary field-scope দিয়েই বজায় থাকছে (*শুধু* lastActiveAt
+      // affected হতে পারবে, অন্য কোনো field না — পুরো family root doc নয়)।
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt']);
+
+      // --- §Google-Login Identity Migration(2_4_1 §৩/§৫, dual-path) ---
+      // সম্পূর্ণ additive, নতুন optional field-সেট। বিদ্যমান কোনো clause-এ
+      // হাত দেওয়া হয়নি — legacy/v2-data-structure ownerUids-based path
+      // অক্ষুণ্ণ থাকে যতক্ষণ না "google-only"।
+      //
+      // identityModel: "legacy"(default/absent) → "transitioning" →
+      // "google-only"। শুধু admin, শুধু forward-direction, এক-ধাপ-এক-ধাপ
+      // (skip করে সরাসরি legacy→google-only অনুমোদিত না — 2_4_1 §৫ Phase
+      // order অনুযায়ী)।
+      allow update: if request.auth != null
+        && isAdminOfFamily(familyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['identityModel', 'updatedAt'])
+        && (
+             (!('identityModel' in resource.data) && request.resource.data.identityModel == 'transitioning')
+             || (resource.data.identityModel == 'transitioning' && request.resource.data.identityModel == 'google-only')
+           );
+
+      // activeInviteToken: create/rotate(নতুন token generate) এবং
+      // revoke(শুধু revoked:true সেট) — শুধু admin। Token-এর নিজস্ব
+      // entropy/length client-side enforce হয়(2_4 §১০.১), Rules শুধু
+      // shape+admin-only guard করে।
+      allow update: if request.auth != null
+        && isAdminOfFamily(familyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeInviteToken', 'updatedAt'])
+        && request.resource.data.activeInviteToken.keys().hasOnly(['token', 'createdAt', 'revoked'])
+        && request.resource.data.activeInviteToken.token is string
+        && request.resource.data.activeInviteToken.token.size() >= 22
+        && request.resource.data.activeInviteToken.revoked is bool;
+
+      // status/orphanedAt(soft-delete, 2_4 §৫.৪): system নিজে(শেষ সদস্য
+      // leave/remove একই transaction-এ) সেট করে — সেই transaction-এর
+      // acting uid পূর্বে ownerUids/googleUid দিয়ে verified-owner ছিল বলে
+      // আলাদা admin-check এখানে না বসিয়ে শুধু field-scope+value-shape
+      // দিয়ে সীমাবদ্ধ করা হলো(orphaned সেট হওয়ার মুহূর্তে family-তে আর কোনো
+      // active admin নাও থাকতে পারে — isAdminOfFamily() তখন false হয়ে
+      // legitimate soft-delete-ই ব্লক করে দিত)।
+      allow update: if request.auth != null
+        && !('status' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'orphanedAt', 'updatedAt'])
+        && request.resource.data.status == 'orphaned';
+      // Grace-period পুনরুদ্ধার(৭ দিনের মধ্যে reactivate, admin/নতুন-join
+      // দ্বারা) — শুধু status/orphanedAt field সরিয়ে দেওয়া(request.resource
+      // -এ এই দুই key অনুপস্থিত থাকলেই যথেষ্ট, keys().hasOnly দিয়ে যাচাই
+      // করা কঠিন কারণ absence-check — তাই diff().affectedKeys() ব্যবহার)।
+      // নোট(client-implementation reminder, security-audit ৯ সেপ্টেম্বর
+      // ২০২৬, Medium #3): এই clause ইচ্ছাকৃতভাবে admin-check ছাড়া রাখা
+      // হয়েছে(orphaned family-তে active admin নাও থাকতে পারে) — কিন্তু
+      // Invite-link join transaction(client, 2_4 §৫.২)-এ member-create-এর
+      // সাথে এই status-removal write একই atomic batch-এ bundle করা
+      // implementation-time-এ নিশ্চিত করতে হবে, নাহলে orphaned family
+      // নতুন সদস্য join করার পরও stale-orphaned থেকে যেতে পারে এবং
+      // manual TTL cleanup script grace-period-পরে ভুলবশত delete করে
+      // ফেলতে পারে(rules-change লাগে না, শুধু client discipline)।
+      allow update: if request.auth != null
+        && 'status' in resource.data
+        && resource.data.status == 'orphaned'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'orphanedAt', 'updatedAt'])
+        && !('status' in request.resource.data);
+
+      // --- Phase C prep: members/entries/weekly subcollection rules ---
+      // পুরোপুরি additive ও এই মুহূর্তে অব্যবহৃত — কোনো app code এখনো এই
+      // path পড়ে/লেখে না (app এখনো সম্পূর্ণভাবে data_<familyCode>-ই
+      // ব্যবহার করছে)। বর্তমান top-level isUnownedOrMine()/isWritable()-এর
+      // লজিক হুবহু পুনর্ব্যবহার করা হয়েছে, শুধু নতুন subcollection path-এর
+      // জন্য মানানসই করে — যাতে Phase C-এর আসল migration script চালানোর
+      // সময় rules নিয়ে আলাদা করে অপেক্ষা করতে না হয়।
+      match /members/{memberId} {
+        // §Member Key Direct-Identify bug-fix(২০ আগস্ট ২০২৬): আগে
+        // "read"(get+list একসাথে) isApprovedMember()-এ গেটেড ছিল — ফলে
+        // নতুন/আগে-কখনো-approve-না-হওয়া user directIdentifyLogin()-এ
+        // সঠিক Family Code+Member Password দিলেও claimMemberWithKey()-এর
+        // transaction-ভিতরের tx.get(memberRef) permission-denied পেত(নিচের
+        // claim-branch update rule pre-approval-friendly হলেও, তার আগের
+        // read-ই ব্লক করে দিত)। Fix: keyIndex-এর মতোই "get" আলাদা করে
+        // pre-approval-open(শুধু authenticated) — actual authorization এখনো
+        // নিচের update rule-এর memberKeyHash cross-check-এই হয়, এই get শুধু
+        // routing/pre-check। "list"(member-select dropdown ইত্যাদি, পুরো
+        // roster) আগের মতোই isApprovedMember()-গেটেড থাকে, কোনো enumeration
+        // exposure বাড়েনি।
+        allow get: if request.auth != null;
+        allow list: if request.auth != null && isApprovedMember(familyId);
+
+        // §Member Key(১৫ আগস্ট ২০২৬-পরবর্তী সেশন, Admin Recovery Key
+        // প্রতিস্থাপন): member তৈরি এখন শুধু Admin করবেন(সরাসরি সংযোজন,
+        // অথবা memberRequests অনুমোদনের মাধ্যমে) — আগের self-serve
+        // isUnownedOrMine() create-bypass সরানো হলো, যাতে কোনো member
+        // Member Key ছাড়া তৈরি না হয় (app.js একই batch-এ member doc +
+        // private/key subdoc দুটোই লেখে)।
+        allow create: if request.auth != null && isAdminOfFamily(familyId);
+
+        // §Google-Login — Invite-link self-join(2_4 §৫.২, additive):
+        // Admin ছাড়াই নতুন সদস্য নিজে token-validated create করতে পারবেন,
+        // শর্তে যে family-র activeInviteToken অবশ্যই আছে+revoked নয়+দেওয়া
+        // token হুবহু মেলে, এবং সৃষ্ট doc-এ googleUid ঠিক নিজের uid(claimed
+        // অবস্থাতেই তৈরি হয়, unclaimed-proxy আলাদা path §৫.১-এ)। role
+        // client "member"-ছাড়া কিছু পাঠাতে পারবে না(privilege-escalation
+        // guard — admin role এই path দিয়ে কখনো পাওয়া যাবে না)।
+        allow create: if request.auth != null
+          && exists(/databases/$(database)/documents/families/$(familyId))
+          && 'activeInviteToken' in get(/databases/$(database)/documents/families/$(familyId)).data
+          && get(/databases/$(database)/documents/families/$(familyId)).data.activeInviteToken.revoked == false
+          && 'inviteTokenAttempt' in request.resource.data
+          && request.resource.data.inviteTokenAttempt
+               == get(/databases/$(database)/documents/families/$(familyId)).data.activeInviteToken.token
+          && request.resource.data.googleUid == request.auth.uid
+          && request.resource.data.role == 'member'
+          && request.resource.data.keys().hasOnly(['name', 'gender', 'googleUid', 'role', 'inviteTokenAttempt', 'createdAt', 'updatedAt']);
+
+        // §Multi-device(v2-only, max 3): ownerUid(string) → ownerUids(array)।
+        // migration-window fallback: resource.data.ownerUids না থাকলে(পুরনো
+        // doc) ownerUid থেকে normalize(memberOwnerUids() একই helper)।
+        //
+        // আপডেট — দুই বৈধ কারণের যেকোনো একটা(OR):
+        // (ক) বর্তমান owners-দের একজন(নাম/জেন্ডার এডিট, নিজে release) অথবা
+        //     Admin(এডিট/force-release) — নতুন ownerUids অবশ্যই বর্তমান
+        //     owners-এর subset(নিজেকে বাদ দেওয়া/রিলিজ) অথবা admin-bypass
+        //     হতে হবে(নতুন কাউকে যোগ করা যাবে না এই clause দিয়ে — শুধু
+        //     claim clause(খ) দিয়ে যোগ হবে)।
+        // (খ) Member Key claim — resource-এর বর্তমান ownerUids যেকোনো
+        //     অবস্থায় থাকুক(claimed/unclaimed/partially-claimed), সঠিক
+        //     memberKeyHash দিলে যে-কেউ নিজের uid array-তে **append**
+        //     করতে পারবে(ইতিমধ্যে থাকলে no-op) — কিন্তু বর্তমান owners
+        //     already 3 জন থাকলে এবং request.auth.uid নতুন হলে reject
+        //     (max-3 limit, rules-level enforce)। শুধু
+        //     ownerUids+updatedAt+claimKeyHashAttempt ছাড়া অন্য field
+        //     বদলানো যাবে না।
+        // §Hybrid Admin Role Model — field-lock guard(নতুন, উপরের top-level
+        // AND): 'role' field affected হলে caller অবশ্যই admin হতে হবে,
+        // branch নির্বিশেষে। এটা ছাড়া নিচের branch-১(self-owner edit,
+        // ownerUids unchanged থাকলে ownerUids.hasOnly() trivially pass করে
+        // কিন্তু অন্য কোনো field-এ lock নেই) দিয়ে একজন non-admin owner
+        // নিজের member doc-এ role:"admin" বসিয়ে দিতে পারতেন — পরে নতুন
+        // ডিভাইসে self-claim(family-root Case 2) rule সেই(নিজের বসানো)
+        // role:"admin" বিশ্বাস করে adminUids-এ যোগ করে ফেলত(privilege
+        // escalation)। এই guard সেই path বন্ধ করে — role শুধু admin-ই
+        // বদলাতে পারবেন(handleMakeAdmin/handleRemoveAdmin/handleSelfDemote,
+        // সব batch-এ family-root adminUids-এর সাথে sync করা হয়)। claim
+        // branch(branch-২) এমনিতেই affectedKeys hasOnly দিয়ে role বাদ
+        // রাখে — এই guard সেটাকে defense-in-depth হিসেবে আরও নিশ্চিত করে।
+        // §Google-Login cutover(নতুন guard): google-only family-তে এই পুরো
+        // legacy ownerUids-based edit/claim path বন্ধ(stale anonymous-UID
+        // session দিয়ে post-cutover write আটকাতে)। Role-change(Make/Remove
+        // Admin)-এর জন্য নিচে আলাদা, ownerUids-নির্বিশেষে-সচল clause যোগ
+        // করা হয়েছে, তাই এই gate role-management ভাঙে না।
+        allow update: if request.auth != null
+          && !isGoogleOnly(familyId)
+          && (!('role' in request.resource.data.diff(resource.data).affectedKeys())
+              || isAdminOfFamily(familyId))
+          && (
+            (
+              (memberOwnerUids(familyId, memberId).hasAny([request.auth.uid]) || isAdminOfFamily(familyId))
+              && (
+                request.resource.data.ownerUids.hasOnly(memberOwnerUids(familyId, memberId))
+                || isAdminOfFamily(familyId)
+              )
+              // §Force-Release firstAdminUid protection(Rules-level, ১৯
+              // আগস্ট ২০২৬): এই arm(owner self-edit/release + admin
+              // edit/force-release) দিয়ে firstAdminUid-কে অন্য admin বাদ
+              // দিতে পারবেন না — শুধু firstAdminUid নিজে নিজেকে release
+              // করতে পারেন। current ownerUids থেকে নতুন ownerUids বাদ
+              // দিলে(removeAll) যে uid(গুলো) সরানো হচ্ছে তার মধ্যে
+              // firstAdminUid আছে কিনা চেক হয়। Legacy family(field নেই)
+              // স্বয়ংক্রিয় pass।
+              && (
+                !isAdminOfFamily(familyId)
+                || !('firstAdminUid' in get(/databases/$(database)/documents/families/$(familyId)).data)
+                || !memberOwnerUids(familyId, memberId).removeAll(request.resource.data.ownerUids)
+                     .hasAny([get(/databases/$(database)/documents/families/$(familyId)).data.firstAdminUid])
+                || request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.firstAdminUid
+              )
+            )
+            ||
+            (
+              request.resource.data.ownerUids.hasAny([request.auth.uid])
+              && (
+                   memberOwnerUids(familyId, memberId).hasAny([request.auth.uid])
+                   || memberOwnerUids(familyId, memberId).size() < 3
+                   // §Audit fix(২০ আগস্ট ২০২৬): আগে এখানে
+                   // `request.resource.data.ownerUids.size() <= 3` ছিল, যা
+                   // app.js কখনো ৩-এর বেশি না পাঠানোয় সবসময় true হতো —
+                   // ফলে নিচের admin-eviction branch(firstAdminUid-check)
+                   // কার্যত bypass হয়ে যেত। এখন non-admin FIFO
+                   // eviction(পূর্ণ-৩ অবস্থা)-এর জন্য আলাদা properly-
+                   // validated branch: exact-one-swap(resource-থেকে-
+                   // request-এ ঠিক ১টি uid বাদ) + role admin না হলেই এই
+                   // branch প্রযোজ্য(admin নিচের dedicated firstAdminUid-
+                   // protected branch দিয়েই যেতে হবে, এই lenient branch
+                   // দিয়ে না)। Legacy doc(role field নেই) non-admin
+                   // হিসেবে treat হয় — আগের effective behavior অপরিবর্তিত।
+                   || (
+                        (!('role' in resource.data) || resource.data.role != "admin")
+                        && resource.data.ownerUids.size() == 3
+                        && request.resource.data.ownerUids.size() == 3
+                        && resource.data.ownerUids.removeAll(request.resource.data.ownerUids).size() == 1
+                      )
+                   // §Admin FIFO(১৯ আগস্ট ২০২৬, ৭-দিন threshold তুলে দেওয়া
+                   // হয়েছে, owner-সিদ্ধান্ত): admin member পূর্ণ(৩) থাকলেও
+                   // সঠিক password দিয়ে ঠিক ১টি uid বাদ দিয়ে নতুন uid যোগ
+                   // করা যাবে — non-admin-এর মতোই unconditional(কোনো
+                   // staleness-সময় শর্ত নেই)। firstAdminUid protection —
+                   // এখন এই branch নিজেই সরাসরি চেক করে(১৯ আগস্ট ২০২৬,
+                   // Rules-gap fix): family-root firstAdminUid পড়ে
+                   // নিশ্চিত করা হয় evicted uid সেটা নয়। আগে এই protection
+                   // শুধু family-root adminUids swap clause(নিচে §First
+                   // Admin Protection)-এর সাথে বান্ডেল হওয়া transaction-এর
+                   // উপর নির্ভরশীল ছিল — standalone/direct member-doc
+                   // write দিয়ে bypass সম্ভব ছিল। এখন উভয় জায়গায়
+                   // independently enforced(defense-in-depth), family-root
+                   // clause অপরিবর্তিত রইলো। removeAll() দিয়ে ঠিক কোন uid
+                   // বাদ পড়েছে বের করা হচ্ছে(client কোনটা বাদ যাবে তা
+                   // "সিদ্ধান্ত" নেয় না, শুধু resultant array পাঠায়)।
+                   || (
+                        'role' in resource.data && resource.data.role == "admin"
+                        && resource.data.ownerUids.size() == 3
+                        && request.resource.data.ownerUids.size() == 3
+                        && resource.data.ownerUids.removeAll(request.resource.data.ownerUids).size() == 1
+                        && (
+                             !('firstAdminUid' in get(/databases/$(database)/documents/families/$(familyId)).data)
+                             || !resource.data.ownerUids.removeAll(request.resource.data.ownerUids)
+                                  .hasAny([get(/databases/$(database)/documents/families/$(familyId)).data.firstAdminUid])
+                           )
+                      )
+                 )
+              // ownerActivity(১৭ আগস্ট ২০২৬, FIFO device-limit fix): claim/
+              // re-verify-এ per-uid activity timestamp stamp+evicted-uid
+              // entry delete একই write-এ হয় — affectedKeys top-level key
+              // হিসেবেই দেখায়(dot-path update সত্ত্বেও)।
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerUids', 'ownerUid', 'updatedAt', 'claimKeyHashAttempt', 'ownerActivity'])
+              && 'claimKeyHashAttempt' in request.resource.data
+              && request.resource.data.claimKeyHashAttempt ==
+                 get(/databases/$(database)/documents/families/$(familyId)/members/$(memberId)/private/key).data.memberKeyHash
+            )
+          );
+        // বাগ-ফিক্স(২৭.৪): আগে isUnownedOrMine(...) থাকায় self-owner
+        // নিজেও নিজের member delete করতে পারতো — শুধু Admin-ই member
+        // delete করতে পারবে, এই নিয়ম প্রয়োগ করতে isUnownedOrMine বাদ।
+        allow delete: if request.auth != null && isAdminOfFamily(familyId);
+
+        // §Google-Login cutover-safe role-change(নতুন, additive): উপরের
+        // legacy block google-only-তে বন্ধ হওয়ায় role field আলাদা,
+        // narrow, ownerUids-নির্বিশেষে-সচল clause পাচ্ছে(Make/Remove
+        // Admin — 2_4 §৮ "অপরিবর্তিত" নীতি অনুযায়ী legacy ও google-only
+        // উভয় state-এই কাজ করবে)। শুধু role+updatedAt affected হতে পারবে।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
+
+        // §Google-Login cutover-safe activity-stamp(নতুন, ১৩ সেপ্টেম্বর
+        // ২০২৬, 2_4_1 §৫.১ root-cause fix): memberData.js: stampLastActive()
+        // saveEntry()/saveWeekly()-এর *একই atomic batch*-এ member-doc-এ
+        // {lastActiveAt, ownerActivity:{[uid]:ts}} merge-write করে —
+        // legacy ownerUids-block উপরে !isGoogleOnly(familyId) দিয়ে
+        // guarded থাকায় "google-only" অবস্থায় এই write reject হতো, এবং
+        // batch atomicity-র কারণে entry/weekly-এর মূল write-ও fail করত
+        // (১১ সেপ্টেম্বর ২০২৬ lock-out ইনসিডেন্ট, বিস্তারিত 2_4_1 §৫.১)।
+        // এই নতুন clause শুধু ততক্ষণই relevant যখন caller ইতিমধ্যে
+        // isClaimedByGoogle(familyId, memberId) — অর্থাৎ member-এর
+        // googleUid == request.auth.uid — legacy(pure ownerUids, কোনো
+        // googleUid field নেই) member-এ এই clause কখনো match করবে না,
+        // তাই legacy path-এ কোনো behavior-change নেই। Field-scope-এ
+        // সীমাবদ্ধ(শুধু এই ৩টা), isGoogleOnly()-নির্বিশেষে সচল(legacy ও
+        // google-only উভয় state-এ কাজ করবে, কারণ transitioning/legacy-তে
+        // এই একই write আগে থেকেই উপরের legacy-clause দিয়ে অনুমোদিত ছিল —
+        // এখানে duplicate permission harmless)।
+        allow update: if request.auth != null
+          && isClaimedByGoogle(familyId, memberId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'ownerActivity', 'updatedAt']);
+
+        // §Admin-proxy activity-stamp fix(নতুন, ১৩ সেপ্টেম্বর ২০২৬,
+        // owner-reported): উপরের clause শুধু claimed(googleUid==caller)
+        // সদস্যের নিজের stampLastActive() কভার করে। কিন্তু Admin যখন এখনো
+        // unclaimed proxy member(googleUid: null, 2_4 §৫.১)-এর হয়ে entry
+        // সেভ করেন(caller নিজে সেই member না, admin), stampLastActive()-এর
+        // bundled member-doc write-এ caller(admin)-এর uid isClaimedByGoogle
+        // মেলে না(member.googleUid এখনো null) — legacy-clause-ও
+        // !isGoogleOnly()-guard-এ ব্লকড, ফলে কোনো clause-ই match করত না ও
+        // পুরো entry-save batch(atomicity-র কারণে) "Missing or insufficient
+        // permissions" দিয়ে ব্যর্থ হতো। Fix: admin, শুধু unclaimed
+        // (googleUid field অনুপস্থিত অথবা null) member-এ, একই field-scope-এ
+        // সীমাবদ্ধ লেখার অনুমতি। Claimed member-এ এই clause কখনো match
+        // করবে না(googleUid != null হলে শর্ত false)।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'ownerActivity', 'updatedAt']);
+
+        // --- §Motivational Layer(নতুন, চ্যাট-approved plan, দুইটা clause) ---
+        // দুটোই সম্পূর্ণ additive, saveEntry()/stampLastActive()-এর কোনো
+        // clause স্পর্শ করা হয়নি(sensitive area — ১১ সেপ্টেম্বর ২০২৬-এর
+        // lock-out ইনসিডেন্ট এই একই ধরনের member-doc write-path-এ হয়েছিল,
+        // 2_4_1 §৫.১ দ্রষ্টব্য)। উভয় clause caller claimed member নিজে অথবা
+        // admin(unclaimed proxy-র জন্য) — উপরের existing pattern-এরই reuse।
+
+        // Phase 1.5 — bestScoreEver(denormalized "সর্বকালের সেরা দিন" score,
+        // memberData.js: updateBestScoreIfNeeded(), best-effort/non-blocking,
+        // saveEntry()-এর batch-এর অংশ না, সম্পূর্ণ আলাদা independent write)।
+        // Monotonic guard: নতুন value পুরনো bestScoreEver-এর চেয়ে বেশি হতেই
+        // হবে(কখনো কমতে পারবে না) — client bug/race-condition-এও পুরনো higher
+        // score ভুলবশত overwrite হবে না।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bestScoreEver', 'updatedAt'])
+          && request.resource.data.bestScoreEver is number
+          && request.resource.data.bestScoreEver >= 0
+          && request.resource.data.bestScoreEver <= 100
+          && request.resource.data.bestScoreEver > (('bestScoreEver' in resource.data) ? resource.data.bestScoreEver : -1);
+
+        // Phase 2 — tomorrowFocus(পরদিনের auto-suggested/manual-override
+        // Focus field, memberData.js: saveTomorrowFocus(), explicit user-action
+        // থেকে সরাসরি ট্রিগার হয়, saveEntry() batch-এর অংশ না)।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tomorrowFocus', 'updatedAt'])
+          && request.resource.data.tomorrowFocus.keys().hasOnly(['fieldKey', 'targetDateKey', 'setAt', 'source'])
+          && request.resource.data.tomorrowFocus.fieldKey is string
+          && request.resource.data.tomorrowFocus.fieldKey.size() > 0
+          && request.resource.data.tomorrowFocus.targetDateKey is string
+          && request.resource.data.tomorrowFocus.source in ['auto', 'manual'];
+
+        // --- §Google-Login Identity Migration(2_4 §৪-৬, dual-path) ---
+        // সম্পূর্ণ additive — উপরের ownerUids-based clause-গুলো অপরিবর্তিত।
+        // এই নতুন clause-গুলো শুধু তখনই relevant যখন member doc-এ
+        // email/googleUid field ব্যবহার হচ্ছে(2_4_1-এর Phase-2 data-write
+        // থেকে); বাকি সব বিদ্যমান member(ownerUids-only) এই clause-গুলোর
+        // কোনো শর্তই match করবে না, causing no behavior change।
+
+        // Admin-added proxy member(unclaimed, 2_4 §৫.১) — email/googleUid:
+        // null সেট করে তৈরি। affectedKeys()-এ ইতিমধ্যে-অনুমোদিত keys()-এর
+        // বাইরের নতুন field হওয়ায় উপরের generic create rule(admin-only)-ই
+        // যথেষ্ট, আলাদা create-clause লাগে না।
+
+        // Admin — unclaimed proxy-র email edit/remove(§৫.১, §৫.৩ "মেইল
+        // সরান")। শুধু তখনই যখন member এখনো unclaimed(googleUid অনুপস্থিত
+        // বা null) — claimed member-এর email field ইতিমধ্যে delete করা
+        // (§৪), তাই এই clause claimed member-এ কখনো প্রযোজ্য না।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'updatedAt']);
+
+        // §Google-Login Migration(Medium #5 fix, 2_4_1 §৫ Phase-2, Category
+        // A — "ইতিমধ্যে Google-linked" সদস্য): V1-এর existing Google-linking
+        // linkWithCredential()(account-linking, same Firebase UID-তে Google
+        // provider যোগ হয়) ব্যবহার করত বলে Category-A সদস্যের "verified
+        // Google UID" আসলে তার নিজের বিদ্যমান ownerUids-এই ইতিমধ্যে থাকা
+        // UID। তাই admin সরাসরি googleUid set করতে পারবেন, কিন্তু শুধু
+        // তখনই যখন নতুন মান ইতিমধ্যে সেই member-এর ownerUids array-তে
+        // বিদ্যমান(forge-প্রুফ — কোনো arbitrary/নতুন UID injection সম্ভব
+        // না, শুধু already-platform-verified UID promote করা যায়)। শুধু
+        // unclaimed(googleUid অনুপস্থিত বা null) member-এ প্রযোজ্য —
+        // claimed member-এ কখনো প্রভাব ফেলে না।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
+          && memberOwnerUids(familyId, memberId).hasAny([request.resource.data.googleUid])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleUid', 'updatedAt']);
+
+        // Admin — unclaimed proxy-র নাম/জেন্ডার edit(functional-gap fix)।
+        // নতুন-schema proxy member-এ ownerUids field-ই থাকে না বলে
+        // legacy ownerUids-block(admin-bypass সহ general-edit করত) এই
+        // doc-shape-এর জন্য নির্ভরযোগ্য না — তাই আলাদা explicit clause,
+        // legacy/google-only উভয় state-এই সচল(ownerUids-নিরপেক্ষ)।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt']);
+
+        // Claim(email-match auto-bind বা invite-link join, 2_4 §৫.১/§৫.২):
+        // googleUid null→request.auth.uid সেট হওয়ার সাথে সাথে email field
+        // remove হয়(§৪, একই write-এ) — familyMemberEmails uniqueness-doc
+        // ইতিমধ্যে সংশ্লিষ্ট memberId পয়েন্ট করে বলে(অন্য কোনো path থেকে
+        // এই doc তৈরি না হলে claim সম্ভবই না) forge-সুরক্ষা মূলত সেই
+        // top-level collection-এর create-rule থেকেই আসে।
+        //
+        // §Google-Login fix(Critical #2, security-audit ৯ সেপ্টেম্বর ২০২৬):
+        // আগে এখানে request.auth-এর প্রকৃত email কখনো যাচাই হতো না — শুধু
+        // client দাবি করত যে সে সঠিক member match করেছে। কিন্তু
+        // familyMemberEmails/{emailKey}-এর "get" যেকোনো authenticated
+        // user-এর জন্য খোলা(§Google-Login Identity Migration comment
+        // দ্রষ্টব্য) — অর্থাৎ কেউ target-এর email জানলে/guess করলে সেই
+        // email দিয়ে normalize করে mapping doc পড়ে familyId/memberId বের
+        // করে নিজের uid দিয়ে claim করে নিতে পারত(Authentication ঠিক থাকলেও
+        // Authorization কখনো যাচাই হতো না — account/identity-takeover)।
+        // Fix: Firebase Auth-এর server-verified ID token email claim
+        // (request.auth.token.email, client দাবির উপর নির্ভরশীল নয়) এখন
+        // resource-এ সংরক্ষিত normalized email-এর সাথে মিলতেই হবে। §১০.২
+        // অনুযায়ী resource.data.email আগে থেকেই normalizeEmail()
+        // (trim+lowercase)-প্রয়োগ করা থাকে, তাই এখানে শুধু auth-token
+        // email-কে .lower() করেই তুলনা যথেষ্ট(trim দরকার নেই — Google
+        // account email-এ leading/trailing space থাকে না)।
+        allow update: if request.auth != null
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
+          && request.resource.data.googleUid == request.auth.uid
+          && !('email' in request.resource.data)
+          && 'email' in resource.data
+          && request.auth.token.email is string
+          && request.auth.token.email.lower() == resource.data.email
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleUid', 'email', 'updatedAt']);
+
+        // Claimed member নিজে(googleUid==request.auth.uid) — profile-edit
+        // (নাম/জেন্ডার, 2_5 Screen E "প্রোফাইল এডিট")। role এখানে কখনো
+        // affected হতে পারবে না(উপরের top-level role-lock guard এই
+        // clause-এও প্রযোজ্য, কারণ সেটা match-level AND, সব clause কভার
+        // করে)।
+        allow update: if request.auth != null
+          && isClaimedByGoogle(familyId, memberId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt']);
+
+        // Family ত্যাগ(self-leave, 2_4 §৫.৩) — claimed member নিজে নিজের
+        // doc delete করতে পারবে, শুধু firstAdminUid না হলে(protection নিচের
+        // family-root-এর মতোই — firstAdminUid প্রথমে admin-transfer ছাড়া
+        // leave করতে পারবেন না)।
+        allow delete: if request.auth != null
+          && isClaimedByGoogle(familyId, memberId)
+          && (
+               !('firstAdminUid' in get(/databases/$(database)/documents/families/$(familyId)).data)
+               || request.auth.uid != get(/databases/$(database)/documents/families/$(familyId)).data.firstAdminUid
+             );
+
+        // §Member Key — private ownership/recovery credential। plaintext
+        // (memberKey, owner/admin display+copy) ও hash(memberKeyHash,
+        // উপরের claim-verify) একই doc-এ — read শুধু owner/admin, অন্য কোনো
+        // approved member পড়তে পারবে না(document-level rule বলে আলাদা
+        // subcollection-এ রাখা হলো)।
+        match /private/key {
+          allow read: if request.auth != null && (
+            isAdminOfFamily(familyId)
+            || memberOwnerUids(familyId, memberId).hasAny([request.auth.uid])
+          );
+          // Create: Admin(member তৈরির সাথে সাথে) অথবা owner নিজে(পুরনো
+          // key-বিহীন member নিজের Key প্রথমবার generate করলে) — update
+          // rule-এ এই owner-self permission আগে থেকেই ছিল, শুধু create-এ
+          // asymmetry ছিল(bugfix, ১৬ আগস্ট ২০২৬)। memberOwnerUids() এই
+          // *একই* memberId-এর(nested match, path-bound) ownerUids-ই চেক
+          // করে — অন্য কোনো member-এর key touch করা সম্ভব না।
+          // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): charset
+          // client-side MEMBER_KEY_CHARSET_PATTERN(English letter/digit +
+          // existing auto-gen symbol pool !@#$%&*+-_)-এর সাথে সামঞ্জস্যপূর্ণ।
+          // §Google-Login cutover(নতুন guard): google-only family-তে নতুন
+          // Member Password create/rotate বন্ধ(পুরো system obsolete)।
+          allow create: if request.auth != null
+            && !isGoogleOnly(familyId)
+            && (isAdminOfFamily(familyId)
+                || memberOwnerUids(familyId, memberId).hasAny([request.auth.uid]))
+            && request.resource.data.keys().hasOnly(['memberKey', 'memberKeyHash', 'updatedAt'])
+            && request.resource.data.memberKey is string
+            && request.resource.data.memberKey.size() >= 6 && request.resource.data.memberKey.size() <= 64
+            && request.resource.data.memberKey.matches('^[A-Za-z0-9!@#$%&*+_-]+$')
+            && request.resource.data.memberKeyHash is string
+            && request.resource.data.memberKeyHash.size() == 64;
+          // Update(key change): owner নিজে অথবা Admin।
+          allow update: if request.auth != null
+            && !isGoogleOnly(familyId)
+            && (isAdminOfFamily(familyId)
+                || memberOwnerUids(familyId, memberId).hasAny([request.auth.uid]))
+            && request.resource.data.keys().hasOnly(['memberKey', 'memberKeyHash', 'updatedAt'])
+            && request.resource.data.memberKey is string
+            && request.resource.data.memberKey.size() >= 6 && request.resource.data.memberKey.size() <= 64
+            && request.resource.data.memberKey.matches('^[A-Za-z0-9!@#$%&*+_-]+$')
+            && request.resource.data.memberKeyHash is string
+            && request.resource.data.memberKeyHash.size() == 64;
+          allow delete: if false;
+        }
+      }
+
+      match /entries/{entryId} {
+        allow read: if request.auth != null && isApprovedMember(familyId);
+        allow create, update, delete: if request.auth != null
+          && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, entryId)) || isAdminOfFamily(familyId));
+      }
+
+      match /weekly/{weeklyId} {
+        allow read: if request.auth != null && isApprovedMember(familyId);
+        allow create, update, delete: if request.auth != null
+          && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, weeklyId)) || isAdminOfFamily(familyId));
+      }
+
+      // --- §keyIndex(Direct-identify, pre-approval routing-only) ---
+      // Content শুধু {memberId: string} — কোনো authorization field নেই।
+      // Get শুধু "কোন memberId" বলে, actual claim/authorization member
+      // doc-এর existing Rules-এ(memberKeyHash cross-check) হয়, অপরিবর্তিত।
+      match /keyIndex/{hash} {
+        // Pre-approval flow বজায় রাখতে isApprovedMember() গেট নেই —
+        // শুধু authenticated(anonymous সহ) হলেই get করা যাবে।
+        allow get: if request.auth != null;
+        allow list: if false;
+
+        // Create: শুধু owner/admin নিজের memberId-এর জন্যই নতুন keyIndex
+        // বানাতে পারবেন — request.resource.data.memberId অবশ্যই string
+        // হতে হবে এবং requester সেই member-এর owner/admin হতে হবে
+        // (cross-member injection আটকায়)। Doc ইতিমধ্যে exist করলে এটা আর
+        // "create" হিসেবে গণ্য হয় না(Firestore নিজেই "update" ধরবে) —
+        // নিচে কোনো update rule নেই, তাই duplicate-hash create
+        // স্বয়ংক্রিয়ভাবে deny হয়ে যায়(explicit exists-check লাগে না)।
+        //
+        // ২০ আগস্ট ২০২৬ — BLOCKER fix: createMemberWithKey() নতুন member
+        // doc + keyIndex একই batch-এ create করে। batch/transaction-এর
+        // ভেতরে exists()/get() sibling pending write দেখতে পায় না, তাই
+        // brand-new memberId-এর জন্য exists(member) সবসময় false আসত এবং
+        // পুরো batch deny হয়ে যেত(existing "নতুন member তৈরি" ও
+        // "memberRequest approve" flow ভাঙত)। সমাধান: exists(member)
+        // অনুযায়ী branch —
+        //   Case A(member আগে থেকেই বিদ্যমান, যেমন changeMemberKey
+        //   rotation): exists() নির্ভরযোগ্য, আগের মতোই
+        //   owner/admin cross-check বজায়(defense-in-depth অক্ষুণ্ণ)।
+        //   Case B(member একই batch-এ নতুন তৈরি হচ্ছে, তাই exists()
+        //   false): সব caller(createMemberWithKey) admin-initiated —
+        //   তাই এই branch-এ শুধু isAdminOfFamily(familyId) দিয়ে গেট,
+        //   যা বাস্তব app flow-এর সাথে সামঞ্জস্যপূর্ণ এবং memberId
+        //   app-generated(user input না) বলে নতুন attack-surface তৈরি
+        //   করে না।
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly(['memberId'])
+          && request.resource.data.memberId is string
+          && (
+            (exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.memberId))
+              && (isAdminOfFamily(familyId)
+                  || memberOwnerUids(familyId, request.resource.data.memberId).hasAny([request.auth.uid])))
+            || (!exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.memberId))
+              && isAdminOfFamily(familyId))
+          );
+
+        // Update path নেই(memberId পরে বদলানোর দরকার নেই, tamper-surface
+        // কমাতে ইচ্ছাকৃতভাবে বাদ) — default deny প্রযোজ্য।
+
+        // Delete: শুধু ওই keyIndex-এ লেখা memberId-এর owner/admin — অন্য
+        // member-এর keyIndex accidental/malicious delete আটকায়।
+        allow delete: if request.auth != null
+          && (isAdminOfFamily(familyId)
+              || memberOwnerUids(familyId, resource.data.memberId).hasAny([request.auth.uid]));
+      }
+
+      // --- §Notification System(নতুন) ---
+      // সাধারণ, extensible in-app notification framework(শুরুতে শুধু
+      // "admin_assigned" type)। শুধু নিজের(targetUid-matched) notification
+      // পড়া/read-mark করা যায়; create শুধু admin করতে পারবে(এই মুহূর্তে
+      // handleMakeAdmin() থেকে) — future-এ অন্য admin action-ও এই একই
+      // collection ব্যবহার করতে পারবে কোনো Rules পরিবর্তন ছাড়াই।
+      match /notifications/{notifId} {
+        allow read: if request.auth != null && request.auth.uid == resource.data.targetUid;
+        // "device_joined"(নতুন, ১৫ আগস্ট ২০২৬, Option A auto-approve-এর
+        // সাথে যোগ): নতুন self-approved(non-admin) member-ও admin-কে
+        // notify করতে পারবে — কিন্তু শুধু এই নির্দিষ্ট type-এ, শুধু
+        // approved member হলে, এবং targetUid অবশ্যই family-র প্রকৃত admin
+        // হতে হবে(resource.data.adminUids থেকে verify, forge করা যাবে না)।
+        // admin_assigned-এর পুরনো path(শুধু admin) অপরিবর্তিত।
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly(['targetUid', 'type', 'message', 'createdAt', 'read'])
+          && request.resource.data.targetUid is string
+          && request.resource.data.type is string
+          && request.resource.data.message is string
+          && request.resource.data.read == false
+          && (
+               (request.resource.data.type == 'admin_assigned' && isAdminOfFamily(familyId))
+               || (request.resource.data.type == 'device_joined'
+                   && isApprovedMember(familyId)
+                   && get(/databases/$(database)/documents/families/$(familyId)).data.adminUids.hasAny([request.resource.data.targetUid]))
+               || (request.resource.data.type == 'member_request'
+                   // Fix(১৯ আগস্ট ২০২৬, item 33): requester তখনও approved
+                   // member না(এটাই approval পাওয়ার প্রথম ধাপ), তাই
+                   // isApprovedMember() সবসময় false হতো — notification
+                   // silently deny হয়ে যেত। বদলে requester-এর নিজের নামে
+                   // pending memberRequests doc থাকা যাচাই(forge-প্রুফ,
+                   // request.auth.uid == doc-id)।
+                   && exists(/databases/$(database)/documents/families/$(familyId)/memberRequests/$(request.auth.uid))
+                   && get(/databases/$(database)/documents/families/$(familyId)/memberRequests/$(request.auth.uid)).data.status == 'pending'
+                   && get(/databases/$(database)/documents/families/$(familyId)).data.adminUids.hasAny([request.resource.data.targetUid]))
+             );
+        allow update: if request.auth != null
+          && request.auth.uid == resource.data.targetUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow delete: if request.auth != null && request.auth.uid == resource.data.targetUid;
+      }
+
+      // --- §Recovery Key(First Admin) — hidden hash storage ---
+      // Plaintext key কখনো Firestore-এ যায় না(client-side generate+hash)।
+      // এই doc client থেকে কখনো read করা যায় না(শুধু Rules-এর ভেতরে get()
+      // দিয়ে hash compare করার জন্য ব্যবহৃত) — তাই hash কখনো leak হয় না।
+      // একবার সেট হলে immutable(update/delete সম্পূর্ণ বন্ধ) — rotation
+      // future scope, এখন প্রয়োজন নেই।
+      match /private/{docId} {
+        allow read: if false;
+        allow create: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && docId == 'recovery'
+          && request.resource.data.keys().hasOnly(['hash', 'createdAt'])
+          && request.resource.data.hash is string
+          && request.resource.data.hash.size() == 64;
+        allow update, delete: if false;
+      }
+
+      // --- Access Approval Gate — Step 2 bootstrap: accessRequests write ---
+      // শুধু grandfather migration script (migrateApprovedGrandfatherAccess())
+      // চালানোর জন্য ন্যূনতম rule। শুধু বর্তমান family-র server-verified
+      // admin (adminUids) create করতে পারবে, শুধু status:"approved" সহ
+      // নির্দিষ্ট তিনটি field-এ সীমাবদ্ধ। update/delete client থেকে বন্ধ —
+      // ভুল হলে শুধু owner Console থেকে ম্যানুয়ালি ঠিক করবেন (legacyCollectionMap-এর
+      // মতো একই pattern)। ভবিষ্যতের isApprovedMember() শুধু এই collection
+      // read করবে অন্য rule-এ ব্যবহারের জন্য — এই write-rule-এর সাথে
+      // কোনো সংঘর্ষ নেই।
+      match /accessRequests/{uid} {
+        // Audit-fix(High #2, ১৫ আগস্ট ২০২৬): আগে শুধু auth!=null চেক হতো —
+        // ফলে যেকোনো authenticated user অন্য family-র pending/approved/
+        // denied request status ও UID পড়তে পারত। এখন শুধু নিজের request
+        // (self-uid) অথবা সেই family-র Admin (approve UI-এর জন্য দরকার)।
+        allow read: if request.auth != null
+          && (request.auth.uid == uid || isAdminOfFamily(familyId));
+
+        // Bootstrap/grandfather admin-write (অপরিবর্তিত)
+        allow create: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && request.resource.data.keys().hasOnly(['status', 'source', 'approvedAt'])
+          && request.resource.data.status == 'approved';
+
+        // --- Access Approval Gate — Step 4: self-request ---
+        // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved, reversible):
+        // Non-admin নিজের uid-তে status:"pending" অথবা "approved" দুটোই
+        // create করতে পারবে (আগে শুধু pending, admin-approve লাগত) —
+        // অন্য কারো uid-তে বা denied স্ট্যাটাসে এখনো না। isApprovedMember()
+        // ও অন্য কোনো read/write rule অপরিবর্তিত — শুধু এই একটি self-create
+        // condition শিথিল করা হয়েছে। মডারেশন ফিরিয়ে আনতে শুধু নিচের লাইন
+        // আবার status == 'pending'-এ ফেরত দিতে হবে।
+        allow create: if request.auth != null
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['status', 'requestedAt'])
+          && request.resource.data.status in ['pending', 'approved'];
+
+        // --- Access Approval Gate — Step 4: admin decide (নতুন) ---
+        // শুধু admin, শুধু বিদ্যমান pending থেকে approved/denied-এ,
+        // শুধু status+decidedAt field affected — অন্য কোনো mutation না।
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && resource.data.status == 'pending'
+          && request.resource.data.status in ['approved', 'denied']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt']);
+
+        allow delete: if false;
+      }
+
+      // --- §সদস্য হোন(Member Request, নতুন, Member Key সেশন) ---
+      // Family Code দিয়ে approved(accessRequests) হওয়া মানেই এখন আর
+      // সরাসরি member(person) তৈরি করা যায় না — নাম(+জেন্ডার) দিয়ে
+      // অনুরোধ করবে, Admin অনুমোদন করলে তবেই members/{id}+private/key
+      // তৈরি হবে(app.js, admin-side, একই batch-এ)। accessRequests-এর
+      // সাথে একই pattern — শুধু self-uid read/create, admin-only decide।
+      match /memberRequests/{uid} {
+        allow read: if request.auth != null
+          && (request.auth.uid == uid || isAdminOfFamily(familyId));
+        allow create: if request.auth != null
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['name', 'gender', 'status', 'requestedAt', 'presetKey'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.presetKey is string
+          && request.resource.data.presetKey.size() >= 6 && request.resource.data.presetKey.size() <= 64
+          // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): উপরের
+          // private/key create/update rule-এর memberKey regex-এর সাথে
+          // সামঞ্জস্যপূর্ণ(approval-এ ঠিক এই presetKey-ই memberKey হিসেবে
+          // বসে, তাই দুই জায়গায় একই charset প্রয়োজন)।
+          && request.resource.data.presetKey.matches('^[A-Za-z0-9!@#$%&*+_-]+$');
+        allow update: if request.auth != null
+          && isAdminOfFamily(familyId)
+          && resource.data.status == 'pending'
+          && request.resource.data.status in ['approved', 'denied']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt']);
+        allow delete: if false;
+      }
+    }
+
+    // --- PWA ইনস্টল কাউন্টার (গ্লোবাল, কোনো নির্দিষ্ট পরিবারের ডাটা নয়) ---
+    match /app_stats/{statId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['count', 'lastInstalledAt'])
+        && request.resource.data.count is number;
+      allow delete: if false;
+    }
+  }
+}
