@@ -8,7 +8,7 @@
 // React global(window.React, globals.js)।
 
 import { ChevronLeft } from "../icons.jsx";
-import { ToolGridSection } from "./ToolGrid.jsx";
+import { ToolGridSection, PageHeader, VerseCard } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { ZakatCalculator } from "./ZakatCalculator.jsx";
@@ -237,7 +237,9 @@ export function PublicToolsShell() {
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
+    /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
     /*#__PURE__*/React.createElement(ToolGridSection, {
+      variant: "hero",
       items: FRONT_ITEMS,
       onSelect: (item) => {
         if (item.kind === "category") {
@@ -248,6 +250,7 @@ export function PublicToolsShell() {
           setView({ single: item });
         }
       },
-    })
+    }),
+    /*#__PURE__*/React.createElement(VerseCard, { text: "“আল্লাহর স্মরণেই হৃদয় প্রশান্ত হয়।”", source: "— সূরা আর-রা'দ ১৩:২৮" })
   );
 }

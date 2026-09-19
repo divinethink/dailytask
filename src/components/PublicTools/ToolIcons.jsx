@@ -37,6 +37,12 @@ const SHAPES = {
   kaaba: '<rect x="5" y="5" width="14" height="15" rx="1"/><path d="M5 10h14M14 13h3M14 16h3"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  // ১৯ সেপ্টেম্বর ২০২৬(premium-grid, owner-approved): দিন-রাত(সূর্য+চাঁদ), তাসবীহ(পুঁতির মালা+ঝুঁটি),
+  // দু'আ(দু'হাত-তোলা পাত্র-ভঙ্গি), chevronRight(সহায়িকা কার্ডের কোণা-চিহ্ন)।
+  dayNight: '<circle cx="7.5" cy="7.5" r="2.6"/><path d="M7.5 1.6v1.2M7.5 12.2v1.2M1.6 7.5h1.2M12.2 7.5h1.2M3.3 3.3l.9.9M11.7 3.3l-.9.9M3.3 11.7l.9-.9"/><path transform="translate(9.5 9.5) scale(0.6)" stroke-width="3.3" d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  tasbih: '<circle cx="12" cy="9.5" r="7.2" stroke-width="1.2"/><g fill="currentColor" stroke="none"><circle cx="12" cy="2.3" r="2"/><circle cx="17.1" cy="4.4" r="2"/><circle cx="19.2" cy="9.5" r="2"/><circle cx="17.1" cy="14.6" r="2"/><circle cx="12" cy="16.7" r="2"/><circle cx="6.9" cy="14.6" r="2"/><circle cx="4.8" cy="9.5" r="2"/><circle cx="6.9" cy="4.4" r="2"/></g><path d="M12 18.7v1.6"/><path d="M10.5 20.3h3l-.6 2.7h-1.8z"/>',
+  dua: '<path d="M3 11h18c0 5-4 9-9 9s-9-4-9-9z"/><path d="M6 11V7.5M9.3 11V5M14.7 11V5M18 11V7.5"/>',
+  chevronRight: '<path d="M9 6l6 6-6 6"/>',
   grip: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
 };
 
