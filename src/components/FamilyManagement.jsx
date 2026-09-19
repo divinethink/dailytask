@@ -164,7 +164,7 @@ export function RenameFamilyCodeModal({
     readOnly: true,
     disabled: true,
     className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-slate-50 text-slate-500 disabled:opacity-100",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
+    style: { fontFamily: "'Hind Siliguri', sans-serif" }
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setRenameCodeRevealed(v => !v),
@@ -187,7 +187,7 @@ export function RenameFamilyCodeModal({
     placeholder: "নতুন ইউজারনেম দিন (কমপক্ষে ৬ ক্যারেক্টার)",
     maxLength: 30,
     className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
+    style: { fontFamily: "'Hind Siliguri', sans-serif" }
   }), renameFamCodeInput && renameConfirmInput && /*#__PURE__*/React.createElement("div", {
     className: "absolute right-2 top-1/2 -translate-y-1/2"
   }, renameFamCodeInput === renameConfirmInput
@@ -208,7 +208,7 @@ export function RenameFamilyCodeModal({
     disabled: renameFamCodeBusy,
     placeholder: "একই ইউজারনেম আবার দিন",
     className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
-    style: { fontFamily: "'IBM Plex Mono', monospace" }
+    style: { fontFamily: "'Hind Siliguri', sans-serif" }
   }), renameFamCodeInput && renameConfirmInput && /*#__PURE__*/React.createElement("div", {
     className: "absolute right-2 top-1/2 -translate-y-1/2"
   }, renameFamCodeInput === renameConfirmInput
