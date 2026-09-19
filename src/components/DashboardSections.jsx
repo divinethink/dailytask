@@ -35,15 +35,21 @@ export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPerce
   // mode অনুযায়ী বদলায়, বাকি presentation অপরিবর্তিত।
   const label = mode === "yesterday" ? "গতকালের অগ্রগতি:" : "আজকের অগ্রগতি:";
   const deltaPrefix = mode === "yesterday" ? "· আগের দিনের চেয়ে " : "· গতকালের চেয়ে ";
+  // §১-লাইন ফিক্স(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): "গতকালের অগ্রগতি:"
+  // লেবেল "আজকের অগ্রগতি:"-এর চেয়ে লম্বা বলে ছোট স্ক্রিনে flex-wrap হয়ে ২য়
+  // লাইনে চলে যেত(device/font-scale-নির্ভর, unpredictable)। Fix: ফন্ট/গ্যাপ
+  // ছোট করে + flex-nowrap দিয়ে সবসময় ১-লাইনে রাখা হলো; overflow-x-auto শুধু
+  // চরম extreme-zoom edge-case-এর জন্য safety-net(স্বাভাবিক অবস্থায় কখনো
+  // scroll লাগবে না, clip/hidden-content-এর চেয়ে নিরাপদ ফলব্যাক)।
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center flex-wrap gap-x-2 gap-y-0.5"
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center flex-nowrap overflow-x-auto gap-x-1.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-bold text-emerald-900"
+    className: "text-xs font-bold text-emerald-900 flex-shrink-0"
   }, label), /*#__PURE__*/React.createElement("span", {
-    className: "text-base font-bold text-emerald-900",
+    className: "text-sm font-bold text-emerald-900 flex-shrink-0",
     style: { fontFamily: "'Hind Siliguri', sans-serif" }
   }, toBn(primaryPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
-    className: delta >= 0 ? "text-xs text-emerald-700 font-medium" : "text-xs text-red-700 font-medium"
+    className: (delta >= 0 ? "text-emerald-700" : "text-red-700") + " text-[10px] font-medium whitespace-nowrap flex-shrink-0"
   }, deltaPrefix, toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
 }
 
