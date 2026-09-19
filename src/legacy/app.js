@@ -3052,33 +3052,34 @@ function App() {
   }, /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
     toBn: toBn,
-    // §Streak-box একলাইন আজকের সার্বিক অগ্রগতি(১৬ সেপ্টেম্বর ২০২৬, owner-
-    // অনুরোধ): নতুন hesab/listener লাগেনি — monthEntries ইতিমধ্যে চলতি
-    // viewCursor-এর মাস fetch করা থাকে; সেই মাস আজকের প্রকৃত মাসের সাথে না
-    // মিললে(owner অন্য মাস browse করছেন) today's entry পাওয়া যায় না বলে
-    // null রাখা হয়েছে(নতুন আলাদা listener না বাড়িয়ে, existing data-ই reuse)।
-    // ক্যালেন্ডারে ব্যবহৃত একই dailyScore()(overall, সব ফিল্ড একসাথে) reuse
-    // করা হয়েছে — নতুন ক্যাটাগরি-গড় formula বানানো হয়নি(owner-confirmed)।
-    todayPercent: (() => {
+    // §Stable "আজকের অগ্রগতি"(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড bug): আগে
+    // রাত ১২টার পর(আজকের এন্ট্রি এখনো সেভ না হলে) todayPercent null হয়ে
+    // পুরো কার্ডই অদৃশ্য হয়ে যেত। Fix: আজকের এন্ট্রি না থাকলে গতকালের এন্ট্রি
+    // fallback হিসেবে দেখানো হয়("গতকালের অগ্রগতি", তুলনা তার আগের দিনের
+    // সাথে) — নতুন কোনো Firestore read/listener লাগেনি, existing
+    // monthEntries-ই যথেষ্ট। মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে(load করা
+    // নেই) — সেই edge-case-এ আগের existing limitation অনুযায়ীই silently
+    // card hidden থাকে(নতুন cross-month fetch যোগ করা হয়নি, over-engineering
+    // এড়াতে)।
+    ...(() => {
       const now_ = new Date();
       const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
-      if (!isCurrentMonth) return null;
-      const todayEntry_ = monthEntries[pad2(now_.getDate())];
-      const s = dailyScore(todayEntry_, selectedMember, allFields);
-      return s === null || s === undefined ? null : Math.round(s * 100);
-    })(),
-    // §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): "গতকালের চেয়ে
-    // X% কম/বেশি" — ইচ্ছাকৃতভাবে শুধু same-month(now_.getDate() > 1) হলেই
-    // derive করা হয়, কারণ monthEntries শুধু চলতি viewCursor-এর মাস-scoped —
-    // মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে, যা load করা নেই। সেই edge-case-এ
-    // নতুন fetch না করে silently null(StreakCard delta-লাইন বাদ দেয়)।
-    yesterdayPercent: (() => {
-      const now_ = new Date();
-      const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
-      if (!isCurrentMonth || now_.getDate() <= 1) return null;
-      const yEntry_ = monthEntries[pad2(now_.getDate() - 1)];
-      const s = dailyScore(yEntry_, selectedMember, allFields);
-      return s === null || s === undefined ? null : Math.round(s * 100);
+      if (!isCurrentMonth) return { mode: "today", primaryPercent: null, comparisonPercent: null };
+      const scoreOf_ = (d) => {
+        if (d < 1) return null;
+        const s = dailyScore(monthEntries[pad2(d)], selectedMember, allFields);
+        return s === null || s === undefined ? null : Math.round(s * 100);
+      };
+      const todayNum_ = now_.getDate();
+      const todayPct_ = scoreOf_(todayNum_);
+      if (todayPct_ !== null) {
+        return { mode: "today", primaryPercent: todayPct_, comparisonPercent: scoreOf_(todayNum_ - 1) };
+      }
+      const yesterdayPct_ = scoreOf_(todayNum_ - 1);
+      if (yesterdayPct_ !== null) {
+        return { mode: "yesterday", primaryPercent: yesterdayPct_, comparisonPercent: scoreOf_(todayNum_ - 2) };
+      }
+      return { mode: "today", primaryPercent: null, comparisonPercent: null };
     })()
   }), /*#__PURE__*/React.createElement(DailyInsightCard, {
     insight: dailyInsight,

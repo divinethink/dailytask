@@ -644,7 +644,12 @@ function dailyScore(entry, member, allFields) {
 }
 function scoreColor(score) {
   if (score === null || score === undefined) return "#E7EEE3";
-  if (score >= 0.85) return "var(--theme-primary)";
+  // §Fix(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): আগে "চমৎকার"-tier রঙ সরাসরি
+  // var(--theme-primary) ব্যবহার করত — ফলে থিম বদলালে(যেমন পিংক) পারফরম্যান্স-
+  // ইন্ডিকেটর রঙও বদলে যেত(পারফরম্যান্স-সেমান্টিক্স আর decorative brand-accent
+  // একই ভ্যারিয়েবলে মিশে ছিল)। Fix: fixed hex(ডিফল্ট থিমের সবুজ, design-system
+  // Primary #0E4B43) — থিম যাই হোক, "চমৎকার" সবসময় এই রঙই দেখাবে।
+  if (score >= 0.85) return "#0E4B43";
   if (score >= 0.6) return "#2563A8";
   if (score >= 0.35) return "#F5D061";
   if (score > 0) return "#C1666B";
