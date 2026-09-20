@@ -40,7 +40,18 @@ firebase.appCheck().activate(
 );
 
 const db = firebase.firestore();
-db.enablePersistence().catch(() => {});
+// §অফলাইন ফিক্স(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড "অ্যাপ অফলাইনে চলে না"):
+// আগে synchronizeTabs ছাড়া enablePersistence() কল হতো — PWA হোম-স্ক্রিন
+// ইনস্ট্যান্স + ব্রাউজার ট্যাব(বা দুইটা ট্যাব) একসাথে খোলা থাকলে দ্বিতীয়
+// instance-এ persistence 'failed-precondition' দিয়ে silently fail করত(শুধু
+// প্রথম ট্যাবেই IndexedDB lock পেত) — catch(()=>{}) থাকায় কোনো log-ও হতো
+// না, তাই এতদিন ধরা পড়েনি। Fix: synchronizeTabs:true দিয়ে একাধিক ট্যাব
+// নিরাপদে persistence শেয়ার করে; সাথে diagnostic log(silent-swallow না
+// রেখে) যোগ করা হলো, যাতে ভবিষ্যতে persistence fail করলে(যেমন সত্যিকারের
+// unsupported browser) console-এ দেখা যায়।
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  console.error("[DT-Diag] Firestore offline-persistence enable ব্যর্থ — code:", err && err.code, err);
+});
 const auth = firebase.auth();
 
 // --- Diagnostic helper(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported sudden
