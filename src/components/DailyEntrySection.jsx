@@ -42,7 +42,7 @@ function LabelText({
   return parts.map((part, i) => /^[০-৯]+$/.test(part) ? /*#__PURE__*/React.createElement("span", {
     key: i,
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif",
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       fontWeight: 700,
       color: "var(--theme-primary)"
     }
@@ -101,7 +101,7 @@ function CountStepper({
   }, "−"), /*#__PURE__*/React.createElement("span", {
     className: "w-8 text-center font-bold text-sm",
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif",
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: "#16302B"
     }
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
@@ -145,7 +145,7 @@ function NumberField({
   }, "\u2212"), /*#__PURE__*/React.createElement("span", {
     className: "w-8 text-center font-bold text-sm",
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif",
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: "#16302B"
     }
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
@@ -241,7 +241,7 @@ function FieldGroup({
   }, percentLabel && /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif",
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: percentColor || "#5B6B64",
       background: "var(--color-primary-soft, #E8F0EE)"
     }
@@ -490,18 +490,18 @@ export function DailyEntrySection({
     size: 16,
     color: "var(--theme-primary)"
   }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'Hind Siliguri', sans-serif", fontWeight: 700 }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
   }, toBn(viewDate.getDate())), " ", BN_MONTHS[viewDate.getMonth()], " ", /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'Hind Siliguri', sans-serif", fontWeight: 700 }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
   }, toBn(viewDate.getFullYear())))), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] font-semibold text-slate-400"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif"
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
     }
   }, toBn(getHijriDate(viewDate).day)), " ", getHijriDate(viewDate).month, " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Hind Siliguri', sans-serif"
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
     }
   }, toBn(getHijriDate(viewDate).year)), " হিজরি")), /*#__PURE__*/React.createElement("button", {
     onClick: () => {

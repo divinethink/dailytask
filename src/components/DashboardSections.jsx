@@ -47,7 +47,7 @@ export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPerce
     className: "text-xs font-bold text-emerald-900 flex-shrink-0"
   }, label), /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-bold text-emerald-900 flex-shrink-0",
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(primaryPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
     className: (delta >= 0 ? "text-emerald-700" : "text-red-700") + " text-[10px] font-medium whitespace-nowrap flex-shrink-0"
   }, deltaPrefix, toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
@@ -93,7 +93,7 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
     className: "text-[10px] text-slate-500 flex-1"
   }, rankPrefix), /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-[11px]",
-    style: { fontFamily: "'Hind Siliguri', sans-serif", color }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
   }, toBn(pct), "%")), /*#__PURE__*/React.createElement("div", {
     className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1 shadow-inner"
   }, /*#__PURE__*/React.createElement("div", {
@@ -300,7 +300,7 @@ function MonthNavControl({
   })), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold px-1"
   }, BN_MONTHS[monthCursor.month0], " ", /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -396,10 +396,10 @@ export function WeeklyReflectionSection({
       className: "flex items-center gap-2 px-3.5 py-2.5"
     }, /*#__PURE__*/React.createElement("span", {
       className: "bg-emerald-900 text-white text-xs font-bold px-2.5 py-1 rounded-full",
-      style: { fontFamily: "'Hind Siliguri', sans-serif" }
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "সপ্তাহ ", toBn(w)), /*#__PURE__*/React.createElement("span", {
       className: "text-[11px] text-slate-400 font-semibold",
-      style: { fontFamily: "'Hind Siliguri', sans-serif" }
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement("div", {
       className: "px-3.5 pb-3.5 space-y-2.5"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -515,12 +515,12 @@ export function MonthlyOverviewSection({
     className: "text-[10px] text-slate-400 font-bold"
   }, "গড় স্কোর"), /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.avgPct), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "text-[10px] text-slate-400 font-bold"
   }, "পূরণ করা দিন"), /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.filled), "/", toBn(total))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPrintMode(true),
     className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
@@ -559,7 +559,7 @@ export function MonthlyOverviewSection({
       style: {
         background: scoreColor(s),
         color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
-        fontFamily: "'Hind Siliguri', sans-serif",
+        fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
         boxShadow: isToday ? "0 0 0 2px var(--theme-primary), 0 2px 5px -1px rgba(0,0,0,0.15)" : "0 1px 2px rgba(0,0,0,0.06)"
       }
     }, toBn(d));
@@ -587,7 +587,7 @@ export function MonthlyOverviewSection({
     className: "text-[9px] font-medium text-slate-500"
   }, item.l, /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-slate-700",
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, "(", toBn(item.n), ")"))))), rankingSlot));
 }
 
@@ -669,7 +669,7 @@ export function MeetingMinutesSection({
       className: "flex items-center gap-2 min-w-0"
     }, /*#__PURE__*/React.createElement("span", {
       className: "bg-[#C89B3C] text-emerald-950 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0",
-      style: { fontFamily: "'Hind Siliguri', sans-serif" }
+      style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "ক্র. ", toBn(idx + 1)), row.topic && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-500 truncate"
     }, row.topic)), rows.length > 1 && /*#__PURE__*/React.createElement("button", {
@@ -869,7 +869,7 @@ export function WeeklySummaryToast({
   }, "\u0997\u09a4 \u09b8\u09aa\u09cd\u09a4\u09be\u09b9\u09c7\u09b0 \u09b8\u09be\u09b0\u09be\u0982\u09b6"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 mt-0.5"
   }, "\u0997\u09a1\u09bc \u09b8\u09cd\u0995\u09cb\u09b0 ", /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'Hind Siliguri', sans-serif", fontWeight: 700 }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
   }, toBn(avgPct) + "%"), " \u00b7 ", toBn(filled), "/", toBn(totalDays), " \u09a6\u09bf\u09a8 \u09b8\u09ae\u09cd\u09aa\u09c2\u09b0\u09cd\u09a3")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setWeeklySummaryToast(null),
     className: "text-slate-400 hover:text-slate-700 shrink-0"
@@ -910,7 +910,7 @@ export function MilestoneToast({
   }, "অভিনন্দন!"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-200 mt-0.5"
   }, /*#__PURE__*/React.createElement("span", {
-    style: { fontFamily: "'Hind Siliguri', sans-serif" }
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(milestoneToast)), " দিনের ধারাবাহিকতা পূর্ণ হয়েছে — মাশাআল্লাহ, চালিয়ে যান!")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setMilestoneToast(null),
     className: "text-slate-400 hover:text-white shrink-0"
