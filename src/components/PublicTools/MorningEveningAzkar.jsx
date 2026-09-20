@@ -1,16 +1,15 @@
 // MorningEveningAzkar.jsx — "আমল" হাব, item ৪(3_1 §"আমল হাব")। সকাল-সন্ধ্যার
 // আমল, pure reference(কোনো checklist/completion-state নেই, 3_1 Core Decision)।
 // ✏️(accordion, 3_6 §২.১) — App Creator UI থেকে সরাসরি এডিট করতে পারবেন।
-// Tab-ভাগ(সকাল/সন্ধ্যা) দুটো আলাদা sectionId("morning_azkar"/"evening_azkar")
-// হিসেবে রাখা হয়েছে(§৪.২ mockup-এর tab-UI অনুযায়ী) — EditableSection.jsx সম্পূর্ণ
-// generic থাকে(একটা sectionId/format-ই জানে), tab-নেভিগেশন এই component-এর
-// নিজস্ব local state।
+// §Tab-removal(১৯ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): সকাল/সন্ধ্যা কনটেন্ট
+// বাস্তবে প্রায় অভিন্ন(পার্থক্য শুধু দু'আর টেক্সটে) বলে আলাদা ট্যাব তুলে
+// দেওয়া হয়েছে — এখন শুধু একটাই তালিকা(sectionId "morning_azkar", owner
+// ইতিমধ্যে এখানেই সব আমল লিখে রেখেছেন)। পুরনো "evening_azkar" Firestore doc
+// (যদি কখনো এডিট হয়ে থাকে) touch/delete করা হয়নি — শুধু আর render হয় না।
 // React global(window.React, globals.js)।
 
 import { ChevronLeft } from "../icons.jsx";
 import { EditableSection } from "./EditableSection.jsx";
-
-const { useState } = React;
 
 // Default content(§২ Fallback নীতি) — App Creator এখনো এডিট না করলে এটাই
 // দেখাবে। প্রতিটা itemId fixed(edit করলে এই ডিফল্ট আর ব্যবহার হবে না, Firestore
@@ -53,47 +52,8 @@ const MORNING_DEFAULT = [
   },
 ];
 
-const EVENING_DEFAULT = [
-  {
-    itemId: "e_ayatul_kursi",
-    title: "আয়াতুল কুরসি(১ বার)",
-    body: "সন্ধ্যায় একবার আয়াতুল কুরসি পড়া — সকালের মতোই, সকাল পর্যন্ত হেফাজতের জন্য।",
-  },
-  {
-    itemId: "e_ikhlas_falaq_nas",
-    title: "সূরা ইখলাস, ফালাক ও নাস(প্রতিটি ৩ বার)",
-    body: "সন্ধ্যায়ও তিন সূরা প্রতিটি তিনবার করে পড়া, সকালের নিয়মের মতোই(তিরমিযি)।",
-  },
-  {
-    itemId: "e_sayidul_istighfar",
-    title: "সাইয়িদুল ইস্তিগফার(১ বার)",
-    body: "সন্ধ্যায় দৃঢ় বিশ্বাসে পড়লে, রাতে মারা গেলে জান্নাতি হওয়ার সুসংবাদ হাদিসে এসেছে(বুখারি)।",
-  },
-  {
-    itemId: "e_amsayna",
-    title: "আমসাইনা ওয়া আমসাল মুলকু লিল্লাহ(১ বার)",
-    body: "আমরা সন্ধ্যায় উপনীত হলাম এবং সব রাজত্ব আল্লাহরই জন্য সন্ধ্যায় উপনীত হলো... — সকালের দু'আর সন্ধ্যা-সংস্করণ(মুসলিম)।",
-  },
-  {
-    itemId: "e_subhanallah_bihamdihi",
-    title: "সুবহানাল্লাহি ওয়া বিহামদিহি(১০০ বার)",
-    body: "সন্ধ্যায়ও একই ফজিলত(মুসলিম) — সকালের মতোই ১০০ বার।",
-  },
-  {
-    itemId: "e_audhu",
-    title: "আউজু বিকালিমাতিল্লাহিত তাম্মাতি মিন শাররি মা খলাক্ব(৩ বার)",
-    body: "আমি আল্লাহর পূর্ণাঙ্গ কালিমাসমূহের মাধ্যমে তাঁর সৃষ্টির অনিষ্ট থেকে আশ্রয় চাচ্ছি — সন্ধ্যায় ৩ বার পড়লে কোনো কিছু ক্ষতি করতে পারবে না বলে হাদিসে এসেছে(তিরমিযি)।",
-  },
-  {
-    itemId: "e_durud",
-    title: "দুরুদ শরীফ(কমপক্ষে ১০ বার)",
-    body: "সন্ধ্যায়ও দুরুদ পাঠ চালিয়ে যাওয়া — সকালের নিয়মের মতোই।",
-  },
-];
 
 export function MorningEveningAzkar({ onBack }) {
-  const [period, setPeriod] = useState("morning");
-
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
@@ -110,47 +70,19 @@ export function MorningEveningAzkar({ onBack }) {
     /*#__PURE__*/React.createElement(
       "div",
       {
-        className: "px-4 pb-2 text-lg font-semibold",
+        className: "px-4 pb-3 text-lg font-semibold",
         style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" },
       },
       "সকাল-সন্ধ্যার আমল"
     ),
     /*#__PURE__*/React.createElement(
       "div",
-      { className: "px-4 pb-3 flex gap-2" },
-      [
-        { key: "morning", label: "সকালের আমল" },
-        { key: "evening", label: "সন্ধ্যার আমল" },
-      ].map((t) =>
-        /*#__PURE__*/React.createElement(
-          "button",
-          {
-            key: t.key,
-            type: "button",
-            onClick: () => setPeriod(t.key),
-            className:
-              "flex-1 py-2 rounded-xl text-sm font-semibold border " +
-              (period === t.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"),
-            style: period === t.key ? { background: "var(--theme-primary, #0E4B43)" } : undefined,
-          },
-          t.label
-        )
-      )
-    ),
-    /*#__PURE__*/React.createElement(
-      "div",
       { className: "px-4" },
-      period === "morning"
-        ? /*#__PURE__*/React.createElement(EditableSection, {
-            sectionId: "morning_azkar",
-            format: "accordion",
-            defaultContent: MORNING_DEFAULT,
-          })
-        : /*#__PURE__*/React.createElement(EditableSection, {
-            sectionId: "evening_azkar",
-            format: "accordion",
-            defaultContent: EVENING_DEFAULT,
-          })
+      /*#__PURE__*/React.createElement(EditableSection, {
+        sectionId: "morning_azkar",
+        format: "accordion",
+        defaultContent: MORNING_DEFAULT,
+      })
     )
   );
 }
