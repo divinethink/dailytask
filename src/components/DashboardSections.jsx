@@ -42,7 +42,7 @@ export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPerce
   // চরম extreme-zoom edge-case-এর জন্য safety-net(স্বাভাবিক অবস্থায় কখনো
   // scroll লাগবে না, clip/hidden-content-এর চেয়ে নিরাপদ ফলব্যাক)।
   return /*#__PURE__*/React.createElement("div", {
-    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center flex-nowrap overflow-x-auto gap-x-1.5"
+    className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center justify-center flex-nowrap overflow-x-auto gap-x-1.5"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-emerald-900 flex-shrink-0"
   }, label), /*#__PURE__*/React.createElement("span", {
