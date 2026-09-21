@@ -3,10 +3,11 @@
 // accordion-item-id helper। single-owner(App-Creator-only, Rules-এ enforced),
 // top-level `publicToolsContent/{sectionId}` collection — family-Firestore/
 // V1-V2 structure থেকে সম্পূর্ণ independent(ব্লগ/কুইজের quizData.js pattern reuse)।
-import { db, auth } from "./firebaseConfig.js";
+import { authModular as auth, dbModular as db } from "./firebaseConfig.js";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 function sectionRef(sectionId) {
-  return db.collection("publicToolsContent").doc(sectionId);
+  return doc(db, "publicToolsContent", sectionId);
 }
 
 // §২ Fallback নীতি — doc না থাকলে বা read error হলে null(কখনো throw না)।
@@ -15,8 +16,10 @@ function sectionRef(sectionId) {
 // এই ফাংশন শুধু raw doc data ফেরত দেয়, কোনো একক "format" ফিল্ডকে authority ধরে না।
 async function fetchSection(sectionId) {
   try {
-    const snap = await sectionRef(sectionId).get();
-    return snap.exists ? snap.data() : null;
+    const snap = await getDoc(sectionRef(sectionId));
+    // modular v9-এ exists boolean-property না, method(snap.exists()) —
+    // compat→modular-এর সবচেয়ে সাধারণ breaking-difference, এখানে সংশোধিত।
+    return snap.exists() ? snap.data() : null;
   } catch (e) {
     return null;
   }
@@ -32,11 +35,12 @@ function requireCreator() {
 // একটা format সেভ করলে অন্য format-field মুছে যাবে না।
 async function saveRichtext(sectionId, body) {
   const user = requireCreator();
-  await sectionRef(sectionId).set(
+  await setDoc(
+    sectionRef(sectionId),
     {
       format: "richtext",
       richtext: { body: (body || "").trim() },
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: serverTimestamp(),
       updatedBy: user.uid,
     },
     { merge: true }
@@ -45,11 +49,12 @@ async function saveRichtext(sectionId, body) {
 
 async function saveAccordion(sectionId, items) {
   const user = requireCreator();
-  await sectionRef(sectionId).set(
+  await setDoc(
+    sectionRef(sectionId),
     {
       format: "accordion",
       accordion: { items: Array.isArray(items) ? items : [] },
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: serverTimestamp(),
       updatedBy: user.uid,
     },
     { merge: true }
@@ -58,14 +63,15 @@ async function saveAccordion(sectionId, items) {
 
 async function saveTable(sectionId, columns, rows) {
   const user = requireCreator();
-  await sectionRef(sectionId).set(
+  await setDoc(
+    sectionRef(sectionId),
     {
       format: "table",
       table: {
         columns: Array.isArray(columns) ? columns : [],
         rows: Array.isArray(rows) ? rows : [],
       },
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: serverTimestamp(),
       updatedBy: user.uid,
     },
     { merge: true }
