@@ -1,3 +1,17 @@
+// Phase 1(নতুন, ২১ সেপ্টেম্বর ২০২৬, modular v9 SDK Migration Plan — additive-only,
+// zero-risk প্রথম ধাপ): getApp()/getFirestore()/getAuth()/getAnalytics() —
+// এই ৪টা modular import নতুন যোগ হলো, কিন্তু নিচের কোনো existing compat লাইন
+// (firebase.initializeApp/.firestore()/.auth()/.analytics()/.appCheck())
+// touch হয়নি। App Check ইচ্ছাকৃতভাবে এই ধাপে বাদ — initializeAppCheck()
+// দ্বিতীয়বার কল করলে duplicate-init error দেওয়ার ঝুঁকি আছে(compat-এর
+// firebase.appCheck().activate() ইতিমধ্যে এটা করে ফেলেছে); App Check-এর
+// modular সংস্করণ শুধু firebaseConfig.js নিজে convert হওয়ার ধাপে(Phase 2,
+// এককালীন cutover হিসেবে) যোগ হবে।
+import { getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
+
 // Firebase Setup
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -54,6 +68,26 @@ db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
 });
 const auth = firebase.auth();
 
+// --- Phase 1(modular SDK, same default app, parallel-only, additive) ---
+// এই ব্লক ইচ্ছাকৃতভাবে উপরের compat db/auth init + db.enablePersistence()
+// সম্পূর্ণ হওয়ার *পরে* বসানো হয়েছে — Firestore instance-এর persistence/
+// settings শুধু প্রথম operation-এর আগেই set করা যায়, তাই getFirestore()
+// কে persistence-enable কল-এর আগে চালালে race/ভুল-settings তৈরি হওয়ার
+// ঝুঁকি থাকত। এখানে getApp()/getFirestore()/getAuth()/getAnalytics() —
+// এই ৪টাই compat-এর ইতিমধ্যে-তৈরি ও persistence-configured একই app/db/auth
+// instance ফেরত দেয়(নতুন initializeApp() বা নতুন Firestore-settings তৈরি
+// হয় না)। dbModular/authModular/analyticsModular এখনো কোথাও import/ব্যবহার
+// হচ্ছে না — শুধু init সফল হচ্ছে কিনা প্রমাণ করার জন্য এই ধাপে export করা।
+const modularApp = getApp();
+const dbModular = getFirestore(modularApp);
+const authModular = getAuth(modularApp);
+let analyticsModular = null;
+try {
+  analyticsModular = getAnalytics(modularApp);
+} catch (e) {
+  console.error("Firebase Analytics(modular) init failed:", e);
+}
+
 // --- Diagnostic helper(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported sudden
 // Google Sign-in/Add-Member ব্যর্থতা ইনসিডেন্ট-এর পরে) ---
 // Firestore-এর "Missing or insufficient permissions" ও Google Sign-in
@@ -74,4 +108,4 @@ function logAuthDiagnostics(context, err) {
   } catch (e) { /* diagnostic কখনো app-flow block করবে না */ }
 }
 
-export { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics };
+export { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, dbModular, authModular, analyticsModular };
