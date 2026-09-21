@@ -1,4 +1,4 @@
-import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
+import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, dbModular, authModular } from "./firebaseConfig.js";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
@@ -2996,8 +2996,8 @@ function App() {
     weeklyDirtyRef: weeklyDirtyRef,
     AppLogo: AppLogo,
     BN_MONTHS: BN_MONTHS,
-    auth: auth,
-    db: db,
+    auth: authModular,
+    db: dbModular,
     getFamilyCode: getFamilyCode,
     getFamilyId: getFamilyId,
     isGoogleLinked: isGoogleLinked,
