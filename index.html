@@ -61,6 +61,21 @@
 <link rel="preconnect" href="https://www.google.com" />
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
 
+<!-- লোড-স্পিড ফিক্স(২১ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড "অ্যাপ ওপেন হতে সময় নেয়"):
+     এই ফন্ট-লিংক আগে src/legacy/appHelpers.js-এর useFonts()(useEffect) দিয়ে
+     JS-execution-এর পরে dynamically inject হতো — অর্থাৎ React/JS bundle পুরো
+     download+parse+execute হওয়া পর্যন্ত ফন্ট-ডাউনলোড শুরুই হতো না(দুর্বল-প্রসেসর
+     ডিভাইসে এই serial-chain-ই সবচেয়ে বড় বিলম্বের একটা কারণ)। এখন static HTML-এ
+     সরাসরি বসানো হলো, যাতে browser-এর preload-scanner শুরুতেই(কোনো JS ছাড়াই)
+     ফন্ট-ফাইল fetch শুরু করতে পারে। href হুবহু অপরিবর্তিত(ফন্ট/weight/display
+     কিছুই বদলায়নি)। useFonts() হুক নিজে সরানো হয়নি(app.js/appHelpers.js touch
+     হয়নি) — id="dt-fonts" এখানেও দেওয়া হয়েছে যাতে হুকের বিদ্যমান
+     `document.getElementById(id)` duplicate-guard এটাকে already-present ধরে
+     no-op করে, দ্বিতীয়বার fetch না হয়। -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link id="dt-fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+
 <script>
   // Suppresses a known-safe, cosmetic console warning:
   // Firestore's enableIndexedDbPersistence() deprecation notice
