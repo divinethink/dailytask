@@ -555,7 +555,16 @@ import {
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { NotificationPanel } from "../components/NotificationPanel.jsx";
 import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
-import { ArchiveModal, BackupOptionsModal, DriveRestoreModal, ImportOptionsModal } from "../components/BackupRestore.jsx";
+// §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, বিদ্যমান PrintReport/Public-Tools lazy
+// pattern reuse): এই ৪টা মোডাল সবসময় mount থাকে(শুধু `show` prop visibility
+// নিয়ন্ত্রণ করে), তাই static import থাকলে প্রতিটা boot-এ parse হতো যদিও
+// বেশিরভাগ session-এ কখনো খোলা হয় না। এখন React.lazy()+ব্যবহারের জায়গায়
+// React.Suspense(fallback: null, কারণ show=false-এ এমনিতেও কিছু render হয়
+// না) দিয়ে আলাদা chunk-এ সরানো হলো — কোনো logic/condition/prop অপরিবর্তিত।
+const ArchiveModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ArchiveModal })));
+const BackupOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.BackupOptionsModal })));
+const DriveRestoreModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.DriveRestoreModal })));
+const ImportOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ImportOptionsModal })));
 import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // §Part B §B৫(Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
@@ -586,7 +595,9 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬): আগে
 // DashboardHeader.jsx-এর হ্যামবার্গার dropdown ছিল, এখন bottom-nav "মেনু"
 // ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
-import { MenuPage } from "../components/MenuPage.jsx";
+// §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, একই pattern): TAB_SETTINGS-এ ট্যাপ না
+// করলে এই chunk লোড হবে না।
+const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 // §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো(3_2 §১-এর নীতি
@@ -2741,6 +2752,7 @@ function App() {
     // থেকে ট্রিগার করা বাটনগুলো কোনো modal-ই দেখাবে না।
     if (activeTab === TAB_SETTINGS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(React.Suspense, { fallback: null },
         React.createElement(MenuPage, {
           isGuestMode: isGuestMode,
           onGuestSignInTap: () => setShowGuestSignIn(true),
@@ -2773,8 +2785,8 @@ function App() {
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
           themeColorPickerEl: themeColorPickerEl
-        }),
-        React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive}),
+        })),
+        React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})),
         React.createElement(FamilyCodeChoiceModal, {
           show: showFamilyCodeChoiceModal,
           onClose: () => setShowFamilyCodeChoiceModal(false),
@@ -2798,7 +2810,7 @@ function App() {
           handleRenameFamilyCode,
           FAMILY_CODE_MIN_LENGTH
         }),
-        React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick}),
+        React.createElement(React.Suspense, { fallback: null }, React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick})),
         /*#__PURE__*/React.createElement("input", {
           ref: importFileInputRef,
           type: "file",
@@ -2809,8 +2821,8 @@ function App() {
           },
           className: "hidden"
         }),
-        React.createElement(ImportOptionsModal, {show: showImportOptionsModal, onClose: () => setShowImportOptionsModal(false), handleManualDriveRestoreClick, driveRestoreChecking, importFileInputRef}),
-        React.createElement(DriveRestoreModal, {show: showDriveRestoreModal, candidate: driveRestoreCandidate, onClose: () => setShowDriveRestoreModal(false), driveRestoreBusy, handleConfirmDriveRestore}),
+        React.createElement(React.Suspense, { fallback: null }, React.createElement(ImportOptionsModal, {show: showImportOptionsModal, onClose: () => setShowImportOptionsModal(false), handleManualDriveRestoreClick, driveRestoreChecking, importFileInputRef})),
+        React.createElement(React.Suspense, { fallback: null }, React.createElement(DriveRestoreModal, {show: showDriveRestoreModal, candidate: driveRestoreCandidate, onClose: () => setShowDriveRestoreModal(false), driveRestoreBusy, handleConfirmDriveRestore})),
         React.createElement(FeedbackModal, {
           feedbackMsg: feedbackMsg,
           feedbackSending: feedbackSending,
@@ -3167,7 +3179,7 @@ function App() {
     setMonthRefreshKey: setMonthRefreshKey,
     weeklyDirtyRef: weeklyDirtyRef,
     meetingDirtyRef: meetingDirtyRef
-  })), React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive}), React.createElement(FamilyCodeChoiceModal, {
+  })), React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})), React.createElement(FamilyCodeChoiceModal, {
     show: showFamilyCodeChoiceModal,
     onClose: () => setShowFamilyCodeChoiceModal(false),
     isAdmin,
@@ -3213,7 +3225,7 @@ function App() {
   // MemberRequestsModal("সদস্য হোন" submit+admin-approve — approve-branch
   // google-only family-তে Rules-blocked) সরানো হয়েছে।
 
-  React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick}), /*#__PURE__*/React.createElement("input", {
+  React.createElement(React.Suspense, { fallback: null }, React.createElement(BackupOptionsModal, {show: showBackupOptionsModal, onClose: () => setShowBackupOptionsModal(false), driveBackupStatus, driveBackupBusy, handleDriveBackupClick, isGoogleLinked, handleExportData, handleBothBackupClick})), /*#__PURE__*/React.createElement("input", {
     ref: importFileInputRef,
     type: "file",
     accept: ".json,application/json,text/plain,text/json,application/octet-stream",
@@ -3222,7 +3234,7 @@ function App() {
       setShowImportOptionsModal(false);
     },
     className: "hidden"
-  }), React.createElement(ImportOptionsModal, {show: showImportOptionsModal, onClose: () => setShowImportOptionsModal(false), handleManualDriveRestoreClick, driveRestoreChecking, importFileInputRef}), React.createElement(DriveRestoreModal, {show: showDriveRestoreModal, candidate: driveRestoreCandidate, onClose: () => setShowDriveRestoreModal(false), driveRestoreBusy, handleConfirmDriveRestore}), React.createElement(DeleteAccountWarningModal, {
+  }), React.createElement(React.Suspense, { fallback: null }, React.createElement(ImportOptionsModal, {show: showImportOptionsModal, onClose: () => setShowImportOptionsModal(false), handleManualDriveRestoreClick, driveRestoreChecking, importFileInputRef})), React.createElement(React.Suspense, { fallback: null }, React.createElement(DriveRestoreModal, {show: showDriveRestoreModal, candidate: driveRestoreCandidate, onClose: () => setShowDriveRestoreModal(false), driveRestoreBusy, handleConfirmDriveRestore})), React.createElement(DeleteAccountWarningModal, {
     handleDeleteGoogleAccount: handleDeleteGoogleAccount,
     setShowDeleteAccountWarning: setShowDeleteAccountWarning,
     showDeleteAccountWarning: showDeleteAccountWarning
