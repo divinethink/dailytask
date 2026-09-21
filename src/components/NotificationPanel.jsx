@@ -3,6 +3,7 @@
 // globals, and cross-feature setters/handlers passed through as props (state/logic
 // ownership stays in App()). JSX + inline Firestore calls unchanged (moved as-is).
 import { Trash } from "./icons.jsx";
+import { doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 
 export function NotificationPanel({
   show,
@@ -24,9 +25,7 @@ export function NotificationPanel({
     className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex items-start gap-2"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => {
-      db.collection("families").doc(getFamilyId())
-        .collection("notifications").doc(n.id)
-        .update({ read: true }).catch(() => {});
+      updateDoc(doc(db, "families", getFamilyId(), "notifications", n.id), { read: true }).catch(() => {});
       // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
       // "member_request" type click → MemberRequestsModal open করার branch
       // সরানো হয়েছে(সেই মোডাল নিজেই সরানো হয়েছে, app.js দ্রষ্টব্য) — পুরনো,
@@ -42,9 +41,7 @@ export function NotificationPanel({
     type: "button",
     onClick: e => {
       e.stopPropagation();
-      db.collection("families").doc(getFamilyId())
-        .collection("notifications").doc(n.id)
-        .delete().catch(() => {});
+      deleteDoc(doc(db, "families", getFamilyId(), "notifications", n.id)).catch(() => {});
       setNotifications(prev => prev.filter(x => x.id !== n.id));
     },
     className: "shrink-0 p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors",
@@ -55,9 +52,9 @@ export function NotificationPanel({
       e.stopPropagation();
       const all = notifications;
       if (all.length === 0) return;
-      const batch = db.batch();
+      const batch = writeBatch(db);
       all.forEach(n => {
-        batch.delete(db.collection("families").doc(getFamilyId()).collection("notifications").doc(n.id));
+        batch.delete(doc(db, "families", getFamilyId(), "notifications", n.id));
       });
       batch.commit().catch(() => {});
       setNotifications([]);

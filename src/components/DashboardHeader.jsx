@@ -14,6 +14,7 @@
 // are NOT true globals (lesson from G1 toBn prop-miss bug — nothing assumed global
 // except React and icons.jsx imports).
 import { ChevronDown, User, X } from "./icons.jsx";
+import { doc, writeBatch } from "firebase/firestore";
 import { NotificationPanel } from "./NotificationPanel.jsx";
 import { ProfileDropdownGoogle } from "./ProfileDropdownGoogle.jsx";
 
@@ -162,10 +163,10 @@ export function DashboardHeader({
           // read:true mark করা হয়(badge কমানোর জন্য), list অপরিবর্তিত থাকে।
           const toMark = notifications.filter(n => !n.read);
           if (toMark.length > 0) {
-            const batch = db.batch();
+            const batch = writeBatch(db);
             toMark.forEach(n => {
               batch.update(
-                db.collection("families").doc(getFamilyId()).collection("notifications").doc(n.id),
+                doc(db, "families", getFamilyId(), "notifications", n.id),
                 { read: true }
               );
             });
