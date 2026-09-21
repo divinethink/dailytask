@@ -3,7 +3,8 @@
 // shuffle utility + personal-best(localStorage)। 3_5_Quiz_Feature_Plan.md
 // §২/§৩/§৫-এর সাথে সামঞ্জস্যপূর্ণ — top-level `quizQuestions` collection,
 // single-owner(App-Creator-only), ব্লগের চেয়ে সরল(কোনো writer-allowlist না)।
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
 
 // §১.১(সংশোধিত, ১৮ সেপ্টেম্বর ২০২৬, owner-approved) — কুইজের category-list এখন
 // ব্লগের ১৮-ক্যাটাগরি তালিকা থেকে ইচ্ছাকৃতভাবে বিচ্ছিন্ন, কুইজ-নির্দিষ্ট সরলীকৃত
@@ -28,24 +29,24 @@ const QUESTIONS_PER_SESSION = 10;
 const BEST_SCORE_KEY = "dt_pt_quiz_bestscore";
 
 function questionsRef() {
-  return db.collection("quizQuestions");
+  return collection(db, "quizQuestions");
 }
 
 // --- Questions(§২.১) ---
 async function fetchAllQuestions() {
-  const snap = await questionsRef().get();
+  const snap = await getDocs(questionsRef());
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 async function fetchQuestionsByCategory(category) {
-  const snap = await questionsRef().where("category", "==", category).get();
+  const snap = await getDocs(query(questionsRef(), where("category", "==", category)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 async function createQuestion({ category, question, options, correctIndex, explanation }) {
   const user = auth.currentUser;
   if (!user) throw new Error("সাইন-ইন প্রয়োজন");
-  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const now = serverTimestamp();
   const payload = {
     category,
     question: (question || "").trim(),
@@ -56,23 +57,23 @@ async function createQuestion({ category, question, options, correctIndex, expla
     createdAt: now,
     updatedAt: now,
   };
-  const ref = await questionsRef().add(payload);
+  const ref = await addDoc(questionsRef(), payload);
   return ref.id;
 }
 
 async function updateQuestion(questionId, { category, question, options, correctIndex, explanation }) {
-  await questionsRef().doc(questionId).update({
+  await updateDoc(doc(questionsRef(), questionId), {
     category,
     question: (question || "").trim(),
     options: Array.isArray(options) ? options.map((o) => (o || "").trim()) : [],
     correctIndex: Number(correctIndex),
     explanation: explanation ? explanation.trim() : null,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 }
 
 async function deleteQuestion(questionId) {
-  await questionsRef().doc(questionId).delete();
+  await deleteDoc(doc(questionsRef(), questionId));
 }
 
 // --- ডিফল্ট প্রশ্ন-ব্যাংক ইম্পোর্ট(App Creator-only, Rules-এ create শুধু creator-এর) ---
@@ -85,11 +86,11 @@ async function importSeedQuestions() {
   const seed = buildSeedQuestions();
   const existing = new Set((await fetchAllQuestions()).map((q) => q.id));
   const missing = seed.filter((q) => !existing.has(q.id));
-  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const now = serverTimestamp();
   for (let i = 0; i < missing.length; i += 400) {
-    const batch = db.batch();
+    const batch = writeBatch(db);
     missing.slice(i, i + 400).forEach((q) => {
-      batch.set(questionsRef().doc(q.id), {
+      batch.set(doc(questionsRef(), q.id), {
         category: q.category,
         question: q.question,
         options: q.options,
