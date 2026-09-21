@@ -6,6 +6,7 @@
 // googleProvider, linkGoogleAccount, syncFamilyCodeWithAccount) added as explicit
 // new props (were closures before — G1 toBn lesson applied proactively).
 import { InfoIcon, Loader2, X } from "./icons.jsx";
+import { signInWithCredential, signInWithPopup } from "firebase/auth";
 
 // React hooks are true globals here (app.js destructures them from the global
 // React the same way — see DashboardSections.jsx for the same established note).
@@ -40,9 +41,9 @@ export function GoogleAccountModal({
     if (pendingRecovery) {
       try {
         if (pendingRecovery.type === "credential") {
-          await auth.signInWithCredential(pendingRecovery.credential);
+          await signInWithCredential(auth, pendingRecovery.credential);
         } else {
-          await auth.signInWithPopup(googleProvider);
+          await signInWithPopup(auth, googleProvider);
         }
         try {
           localStorage.setItem("dt_check_drive_after_reload", "1");
