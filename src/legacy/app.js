@@ -1,4 +1,5 @@
 import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, dbModular, authModular } from "./firebaseConfig.js";
+import { GoogleAuthProvider } from "firebase/auth";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
@@ -2637,9 +2638,9 @@ function App() {
     onClose: () => setShowGoogleAccountModal(false),
     onLinked: checkDriveBackupAfterLink,
     memberName: selectedMember?.name,
-    auth: auth,
+    auth: authModular,
     claimFirstAdminIfEligible: claimFirstAdminIfEligible,
-    googleProvider: googleProvider,
+    googleProvider: googleProviderModular,
     linkGoogleAccount: linkGoogleAccount,
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
@@ -3293,6 +3294,14 @@ function App() {
 // Redirect-based flows survive a full page reload, so any pending
 // action/result is remembered across that reload via localStorage.
 const googleProvider = new firebase.auth.GoogleAuthProvider();
+// modular v9 SDK Migration Plan, GoogleAccountModal.jsx ধাপ(২১ সেপ্টেম্বর
+// ২০২৬): উপরের compat `googleProvider` এখনো linkGoogleAccount()/সরাসরি
+// signInWithPopup() কল(নিচে, এখনো compat-syntax)-এ ব্যবহৃত হয় — সেগুলো
+// touch করা হয়নি। GoogleAccountModal.jsx-কে আলাদা, dedicated modular
+// provider instance দেওয়া হলো(শুধু এই একটা consumer-এর জন্য) — shared
+// compat constant-টা compat-code-এর জন্য অক্ষুণ্ণ রেখে blast-radius
+// ন্যূনতম রাখতে।
+const googleProviderModular = new GoogleAuthProvider();
 // Popup instead of redirect: a redirect round-trip depends on session/local
 // storage surviving the navigation away to Google and back, which silently
 // fails on browsers that partition storage for third-party contexts (this
