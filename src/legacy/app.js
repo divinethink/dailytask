@@ -1,5 +1,6 @@
 import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, dbModular, authModular } from "./firebaseConfig.js";
 import { GoogleAuthProvider } from "firebase/auth";
+import { query, where, documentId, onSnapshot } from "firebase/firestore";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
@@ -1388,15 +1389,17 @@ function App() {
     const prefix = ctx.mode === "v2"
       ? `${selectedId}_${year}-${pad2(month0 + 1)}-`
       : `entry:${selectedId}:${year}-${pad2(month0 + 1)}-`;
-    const q = ctx.entriesRef
-      .where(firebase.firestore.FieldPath.documentId(), ">=", prefix)
-      .where(firebase.firestore.FieldPath.documentId(), "<", prefix + "\uf8ff");
-    const unsub = q.onSnapshot(snap => {
+    const q = query(
+      ctx.entriesRef,
+      where(documentId(), ">=", prefix),
+      where(documentId(), "<", prefix + "\uf8ff")
+    );
+    const unsub = onSnapshot(q, snap => {
       const liveData = {};
-      snap.docs.forEach(doc => {
-        const dayStr = doc.id.slice(prefix.length);
+      snap.docs.forEach(docSnap => {
+        const dayStr = docSnap.id.slice(prefix.length);
         try {
-          liveData[dayStr] = JSON.parse(doc.data().value);
+          liveData[dayStr] = JSON.parse(docSnap.data().value);
         } catch {
           // Skip a malformed single entry rather than break the whole
           // month's view over one bad document.

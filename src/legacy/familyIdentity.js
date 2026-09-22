@@ -2,7 +2,8 @@
 // (legacy/v2 routing), App Creator override, account-based family recovery
 // mapping, isGoogleLinked() (moved here from app.js boot-section — needed
 // by both this file ও memberData.js, single source of truth).
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDoc, getDocs, query, where, documentId, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { FAMILY_CODE_CHARS, generateSecureCode } from "./appHelpers.js";
 // §২.৪ Identity Simplification — Sign Up(§২.১) নতুন Google-only family
 // creation path-এর জন্য(নিচে createNewFamilyGoogleOnly)। শুধু এই একটা
@@ -24,8 +25,8 @@ async function enterFamilyAsCreator(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   try {
-    const snap = await db.collection("familyCodes").doc(normalized).get();
-    if (!snap.exists) {
+    const snap = await getDoc(doc(db, "familyCodes", normalized));
+    if (!snap.exists()) {
       console.error("[Creator override] এই কোডের কোনো family পাওয়া যায়নি।");
       return { aborted: true, reason: "not-found" };
     }
@@ -114,19 +115,19 @@ async function changeFamilyCodeForExistingFamily(newCode) {
   }
   try {
     let oldCode = null;
-    await db.runTransaction(async tx => {
-      const familyRef = db.collection("families").doc(familyId);
+    await runTransaction(db, async tx => {
+      const familyRef = doc(db, "families", familyId);
       const snap = await tx.get(familyRef);
-      if (!snap.exists) throw new Error("families ডকুমেন্ট পাওয়া যায়নি।");
+      if (!snap.exists()) throw new Error("families ডকুমেন্ট পাওয়া যায়নি।");
       const fam = snap.data();
       if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
         throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
       }
       oldCode = fam.familyCode || null;
       const newKey = normalizeFamilyKey(normalized);
-      const newCodeRef = db.collection("familyCodes").doc(newKey);
+      const newCodeRef = doc(db, "familyCodes", newKey);
       const newCodeSnap = await tx.get(newCodeRef);
-      if (newCodeSnap.exists && newCodeSnap.data().familyId !== familyId) {
+      if (newCodeSnap.exists() && newCodeSnap.data().familyId !== familyId) {
         throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
       }
       tx.set(newCodeRef, { familyId, createdAt: Date.now() });
@@ -142,10 +143,10 @@ async function changeFamilyCodeForExistingFamily(newCode) {
       if (oldCode) {
         const oldKey = normalizeFamilyKey(oldCode);
         if (oldKey !== newKey) {
-          tx.delete(db.collection("familyCodes").doc(oldKey));
+          tx.delete(doc(db, "familyCodes", oldKey));
         }
         if (oldCode !== oldKey && oldCode !== newKey) {
-          tx.delete(db.collection("familyCodes").doc(oldCode));
+          tx.delete(doc(db, "familyCodes", oldCode));
         }
       }
     });
@@ -193,15 +194,15 @@ async function createNewFamily(newCode) {
     // overwrite)। changeFamilyCodeForExistingFamily()-এর একই প্যাটার্নে
     // get+set একই transaction-এ এনে atomic করা হলো — lookup key/flow
     // অপরিবর্তিত, শুধু atomicity যোগ হয়েছে।
-    const codeRef = db.collection("familyCodes").doc(normalizeFamilyKey(normalized));
-    await db.runTransaction(async tx => {
+    const codeRef = doc(db, "familyCodes", normalizeFamilyKey(normalized));
+    await runTransaction(db, async tx => {
       const codeSnap = await tx.get(codeRef);
-      if (codeSnap.exists) {
+      if (codeSnap.exists()) {
         throw new Error("code-taken");
       }
       tx.set(codeRef, { familyId: newFamilyId, createdAt: Date.now() });
     });
-    await db.collection("families").doc(newFamilyId).set({
+    await setDoc(doc(db, "families", newFamilyId), {
       familyId: newFamilyId,
       familyCode: normalized,
       isCustomCode: true,
@@ -225,7 +226,7 @@ async function createNewFamily(newCode) {
     // পরে claimFirstAdminIfEligible() বা ম্যানুয়াল রিকভারি সম্ভব।
     if (auth.currentUser) {
       try {
-        await db.collection("families").doc(newFamilyId).update({
+        await updateDoc(doc(db, "families", newFamilyId), {
           adminUids: [auth.currentUser.uid],
           firstAdminUid: auth.currentUser.uid,
           updatedAt: Date.now()
@@ -291,16 +292,16 @@ async function createNewFamilyGoogleOnly(newCode, name, gender) {
   const uid = auth.currentUser.uid;
   const newFamilyId = generateSecureCode(20);
   try {
-    const codeRef = db.collection("familyCodes").doc(normalizeFamilyKey(normalized));
-    await db.runTransaction(async tx => {
+    const codeRef = doc(db, "familyCodes", normalizeFamilyKey(normalized));
+    await runTransaction(db, async tx => {
       const codeSnap = await tx.get(codeRef);
-      if (codeSnap.exists) {
+      if (codeSnap.exists()) {
         throw new Error("code-taken");
       }
       tx.set(codeRef, { familyId: newFamilyId, createdAt: Date.now() });
     });
-    const familyRef = db.collection("families").doc(newFamilyId);
-    await familyRef.set({
+    const familyRef = doc(db, "families", newFamilyId);
+    await setDoc(familyRef, {
       familyId: newFamilyId,
       familyCode: normalized,
       isCustomCode: true,
@@ -313,18 +314,18 @@ async function createNewFamilyGoogleOnly(newCode, name, gender) {
     });
     // Rules: adminUids.size()==0 → [uid] + firstAdminUid(একবারই, উপরের
     // পুরনো createNewFamily()-এর মতোই একই clause reuse)।
-    await familyRef.update({
+    await updateDoc(familyRef, {
       adminUids: [uid],
       firstAdminUid: uid,
       updatedAt: Date.now()
     });
     // identityModel — দুই-ধাপ(Rules-gated), উপরের কমেন্ট দ্রষ্টব্য।
-    await familyRef.update({ identityModel: "transitioning", updatedAt: Date.now() });
-    await familyRef.update({ identityModel: "google-only", updatedAt: Date.now() });
+    await updateDoc(familyRef, { identityModel: "transitioning", updatedAt: Date.now() });
+    await updateDoc(familyRef, { identityModel: "google-only", updatedAt: Date.now() });
     // First-admin member — claimed অবস্থাতেই তৈরি(googleUid=uid), কখনো
     // email field বসে না(unclaimed-proxy পথ ভিন্ন, §৫.১)।
     const memberId = generateSecureCode(16);
-    await familyRef.collection("members").doc(memberId).set({
+    await setDoc(doc(familyRef, "members", memberId), {
       name: name.trim(),
       gender: gender || null,
       role: "admin",
@@ -359,11 +360,11 @@ async function resolveFamilyIdFromCode(code) {
     // বিদ্যমান সব production family raw(uppercase, auto-generated) doc-id-তে
     // আছে — তাই normalized-key প্রথমে try, miss হলে raw-code fallback।
     // এতে কোনো migration ছাড়াই existing lookup আচরণ অক্ষুণ্ণ থাকে।
-    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
-    if (!codeSnap.exists) {
-      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    let codeSnap = await getDoc(doc(db, "familyCodes", normalizeFamilyKey(normalized)));
+    if (!codeSnap.exists()) {
+      codeSnap = await getDoc(doc(db, "familyCodes", normalized));
     }
-    if (!codeSnap.exists) {
+    if (!codeSnap.exists()) {
       return { ok: false, reason: "not-found" };
     }
     const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
@@ -376,8 +377,8 @@ async function resolveFamilyIdFromCode(code) {
     // migrationState নিরাপদে resolve করবে (একই fallback pattern যা
     // বুট-টাইমে আগে থেকেই ব্যবহৃত হয়)।
     try {
-      const famSnap = await db.collection("families").doc(targetFamilyId).get();
-      if (!famSnap.exists) {
+      const famSnap = await getDoc(doc(db, "families", targetFamilyId));
+      if (!famSnap.exists()) {
         return { ok: false, reason: "not-found" };
       }
       const migrationState = famSnap.data().migrationState || "legacy";
@@ -421,15 +422,15 @@ async function checkFamilyCodeExists(code) {
   const normalized = (code || "").trim();
   if (!normalized) return { exists: false, reason: "empty" };
   try {
-    let codeSnap = await db.collection("familyCodes").doc(normalizeFamilyKey(normalized)).get();
-    if (!codeSnap.exists) {
-      codeSnap = await db.collection("familyCodes").doc(normalized).get();
+    let codeSnap = await getDoc(doc(db, "familyCodes", normalizeFamilyKey(normalized)));
+    if (!codeSnap.exists()) {
+      codeSnap = await getDoc(doc(db, "familyCodes", normalized));
     }
-    if (!codeSnap.exists) return { exists: false, reason: "not-found" };
+    if (!codeSnap.exists()) return { exists: false, reason: "not-found" };
     const targetFamilyId = codeSnap.data() ? codeSnap.data().familyId : null;
     if (!targetFamilyId) return { exists: false, reason: "not-found" };
-    const famSnap = await db.collection("families").doc(targetFamilyId).get();
-    if (!famSnap.exists) return { exists: false, reason: "not-found" };
+    const famSnap = await getDoc(doc(db, "families", targetFamilyId));
+    if (!famSnap.exists()) return { exists: false, reason: "not-found" };
     const migrationState = famSnap.data().migrationState || "legacy";
     if (migrationState !== "v2") return { exists: false, reason: "not-v2" };
     return { exists: true };
@@ -453,9 +454,9 @@ function getFamilyId() {
 async function ensureFamilyCodeMapping() {
   try {
     const code = getFamilyCode();
-    const ref = db.collection("familyCodes").doc(code);
-    const snap = await ref.get();
-    if (snap.exists) {
+    const ref = doc(db, "familyCodes", code);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
       // BUG FIX: আগে এখানে কিছুই করা হতো না যখন mapping আগে থেকেই থাকত
       // (যেমন অন্য device থেকে তৈরি) — ফলে এই device-এর local family_id
       // কখনো server-এর familyId-এর সাথে sync হতো না, এবং getFamilyId()
@@ -470,7 +471,7 @@ async function ensureFamilyCodeMapping() {
         localStorage.setItem("family_id", serverFamilyId);
       }
     } else {
-      await ref.set({ familyId: getFamilyId(), createdAt: Date.now() });
+      await setDoc(ref, { familyId: getFamilyId(), createdAt: Date.now() });
     }
   } catch {
     // Best-effort — future-migration prep, app boot কখনো এর জন্য আটকাবে না।
@@ -478,7 +479,7 @@ async function ensureFamilyCodeMapping() {
 }
 
 function familyDocRef() {
-  return db.collection("families").doc(getFamilyId());
+  return doc(db, "families", getFamilyId());
 }
 // §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — এখন একটি optional
 // `preloaded`({exists, data}) parameter নেয়: boot sequence থেকে একবার
@@ -490,7 +491,7 @@ function familyDocRef() {
 async function ensureFamilyMeta(preloaded) {
   try {
     const ref = familyDocRef();
-    const snap = preloaded || (await ref.get().then(s => ({ exists: s.exists, data: s.exists ? s.data() : null })));
+    const snap = preloaded || (await getDoc(ref).then(s => ({ exists: s.exists(), data: s.exists() ? s.data() : null })));
     if (!snap.exists) {
       // §৫ Family Code Lifecycle fix: dataCollectionName এখন থেকেই family
       // তৈরির মুহূর্তে একবার স্থায়ীভাবে সেট হয় — এটাই সেই আসল Firestore
@@ -508,7 +509,7 @@ async function ensureFamilyMeta(preloaded) {
         schemaVersion: 1,
         adminUids: []
       };
-      await ref.set(payload);
+      await setDoc(ref, payload);
       return { exists: true, data: payload };
     }
     return snap;
@@ -526,7 +527,7 @@ let cachedDataCollectionName = null;
 async function ensureDataCollectionName(preloaded) {
   try {
     const ref = familyDocRef();
-    const snap = preloaded || (await ref.get().then(s => ({ exists: s.exists, data: s.exists ? s.data() : null })));
+    const snap = preloaded || (await getDoc(ref).then(s => ({ exists: s.exists(), data: s.exists() ? s.data() : null })));
     const existing = snap.exists && snap.data ? snap.data.dataCollectionName : null;
     if (existing) {
       cachedDataCollectionName = existing;
@@ -535,7 +536,7 @@ async function ensureDataCollectionName(preloaded) {
     const derived = `data_${getFamilyCode()}`;
     if (snap.exists) {
       try {
-        await ref.update({ dataCollectionName: derived, updatedAt: Date.now() });
+        await updateDoc(ref, { dataCollectionName: derived, updatedAt: Date.now() });
       } catch {
         // Best-effort ব্যাকফিল — persist ব্যর্থ হলেও নিচের cache assignment
         // দিয়ে app চলতি সেশনে ঠিকভাবেই কাজ করবে।
@@ -561,10 +562,10 @@ async function ensureLegacyCollectionMap() {
   try {
     const collectionName = getCollectionName();
     if (!collectionName) return;
-    const mapRef = db.collection("legacyCollectionMap").doc(collectionName);
-    const snap = await mapRef.get();
-    if (!snap.exists) {
-      await mapRef.set({ familyId: getFamilyId(), createdAt: Date.now() });
+    const mapRef = doc(db, "legacyCollectionMap", collectionName);
+    const snap = await getDoc(mapRef);
+    if (!snap.exists()) {
+      await setDoc(mapRef, { familyId: getFamilyId(), createdAt: Date.now() });
     }
   } catch {
     // Best-effort — legacy read-rule gate deploy-এর আগে backfill নিশ্চিত
@@ -583,7 +584,7 @@ async function claimFirstAdminIfEligible(preloaded) {
       // §First Admin Protection — firstAdminUid একই write-এ, একবারই সেট
       // (Rules-এ enforced — এই clause claim-মুহূর্তে ছাড়া আর কখনো fire
       // করে না)।
-      await ref.update({
+      await updateDoc(ref, {
         adminUids: [auth.currentUser.uid],
         firstAdminUid: auth.currentUser.uid,
         updatedAt: Date.now()
@@ -600,8 +601,8 @@ async function claimFirstAdminIfEligible(preloaded) {
 
 async function loadUserFamilyCode(uid) {
   try {
-    const doc = await db.collection("users").doc(uid).get();
-    return doc.exists ? doc.data().familyCode || null : null;
+    const userSnap = await getDoc(doc(db, "users", uid));
+    return userSnap.exists() ? userSnap.data().familyCode || null : null;
   } catch {
     return null;
   }
@@ -619,7 +620,7 @@ async function saveUserFamilyCode(uid, code, memberId) {
     // memberId, existing call site-গুলো(৩টি) এই param পাস করে না বলে
     // অপরিবর্তিত থাকে।
     if (memberId) payload.memberId = memberId;
-    await db.collection("users").doc(uid).set(payload, {
+    await setDoc(doc(db, "users", uid), payload, {
       merge: true
     });
   } catch {}
@@ -628,9 +629,9 @@ async function saveUserFamilyCode(uid, code, memberId) {
 // (existing, শুধু string ফেরত দেয়)-এর contract না ভেঙে আলাদা ফাংশন।
 async function loadUserFamilyMapping(uid) {
   try {
-    const doc = await db.collection("users").doc(uid).get();
-    if (!doc.exists) return null;
-    const d = doc.data() || {};
+    const userSnap = await getDoc(doc(db, "users", uid));
+    if (!userSnap.exists()) return null;
+    const d = userSnap.data() || {};
     return { familyCode: d.familyCode || null, memberId: d.memberId || null };
   } catch {
     return null;
@@ -680,11 +681,11 @@ const appStorage = {
         shared
       } : null;
     }
-    const doc = await db.collection(getCollectionName()).doc(key).get();
-    if (!doc.exists) return null;
+    const docSnap = await getDoc(doc(db, getCollectionName(), key));
+    if (!docSnap.exists()) return null;
     return {
       key,
-      value: doc.data().value,
+      value: docSnap.data().value,
       shared
     };
   },
@@ -697,7 +698,7 @@ const appStorage = {
         shared
       };
     }
-    await db.collection(getCollectionName()).doc(key).set({
+    await setDoc(doc(db, getCollectionName(), key), {
       value,
       updatedAt: Date.now()
     });
@@ -716,7 +717,7 @@ const appStorage = {
         shared
       };
     }
-    await db.collection(getCollectionName()).doc(key).delete();
+    await deleteDoc(doc(db, getCollectionName(), key));
     return {
       key,
       deleted: true,
@@ -732,11 +733,12 @@ const appStorage = {
         shared
       };
     }
-    let q = db.collection(getCollectionName());
+    let qRef = collection(db, getCollectionName());
+    let qConstraints = [];
     if (prefix) {
-      q = q.where(firebase.firestore.FieldPath.documentId(), ">=", prefix).where(firebase.firestore.FieldPath.documentId(), "<", prefix + "\uf8ff");
+      qConstraints = [where(documentId(), ">=", prefix), where(documentId(), "<", prefix + "\uf8ff")];
     }
-    const snap = await q.get();
+    const snap = await getDocs(qConstraints.length ? query(qRef, ...qConstraints) : qRef);
     const keys = snap.docs.map(d => d.id);
     return {
       keys,
@@ -748,12 +750,12 @@ const appStorage = {
 
 function resolvePathContext(migrationState, familyCode, familyId) {
   if (migrationState === "v2") {
-    const familyRoot = db.collection("families").doc(familyId);
+    const familyRoot = doc(db, "families", familyId);
     return {
       mode: "v2",
-      membersRef: familyRoot.collection("members"),
-      entriesRef: familyRoot.collection("entries"),
-      weeklyRef: familyRoot.collection("weekly"),
+      membersRef: collection(familyRoot, "members"),
+      entriesRef: collection(familyRoot, "entries"),
+      weeklyRef: collection(familyRoot, "weekly"),
       memberDocId: (id) => id,
       entryDocId: (memberId, dateKey) => `${memberId}_${dateKey}`,
       weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
@@ -767,7 +769,7 @@ function resolvePathContext(migrationState, familyCode, familyId) {
   // familyCode যতবারই বদলাক, আসল ডাটা কালেকশন একই থাকে। বিদ্যমান সব
   // caller familyCode param পাঠাতে থাকবে (API অপরিবর্তিত, harmless —
   // legacy branch-এ শুধু আর ব্যবহৃত হচ্ছে না)।
-  const legacyRef = db.collection(getCollectionName());
+  const legacyRef = collection(db, getCollectionName());
   return {
     mode: "legacy",
     membersRef: legacyRef,

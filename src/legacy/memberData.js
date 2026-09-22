@@ -1,6 +1,7 @@
 // memberData.js — Member/Entry/Weekly/Key Firestore data-layer (CRUD,
 // claim/FIFO, stampLastActive, member-key system, entry history).
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, Timestamp, deleteField, query, where, documentId, orderBy, limit } from "firebase/firestore";
 import { sha256Hex, monthPrefix } from "./appHelpers.js";
 import { getFamilyCode, resolveFamilyIdFromCode, getFamilyId, saveUserFamilyCode, getCollectionName, appStorage, resolvePathContext, isGoogleLinked } from "./familyIdentity.js";
 
@@ -13,31 +14,31 @@ async function saveMeetingData(year, month0, data) {
   // Data Lifecycle Policy: family-level activity stamp. Meeting doc lives in
   // getCollectionName() (v2 schema migration deferred — see roadmap), so this
   // is a separate write, not part of that batch.
-  db.collection("families").doc(getFamilyId()).set({
-    lastActiveAt: firebase.firestore.Timestamp.now()
+  setDoc(doc(db, "families", getFamilyId()), {
+    lastActiveAt: Timestamp.now()
   }, { merge: true }).catch(() => {});
 }
 async function loadWeekly(migrationState, memberId, year, month0) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const doc = await ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))).get();
-    if (!doc.exists) return {};
-    return JSON.parse(doc.data().value);
+    const docSnap = await getDoc(doc(ctx.weeklyRef, ctx.weeklyDocId(memberId, monthPrefix(year, month0))));
+    if (!docSnap.exists()) return {};
+    return JSON.parse(docSnap.data().value);
   } catch {
     return {};
   }
 }
 async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const batch = db.batch();
-  batch.set(ctx.weeklyRef.doc(ctx.weeklyDocId(memberId, monthPrefix(year, month0))), {
+  const batch = writeBatch(db);
+  batch.set(doc(ctx.weeklyRef, ctx.weeklyDocId(memberId, monthPrefix(year, month0))), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null
   }, {
     merge: true
   });
-  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
+  stampLastActive(batch, doc(ctx.membersRef, ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
   await batch.commit();
 }
 // --- Legacy (v1) member storage — single "members" doc holding a JSON array.
@@ -52,13 +53,13 @@ async function loadLegacyMembers() {
 }
 
 function stampLastActive(batch, memberRef, familyId, uid) {
-  const ts = firebase.firestore.Timestamp.now();
+  const ts = Timestamp.now();
   if (memberRef) {
     const payload = { lastActiveAt: ts };
     if (uid) payload.ownerActivity = { [uid]: ts };
     batch.set(memberRef, payload, { merge: true });
   }
-  if (familyId) batch.set(db.collection("families").doc(familyId), { lastActiveAt: ts }, { merge: true });
+  if (familyId) batch.set(doc(db, "families", familyId), { lastActiveAt: ts }, { merge: true });
 }
 // Firestore Timestamp বা raw millis দুটোই handle করে — ownerActivity map
 // read করার সময় ব্যবহার হয় (transaction snapshot-এ Timestamp আসে)।
@@ -79,13 +80,17 @@ async function loadMembersV2(migrationState) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
     if (ctx.mode === "v2") {
-      const snap = await ctx.membersRef.get();
+      const snap = await getDocs(ctx.membersRef);
       return snap.docs.map(d => ({
         id: d.id,
         ...d.data()
       }));
     }
-    const snap = await ctx.membersRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:").where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get();
+    const snap = await getDocs(query(
+      ctx.membersRef,
+      where(documentId(), ">=", "member:"),
+      where(documentId(), "<", "member:\uf8ff")
+    ));
     return snap.docs.map(d => ({
       id: d.id.slice("member:".length),
       ...d.data()
@@ -113,12 +118,12 @@ async function saveMemberDoc(migrationState, member) {
     ...fields
   } = member;
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const memberRef = ctx.membersRef.doc(ctx.memberDocId(id));
-  const batch = db.batch();
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(id));
+  const batch = writeBatch(db);
   batch.set(memberRef, {
     ...fields,
     updatedAt: Date.now(),
-    lastActiveAt: firebase.firestore.Timestamp.now()
+    lastActiveAt: Timestamp.now()
   }, {
     merge: true
   });
@@ -127,15 +132,15 @@ async function saveMemberDoc(migrationState, member) {
 }
 async function deleteMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.membersRef.doc(ctx.memberDocId(id)).delete();
+  await deleteDoc(doc(ctx.membersRef, ctx.memberDocId(id)));
 }
 
 async function claimMemberDoc(migrationState, id, uid) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const docRef = ctx.membersRef.doc(ctx.memberDocId(id));
-  await db.runTransaction(async tx => {
+  const docRef = doc(ctx.membersRef, ctx.memberDocId(id));
+  await runTransaction(db, async tx => {
     const snap = await tx.get(docRef);
-    const currentOwner = snap.exists ? snap.data().ownerUid ?? null : null;
+    const currentOwner = snap.exists() ? snap.data().ownerUid ?? null : null;
     if (currentOwner && currentOwner !== uid) {
       throw new Error("এই সদস্যের দায়িত্ব ইতিমধ্যে অন্য একটি ডিভাইস নিয়ে নিয়েছে। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।");
     }
@@ -147,7 +152,7 @@ async function claimMemberDoc(migrationState, id, uid) {
 }
 async function releaseMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  await ctx.membersRef.doc(ctx.memberDocId(id)).update({
+  await updateDoc(doc(ctx.membersRef, ctx.memberDocId(id)), {
     ownerUids: [],
     ownerActivity: {},
     updatedAt: Date.now()
@@ -161,9 +166,7 @@ async function releaseMemberDoc(migrationState, id) {
 // rollback-safety হিসেবে অপরিবর্তিত থাকছে, নতুন feature পায়নি)। ---
 // =====================================================================
 function memberPrivateKeyRef(memberId) {
-  return db.collection("families").doc(getFamilyId())
-    .collection("members").doc(memberId)
-    .collection("private").doc("key");
+  return doc(db, "families", getFamilyId(), "members", memberId, "private", "key");
 }
 
 const MEMBER_KEY_CHARSET_PATTERN = /^[A-Za-z0-9!@#$%&*+\-_]+$/;
@@ -218,12 +221,12 @@ function generateReadableMemberKey(name) {
 // ব্যর্থ হলে(অত্যন্ত বিরল) পুরনো high-entropy generator fallback(ব্যবহারিকভাবে
 // collision-free) — কখনো silently duplicate key লেখা হয় না।
 async function generateUniqueReadableMemberKey(name) {
-  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
+  const keyIndexColl = collection(db, "families", getFamilyId(), "keyIndex");
   for (let attempt = 0; attempt < 8; attempt++) {
     const key = generateReadableMemberKey(name);
     const hash = await sha256Hex(key);
-    const dupSnap = await keyIndexColl.doc(hash).get();
-    if (!dupSnap.exists) return { key, hash };
+    const dupSnap = await getDoc(doc(keyIndexColl, hash));
+    if (!dupSnap.exists()) return { key, hash };
   }
   const key = generateMemberKeyPlain();
   const hash = await sha256Hex(key);
@@ -235,9 +238,9 @@ async function createMemberWithKey(member, presetKey) {
     id,
     ...fields
   } = member;
-  const memberRef = db.collection("families").doc(getFamilyId()).collection("members").doc(id);
-  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
-  const privateRef = memberRef.collection("private").doc("key");
+  const memberRef = doc(db, "families", getFamilyId(), "members", id);
+  const keyIndexColl = collection(db, "families", getFamilyId(), "keyIndex");
+  const privateRef = doc(memberRef, "private", "key");
   // §"সদস্য হোন" pre-generated password(২২ আগস্ট ২০২৬, অপরিবর্তিত নীতি):
   // presetKey দেওয়া হলে(admin approve path) requester-এর নিজের generate
   // করা password-ই ব্যবহার হয়, silently regenerate হয় না — approval-এর
@@ -263,7 +266,7 @@ async function createMemberWithKey(member, presetKey) {
   const initialOwnerActivity = {};
   if (Array.isArray(fields.ownerUids)) {
     fields.ownerUids.forEach(u => {
-      initialOwnerActivity[u] = firebase.firestore.Timestamp.now();
+      initialOwnerActivity[u] = Timestamp.now();
     });
   }
   // §Collision-safe write(২৩ আগস্ট ২০২৬, critical) — batch.set()-এর বদলে
@@ -273,16 +276,16 @@ async function createMemberWithKey(member, presetKey) {
   // ও এই final authoritative check — দুই স্তরেই duplicate silently overwrite
   // হওয়া থেকে রক্ষা করে; কলিশন হলে(অত্যন্ত বিরল race) member তৈরি না হয়ে
   // স্পষ্ট error throw হয়(caller-এর existing catch/alert দেখাবে)।
-  await db.runTransaction(async tx => {
-    const dupSnap = await tx.get(keyIndexColl.doc(hash));
-    if (dupSnap.exists) {
+  await runTransaction(db, async tx => {
+    const dupSnap = await tx.get(doc(keyIndexColl, hash));
+    if (dupSnap.exists()) {
       throw new Error("পাসওয়ার্ডে দ্বন্দ্ব(collision) হয়েছে — আবার চেষ্টা করুন।");
     }
     tx.set(memberRef, {
       ...fields,
       ...(Object.keys(initialOwnerActivity).length ? { ownerActivity: initialOwnerActivity } : {}),
       updatedAt: Date.now(),
-      lastActiveAt: firebase.firestore.Timestamp.now()
+      lastActiveAt: Timestamp.now()
     }, { merge: true });
     tx.set(privateRef, {
       memberKey: key,
@@ -292,15 +295,15 @@ async function createMemberWithKey(member, presetKey) {
     // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬) — routing-only ইনডেক্স,
     // কোনো authorization field না। firestore.rules-এ ইতিমধ্যে implement করা
     // আছে(cross-member injection-protected, duplicate-hash auto-block)।
-    tx.set(keyIndexColl.doc(hash), { memberId: id });
+    tx.set(doc(keyIndexColl, hash), { memberId: id });
     stampLastActive(tx, null, getFamilyId());
   });
   return key;
 }
 
 async function fetchMemberKey(memberId) {
-  const snap = await memberPrivateKeyRef(memberId).get();
-  return snap.exists ? snap.data().memberKey : null;
+  const snap = await getDoc(memberPrivateKeyRef(memberId));
+  return snap.exists() ? snap.data().memberKey : null;
 }
 // Key পরিবর্তন(owner অথবা admin) — নতুন key generate করে plaintext+hash
 // দুটোই আপডেট, পুরনো key নিষ্ক্রিয় হয়ে যায়।
@@ -308,22 +311,22 @@ async function changeMemberKey(memberId, customKey) {
   const key = (customKey && customKey.trim()) ? customKey.trim() : generateMemberKeyPlain();
   const hash = await sha256Hex(key);
   const privateRef = memberPrivateKeyRef(memberId);
-  const keyIndexColl = db.collection("families").doc(getFamilyId()).collection("keyIndex");
-  const newIndexRef = keyIndexColl.doc(hash);
+  const keyIndexColl = collection(db, "families", getFamilyId(), "keyIndex");
+  const newIndexRef = doc(keyIndexColl, hash);
   // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 2) — transaction:
   // পুরনো keyIndex delete → key update → নতুন keyIndex create(duplicate-hash
   // check সহ)। set(merge:true) — update()-এর বদলে, কারণ Member Key System-এর
   // আগে তৈরি পুরনো member-দের private/key doc-ই না-ও থাকতে পারে(তখন update()
   // "No document to update" error দিত)। merge:true দিয়ে create ও overwrite
   // দুই ক্ষেত্রেই কাজ করবে।
-  await db.runTransaction(async tx => {
+  await runTransaction(db, async tx => {
     const oldSnap = await tx.get(privateRef);
-    const oldHash = oldSnap.exists ? oldSnap.data().memberKeyHash : null;
+    const oldHash = oldSnap.exists() ? oldSnap.data().memberKeyHash : null;
     // নতুন hash আগের hash-এর সমান না হলে(সাধারণ ক্ষেত্র) duplicate-check —
     // hash collision(অন্য member-এর keyIndex দখল) এড়াতে read করা হচ্ছে।
     if (oldHash !== hash) {
       const dupSnap = await tx.get(newIndexRef);
-      if (dupSnap.exists) {
+      if (dupSnap.exists()) {
         throw new Error("key-collision");
       }
     }
@@ -334,7 +337,7 @@ async function changeMemberKey(memberId, customKey) {
     });
     tx.set(newIndexRef, { memberId });
     if (oldHash && oldHash !== hash) {
-      tx.delete(keyIndexColl.doc(oldHash));
+      tx.delete(doc(keyIndexColl, oldHash));
     }
   });
   return key;
@@ -344,14 +347,14 @@ async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
   const trimmed = (enteredKey || "").trim();
   if (!trimmed) return { ok: false, reason: "empty" };
   const targetFamilyId = familyIdOverride || getFamilyId();
-  const memberRef = db.collection("families").doc(targetFamilyId).collection("members").doc(memberId);
-  const famRef = db.collection("families").doc(targetFamilyId);
+  const memberRef = doc(db, "families", targetFamilyId, "members", memberId);
+  const famRef = doc(db, "families", targetFamilyId);
   let attemptedAdminEviction = false;
   try {
     const hash = await sha256Hex(trimmed);
     let wasReplaced = false;
     let outerEvictedUid = null;
-    await db.runTransaction(async tx => {
+    await runTransaction(db, async tx => {
       // transaction contention হলে callback retry হতে পারে — প্রতি
       // attempt-এ flag reset জরুরি, নাহলে আগের ব্যর্থ attempt-এর stale
       // মান থেকে যেতে পারে।
@@ -359,7 +362,7 @@ async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
       attemptedAdminEviction = false;
       outerEvictedUid = null;
       const snap = await tx.get(memberRef);
-      const data = snap.exists ? snap.data() : {};
+      const data = snap.exists() ? snap.data() : {};
       // Migration-window fallback: ownerUids না থাকলে পুরনো ownerUid থেকে।
       const currentOwners = Array.isArray(data.ownerUids)
         ? data.ownerUids
@@ -378,7 +381,7 @@ async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
           ownerUids: currentOwners,
           updatedAt: Date.now(),
           claimKeyHashAttempt: hash,
-          [`ownerActivity.${uid}`]: firebase.firestore.Timestamp.now()
+          [`ownerActivity.${uid}`]: Timestamp.now()
         });
         return;
       }
@@ -417,11 +420,11 @@ async function claimMemberWithKey(memberId, enteredKey, uid, familyIdOverride) {
         ownerUids: nextOwners,
         updatedAt: Date.now(),
         claimKeyHashAttempt: hash,
-        [`ownerActivity.${uid}`]: firebase.firestore.Timestamp.now()
+        [`ownerActivity.${uid}`]: Timestamp.now()
       };
       // evicted uid-এর ownerActivity entry একই transaction-এ মুছে ফেলা হয়
       // (ownerUids ও ownerActivity সবসময় consistent রাখতে — stale key জমবে না)।
-      if (evictedUid) updatePayload[`ownerActivity.${evictedUid}`] = firebase.firestore.FieldValue.delete();
+      if (evictedUid) updatePayload[`ownerActivity.${evictedUid}`] = deleteField();
       tx.update(memberRef, updatePayload);
       if (isAdminRole) {
         // family.adminUids index — এখানে explicit পুরো array লেখা হচ্ছে
@@ -468,9 +471,8 @@ async function directIdentifyLogin(code, password) {
   let keyIndexErr = null;
   try {
     const hash = await sha256Hex(pw);
-    const idxSnap = await db.collection("families").doc(resolved.familyId)
-      .collection("keyIndex").doc(hash).get();
-    if (idxSnap.exists) memberId = idxSnap.data() ? idxSnap.data().memberId : null;
+    const idxSnap = await getDoc(doc(db, "families", resolved.familyId, "keyIndex", hash));
+    if (idxSnap.exists()) memberId = idxSnap.data() ? idxSnap.data().memberId : null;
   } catch (e) {
     memberId = null; // permission-denied/network — miss হিসেবেই treat, কোনো commit না
     keyIndexErr = e && e.message;
@@ -488,9 +490,8 @@ async function directIdentifyLogin(code, password) {
     const selfUid = auth.currentUser ? auth.currentUser.uid : null;
     if (selfUid) {
       try {
-        const reqSnap = await db.collection("families").doc(resolved.familyId)
-          .collection("memberRequests").doc(selfUid).get();
-        if (reqSnap.exists) {
+        const reqSnap = await getDoc(doc(db, "families", resolved.familyId, "memberRequests", selfUid));
+        if (reqSnap.exists()) {
           const reqData = reqSnap.data() || {};
           if (reqData.presetKey === pw && (reqData.status === "pending" || reqData.status === "denied")) {
             return { ok: false, reason: reqData.status, debugTag: "memberRequest:" + reqData.status };
@@ -553,9 +554,9 @@ async function saveCustomFields(fields) {
 async function loadEntry(migrationState, memberId, key) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const doc = await ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).get();
-    if (!doc.exists) return null;
-    return JSON.parse(doc.data().value);
+    const docSnap = await getDoc(doc(ctx.entriesRef, ctx.entryDocId(memberId, key)));
+    if (!docSnap.exists()) return null;
+    return JSON.parse(docSnap.data().value);
   } catch {
     return null;
   }
@@ -566,8 +567,8 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   // future Firestore rules can check request.auth.uid == resource.data.ownerUid
   // directly on this same document (no extra get() lookup needed).
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const batch = db.batch();
-  batch.set(ctx.entriesRef.doc(ctx.entryDocId(memberId, key)), {
+  const batch = writeBatch(db);
+  batch.set(doc(ctx.entriesRef, ctx.entryDocId(memberId, key)), {
     value: JSON.stringify(data),
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null,
@@ -575,11 +576,11 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
     // lastActiveAt কখনো stamp হতো না(শুধু family+member-এ হতো) — ফলে
     // Firestore TTL policy entry-তে কখনো trigger হতো না। existing
     // Timestamp.now() pattern(দ্রষ্টব্য লাইন ৪০৫৯/৪২২৭) reuse করে এখানে যোগ।
-    lastActiveAt: firebase.firestore.Timestamp.now()
+    lastActiveAt: Timestamp.now()
   }, {
     merge: true
   });
-  stampLastActive(batch, ctx.membersRef.doc(ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
+  stampLastActive(batch, doc(ctx.membersRef, ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
   await batch.commit();
 }
 function entryDocId(memberId, key) {
@@ -598,11 +599,11 @@ function entryDocId(memberId, key) {
 async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const memberRef = ctx.membersRef.doc(ctx.memberDocId(memberId));
-    const snap = await memberRef.get();
-    const current = snap.exists && typeof snap.data().bestScoreEver === "number" ? snap.data().bestScoreEver : 0;
+    const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+    const snap = await getDoc(memberRef);
+    const current = snap.exists() && typeof snap.data().bestScoreEver === "number" ? snap.data().bestScoreEver : 0;
     if (todayScorePct > current) {
-      await memberRef.set({ bestScoreEver: todayScorePct, updatedAt: Date.now() }, { merge: true });
+      await setDoc(memberRef, { bestScoreEver: todayScorePct, updatedAt: Date.now() }, { merge: true });
     }
   } catch {
     // Best-effort convenience layer — ব্যর্থ হলে silently ignore(pushEntryHistory()-এর
@@ -617,8 +618,8 @@ async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) 
 // দেখাবে(entry-save flow-এর সাথে কোনো সম্পর্ক নেই)।
 async function saveTomorrowFocus(migrationState, memberId, focus) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const memberRef = ctx.membersRef.doc(ctx.memberDocId(memberId));
-  await memberRef.set({
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, {
     tomorrowFocus: {
       fieldKey: focus.fieldKey,
       targetDateKey: focus.targetDateKey,
@@ -632,15 +633,15 @@ async function saveTomorrowFocus(migrationState, memberId, focus) {
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const histRef = ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).collection("history");
-    await histRef.add({
+    const histRef = collection(doc(ctx.entriesRef, ctx.entryDocId(memberId, key)), "history");
+    await addDoc(histRef, {
       value: JSON.stringify(oldData),
       editedAt: Date.now()
     });
-    const snap = await histRef.orderBy("editedAt", "desc").get();
+    const snap = await getDocs(query(histRef, orderBy("editedAt", "desc")));
     if (snap.size > 5) {
       const excess = snap.docs.slice(5);
-      const batch = db.batch();
+      const batch = writeBatch(db);
       excess.forEach(d => batch.delete(d.ref));
       await batch.commit();
     }
@@ -652,8 +653,8 @@ async function pushEntryHistory(migrationState, memberId, key, oldData) {
 async function fetchEntryHistory(migrationState, memberId, key) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const histRef = ctx.entriesRef.doc(ctx.entryDocId(memberId, key)).collection("history");
-    const snap = await histRef.orderBy("editedAt", "desc").limit(5).get();
+    const histRef = collection(doc(ctx.entriesRef, ctx.entryDocId(memberId, key)), "history");
+    const snap = await getDocs(query(histRef, orderBy("editedAt", "desc"), limit(5)));
     return snap.docs.map(d => ({
       id: d.id,
       editedAt: d.data().editedAt,

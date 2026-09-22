@@ -1,7 +1,8 @@
 // backup.js — Google Drive personal backup/restore + Android File System
 // Access(FSA) device-local backup(merged, কারণ UI-ও BackupRestore.jsx-এ
 // একসাথে)। mergeBackupData() উভয় path-এর shared merge logic।
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDocs, setDoc, writeBatch } from "firebase/firestore";
 import { getFamilyCode, getFamilyId, getCollectionName, resolvePathContext } from "./familyIdentity.js";
 import { loadMembersV2 } from "./memberData.js";
 import { extractOwnerUidsFromMemberData } from "./legacyMigrationTools.js";
@@ -194,16 +195,16 @@ async function readAllFamilyDataForBackup(migrationState) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const result = {};
   if (ctx.mode !== "v2") {
-    const snap = await db.collection(getCollectionName()).get();
-    snap.docs.forEach(doc => {
-      result[doc.id] = doc.data();
+    const snap = await getDocs(collection(db, getCollectionName()));
+    snap.docs.forEach(docSnap => {
+      result[docSnap.id] = docSnap.data();
     });
     return result;
   }
   const [membersSnap, entriesSnap, weeklySnap] = await Promise.all([
-    ctx.membersRef.get(),
-    ctx.entriesRef.get(),
-    ctx.weeklyRef.get()
+    getDocs(ctx.membersRef),
+    getDocs(ctx.entriesRef),
+    getDocs(ctx.weeklyRef)
   ]);
   membersSnap.docs.forEach(d => {
     result[`member:${d.id}`] = d.data();
@@ -227,11 +228,11 @@ async function readAllFamilyDataForBackup(migrationState) {
   // ধরা হচ্ছে যাতে মূল member/entry/weekly backup আটকে না যায়(Root-cause
   // Learnings pattern reuse, V1 ফাইল ১.২ §১৭)।
   try {
-    const legacySnap = await db.collection(getCollectionName()).get();
-    legacySnap.docs.forEach(doc => {
-      const id = doc.id;
+    const legacySnap = await getDocs(collection(db, getCollectionName()));
+    legacySnap.docs.forEach(docSnap => {
+      const id = docSnap.id;
       if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
-        result[id] = doc.data();
+        result[id] = docSnap.data();
       }
     });
   } catch (err) {
@@ -247,7 +248,7 @@ async function writeParsedBackupToFamily(migrationState, items) {
   const CHUNK_SIZE = 450;
   async function commitInChunks(writes) {
     for (let i = 0; i < writes.length; i += CHUNK_SIZE) {
-      const batch = db.batch();
+      const batch = writeBatch(db);
       writes.slice(i, i + CHUNK_SIZE).forEach(({ ref, data }) => {
         batch.set(ref, data, { merge: true });
       });
@@ -255,34 +256,34 @@ async function writeParsedBackupToFamily(migrationState, items) {
     }
   }
   if (ctx.mode !== "v2") {
-    const colRef = db.collection(getCollectionName());
-    await commitInChunks(items.map(({ key, data }) => ({ ref: colRef.doc(key), data })));
+    const colRef = collection(db, getCollectionName());
+    await commitInChunks(items.map(({ key, data }) => ({ ref: doc(colRef, key), data })));
     return;
   }
-  const legacyColRef = db.collection(getCollectionName());
+  const legacyColRef = collection(db, getCollectionName());
   const mainWrites = [];
   const legacyWrites = [];
   items.forEach(({ key, data }) => {
     if (key.startsWith("member:")) {
-      mainWrites.push({ ref: ctx.membersRef.doc(key.slice("member:".length)), data });
+      mainWrites.push({ ref: doc(ctx.membersRef, key.slice("member:".length)), data });
       return;
     }
     if (key.startsWith("entry:")) {
       const rest = key.slice("entry:".length);
       const idx = rest.indexOf(":");
       if (idx === -1) return;
-      mainWrites.push({ ref: ctx.entriesRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
+      mainWrites.push({ ref: doc(ctx.entriesRef, `${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
       return;
     }
     if (key.startsWith("weekly:")) {
       const rest = key.slice("weekly:".length);
       const idx = rest.indexOf(":");
       if (idx === -1) return;
-      mainWrites.push({ ref: ctx.weeklyRef.doc(`${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
+      mainWrites.push({ ref: doc(ctx.weeklyRef, `${rest.slice(0, idx)}_${rest.slice(idx + 1)}`), data });
       return;
     }
     // custom_fields / meeting_rows_v2: — legacy-only (উপরের নোট দেখুন)
-    legacyWrites.push({ ref: legacyColRef.doc(key), data });
+    legacyWrites.push({ ref: doc(legacyColRef, key), data });
   });
   await commitInChunks(mainWrites);
   // Fail-safe fix(২৫ আগস্ট ২০২৬): legacy custom_fields/meeting_rows_v2
