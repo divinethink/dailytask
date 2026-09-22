@@ -4,7 +4,7 @@
 // console tool হিসেবে ব্যবহৃত হয়)। Active member/family code থেকে ইচ্ছাকৃতভাবে
 // আলাদা রাখা হয়েছে যাতে active-flow maintenance-এ এই ~১,০০০ লাইন বাধা না দেয়।
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, query, where, documentId, limit, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, documentId, limit, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp } from "firebase/firestore";
 import { getFamilyCode, getFamilyId, ensureFamilyCodeMapping, getCollectionName } from "./familyIdentity.js";
 
 async function dryRunPhaseCReadinessCheck() {
@@ -989,24 +989,24 @@ if (typeof window !== "undefined") {
 }
 
 async function backfillLastActiveAt(familyId, confirm) {
-  const familyRoot = db.collection("families").doc(familyId);
-  const membersSnap = await familyRoot.collection("members").get();
+  const familyRoot = doc(db, "families", familyId);
+  const membersSnap = await getDocs(collection(familyRoot, "members"));
   // TTL dry-run audit(২৫ আগস্ট ২০২৬) finding: entries-এ lastActiveAt কখনো
   // stamp হতো না(saveEntry() ফিক্স হয়েছে future save-এর জন্য, কিন্তু
   // existing doc-এর জন্য এই backfill-এই scope বাড়ানো হলো — same pattern)।
-  const entriesSnap = await familyRoot.collection("entries").get();
+  const entriesSnap = await getDocs(collection(familyRoot, "entries"));
   console.log(`[Lifecycle backfill] familyId=${familyId} — ${membersSnap.size}টি member + ${entriesSnap.size}টি entry doc + ১টি family doc lastActiveAt পাবে।`);
   if (!confirm) {
     console.log("[Lifecycle backfill] dry-run শেষ — আসল লেখা চালাতে backfillLastActiveAt(familyId, true) কল করুন।");
     return { familyId, memberCount: membersSnap.size, entryCount: entriesSnap.size, dryRun: true };
   }
-  const ts = firebase.firestore.Timestamp.now();
+  const ts = Timestamp.now();
   // ৫০০/batch Firestore limit-এর কারণে entries বড় হলে chunk করা হলো
   // (member+family ছোট বলে প্রথম batch-এই থাকছে, logic অপরিবর্তিত)।
   const CHUNK = 400;
-  let batch = db.batch();
+  let batch = writeBatch(db);
   let opsInBatch = 0;
-  const flush = async () => { if (opsInBatch > 0) { await batch.commit(); batch = db.batch(); opsInBatch = 0; } };
+  const flush = async () => { if (opsInBatch > 0) { await batch.commit(); batch = writeBatch(db); opsInBatch = 0; } };
   membersSnap.docs.forEach(d => { batch.set(d.ref, { lastActiveAt: ts }, { merge: true }); opsInBatch++; });
   batch.set(familyRoot, { lastActiveAt: ts }, { merge: true });
   opsInBatch++;
@@ -1024,9 +1024,9 @@ if (typeof window !== "undefined") {
 }
 
 async function backfillFirstAdminUid(familyId, uid, confirm) {
-  const ref = db.collection("families").doc(familyId);
-  const snap = await ref.get();
-  if (!snap.exists) {
+  const ref = doc(db, "families", familyId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
     console.log(`[FirstAdmin backfill] familyId=${familyId} পাওয়া যায়নি।`);
     return { ok: false, reason: "not-found" };
   }
@@ -1043,7 +1043,7 @@ async function backfillFirstAdminUid(familyId, uid, confirm) {
     console.log(`[FirstAdmin backfill] dry-run — familyId=${familyId}-এ firstAdminUid=${uid} সেট হবে। আসল লেখা চালাতে backfillFirstAdminUid(familyId, uid, true) কল করুন।`);
     return { ok: true, dryRun: true };
   }
-  await ref.update({ firstAdminUid: uid, updatedAt: Date.now() });
+  await updateDoc(ref, { firstAdminUid: uid, updatedAt: Date.now() });
   console.log(`[FirstAdmin backfill] সম্পন্ন — familyId=${familyId}, firstAdminUid=${uid}।`);
   return { ok: true, dryRun: false };
 }
@@ -1059,20 +1059,20 @@ async function backfillMemberRoles(dryRun, familyIdOverride) {
     console.error("[Role Backfill] familyId পাওয়া যায়নি।");
     return null;
   }
-  const famSnap = await db.collection("families").doc(familyId).get();
-  if (!famSnap.exists) {
+  const famSnap = await getDoc(doc(db, "families", familyId));
+  if (!famSnap.exists()) {
     console.error(`[Role Backfill] families/${familyId} পাওয়া যায়নি।`);
     return null;
   }
   const fam = famSnap.data();
   const adminUids = Array.isArray(fam.adminUids) ? fam.adminUids : [];
-  const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+  const membersSnap = await getDocs(collection(doc(db, "families", familyId), "members"));
   const toBackfill = [];
   const skipped = [];
-  membersSnap.docs.forEach(doc => {
-    const data = doc.data();
+  membersSnap.docs.forEach(docSnap => {
+    const data = docSnap.data();
     if (data.role) {
-      skipped.push({ id: doc.id, name: data.name || null, reason: "role আগে থেকে সেট", role: data.role });
+      skipped.push({ id: docSnap.id, name: data.name || null, reason: "role আগে থেকে সেট", role: data.role });
       return;
     }
     const ownerUids = Array.isArray(data.ownerUids)
@@ -1080,13 +1080,13 @@ async function backfillMemberRoles(dryRun, familyIdOverride) {
       : (data.ownerUid ? [data.ownerUid] : []);
     const isInAdminUids = ownerUids.some(u => adminUids.includes(u));
     if (isInAdminUids) {
-      toBackfill.push({ ref: doc.ref, id: doc.id, name: data.name || null, ownerUids, proposedRole: "admin" });
+      toBackfill.push({ ref: docSnap.ref, id: docSnap.id, name: data.name || null, ownerUids, proposedRole: "admin" });
     } else {
-      skipped.push({ id: doc.id, name: data.name || null, reason: "adminUids-এ নেই — role সেট হবে না" });
+      skipped.push({ id: docSnap.id, name: data.name || null, reason: "adminUids-এ নেই — role সেট হবে না" });
     }
   });
   if (!dryRun && toBackfill.length) {
-    const batch = db.batch();
+    const batch = writeBatch(db);
     toBackfill.forEach(m => {
       batch.update(m.ref, { role: "admin", updatedAt: Date.now() });
     });
