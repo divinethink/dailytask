@@ -3,12 +3,13 @@
 // কোনো active code-path এখান থেকে trigger হয় না — শুধু owner manual browser-
 // console tool হিসেবে ব্যবহৃত হয়)। Active member/family code থেকে ইচ্ছাকৃতভাবে
 // আলাদা রাখা হয়েছে যাতে active-flow maintenance-এ এই ~১,০০০ লাইন বাধা না দেয়।
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDoc, getDocs, query, where, documentId, limit, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFamilyCode, getFamilyId, ensureFamilyCodeMapping, getCollectionName } from "./familyIdentity.js";
 
 async function dryRunPhaseCReadinessCheck() {
   console.log("[Phase C dry-run] শুরু হচ্ছে — শুধু read, কোনো write হবে না। Family:", getFamilyCode());
-  const snap = await db.collection(getCollectionName()).get();
+  const snap = await getDocs(collection(db, getCollectionName()));
   const report = {
     totalDocs: snap.size,
     members: 0,
@@ -20,9 +21,9 @@ async function dryRunPhaseCReadinessCheck() {
     missingUpdatedAt: [],
     unexpectedKeyPattern: []
   };
-  snap.docs.forEach(doc => {
-    const id = doc.id;
-    const data = doc.data();
+  snap.docs.forEach(docSnap => {
+    const id = docSnap.id;
+    const data = docSnap.data();
     if (id.startsWith("member:")) report.members += 1;
     else if (id.startsWith("entry:")) report.entries += 1;
     else if (id.startsWith("weekly:")) report.weekly += 1;
@@ -71,8 +72,8 @@ async function copyPhaseCData() {
   const localId = getFamilyId();
   let serverId = null;
   try {
-    const codeSnap = await db.collection("familyCodes").doc(code).get();
-    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+    const codeSnap = await getDoc(doc(db, "familyCodes", code));
+    serverId = codeSnap.exists() ? codeSnap.data().familyId : null;
   } catch (err) {
     console.error("[Phase C copy] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। কোনো write হয়নি।", err);
     return { aborted: true, reason: "lookup-failed" };
@@ -92,31 +93,31 @@ async function copyPhaseCData() {
   // doc আগে থেকেই থাকলে touch করা হয় না, শুধু existing value
   // server-verified familyId-এর সাথে মেলে কিনা guard করা হয় (উপরের
   // familyCodes guard-এর একই disciplined pattern) — না মিললে থামে।
-  const mapRef = db.collection("legacyCollectionMap").doc(getCollectionName());
+  const mapRef = doc(db, "legacyCollectionMap", getCollectionName());
   try {
-    const mapSnap = await mapRef.get();
-    if (mapSnap.exists) {
+    const mapSnap = await getDoc(mapRef);
+    if (mapSnap.exists()) {
       const existingFamilyId = mapSnap.data().familyId;
       if (existingFamilyId !== serverId) {
         console.error(`[Phase C copy] Guard ব্যর্থ — legacyCollectionMap-এ বিদ্যমান familyId (${existingFamilyId}) ও server-verified familyId (${serverId}) ভিন্ন। কোনো data write হয়নি।`);
         return { aborted: true, reason: "map-mismatch", existingFamilyId, serverId };
       }
     } else {
-      await mapRef.set({ familyId: serverId, createdAt: Date.now() });
+      await setDoc(mapRef, { familyId: serverId, createdAt: Date.now() });
     }
   } catch (err) {
     console.error("[Phase C copy] Guard ব্যর্থ — legacyCollectionMap read/write করতে সমস্যা হয়েছে। কোনো data write হয়নি।", err);
     return { aborted: true, reason: "map-write-failed" };
   }
 
-  const snap = await db.collection(getCollectionName()).get();
+  const snap = await getDocs(collection(db, getCollectionName()));
   const memberDocs = [];
   const entryDocs = [];
   const weeklyDocs = [];
   const skipped = [];
-  snap.docs.forEach(doc => {
-    const id = doc.id;
-    const data = doc.data();
+  snap.docs.forEach(docSnap => {
+    const id = docSnap.id;
+    const data = docSnap.data();
     if (id.startsWith("member:")) {
       memberDocs.push({ id: id.slice("member:".length), data });
     } else if (id.startsWith("entry:")) {
@@ -135,13 +136,13 @@ async function copyPhaseCData() {
     // অনুযায়ী — বাকিগুলো পরবর্তী কোনো ধাপে, আলাদা approval-এ)।
   });
 
-  const familyRoot = db.collection("families").doc(serverId);
+  const familyRoot = doc(db, "families", serverId);
   const CHUNK_SIZE = 450;
   async function writeChunked(items, subcollection) {
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-      const batch = db.batch();
+      const batch = writeBatch(db);
       items.slice(i, i + CHUNK_SIZE).forEach(({ id, data }) => {
-        batch.set(familyRoot.collection(subcollection).doc(id), data);
+        batch.set(doc(familyRoot, subcollection, id), data);
       });
       await batch.commit();
     }
@@ -177,8 +178,8 @@ async function verifyPhaseCData() {
   const localId = getFamilyId();
   let serverId = null;
   try {
-    const codeSnap = await db.collection("familyCodes").doc(code).get();
-    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+    const codeSnap = await getDoc(doc(db, "familyCodes", code));
+    serverId = codeSnap.exists() ? codeSnap.data().familyId : null;
   } catch (err) {
     console.error("[Phase C verify] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। থামানো হলো।", err);
     return { aborted: true, reason: "lookup-failed" };
@@ -194,11 +195,11 @@ async function verifyPhaseCData() {
   console.log("[Phase C verify] Guard পাস — server-verified familyId:", serverId);
 
   // --- Source (data_<familyCode>) থেকে expected target-id -> data ম্যাপ তৈরি ---
-  const sourceSnap = await db.collection(getCollectionName()).get();
+  const sourceSnap = await getDocs(collection(db, getCollectionName()));
   const expected = { members: {}, entries: {}, weekly: {} };
-  sourceSnap.docs.forEach(doc => {
-    const id = doc.id;
-    const data = doc.data();
+  sourceSnap.docs.forEach(docSnap => {
+    const id = docSnap.id;
+    const data = docSnap.data();
     if (id.startsWith("member:")) {
       expected.members[id.slice("member:".length)] = data;
     } else if (id.startsWith("entry:")) {
@@ -215,11 +216,11 @@ async function verifyPhaseCData() {
   });
 
   // --- Target (families/<familyId>/...) থেকে actual পড়া ---
-  const familyRoot = db.collection("families").doc(serverId);
+  const familyRoot = doc(db, "families", serverId);
   const [membersSnap, entriesSnap, weeklySnap] = await Promise.all([
-    familyRoot.collection("members").get(),
-    familyRoot.collection("entries").get(),
-    familyRoot.collection("weekly").get()
+    getDocs(collection(familyRoot, "members")),
+    getDocs(collection(familyRoot, "entries")),
+    getDocs(collection(familyRoot, "weekly"))
   ]);
   const actual = {
     members: Object.fromEntries(membersSnap.docs.map(d => [d.id, d.data()])),
@@ -295,8 +296,8 @@ async function reverseSyncPhaseCData() {
   const localId = getFamilyId();
   let serverId = null;
   try {
-    const codeSnap = await db.collection("familyCodes").doc(code).get();
-    serverId = codeSnap.exists ? codeSnap.data().familyId : null;
+    const codeSnap = await getDoc(doc(db, "familyCodes", code));
+    serverId = codeSnap.exists() ? codeSnap.data().familyId : null;
   } catch (err) {
     console.error("[Reverse-sync] Guard ব্যর্থ — familyCodes লুকআপ করতে সমস্যা হয়েছে। কোনো write হয়নি।", err);
     return { aborted: true, reason: "lookup-failed" };
@@ -311,9 +312,9 @@ async function reverseSyncPhaseCData() {
   }
   console.log("[Reverse-sync] Guard পাস — server-verified familyId:", serverId);
 
-  const familyRef = db.collection("families").doc(serverId);
-  const familySnap = await familyRef.get();
-  if (!familySnap.exists) {
+  const familyRef = doc(db, "families", serverId);
+  const familySnap = await getDoc(familyRef);
+  if (!familySnap.exists()) {
     console.error("[Reverse-sync] families ডকুমেন্ট পাওয়া যায়নি। থামানো হলো।");
     return { aborted: true, reason: "no-family-doc" };
   }
@@ -325,11 +326,11 @@ async function reverseSyncPhaseCData() {
   const flipTimestamp = famData.updatedAt || 0;
   console.log("[Reverse-sync] flip-timestamp (families.updatedAt):", flipTimestamp, new Date(flipTimestamp).toISOString());
 
-  const familyRoot = db.collection("families").doc(serverId);
+  const familyRoot = doc(db, "families", serverId);
   const CHUNK_SIZE = 450;
   async function writeChunked(items) {
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-      const batch = db.batch();
+      const batch = writeBatch(db);
       items.slice(i, i + CHUNK_SIZE).forEach(({ ref, data, del }) => {
         if (del) batch.delete(ref);
         else batch.set(ref, data, { merge: true });
@@ -338,30 +339,33 @@ async function reverseSyncPhaseCData() {
     }
   }
 
-  const legacyColRef = db.collection(getCollectionName());
+  const legacyColRef = collection(db, getCollectionName());
 
   // --- entries/weekly: timestamp-diff (delete function নেই, শুধু candidate নির্বাচন) ---
   async function reverseSyncTimestampScoped(subcollection, legacyPrefix, splitFn) {
     const [v2Snap, legacySnap] = await Promise.all([
-      familyRoot.collection(subcollection).get(),
-      legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", legacyPrefix)
-        .where(firebase.firestore.FieldPath.documentId(), "<", legacyPrefix + "\uf8ff").get()
+      getDocs(collection(familyRoot, subcollection)),
+      getDocs(query(
+        legacyColRef,
+        where(documentId(), ">=", legacyPrefix),
+        where(documentId(), "<", legacyPrefix + "\uf8ff")
+      ))
     ]);
     const existingLegacy = {};
     legacySnap.docs.forEach(d => { existingLegacy[d.id] = d.data(); });
 
     const writes = [];
     let candidates = 0, written = 0, skippedOlder = 0;
-    v2Snap.docs.forEach(doc => {
-      const data = doc.data();
+    v2Snap.docs.forEach(docSnap => {
+      const data = docSnap.data();
       const updatedAt = data.updatedAt || 0;
       if (updatedAt <= flipTimestamp) return; // Flip-এর আগেই কপি হয়ে গেছে, touch করার দরকার নেই
       candidates += 1;
-      const legacyId = splitFn(doc.id);
+      const legacyId = splitFn(docSnap.id);
       const existing = existingLegacy[legacyId];
       const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
       if (existing && existingUpdatedAt >= updatedAt) { skippedOlder += 1; return; }
-      writes.push({ ref: legacyColRef.doc(legacyId), data });
+      writes.push({ ref: doc(legacyColRef, legacyId), data });
       written += 1;
     });
     await writeChunked(writes);
@@ -380,9 +384,12 @@ async function reverseSyncPhaseCData() {
 
   // --- members: সম্পূর্ণ id-set compare (delete detection-এর জন্য আবশ্যক) ---
   const [v2MembersSnap, legacyMembersSnap] = await Promise.all([
-    familyRoot.collection("members").get(),
-    legacyColRef.where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
-      .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff").get()
+    getDocs(collection(familyRoot, "members")),
+    getDocs(query(
+      legacyColRef,
+      where(documentId(), ">=", "member:"),
+      where(documentId(), "<", "member:\uf8ff")
+    ))
   ]);
   const v2Members = {};
   v2MembersSnap.docs.forEach(d => { v2Members[d.id] = d.data(); });
@@ -399,13 +406,13 @@ async function reverseSyncPhaseCData() {
     const existing = legacyMembers[id];
     const existingUpdatedAt = existing ? (existing.updatedAt || 0) : 0;
     if (existing && existingUpdatedAt >= updatedAt) { memberSkippedOlder += 1; return; }
-    memberWrites.push({ ref: legacyColRef.doc(legacyId), data });
+    memberWrites.push({ ref: doc(legacyColRef, legacyId), data });
     memberUpdated += 1;
   });
   Object.keys(legacyMembers).forEach(id => {
     if (!(id in v2Members)) {
       // v2-তে নেই কিন্তু legacy-তে আছে — Flip-পরবর্তী v2-deletion, legacy থেকেও সরাতে হবে
-      memberWrites.push({ ref: legacyColRef.doc(`member:${id}`), del: true });
+      memberWrites.push({ ref: doc(legacyColRef, `member:${id}`), del: true });
       memberDeleted += 1;
     }
   });
@@ -439,8 +446,8 @@ async function healthCheckFamily(familyIdOverride) {
   const issues = [];
   const info = {};
 
-  const familySnap = await db.collection("families").doc(familyId).get();
-  if (!familySnap.exists) {
+  const familySnap = await getDoc(doc(db, "families", familyId));
+  if (!familySnap.exists()) {
     console.error("[Health-check] families/" + familyId + " ডকুমেন্ট পাওয়া যায়নি — থামানো হলো।");
     return { familyId, issues: ["families doc missing"], info };
   }
@@ -469,8 +476,8 @@ async function healthCheckFamily(familyIdOverride) {
 
   // --- familyCodes bidirectional consistency (familyCode -> familyId -> ফিরে একই familyCode) ---
   if (typeof fam.familyCode === "string" && fam.familyCode) {
-    const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
-    if (!codeSnap.exists) {
+    const codeSnap = await getDoc(doc(db, "familyCodes", fam.familyCode));
+    if (!codeSnap.exists()) {
       issues.push(`familyCodes/${fam.familyCode} ডকুমেন্ট নেই — এই family-এর code দিয়ে familyId খুঁজে পাওয়া যাবে না।`);
     } else if (codeSnap.data().familyId !== familyId) {
       issues.push(`familyCodes/${fam.familyCode}.familyId (${codeSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
@@ -478,9 +485,9 @@ async function healthCheckFamily(familyIdOverride) {
 
     // --- legacyCollectionMap equation consistency ---
     const expectedCollectionName = "data_" + fam.familyCode;
-    const mapSnap = await db.collection("legacyCollectionMap").doc(expectedCollectionName).get();
-    info.legacyCollectionMapExists = mapSnap.exists;
-    if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+    const mapSnap = await getDoc(doc(db, "legacyCollectionMap", expectedCollectionName));
+    info.legacyCollectionMapExists = mapSnap.exists();
+    if (mapSnap.exists() && mapSnap.data().familyId !== familyId) {
       issues.push(`legacyCollectionMap/${expectedCollectionName}.familyId (${mapSnap.data().familyId}) এই family-এর নিজের ID-এর সাথে মেলে না।`);
     }
   }
@@ -509,11 +516,11 @@ if (typeof window !== "undefined") {
 
 async function auditAllFamiliesHealthCheck() {
   console.log("[Multi-family audit] শুরু হচ্ছে (সম্পূর্ণ read-only, কোনো write/fix হবে না)...");
-  const familiesSnap = await db.collection("families").get();
+  const familiesSnap = await getDocs(collection(db, "families"));
   const rows = [];
-  for (const doc of familiesSnap.docs) {
-    const familyId = doc.id;
-    const fam = doc.data();
+  for (const familyDoc of familiesSnap.docs) {
+    const familyId = familyDoc.id;
+    const fam = familyDoc.data();
     const issues = [];
 
     // --- familyCode presence/type (মান নয়, শুধু আছে/সঠিক টাইপ কিনা) ---
@@ -525,8 +532,8 @@ async function auditAllFamiliesHealthCheck() {
       // familyCodes/<code> <-> families/<id> bidirectional consistency —
       // শুধু match/mismatch বলা হয়, code-এর মান কখনো log হয় না।
       try {
-        const codeSnap = await db.collection("familyCodes").doc(fam.familyCode).get();
-        if (!codeSnap.exists) {
+        const codeSnap = await getDoc(doc(db, "familyCodes", fam.familyCode));
+        if (!codeSnap.exists()) {
           familyCodeStatus = "mapping অনুপস্থিত";
           issues.push("familyCodes mapping অনুপস্থিত");
         } else if (codeSnap.data().familyId !== familyId) {
@@ -539,8 +546,8 @@ async function auditAllFamiliesHealthCheck() {
       }
       // legacyCollectionMap equation consistency (এখানেও শুধু exists/match বলা হয়)
       try {
-        const mapSnap = await db.collection("legacyCollectionMap").doc("data_" + fam.familyCode).get();
-        if (mapSnap.exists && mapSnap.data().familyId !== familyId) {
+        const mapSnap = await getDoc(doc(db, "legacyCollectionMap", "data_" + fam.familyCode));
+        if (mapSnap.exists() && mapSnap.data().familyId !== familyId) {
           issues.push("legacyCollectionMap.familyId এই family-এর সাথে মেলে না");
         }
       } catch {
@@ -609,8 +616,8 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
   const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
   const familyIdSet = new Set(extra);
   try {
-    const familiesSnap = await db.collection("families").get();
-    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+    const familiesSnap = await getDocs(collection(db, "families"));
+    familiesSnap.docs.forEach(familyDoc => familyIdSet.add(familyDoc.id));
   } catch (err) {
     console.warn("[Grandfather audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
   }
@@ -624,8 +631,8 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
   const details = {};
   for (const familyId of familyIdSet) {
     try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (!famSnap.exists) {
+      const famSnap = await getDoc(doc(db, "families", familyId));
+      if (!famSnap.exists()) {
         console.warn(`[Grandfather audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
         continue;
       }
@@ -637,7 +644,7 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
       let ownerUids = [];
       let memberCount = 0;
       if (migrationState === "v2") {
-        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        const membersSnap = await getDocs(collection(doc(db, "families", familyId), "members"));
         memberCount = membersSnap.size;
         ownerUids = membersSnap.docs.flatMap(d => extractOwnerUidsFromMemberData(d.data()));
       } else {
@@ -646,10 +653,11 @@ async function auditGrandfatherCandidates(extraFamilyIds) {
         // সামঞ্জস্যপূর্ণ fallback)।
         const collectionName = fam.dataCollectionName || (familyCode ? `data_${familyCode}` : null);
         if (collectionName) {
-          const memberSnap = await db.collection(collectionName)
-            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
-            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
-            .get();
+          const memberSnap = await getDocs(query(
+            collection(db, collectionName),
+            where(documentId(), ">=", "member:"),
+            where(documentId(), "<", "member:\uf8ff")
+          ));
           memberCount = memberSnap.size;
           ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
         } else {
@@ -692,8 +700,8 @@ async function migrateOwnerUidsToArray(dryRun, familyIdOverride) {
     console.error("[ownerUids Migration] familyId পাওয়া যায়নি।");
     return null;
   }
-  const famSnap = await db.collection("families").doc(familyId).get();
-  if (!famSnap.exists) {
+  const famSnap = await getDoc(doc(db, "families", familyId));
+  if (!famSnap.exists()) {
     console.error(`[ownerUids Migration] families/${familyId} পাওয়া যায়নি।`);
     return null;
   }
@@ -702,24 +710,24 @@ async function migrateOwnerUidsToArray(dryRun, familyIdOverride) {
     console.error(`[ownerUids Migration] families/${familyId} v2 নয় (migrationState=${fam.migrationState || "নেই"}) — স্কিপ, কোনো write হয়নি।`);
     return null;
   }
-  const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+  const membersSnap = await getDocs(collection(doc(db, "families", familyId), "members"));
   const toMigrate = [];
   const alreadyOk = [];
   const skippedUnclaimed = [];
-  membersSnap.docs.forEach(doc => {
-    const data = doc.data();
+  membersSnap.docs.forEach(docSnap => {
+    const data = docSnap.data();
     if (Array.isArray(data.ownerUids)) {
-      alreadyOk.push({ id: doc.id, name: data.name || null, ownerUids: data.ownerUids });
+      alreadyOk.push({ id: docSnap.id, name: data.name || null, ownerUids: data.ownerUids });
       return;
     }
     if (typeof data.ownerUid === "string" && data.ownerUid) {
-      toMigrate.push({ ref: doc.ref, id: doc.id, name: data.name || null, ownerUid: data.ownerUid });
+      toMigrate.push({ ref: docSnap.ref, id: docSnap.id, name: data.name || null, ownerUid: data.ownerUid });
     } else {
-      skippedUnclaimed.push({ id: doc.id, name: data.name || null });
+      skippedUnclaimed.push({ id: docSnap.id, name: data.name || null });
     }
   });
   if (!dryRun && toMigrate.length) {
-    const batch = db.batch();
+    const batch = writeBatch(db);
     toMigrate.forEach(m => {
       batch.set(m.ref, { ownerUids: [m.ownerUid] }, { merge: true });
     });
@@ -754,8 +762,8 @@ async function migrateApprovedGrandfatherAccess() {
   const results = [];
   for (const { familyId, uid, label } of approvedList) {
     try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (!famSnap.exists) {
+      const famSnap = await getDoc(doc(db, "families", familyId));
+      if (!famSnap.exists()) {
         results.push({ familyCode: label, familyId, uid, status: "SKIPPED", কারণ: "families doc পাওয়া যায়নি" });
         continue;
       }
@@ -765,15 +773,16 @@ async function migrateApprovedGrandfatherAccess() {
 
       let ownerUids = [];
       if (migrationState === "v2") {
-        const membersSnap = await db.collection("families").doc(familyId).collection("members").get();
+        const membersSnap = await getDocs(collection(doc(db, "families", familyId), "members"));
         ownerUids = membersSnap.docs.flatMap(d => extractOwnerUidsFromMemberData(d.data()));
       } else {
         const collectionName = fam.dataCollectionName || (fam.familyCode ? `data_${fam.familyCode}` : null);
         if (collectionName) {
-          const memberSnap = await db.collection(collectionName)
-            .where(firebase.firestore.FieldPath.documentId(), ">=", "member:")
-            .where(firebase.firestore.FieldPath.documentId(), "<", "member:\uf8ff")
-            .get();
+          const memberSnap = await getDocs(query(
+            collection(db, collectionName),
+            where(documentId(), ">=", "member:"),
+            where(documentId(), "<", "member:\uf8ff")
+          ));
           ownerUids = memberSnap.docs.map(d => d.data().ownerUid).filter(u => typeof u === "string" && u);
         }
       }
@@ -784,15 +793,15 @@ async function migrateApprovedGrandfatherAccess() {
         continue;
       }
 
-      const reqRef = db.collection("families").doc(familyId).collection("accessRequests").doc(uid);
-      await reqRef.set({
+      const reqRef = doc(db, "families", familyId, "accessRequests", uid);
+      await setDoc(reqRef, {
         status: "approved",
         source: "grandfather-migration",
         approvedAt: Date.now()
       }, { merge: true });
 
-      const verifySnap = await reqRef.get();
-      const verifiedOk = verifySnap.exists && verifySnap.data().status === "approved";
+      const verifySnap = await getDoc(reqRef);
+      const verifiedOk = verifySnap.exists() && verifySnap.data().status === "approved";
       results.push({ familyCode: label, familyId, uid, status: verifiedOk ? "OK" : "VERIFY_FAILED" });
     } catch (err) {
       results.push({ familyCode: label, familyId, uid, status: "ERROR", কারণ: String(err && err.message || err) });
@@ -811,8 +820,8 @@ async function auditOrphanFamilies(extraFamilyIds) {
   const extra = Array.isArray(extraFamilyIds) ? extraFamilyIds.filter(Boolean) : [];
   const familyIdSet = new Set(extra);
   try {
-    const familiesSnap = await db.collection("families").get();
-    familiesSnap.docs.forEach(doc => familyIdSet.add(doc.id));
+    const familiesSnap = await getDocs(collection(db, "families"));
+    familiesSnap.docs.forEach(familyDoc => familyIdSet.add(familyDoc.id));
   } catch (err) {
     console.warn("[Orphan audit] families collection স্ক্যান ব্যর্থ (শুধু extraFamilyIds দিয়ে এগোনো হচ্ছে):", err);
   }
@@ -826,8 +835,8 @@ async function auditOrphanFamilies(extraFamilyIds) {
   const details = {};
   for (const familyId of familyIdSet) {
     try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (!famSnap.exists) {
+      const famSnap = await getDoc(doc(db, "families", familyId));
+      if (!famSnap.exists()) {
         console.warn(`[Orphan audit] families/${familyId} ডকুমেন্ট পাওয়া যায়নি — স্কিপ করা হলো।`);
         continue;
       }
@@ -840,11 +849,11 @@ async function auditOrphanFamilies(extraFamilyIds) {
       let hasV2Data = false;
       let hasLegacyData = false;
       if (migrationState === "v2") {
-        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        const membersSnap = await getDocs(query(collection(doc(db, "families", familyId), "members"), limit(1)));
         hasV2Data = !membersSnap.empty;
       }
       if (collectionName) {
-        const legacySnap = await db.collection(collectionName).limit(1).get();
+        const legacySnap = await getDocs(query(collection(db, collectionName), limit(1)));
         hasLegacyData = !legacySnap.empty;
       }
       const dataExists = hasV2Data || hasLegacyData;
@@ -854,8 +863,8 @@ async function auditOrphanFamilies(extraFamilyIds) {
       let familyCodesMappingExists = null;
       if (familyCode) {
         try {
-          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
-          familyCodesMappingExists = codeSnap.exists;
+          const codeSnap = await getDoc(doc(db, "familyCodes", familyCode));
+          familyCodesMappingExists = codeSnap.exists();
         } catch {
           familyCodesMappingExists = "যাচাই ব্যর্থ";
         }
@@ -903,8 +912,8 @@ async function cleanupOrphanFamilies(orphanFamilyIds) {
   const results = [];
   for (const familyId of orphanFamilyIds) {
     try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (!famSnap.exists) {
+      const famSnap = await getDoc(doc(db, "families", familyId));
+      if (!famSnap.exists()) {
         results.push({ familyId, status: "skip", reason: "already-gone" });
         continue;
       }
@@ -917,11 +926,11 @@ async function cleanupOrphanFamilies(orphanFamilyIds) {
       let hasV2Data = false;
       let hasLegacyData = false;
       if (migrationState === "v2") {
-        const membersSnap = await db.collection("families").doc(familyId).collection("members").limit(1).get();
+        const membersSnap = await getDocs(query(collection(doc(db, "families", familyId), "members"), limit(1)));
         hasV2Data = !membersSnap.empty;
       }
       if (collectionName) {
-        const legacySnap = await db.collection(collectionName).limit(1).get();
+        const legacySnap = await getDocs(query(collection(db, collectionName), limit(1)));
         hasLegacyData = !legacySnap.empty;
       }
       if (hasV2Data || hasLegacyData) {
@@ -931,15 +940,15 @@ async function cleanupOrphanFamilies(orphanFamilyIds) {
       }
 
       // ধাপ ১: families/{familyId} delete
-      await db.collection("families").doc(familyId).delete();
+      await deleteDoc(doc(db, "families", familyId));
 
       // ধাপ ২: familyCodes/{familyCode} — শুধু matching familyId হলে
       let familyCodesDeleted = false;
       if (familyCode) {
         try {
-          const codeSnap = await db.collection("familyCodes").doc(familyCode).get();
-          if (codeSnap.exists && codeSnap.data().familyId === familyId) {
-            await db.collection("familyCodes").doc(familyCode).delete();
+          const codeSnap = await getDoc(doc(db, "familyCodes", familyCode));
+          if (codeSnap.exists() && codeSnap.data().familyId === familyId) {
+            await deleteDoc(doc(db, "familyCodes", familyCode));
             familyCodesDeleted = true;
           }
         } catch (err) {
@@ -951,9 +960,9 @@ async function cleanupOrphanFamilies(orphanFamilyIds) {
       let legacyMapDeleted = false;
       if (collectionName) {
         try {
-          const mapSnap = await db.collection("legacyCollectionMap").doc(collectionName).get();
-          if (mapSnap.exists && mapSnap.data().familyId === familyId) {
-            await db.collection("legacyCollectionMap").doc(collectionName).delete();
+          const mapSnap = await getDoc(doc(db, "legacyCollectionMap", collectionName));
+          if (mapSnap.exists() && mapSnap.data().familyId === familyId) {
+            await deleteDoc(doc(db, "legacyCollectionMap", collectionName));
             legacyMapDeleted = true;
           }
         } catch (err) {
