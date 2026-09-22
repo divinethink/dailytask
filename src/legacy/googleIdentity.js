@@ -6,7 +6,9 @@
 // Firestore Rules(firestore.rules) ইতিমধ্যে এই schema সাপোর্ট করে — এই
 // module সেই একই shape/convention অনুসরণ করে(§৩ Data Schema, §১০.২ Email
 // Normalization)।
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from "firebase/firestore";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { generateSecureCode } from "./appHelpers.js";
 
 // §১০.২ — চূড়ান্ত সংজ্ঞা: শুধু trim+lowercase, dot/plus-stripping না
@@ -25,7 +27,7 @@ async function writeUserMapping(googleUid, familyId, memberId) {
   // overwrite করে ফেলত(অথবা উল্টো — পুরনো doc-এ familyId না থাকায়
   // loadUserMapping() fast-path মিস করত)। merge:true দিয়ে দুই schema
   // নিরাপদে সহাবস্থান করবে, কোনো ডেটা হারাবে না।
-  await db.collection("users").doc(googleUid).set({ familyId, memberId }, { merge: true });
+  await setDoc(doc(db, "users", googleUid), { familyId, memberId }, { merge: true });
 }
 
 // --- Startup-race retry(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported
@@ -53,8 +55,8 @@ async function withStartupRaceRetry(fn) {
 
 async function loadUserMapping(googleUid) {
   return withStartupRaceRetry(async () => {
-    const snap = await db.collection("users").doc(googleUid).get();
-    return snap.exists ? snap.data() : null;
+    const snap = await getDoc(doc(db, "users", googleUid));
+    return snap.exists() ? snap.data() : null;
   });
 }
 
@@ -64,14 +66,14 @@ async function loadUserMapping(googleUid) {
 // এই helper শুধু ref/read/delete shape দেয়, caller নিজে সঠিক context
 // নিশ্চিত করবে যেন Rules pass করে।
 function familyMemberEmailRef(normalizedEmail) {
-  return db.collection("familyMemberEmails").doc(normalizedEmail);
+  return doc(db, "familyMemberEmails", normalizedEmail);
 }
 
 async function lookupFamilyByEmail(email) {
   const key = normalizeEmail(email);
   return withStartupRaceRetry(async () => {
-    const snap = await familyMemberEmailRef(key).get();
-    return snap.exists ? { normalizedEmail: key, ...snap.data() } : null;
+    const snap = await getDoc(familyMemberEmailRef(key));
+    return snap.exists() ? { normalizedEmail: key, ...snap.data() } : null;
   });
 }
 
@@ -85,9 +87,8 @@ async function lookupFamilyByEmail(email) {
 // bind করার আগে target member সত্যিই এখনো বিদ্যমান কিনা যাচাই করা হয়,
 // stale হলে trust না করে normal("no-match"-এর মতো) flow-এ পড়ে যায়।
 async function fetchMemberData(familyId, memberId) {
-  const snap = await db.collection("families").doc(familyId)
-    .collection("members").doc(memberId).get();
-  return snap.exists ? snap.data() : null;
+  const snap = await getDoc(doc(db, "families", familyId, "members", memberId));
+  return snap.exists() ? snap.data() : null;
 }
 
 // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap): পুরনো createMemberWithKey()
@@ -147,8 +148,8 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
       throw new Error("পুরনো তথ্য পরিষ্কার করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
     }
   }
-  const batch = db.batch();
-  const memberRef = db.collection("families").doc(familyId).collection("members").doc(memberId);
+  const batch = writeBatch(db);
+  const memberRef = doc(db, "families", familyId, "members", memberId);
   batch.set(memberRef, {
     name,
     gender: gender || "male",
@@ -167,7 +168,7 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
 // normalizedEmail caller-কেই আলাদাভাবে জানা/পাস করা লাগবে(reverse-query
 // পরের sub-phase-এ familyId+memberId দিয়ে করা হবে, এখানে শুধু delete-primitive)।
 async function deleteFamilyMemberEmail(normalizedEmail) {
-  await familyMemberEmailRef(normalizedEmail).delete();
+  await deleteDoc(familyMemberEmailRef(normalizedEmail));
 }
 
 // existing isGoogleLinked()(familyIdentity.js)-এর মতোই সহজ accessor, কিন্তু
@@ -224,7 +225,7 @@ async function signInExistingMemberByGoogle() {
     // Stale mapping(admin আগে remove করেছেন) — নিজের(self-owned, Rules-
     // permitted) users/{uid} doc delete করে ধাপ ২-এ fresh চেষ্টা।
     try {
-      await db.collection("users").doc(uid).delete();
+      await deleteDoc(doc(db, "users", uid));
     } catch (err) {
       console.error("[Google Sign-in] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
     }
@@ -251,15 +252,14 @@ async function signInExistingMemberByGoogle() {
     // permission caller-এর নেই বলে শুধু bypass করা হচ্ছে, harmless)।
     return { matched: false, reason: "no-match" };
   }
-  const memberRef = db.collection("families").doc(lookup.familyId)
-    .collection("members").doc(lookup.memberId);
+  const memberRef = doc(db, "families", lookup.familyId, "members", lookup.memberId);
   try {
     // Rules(claim-clause) নিজেই নিশ্চিত করে যে request.auth.token.email
     // resource-এ সংরক্ষিত member.email-এর সাথে মেলে — client এখানে আলাদা
     // pre-check করছে না(server-verified token-ই একমাত্র সত্যতা)।
-    await memberRef.update({
+    await updateDoc(memberRef, {
       googleUid: uid,
-      email: firebase.firestore.FieldValue.delete(),
+      email: deleteField(),
       updatedAt: Date.now()
     });
     await writeUserMapping(uid, lookup.familyId, lookup.memberId);
@@ -288,7 +288,7 @@ function generateInviteToken() {
 // Admin — নতুন/rotate(পুরনো থাকলেও overwrite, single-active-token মডেল)।
 async function rotateInviteLink(familyId) {
   const token = generateInviteToken();
-  await db.collection("families").doc(familyId).update({
+  await updateDoc(doc(db, "families", familyId), {
     activeInviteToken: { token, createdAt: Date.now(), revoked: false },
     updatedAt: Date.now()
   });
@@ -298,7 +298,7 @@ async function rotateInviteLink(familyId) {
 // Admin — revoke। caller বর্তমান activeInviteToken object পাঠাবে(token/
 // createdAt অক্ষুণ্ণ রাখতে, শুধু revoked flip)।
 async function revokeInviteLink(familyId, activeInviteToken) {
-  await db.collection("families").doc(familyId).update({
+  await updateDoc(doc(db, "families", familyId), {
     activeInviteToken: { ...activeInviteToken, revoked: true },
     updatedAt: Date.now()
   });
@@ -314,14 +314,14 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     return { aborted: true, reason: "google-signin-required" };
   }
   const uid = auth.currentUser.uid;
-  const familyRef = db.collection("families").doc(familyId);
+  const familyRef = doc(db, "families", familyId);
   let familySnap;
   try {
-    familySnap = await familyRef.get();
+    familySnap = await getDoc(familyRef);
   } catch (err) {
     return { aborted: true, reason: "error", error: err.message };
   }
-  if (!familySnap.exists) {
+  if (!familySnap.exists()) {
     return { aborted: true, reason: "family-not-found" };
   }
   const fam = familySnap.data();
@@ -358,7 +358,7 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
       return { aborted: true, reason: "already-member-elsewhere" };
     }
     try {
-      await db.collection("users").doc(uid).delete();
+      await deleteDoc(doc(db, "users", uid));
     } catch (err) {
       console.error("[Invite-Link] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
     }
@@ -386,11 +386,11 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
           }
           return { aborted: true, reason: "email-already-member" };
         }
-        const memberRef = familyRef.collection("members").doc(lookup.memberId);
+        const memberRef = doc(familyRef, "members", lookup.memberId);
         try {
-          await memberRef.update({
+          await updateDoc(memberRef, {
             googleUid: uid,
-            email: firebase.firestore.FieldValue.delete(),
+            email: deleteField(),
             updatedAt: Date.now()
           });
           await writeUserMapping(uid, familyId, lookup.memberId);
@@ -423,7 +423,7 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   // role client পাঠাতে পারে শুধু "member", privilege-escalation guard)।
   const memberId = generateSecureCode(16);
   try {
-    await familyRef.collection("members").doc(memberId).set({
+    await setDoc(doc(familyRef, "members", memberId), {
       name: (name || "").trim(),
       gender: gender || null,
       googleUid: uid,
@@ -441,7 +441,7 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     // join সফলই থাকে — শুধু future-dedup convenience layer মিস হবে।
     if (email) {
       try {
-        await familyMemberEmailRef(normalizeEmail(email)).set({ familyId, memberId });
+        await setDoc(familyMemberEmailRef(normalizeEmail(email)), { familyId, memberId });
       } catch (err) {
         console.error("[Invite-Link] email-mapping write ব্যর্থ(non-fatal):", err.message);
       }
@@ -463,11 +463,11 @@ async function leaveFamily(familyId, memberId) {
     return { aborted: true, reason: "not-signed-in" };
   }
   const uid = auth.currentUser.uid;
-  const familyRef = db.collection("families").doc(familyId);
+  const familyRef = doc(db, "families", familyId);
   let fam = null;
   try {
-    const familySnap = await familyRef.get();
-    fam = familySnap.exists ? familySnap.data() : null;
+    const familySnap = await getDoc(familyRef);
+    fam = familySnap.exists() ? familySnap.data() : null;
   } catch (err) {
     return { aborted: true, reason: "error", error: err.message };
   }
@@ -492,14 +492,14 @@ async function leaveFamily(familyId, memberId) {
       const myEmail = auth.currentUser.email;
       if (myEmail) {
         const emailKey = normalizeEmail(myEmail);
-        const mapSnap = await db.collection("familyMemberEmails").doc(emailKey).get();
-        if (mapSnap.exists && mapSnap.data().familyId === familyId && mapSnap.data().memberId === memberId) {
+        const mapSnap = await getDoc(doc(db, "familyMemberEmails", emailKey));
+        if (mapSnap.exists() && mapSnap.data().familyId === familyId && mapSnap.data().memberId === memberId) {
           mappingRef = mapSnap.ref;
         }
       }
     } catch {}
-    const batch = db.batch();
-    batch.delete(familyRef.collection("members").doc(memberId));
+    const batch = writeBatch(db);
+    batch.delete(doc(familyRef, "members", memberId));
     if (mappingRef) {
       batch.delete(mappingRef);
     }
@@ -510,7 +510,7 @@ async function leaveFamily(familyId, memberId) {
     // familyId/memberId-ই ফেরত দিত, dead-end/permission-denied তৈরি হতো।
     // এটা নিজের(request.auth.uid==uid) doc, Rules ইতিমধ্যে self-delete
     // অনুমোদিত — কোনো Rules change লাগেনি।
-    batch.delete(db.collection("users").doc(uid));
+    batch.delete(doc(db, "users", uid));
     await batch.commit();
     return { success: true };
   } catch (err) {
@@ -527,7 +527,7 @@ async function editOwnProfile(familyId, memberId, name, gender) {
     return { aborted: true, reason: "not-signed-in" };
   }
   try {
-    await db.collection("families").doc(familyId).collection("members").doc(memberId).update({
+    await updateDoc(doc(db, "families", familyId, "members", memberId), {
       name: (name || "").trim(),
       gender: gender || null,
       updatedAt: Date.now()
@@ -544,9 +544,9 @@ async function editOwnProfile(familyId, memberId, name, gender) {
 // (কোনো await/.then()-এর ভিতর থেকে না) — existing GoogleAccountModal.jsx-
 // এর googleProvider(app.js) প্যাটার্নের সাথে সামঞ্জস্যপূর্ণ, এখানে আলাদা
 // module-level instance(কোনো extra config লাগে না, একই default provider)।
-const googleSignInProvider = new firebase.auth.GoogleAuthProvider();
+const googleSignInProvider = new GoogleAuthProvider();
 function triggerGoogleSignInPopup() {
-  return auth.signInWithPopup(googleSignInProvider);
+  return signInWithPopup(auth, googleSignInProvider);
 }
 
 export {

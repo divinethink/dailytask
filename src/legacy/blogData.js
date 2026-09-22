@@ -2,7 +2,8 @@
 // update/delete + writer add/remove, Firestore) + category-তালিকা constant।
 // 3_4_Blog_Feature_Plan.md §২/§৩/§৫-এর সাথে সামঞ্জস্যপূর্ণ — top-level
 // `blogPosts`/`blogWriters` collection, family-Firestore থেকে সম্পূর্ণ independent।
-import { db, auth } from "./firebaseConfig.js";
+import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, query, orderBy, serverTimestamp } from "firebase/firestore";
 import { normalizeEmail } from "./googleIdentity.js";
 import { isCreatorAuth } from "./familyIdentity.js";
 
@@ -46,15 +47,15 @@ function splitByMoreMarker(body) {
 }
 
 function postsRef() {
-  return db.collection("blogPosts");
+  return collection(db, "blogPosts");
 }
 function writersRef() {
-  return db.collection("blogWriters");
+  return collection(db, "blogWriters");
 }
 
 // --- Writer allowlist(§২.২) ---
 async function getWriters() {
-  const snap = await writersRef().get();
+  const snap = await getDocs(writersRef());
   return snap.docs.map((d) => ({ email: d.id, ...d.data() }));
 }
 
@@ -62,8 +63,8 @@ async function isCurrentUserWriter() {
   const user = auth.currentUser;
   if (!user || !user.email) return false;
   const emailKey = normalizeEmail(user.email);
-  const doc = await writersRef().doc(emailKey).get();
-  return doc.exists;
+  const docSnap = await getDoc(doc(writersRef(), emailKey));
+  return docSnap.exists();
 }
 
 const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,15 +73,15 @@ async function addWriter(email) {
   const emailKey = normalizeEmail(email);
   if (!emailKey) throw new Error("email প্রয়োজন");
   if (!EMAIL_FORMAT_PATTERN.test(emailKey)) throw new Error("সঠিক ইমেইল ফরম্যাট দিন(যেমন name@example.com)");
-  await writersRef().doc(emailKey).set({
-    addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  await setDoc(doc(writersRef(), emailKey), {
+    addedAt: serverTimestamp(),
     addedBy: auth.currentUser ? auth.currentUser.uid : null,
   });
 }
 
 async function removeWriter(email) {
   const emailKey = normalizeEmail(email);
-  await writersRef().doc(emailKey).delete();
+  await deleteDoc(doc(writersRef(), emailKey));
 }
 
 // --- Posts(§২.১) ---
@@ -88,14 +89,14 @@ async function removeWriter(email) {
 // কুইজের সাথে সাযুজ্যপূর্ণ) — onSnapshot না, কারণ ব্লগ real-time collaboration
 // টুল না, প্রতিবার sub-screen খোলার সময় fresh read-ই যথেষ্ট।
 async function fetchPosts() {
-  const snap = await postsRef().orderBy("createdAt", "desc").get();
+  const snap = await getDocs(query(postsRef(), orderBy("createdAt", "desc")));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 async function createPost({ category, title, body, tags, sourceNote }) {
   const user = auth.currentUser;
   if (!user) throw new Error("সাইন-ইন প্রয়োজন");
-  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const now = serverTimestamp();
   const payload = {
     category,
     title: (title || "").trim(),
@@ -106,23 +107,23 @@ async function createPost({ category, title, body, tags, sourceNote }) {
     createdAt: now,
     updatedAt: now,
   };
-  const ref = await postsRef().add(payload);
+  const ref = await addDoc(postsRef(), payload);
   return ref.id;
 }
 
 async function updatePost(postId, { category, title, body, tags, sourceNote }) {
-  await postsRef().doc(postId).update({
+  await updateDoc(doc(postsRef(), postId), {
     category,
     title: (title || "").trim(),
     body: body || "",
     tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     sourceNote: sourceNote ? sourceNote.trim() : null,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 }
 
 async function deletePost(postId) {
-  await postsRef().doc(postId).delete();
+  await deleteDoc(doc(postsRef(), postId));
 }
 
 // --- ডিফল্ট পোস্ট ইম্পোর্ট(App Creator-only, লেখক-তালিকাভুক্ত হতে হবে — Rules-এ create-এ
@@ -138,13 +139,13 @@ async function importSeedPosts() {
   }
   const { BLOG_SEED_POSTS } = await import("./blogSeedData.js");
   const existing = new Set((await fetchPosts()).map((p) => p.id));
-  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const now = serverTimestamp();
   let added = 0;
   for (let i = 0; i < BLOG_SEED_POSTS.length; i++) {
     const id = "seed_blog_" + String(i + 1).padStart(2, "0");
     if (existing.has(id)) continue;
     const p = BLOG_SEED_POSTS[i];
-    await postsRef().doc(id).set({
+    await setDoc(doc(postsRef(), id), {
       category: p.category,
       title: p.title,
       body: p.body,
