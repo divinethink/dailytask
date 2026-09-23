@@ -1,2 +1,7 @@
 /*
   Cross-Origin-Opener-Policy: same-origin-allow-popups
+
+# Vite hashed build assets: content-hash is in the file name, so a changed file gets a new URL.
+# Safe to cache for 1 year. sw.js / index.html / manifest are NOT under /assets/ (unaffected).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
