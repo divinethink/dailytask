@@ -1,6 +1,6 @@
-import { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, dbModular, authModular } from "./firebaseConfig.js";
-import { GoogleAuthProvider } from "firebase/auth";
-import { query, where, documentId, onSnapshot } from "firebase/firestore";
+import { dbModular, authModular, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
+import { GoogleAuthProvider, signOut, signInAnonymously, signInWithPopup, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
+import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, writeBatch, increment, arrayUnion, arrayRemove, collection, orderBy, limit } from "firebase/firestore";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
   applyThemeColor, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
@@ -501,8 +501,8 @@ window.addEventListener("beforeinstallprompt", e => {
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
   logAnalyticsEvent("pwa_installed");
-  db.collection("app_stats").doc("pwa_installs").set({
-    count: firebase.firestore.FieldValue.increment(1),
+  setDoc(doc(dbModular, "app_stats", "pwa_installs"), {
+    count: increment(1),
     lastInstalledAt: Date.now()
   }, {
     merge: true
@@ -1078,13 +1078,13 @@ function App() {
       // দরকার), কিন্তু boot এর জন্য অপেক্ষা করে না।
       ensureLegacyCollectionMap();
       const migrationFamilyId = getFamilyId();
-      migrationUnsub = db.collection("families").doc(migrationFamilyId).onSnapshot(
+      migrationUnsub = onSnapshot(doc(dbModular, "families", migrationFamilyId),
         (snap) => {
-          const state = snap.exists ? (snap.data().migrationState || "legacy") : "legacy";
+          const state = snap.exists() ? (snap.data().migrationState || "legacy") : "legacy";
           setMigrationState(state);
           // §Public Invite-Link — একই live listener থেকে mirror(নতুন read
           // না), যাতে অন্য ডিভাইস থেকে rotate/revoke হলে সাথে সাথে sync হয়।
-          setActiveInviteToken(snap.exists ? (snap.data().activeInviteToken || null) : null);
+          setActiveInviteToken(snap.exists() ? (snap.data().activeInviteToken || null) : null);
           // Family Code auto-propagate + notify: সার্ভারের families/{id}.familyCode
           // এই ডিভাইসের local কোড থেকে ভিন্ন হলে (Admin অন্য কোথাও কোড
           // পরিবর্তন করেছেন) — অটো নতুন কোড বসিয়ে, Google-linked হলে
@@ -1092,7 +1092,7 @@ function App() {
           // "family_code_change_notice" flag দেখে ব্যানার দেখানো হবে।
           // familyId অপরিবর্তিত থাকায় এটি সম্পূর্ণ নিরাপদ — শুধু লেবেল sync।
           try {
-            const serverCode = snap.exists ? snap.data().familyCode : null;
+            const serverCode = snap.exists() ? snap.data().familyCode : null;
             const localCode = getFamilyCode();
             if (serverCode && serverCode.trim() && serverCode !== localCode) {
               localStorage.setItem("family_code", serverCode);
@@ -1136,36 +1136,37 @@ function App() {
       // আগের (এই fix-এর আগের) hardcoded আচরণের সাথে সামঞ্জস্যপূর্ণ fallback।
       let bootMigrationState = "legacy";
       try {
-        const migFamSnap = await db.collection("families").doc(migrationFamilyId).get();
-        bootMigrationState = migFamSnap.exists ? (migFamSnap.data().migrationState || "legacy") : "legacy";
+        const migFamSnap = await getDoc(doc(dbModular, "families", migrationFamilyId));
+        bootMigrationState = migFamSnap.exists() ? (migFamSnap.data().migrationState || "legacy") : "legacy";
         // Access Approval Gate — Step 4: একই fetch থেকে isAdmin বের করা,
         // কোনো অতিরিক্ত read ছাড়াই।
-        const famAdminUids = migFamSnap.exists ? migFamSnap.data().adminUids : null;
+        const famAdminUids = migFamSnap.exists() ? migFamSnap.data().adminUids : null;
         const myUid = auth.currentUser ? auth.currentUser.uid : null;
         setIsAdmin(Array.isArray(famAdminUids) && myUid ? famAdminUids.includes(myUid) : false);
         setAdminUidsList(Array.isArray(famAdminUids) ? famAdminUids : []);
         // §First Admin Protection — একই fetch থেকে, extra read ছাড়াই।
-        setFirstAdminUid(migFamSnap.exists ? (migFamSnap.data().firstAdminUid || null) : null);
+        setFirstAdminUid(migFamSnap.exists() ? (migFamSnap.data().firstAdminUid || null) : null);
         // §Public Invite-Link — একই boot fetch থেকে initial value(extra
         // read নেই)।
-        setActiveInviteToken(migFamSnap.exists ? (migFamSnap.data().activeInviteToken || null) : null);
+        setActiveInviteToken(migFamSnap.exists() ? (migFamSnap.data().activeInviteToken || null) : null);
         // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
         // notification(read+unread)-এ live listener, যাতে "seen"(read:true)
         // করার পরও item panel থেকে হারিয়ে না যায়(শুধু explicit delete/Clear-all
         // দিয়েই সরবে)। badge unread-count আলাদাভাবে filter করে বের করা হয়।
         // Spark-এ negligible cost(৩-member স্কেলে খুবই কম doc)।
         if (myUid) {
-          notifUnsub = db.collection("families").doc(migrationFamilyId)
-            .collection("notifications")
-            .where("targetUid", "==", myUid)
-            .orderBy("createdAt", "desc")
-            .limit(30)
-            .onSnapshot(
-              (nsnap) => {
-                setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
-              },
-              () => {}
-            );
+          notifUnsub = onSnapshot(
+            query(
+              collection(dbModular, "families", migrationFamilyId, "notifications"),
+              where("targetUid", "==", myUid),
+              orderBy("createdAt", "desc"),
+              limit(30)
+            ),
+            (nsnap) => {
+              setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            },
+            () => {}
+          );
         }
       } catch {}
       let m;
@@ -1180,16 +1181,15 @@ function App() {
           try {
             const myUid = auth.currentUser ? auth.currentUser.uid : null;
             if (myUid) {
-              const reqRef = db.collection("families").doc(migrationFamilyId)
-                .collection("accessRequests").doc(myUid);
-              const reqSnap = await reqRef.get();
-              if (!reqSnap.exists) {
+              const reqRef = doc(dbModular, "families", migrationFamilyId, "accessRequests", myUid);
+              const reqSnap = await getDoc(reqRef);
+              if (!reqSnap.exists()) {
                 // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved):
                 // নতুন access-request এখন সরাসরি "approved"-এ create হয়
                 // (আগে "pending" থাকত, admin approve করা লাগত)। Rules-এ
                 // self-create-এ approved status-ও allow করা হয়েছে।
                 // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
-                await reqRef.set({ status: "approved", requestedAt: Date.now() });
+                await setDoc(reqRef, { status: "approved", requestedAt: Date.now() });
                 // যেহেতু মডারেশন অটো-অন, "অনুমোদনের অপেক্ষায়" স্ক্রিন
                 // দেখানোর দরকার নেই — সাথে সাথেই approved, তাই একবার
                 // reload করলে migrateMembersIfNeeded() স্বাভাবিকভাবে সফল
@@ -1435,14 +1435,14 @@ function App() {
     // New document (different month) — nothing local worth protecting yet.
     meetingDirtyRef.current = false;
     const docKey = meetingKey(monthCursor.year, monthCursor.month0);
-    const docRef = db.collection(getCollectionName()).doc(docKey);
-    const unsubscribe = docRef.onSnapshot(doc => {
+    const docRef = doc(dbModular, getCollectionName(), docKey);
+    const unsubscribe = onSnapshot(docRef, docSnap => {
       // H-1 fix: while the user has unsaved local edits, ignore incoming
       // snapshots (e.g. another device's save) so typing isn't overwritten.
       if (meetingDirtyRef.current) return;
-      if (doc.exists) {
+      if (docSnap.exists()) {
         try {
-          const data = JSON.parse(doc.data().value);
+          const data = JSON.parse(docSnap.data().value);
           setMeetingState(data);
         } catch (e) {}
       } else {
@@ -2182,11 +2182,11 @@ function App() {
     try {
       // §Hybrid Admin Role Model — role(authoritative) ও adminUids(derived
       // index) একই atomic batch-এ sync।
-      const famRef = db.collection("families").doc(getFamilyId());
-      const memberRef = famRef.collection("members").doc(m.id);
-      const batch = db.batch();
+      const famRef = doc(dbModular, "families", getFamilyId());
+      const memberRef = doc(famRef, "members", m.id);
+      const batch = writeBatch(dbModular);
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayUnion(...mUids),
+        adminUids: arrayUnion(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2198,8 +2198,7 @@ function App() {
       // §Notification System — নতুন admin-কে জানানো, best-effort(ব্যর্থ
       // হলেও মূল Make-Admin action আগেই সফল হয়ে গেছে, তাই silently ignore)।
       try {
-        await Promise.all(mUids.map(uid => db.collection("families").doc(getFamilyId())
-          .collection("notifications").add({
+        await Promise.all(mUids.map(uid => addDoc(collection(famRef, "notifications"), {
             targetUid: uid,
             type: "admin_assigned",
             message: "আপনাকে এই পরিবারের এডমিন করা হয়েছে।",
@@ -2242,11 +2241,11 @@ function App() {
     if (!ok) return;
     try {
       // §Hybrid Admin Role Model — role ও adminUids একই atomic batch-এ sync।
-      const famRef = db.collection("families").doc(getFamilyId());
-      const memberRef = famRef.collection("members").doc(m.id);
-      const batch = db.batch();
+      const famRef = doc(dbModular, "families", getFamilyId());
+      const memberRef = doc(famRef, "members", m.id);
+      const batch = writeBatch(dbModular);
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayRemove(...mUids),
+        adminUids: arrayRemove(...mUids),
         updatedAt: Date.now()
       });
       batch.update(memberRef, {
@@ -2292,14 +2291,14 @@ function App() {
             adminUidsList.includes(u) && (u !== firstAdminUid || myUid === firstAdminUid)
           )
         : [myUid];
-      const famRef = db.collection("families").doc(getFamilyId());
-      const batch = db.batch();
+      const famRef = doc(dbModular, "families", getFamilyId());
+      const batch = writeBatch(dbModular);
       batch.update(famRef, {
-        adminUids: firebase.firestore.FieldValue.arrayRemove(...myOwnAdminUids),
+        adminUids: arrayRemove(...myOwnAdminUids),
         updatedAt: Date.now()
       });
       if (myMember) {
-        batch.update(famRef.collection("members").doc(myMember.id), {
+        batch.update(doc(famRef, "members", myMember.id), {
           role: "member",
           updatedAt: Date.now()
         });
@@ -2361,7 +2360,7 @@ function App() {
         try {
           localStorage.setItem("dt_pending_google_reauth", "1");
         } catch {}
-        await auth.signOut();
+        await signOut(authModular);
       } else {
         await signOutToFreshAnonymous();
       }
@@ -2447,8 +2446,8 @@ function App() {
   async function handleGuestSignInSuccess(familyId, memberId) {
     let famCode = familyId;
     try {
-      const famSnap = await db.collection("families").doc(familyId).get();
-      if (famSnap.exists && famSnap.data().familyCode) {
+      const famSnap = await getDoc(doc(dbModular, "families", familyId));
+      if (famSnap.exists() && famSnap.data().familyCode) {
         famCode = famSnap.data().familyCode;
       }
     } catch {}
@@ -2643,7 +2642,7 @@ function App() {
     memberName: selectedMember?.name,
     auth: authModular,
     claimFirstAdminIfEligible: claimFirstAdminIfEligible,
-    googleProvider: googleProviderModular,
+    googleProvider: googleProvider,
     linkGoogleAccount: linkGoogleAccount,
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
@@ -2766,7 +2765,7 @@ function App() {
           onNavigateHome: () => setActiveTab(TAB_FAMILY),
           entryDirtyRef: entryDirtyRef,
           weeklyDirtyRef: weeklyDirtyRef,
-          auth: auth,
+          auth: authModular,
           handleReleaseMember: handleReleaseMember,
           isLockedForSwitch: isLockedForSwitch,
           isAdmin: isAdmin,
@@ -3296,30 +3295,15 @@ function App() {
 //
 // Redirect-based flows survive a full page reload, so any pending
 // action/result is remembered across that reload via localStorage.
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-// modular v9 SDK Migration Plan, GoogleAccountModal.jsx ধাপ(২১ সেপ্টেম্বর
-// ২০২৬): উপরের compat `googleProvider` এখনো linkGoogleAccount()/সরাসরি
-// signInWithPopup() কল(নিচে, এখনো compat-syntax)-এ ব্যবহৃত হয় — সেগুলো
-// touch করা হয়নি। GoogleAccountModal.jsx-কে আলাদা, dedicated modular
-// provider instance দেওয়া হলো(শুধু এই একটা consumer-এর জন্য) — shared
-// compat constant-টা compat-code-এর জন্য অক্ষুণ্ণ রেখে blast-radius
-// ন্যূনতম রাখতে।
-const googleProviderModular = new GoogleAuthProvider();
-// Popup instead of redirect: a redirect round-trip depends on session/local
-// storage surviving the navigation away to Google and back, which silently
-// fails on browsers that partition storage for third-party contexts (this
-// is now the default in Safari and increasingly Chrome/Firefox) — the
-// classic symptom is "I picked my Google account, it came back, and
-// nothing changed." Popup resolves the promise directly on this same page,
-// so it doesn't depend on that storage round-trip surviving.
+const googleProvider = new GoogleAuthProvider();
 function linkGoogleAccount() {
-  return auth.currentUser.linkWithPopup(googleProvider);
+  return linkWithPopup(authModular.currentUser, googleProvider);
 }
 function unlinkGoogleAccount() {
-  return auth.currentUser.unlink("google.com");
+  return unlink(authModular.currentUser, "google.com");
 }
 function signOutToFreshAnonymous() {
-  return auth.signOut().then(() => auth.signInAnonymously());
+  return signOut(authModular).then(() => signInAnonymously(authModular));
 }
 
 // =====================================================================
@@ -3393,7 +3377,7 @@ function renderPendingGoogleReauthGate() {
     const [err, setErr] = useState(null);
     function proceedAnonymous() {
       setBusy(true);
-      auth.signInAnonymously().catch(e => {
+      signInAnonymously(authModular).catch(e => {
         console.error("Anonymous sign-in failed:", e);
       }).finally(() => {
         // mountApp() নিজে আবার এই একই #root container-এ createRoot()
@@ -3406,7 +3390,7 @@ function renderPendingGoogleReauthGate() {
     function handleGoogleClick() {
       setBusy(true);
       setErr(null);
-      auth.signInWithPopup(googleProvider).then(() => {
+      signInWithPopup(authModular, googleProvider).then(() => {
         root.unmount();
         bootOnce();
       }).catch(e => {
@@ -3446,7 +3430,7 @@ function renderPendingGoogleReauthGate() {
 // সবসময় একই bootOnce()→mountApp()→App() path। renderGoogleLandingGate()
 // ফাংশনটাই আর দরকার নেই, সরিয়ে ফেলা হলো(NonMemberLanding.jsx-ও এখন
 // unused, সেটাও সরানো হয়েছে)।
-const unsubscribeAuth = auth.onAuthStateChanged(user => {
+const unsubscribeAuth = onAuthStateChanged(authModular, user => {
   unsubscribeAuth();
   if (!user) {
     try {
