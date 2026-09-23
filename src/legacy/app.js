@@ -1053,8 +1053,8 @@ function App() {
       // claimFirstAdminIfEligible — তিনটিতেই thread হয় (প্রতিটি write-এর
       // পর in-memory state আপডেট হয়ে পরের ধাপে যায়), ফলে এই চেইনে আগে
       // ৫টা আলাদা `.get()` লাগত, এখন ১টা।
-      const initialFamSnap = await familyDocRef().get();
-      let famState = { exists: initialFamSnap.exists, data: initialFamSnap.exists ? initialFamSnap.data() : null };
+      const initialFamSnap = await getDoc(familyDocRef());
+      let famState = { exists: initialFamSnap.exists(), data: initialFamSnap.exists() ? initialFamSnap.data() : null };
       // §৫ fix: familyId self-heal সম্পন্ন হওয়ার পরই family doc নিশ্চিত
       // (idempotent — আগে থেকে থাকলে no-op) ও dataCollectionName cache
       // পূরণ করা হচ্ছে — এর পরের যেকোনো read/write (migrateMembersIfNeeded
