@@ -1,4 +1,4 @@
-import { dbModular, authModular, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
+import { dbModular, authModular, authModular as auth, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
 import { GoogleAuthProvider, signOut, signInAnonymously, signInWithPopup, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
 import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, writeBatch, increment, arrayUnion, arrayRemove, collection, orderBy, limit } from "firebase/firestore";
 import {
