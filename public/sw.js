@@ -1,4 +1,9 @@
-const CACHE = "daily-task-v2";
+// v3: /assets/* (Vite hashed build files) এখন cache-first; activate-এ পুরনো
+// "daily-task-v2" cache স্বয়ংক্রিয়ভাবে মুছে যায় (নিচের activate handler)।
+const CACHE = "daily-task-v3";
+// /assets/ entry-র সর্বোচ্চ সংখ্যা — প্রতি deploy-এ নতুন hash জমে cache
+// অনির্দিষ্টকাল বাড়া ঠেকাতে; সীমা ছাড়ালে সবচেয়ে পুরনো entry আগে বাদ যায়।
+const MAX_ASSET_ENTRIES = 100;
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 // Analytics/tracking requests must always hit the network directly — never
@@ -17,6 +22,50 @@ function isAnalyticsRequest(url) {
     return ANALYTICS_HOSTS.some((h) => host === h || host.endsWith("." + h));
   } catch {
     return false;
+  }
+}
+
+// Vite-এর hashed build asset (/assets/index-AbC123.js ইত্যাদি): ফাইলের
+// নামেই content-hash থাকে, তাই একই URL-এর content কখনো বদলায় না —
+// revalidate ছাড়াই cache থেকে দেওয়া নিরাপদ।
+function isHashedAsset(url) {
+  try {
+    return new URL(url).pathname.startsWith("/assets/");
+  } catch {
+    return false;
+  }
+}
+
+async function trimAssetCache(cache) {
+  const keys = await cache.keys(); // insertion order — সবচেয়ে পুরনো আগে
+  const assetKeys = keys.filter((r) => isHashedAsset(r.url));
+  const extra = assetKeys.length - MAX_ASSET_ENTRIES;
+  for (let i = 0; i < extra; i++) await cache.delete(assetKeys[i]);
+}
+
+async function assetCacheFirst(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  try {
+    const res = await fetch(request);
+    // Guard: server কখনো missing asset-এর জায়গায় index.html (SPA fallback,
+    // status 200) ফেরত দিলে সেটা JS/CSS URL-এর নিচে cache করা যাবে না —
+    // নইলে ওই URL স্থায়ীভাবে ভুল content দেবে।
+    const ct = res.headers.get("content-type") || "";
+    if (res.status === 200 && !ct.includes("text/html")) {
+      try {
+        await cache.put(request, res.clone());
+        await trimAssetCache(cache);
+      } catch {
+        // cache-write ব্যর্থ হলেও response ঠিকই ফেরত যাবে
+      }
+    }
+    return res;
+  } catch {
+    // Offline + cache miss: undefined না, explicit Response(C-3/C-4 fix-এর
+    // একই নীতি — respondWith() যেন সবসময় valid Response পায়)।
+    return new Response("", { status: 503, statusText: "Offline" });
   }
 }
 
@@ -51,6 +100,13 @@ self.addEventListener("fetch", (e) => {
   // (same-origin) static asset-ই SW cache করবে, বাকি সব browser-এর
   // default(direct network) আচরণে ছেড়ে দেওয়া হচ্ছে।
   if (!e.request.url.startsWith(self.location.origin)) return;
+
+  // [নতুন] hashed build asset → cache-first (নিচের stale-while-revalidate
+  // শুধু index.html/manifest/icon-এর জন্য থাকে — auto-update logic অপরিবর্তিত)।
+  if (isHashedAsset(e.request.url)) {
+    e.respondWith(assetCacheFirst(e.request));
+    return;
+  }
 
   e.respondWith(
     caches.match(e.request).then((cached) => {
