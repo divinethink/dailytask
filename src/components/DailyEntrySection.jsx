@@ -426,18 +426,11 @@ function CustomTasksBody({
   const small = "shrink-0 h-9 px-3 rounded-xl text-xs font-bold border disabled:opacity-40";
   const canAdd = !manageDisabled && !busy && newLabel.trim() && active.length < MAX_ACTIVE;
   return h("div", null,
-    !manageDisabled && h("div", { className: "flex justify-end mb-1" }, h("button", {
-      type: "button",
-      onClick: () => setShowAdd(v => !v),
-      "aria-label": showAdd ? "বন্ধ করুন" : "নতুন টাস্ক যোগ করুন",
-      "aria-expanded": showAdd,
-      className: "w-10 h-10 flex items-center justify-center rounded-xl border border-emerald-800 text-emerald-800 transition-transform" + (showAdd ? " rotate-45 bg-emerald-50" : "")
-    }, h(Plus, { size: 18 }))),
     active.length === 0 && h("div", {
       className: "flex flex-col items-center gap-2 text-center py-3"
     }, h(ClipboardListIcon, { size: 28, color: "#B9C2B2" }), h("p", {
       className: "text-xs text-slate-400"
-    }, "কোনো কাস্টম টাস্ক নেই। উপরের + চাপ দিয়ে যোগ করুন।")),
+    }, "কোনো কাস্টম টাস্ক নেই। নিচে নতুন টাস্ক চাপ দিয়ে যোগ করুন।")),
     active.map(t => editId === t.id ? h("div", {
       key: t.id,
       className: "py-2 border-b border-slate-100 space-y-2"
@@ -451,20 +444,13 @@ function CustomTasksBody({
       className: "w-full h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800"
     }), h("div", { className: "flex gap-2" },
       h("button", { type: "button", onClick: saveEdit, disabled: busy || !editLabel.trim(), className: small + " bg-emerald-800 text-white border-emerald-800" }, "সেভ"),
-      h("button", { type: "button", onClick: () => archive(t.id), disabled: busy, className: small + " bg-slate-50 text-red-700 border-slate-200" }, "আর্কাইভ"),
+      h("button", { type: "button", onClick: () => archive(t.id), disabled: busy, "aria-label": "টাস্ক ডিলিট", className: small + " bg-slate-50 text-red-700 border-slate-200 flex items-center gap-1" }, h(Trash, { size: 13 }), "ডিলিট"),
       h("button", { type: "button", onClick: () => setEditId(null), disabled: busy, className: small + " bg-white text-slate-600 border-slate-200" }, "বাতিল")
     )) : h("div", {
       key: t.id,
       className: "flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0"
     }, h("span", { className: "text-sm font-medium text-slate-700 min-w-0 break-words" }, h(LabelText, { text: t.label })),
       h("div", { className: "flex items-center gap-2 shrink-0" },
-        !manageDisabled && h("button", {
-          type: "button",
-          onClick: () => archive(t.id),
-          disabled: busy,
-          "aria-label": t.label + " ডিলিট",
-          className: "w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-700 disabled:opacity-40"
-        }, h(Trash, { size: 14 })),
         !manageDisabled && h("button", {
           type: "button",
           onClick: () => { setEditId(t.id); setEditLabel(t.label); },
@@ -477,7 +463,12 @@ function CustomTasksBody({
           disabled: toggleDisabled
         }))
       ))),
-    showAdd && !manageDisabled && h("div", { className: "mt-3 flex items-center gap-2 pt-3 border-t border-slate-100" },
+    !manageDisabled && !showAdd && active.length < MAX_ACTIVE && h("button", {
+      type: "button",
+      onClick: () => setShowAdd(true),
+      className: "flex items-center gap-1 pt-2 pb-0.5 text-xs font-bold text-emerald-800"
+    }, h(Plus, { size: 13 }), "নতুন টাস্ক"),
+    showAdd && !manageDisabled && h("div", { className: "mt-2 flex items-center gap-2" },
       h("input", {
         type: "text",
         value: newLabel,
@@ -490,7 +481,8 @@ function CustomTasksBody({
         "aria-label": "নতুন টাস্কের নাম",
         className: "min-w-0 flex-1 h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800 disabled:opacity-40"
       }),
-      h("button", { type: "button", onClick: add, disabled: !canAdd, className: small + " h-10 bg-emerald-800 text-white border-emerald-800" }, busy ? "…" : "সেভ")
+      h("button", { type: "button", onClick: add, disabled: !canAdd, className: small + " h-10 bg-emerald-800 text-white border-emerald-800" }, busy ? "…" : "সেভ"),
+      h("button", { type: "button", onClick: () => { setShowAdd(false); setNewLabel(""); }, "aria-label": "বাতিল", className: "shrink-0 w-8 h-10 flex items-center justify-center text-slate-400" }, h(X, { size: 16 }))
     ),
     active.length >= MAX_ACTIVE && h("p", { className: "mt-2 text-[11px] text-amber-700" }, "সর্বোচ্চ " + MAX_ACTIVE + "টি সক্রিয় টাস্ক। নতুন যোগ করতে পুরনো কোনোটি আর্কাইভ করুন।"),
     error && h("p", { role: "alert", className: "mt-2 text-xs text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।"),
