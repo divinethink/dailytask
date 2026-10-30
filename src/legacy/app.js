@@ -41,7 +41,7 @@ import {
   releaseMemberDoc,
   createMemberWithKey,
   migrateMembersIfNeeded,
-  loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
+  loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
   updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout
 } from "./memberData.js";
@@ -600,6 +600,8 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, একই pattern): TAB_SETTINGS-এ ট্যাপ না
 // করলে এই chunk লোড হবে না।
 import { renderHomeBelow } from "../components/HomeFold.jsx";
+import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
+const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
 import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
@@ -879,6 +881,8 @@ function App() {
   // email আবশ্যক(2_4 §৫.১ proxy-member pattern, নিচে handleAddMember())।
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [customFields, setCustomFields] = useState([]);
+  const [fieldOverrides, setFieldOverrides] = useState({});
+  const [showFieldManager, setShowFieldManager] = useState(false);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
@@ -1223,6 +1227,7 @@ function App() {
       });
       const cf = await loadCustomFields();
       setCustomFields(cf);
+      setFieldOverrides(sanitizeOverrides(await loadFieldOverrides()));
       let last = null;
       try {
         // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
@@ -1321,9 +1326,22 @@ function App() {
     localStorage.setItem("monthly_reminder_dismissed_on", dateKey(new Date()));
     setMonthlyReminderBanner(false);
   }
+  // §লেবেল ম্যানেজ(ধাপ গ): রিনেম/লুকানো override প্রয়োগ। override না থাকলে তালিকা আগের মতোই।
+  const deenFieldsView = useMemo(() => applyOverrides(DEFAULT_DEEN_FIELDS, fieldOverrides), [fieldOverrides]);
+  const duniyaFieldsView = useMemo(() => applyOverrides(DEFAULT_DUNIYA_FIELDS, fieldOverrides), [fieldOverrides]);
+  const customFieldsView = useMemo(() => applyOverrides(customFields, fieldOverrides), [customFields, fieldOverrides]);
   const allFields = useMemo(() => {
-    return [...DEFAULT_DEEN_FIELDS, ...DEFAULT_DUNIYA_FIELDS, ...customFields];
-  }, [customFields]);
+    return [...deenFieldsView, ...duniyaFieldsView, ...customFieldsView];
+  }, [deenFieldsView, duniyaFieldsView, customFieldsView]);
+  async function handleSaveFieldManager(nextOverrides, nextCustomFields) {
+    if (isLockedForSwitch) throw new Error("locked");
+    if (JSON.stringify(nextCustomFields) !== JSON.stringify(customFields)) {
+      await saveCustomFields(nextCustomFields);
+      setCustomFields(nextCustomFields);
+    }
+    await saveFieldOverrides(nextOverrides);
+    setFieldOverrides(nextOverrides);
+  }
   const selectedMember = useMemo(() => (members || []).find(m => m.id === selectedId) || null, [members, selectedId]);
   // True when this member has been claimed ("দায়িত্ব নিন") by a different
   // Firebase Auth uid than the one this device is currently signed in as.
@@ -2792,7 +2810,16 @@ function App() {
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
           onOpenHomeLayout: () => setShowHomeLayout(true),
+          onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
+        })),
+        showFieldManager && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(FieldManagerScreen, {
+          deenFields: DEFAULT_DEEN_FIELDS,
+          duniyaFields: DEFAULT_DUNIYA_FIELDS,
+          customFields: customFields,
+          overrides: fieldOverrides,
+          onSave: handleSaveFieldManager,
+          onClose: () => setShowFieldManager(false)
         })),
         showHomeLayout && selectedMember && React.createElement(React.Suspense, { fallback: null }, React.createElement(HomeLayoutScreen, {
           member: selectedMember,
@@ -3022,7 +3049,7 @@ function App() {
     className: "max-w-2xl mx-auto"
   }, React.createElement(DailyEntrySection, {
     codeChangeNotice: codeChangeNotice,
-    customFields: customFields,
+    customFields: customFieldsView,
     dismissMonthlyReminder: dismissMonthlyReminder,
     dismissWeeklyReminder: dismissWeeklyReminder,
     entry: entry,
@@ -3048,8 +3075,8 @@ function App() {
     viewDate: viewDate,
     weeklyReminderBanner: weeklyReminderBanner,
     BN_MONTHS: BN_MONTHS,
-    DEFAULT_DEEN_FIELDS: DEFAULT_DEEN_FIELDS,
-    DEFAULT_DUNIYA_FIELDS: DEFAULT_DUNIYA_FIELDS,
+    DEFAULT_DEEN_FIELDS: deenFieldsView,
+    DEFAULT_DUNIYA_FIELDS: duniyaFieldsView,
     // §Part B Phase ২(category-accordion, ১৫ সেপ্টেম্বর ২০২৬): নতুন prop-দুটো —
     // DEEN_CATEGORY_GROUPS(field→category mapping) ও dailyScore(single-entry
     // multi-field aggregate ratio, appHelpers.js-এ আগে থেকেই বিদ্যমান, এতদিন শুধু

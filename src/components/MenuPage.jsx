@@ -43,6 +43,7 @@ export function MenuPage({
   monthCursor,
   setShowFeedbackModal,
   onOpenHomeLayout,
+  onOpenFieldManager,
   themeColorPickerEl
 }) {
   return React.createElement(
@@ -220,6 +221,19 @@ export function MenuPage({
               },
               React.createElement(EditIcon, { size: 14 }),
               " হোম কাস্টমাইজ (কার্ড সাজান/ভাঁজ)"
+            )
+          ),
+          onOpenFieldManager && React.createElement(
+            "div",
+            { className: "py-1" },
+            React.createElement(
+              "button",
+              {
+                onClick: () => { onOpenFieldManager(); },
+                className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+              },
+              React.createElement(EditIcon, { size: 14 }),
+              " লেবেল ম্যানেজ (নাম বদল/লুকান/নতুন)"
             )
           ),
           onOpenHomeLayout && React.createElement("div", { className: "border-t border-slate-100 my-1" }),

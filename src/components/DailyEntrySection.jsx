@@ -558,15 +558,16 @@ export function DailyEntrySection({
       id: g.id,
       title: g.label,
       icon: CATEGORY_ICON_COMPONENTS[g.id] || g.icon,
-      fields: DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)),
+      fields: [...DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)), ...customFields.filter(f => f.category === g.id)],
       showInfo: g.id === "salah"
     })), {
       id: "duniya",
       title: "ব্যক্তিগত ও পারিবারিক অভ্যাস",
       icon: CATEGORY_ICON_COMPONENTS.duniya,
-      fields: DEFAULT_DUNIYA_FIELDS,
+      fields: [...DEFAULT_DUNIYA_FIELDS, ...customFields.filter(f => f.category === "duniya")],
       showInfo: false
     }].forEach((c, idx) => {
+      if (c.fields.length === 0) return;
       const score = dailyScore(entry, selectedMember, c.fields);
       const percent = score === null ? null : Math.round(score * 100);
       m[c.id] = fold => /*#__PURE__*/React.createElement(FieldGroup, {
@@ -607,14 +608,14 @@ export function DailyEntrySection({
     className: "text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
-  }), " নতুন টাস্ক")), customFields.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }), " নতুন টাস্ক")), customFields.filter(f => !f.category || f.category === "other").length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col items-center gap-2 text-center py-4"
   }, /*#__PURE__*/React.createElement(ClipboardListIcon, {
     size: 28,
     color: "#B9C2B2"
   }), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400"
-  }, "কোন কাস্টম টাস্ক নেই। উপরে বোতামে ক্লিক করে যোগ করুন।")) : customFields.map(f => /*#__PURE__*/React.createElement("div", {
+  }, "কোন কাস্টম টাস্ক নেই। উপরে বোতামে ক্লিক করে যোগ করুন।")) : customFields.filter(f => !f.category || f.category === "other").map(f => /*#__PURE__*/React.createElement("div", {
     key: f.key,
     className: "flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0" + (isFutureDate(viewDate) || isLockedForThisDevice ? " opacity-40" : "")
   }, /*#__PURE__*/React.createElement("span", {

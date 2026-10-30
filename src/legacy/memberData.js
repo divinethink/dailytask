@@ -551,6 +551,20 @@ async function saveCustomFields(fields) {
   await appStorage.set("custom_fields", JSON.stringify(fields), true);
 }
 
+// §লেবেল ম্যানেজ(ধাপ গ, owner-approved): family-স্তরের ঐচ্ছিক "field_overrides" doc —
+// custom_fields-এর হুবহু একই storage-পথ(appStorage shared), তাই নতুন Rules লাগে না।
+async function loadFieldOverrides() {
+  try {
+    const res = await appStorage.get("field_overrides", true);
+    return res ? JSON.parse(res.value) : {};
+  } catch {
+    return {};
+  }
+}
+async function saveFieldOverrides(overrides) {
+  await appStorage.set("field_overrides", JSON.stringify(overrides), true);
+}
+
 async function loadEntry(migrationState, memberId, key) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -706,6 +720,8 @@ export {
   migrateMembersIfNeeded,
   loadCustomFields,
   saveCustomFields,
+  loadFieldOverrides,
+  saveFieldOverrides,
   loadEntry,
   saveEntry,
   entryDocId,
