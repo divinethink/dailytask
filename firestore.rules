@@ -1107,6 +1107,16 @@ service cloud.firestore {
           && request.resource.data.homeLayout.below is list
           && request.resource.data.homeLayout.below.size() <= 20;
 
+        // কাস্টম টাস্ক(সদস্যভিত্তিক, owner-approved) — member-ডকের ঐচ্ছিক customTasks: [{id,label,archived?}]।
+        // homeLayout-clause-এর হুবহু একই caller-নিয়ম; শুধু customTasks+updatedAt বদলাতে পারে।
+        // সক্রিয়+আর্কাইভ মিলিয়ে সর্বোচ্চ ৪০টি(client-এ সক্রিয় ২০টি সীমা)। আইটেমের গঠন rules-এ যাচাই হয় না
+        // (list-iteration নেই) — client sanitize করে; এটা শুধু আকার-সীমা ও ফিল্ড-সীমা।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customTasks', 'updatedAt'])
+          && request.resource.data.customTasks is list
+          && request.resource.data.customTasks.size() <= 40;
+
         // --- §Google-Login Identity Migration(2_4 §৪-৬, dual-path) ---
         // সম্পূর্ণ additive — উপরের ownerUids-based clause-গুলো অপরিবর্তিত।
         // এই নতুন clause-গুলো শুধু তখনই relevant যখন member doc-এ

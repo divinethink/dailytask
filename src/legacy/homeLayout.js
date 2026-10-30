@@ -23,7 +23,8 @@ export const CARD_DEFS = {
     d("quranIlm", "কুরআন ও ইলম", "closed"),
     d("dhikrDawah", "যিকির ও দাওয়াহ", "closed"),
     d("duniya", "ব্যক্তিগত ও পারিবারিক অভ্যাস", "closed"),
-    d("other", "অন্যান্য", "closed")
+    d("other", "কাস্টম টাস্ক", "closed"),
+    d("dayNote", "দিনের নোট", "closed")
   ],
   below: [
     d("streak", "স্ট্রিক ও আজকের অগ্রগতি", "fixed"),

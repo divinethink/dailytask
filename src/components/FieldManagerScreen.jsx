@@ -23,8 +23,7 @@ export function FieldManagerScreen({ deenFields, duniyaFields, customFields, ove
   // ক্যাটেগরি → মূল ফিল্ড-তালিকা(লুকানোগুলোসহ, কারণ ফিরিয়ে আনতে দেখাতে হবে)
   const groups = [
     ...DEEN_CATEGORY_GROUPS.map(g => ({ id: g.id, title: GROUP_TITLES[g.id] || g.label, base: deenFields.filter(f => g.keys.includes(f.key)) })),
-    { id: "duniya", title: GROUP_TITLES.duniya, base: duniyaFields },
-    { id: "other", title: GROUP_TITLES.other, base: [] }
+    { id: "duniya", title: GROUP_TITLES.duniya, base: duniyaFields }
   ].map(g => ({
     ...g,
     fields: [...g.base, ...cf.filter(f => (f.category || "other") === g.id)]

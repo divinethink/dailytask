@@ -672,6 +672,17 @@ async function saveHomeLayout(migrationState, memberId, layout) {
   }, { merge: true });
 }
 
+// §কাস্টম টাস্ক(সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
+// saveHomeLayout()-এর মতোই explicit user-action, saveEntry() batch-এর অংশ না।
+async function saveCustomTasks(migrationState, memberId, tasks) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, {
+    customTasks: tasks.map(t => (t.archived ? { id: t.id, label: t.label, archived: true } : { id: t.id, label: t.label })),
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -745,5 +756,6 @@ export {
   fetchEntryHistory,
   updateBestScoreIfNeeded,
   saveTomorrowFocus,
-  saveHomeLayout
+  saveHomeLayout,
+  saveCustomTasks
 };

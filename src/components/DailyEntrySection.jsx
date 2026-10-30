@@ -9,7 +9,8 @@
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
 import { homeEntryCards } from "./HomeFold.jsx";
-import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon } from "./icons.jsx";
+import { sanitizeTasks, activeTasks, archivedTasks, addTask, renameTask, setArchived, taskFields, MAX_ACTIVE, MAX_LABEL, TASK_KEY_PREFIX } from "../legacy/customTasks.js";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon, EditIcon } from "./icons.jsx";
 
 // §B৭ Home category-header icon map(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // DEEN_CATEGORY_GROUPS/duniya-bucket-এর id অনুযায়ী emoji("🕌📖🤲🏃")-এর বদলে
@@ -313,7 +314,10 @@ function CollapsibleCard({
   children,
   defaultOpen,
   categoryId,
-  fold
+  fold,
+  percent,
+  percentColor,
+  toBn
 }) {
   const storageKey = categoryId ? "dt_home_accordion_" + categoryId : null;
   const [open, setOpen] = React.useState(() => {
@@ -348,11 +352,148 @@ function CollapsibleCard({
     color: "var(--theme-primary)"
   })), /*#__PURE__*/React.createElement("h3", {
     className: "text-sm font-bold text-emerald-950 text-left"
-  }, title)), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
+  }, title)), /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-1.5 shrink-0"
+  }, percent !== null && percent !== undefined && toBn && /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
+    style: {
+      fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
+      color: percentColor || "#5B6B64",
+      background: "var(--color-primary-soft, #E8F0EE)"
+    }
+  }, toBn(percent) + "%"), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 15,
     color: "#8A9A8F",
     className: "transition-transform" + (open ? " rotate-180" : "")
-  })), open && children);
+  }))), open && children);
+}
+
+// কাস্টম টাস্ক কার্ডের ভেতরের অংশ(সদস্যভিত্তিক, owner-approved): যোগ("সেভ"), এডিট(রিনেম/আর্কাইভ), আর্কাইভ-তালিকা(ফিরিয়ে আনা)।
+// আর্কাইভ মানে মোছা নয় — পুরনো এন্ট্রির ডেটা অক্ষত থাকে। সেভ ব্যর্থ হলে তালিকা আগের অবস্থায় থাকে ও বার্তা দেখায়।
+function CustomTasksBody({
+  tasks,
+  entry,
+  toggleDisabled,
+  manageDisabled,
+  onToggle,
+  onSaveTasks
+}) {
+  const h = React.createElement;
+  const list = sanitizeTasks(tasks);
+  const active = activeTasks(list);
+  const archived = archivedTasks(list);
+  const [newLabel, setNewLabel] = React.useState("");
+  const [editId, setEditId] = React.useState(null);
+  const [editLabel, setEditLabel] = React.useState("");
+  const [showArchived, setShowArchived] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState(false);
+  async function commit(next) {
+    if (busy || !onSaveTasks) return false;
+    setBusy(true);
+    setError(false);
+    try {
+      await onSaveTasks(next);
+      return true;
+    } catch {
+      setError(true);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function add() {
+    const next = addTask(list, newLabel);
+    if (next === list) return;
+    if (await commit(next)) setNewLabel("");
+  }
+  async function saveEdit() {
+    const next = renameTask(list, editId, editLabel);
+    if (next === list) {
+      setEditId(null);
+      return;
+    }
+    if (await commit(next)) setEditId(null);
+  }
+  async function archive(id) {
+    if (!window.confirm("টাস্কটি আর্কাইভ করবেন? এটি ফর্ম ও হিসাব থেকে সরবে, পুরনো রেকর্ড অক্ষত থাকবে। পরে ফিরিয়ে আনা যাবে।")) return;
+    if (await commit(setArchived(list, id, true))) setEditId(null);
+  }
+  const small = "shrink-0 h-9 px-3 rounded-xl text-xs font-bold border disabled:opacity-40";
+  const canAdd = !manageDisabled && !busy && newLabel.trim() && active.length < MAX_ACTIVE;
+  return h("div", null,
+    active.length === 0 && h("div", {
+      className: "flex flex-col items-center gap-2 text-center py-3"
+    }, h(ClipboardListIcon, { size: 28, color: "#B9C2B2" }), h("p", {
+      className: "text-xs text-slate-400"
+    }, "কোনো কাস্টম টাস্ক নেই। নিচে নাম লিখে সেভ করুন।")),
+    active.map(t => editId === t.id ? h("div", {
+      key: t.id,
+      className: "py-2 border-b border-slate-100 space-y-2"
+    }, h("input", {
+      type: "text",
+      value: editLabel,
+      maxLength: MAX_LABEL,
+      autoFocus: true,
+      onChange: e => setEditLabel(e.target.value),
+      "aria-label": "টাস্কের নাম",
+      className: "w-full h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800"
+    }), h("div", { className: "flex gap-2" },
+      h("button", { type: "button", onClick: saveEdit, disabled: busy || !editLabel.trim(), className: small + " bg-emerald-800 text-white border-emerald-800" }, "সেভ"),
+      h("button", { type: "button", onClick: () => archive(t.id), disabled: busy, className: small + " bg-slate-50 text-red-700 border-slate-200" }, "আর্কাইভ"),
+      h("button", { type: "button", onClick: () => setEditId(null), disabled: busy, className: small + " bg-white text-slate-600 border-slate-200" }, "বাতিল")
+    )) : h("div", {
+      key: t.id,
+      className: "flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0"
+    }, h("span", { className: "text-sm font-medium text-slate-700 min-w-0 break-words" }, h(LabelText, { text: t.label })),
+      h("div", { className: "flex items-center gap-2 shrink-0" },
+        !manageDisabled && h("button", {
+          type: "button",
+          onClick: () => { setEditId(t.id); setEditLabel(t.label); },
+          "aria-label": t.label + " এডিট",
+          className: "w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-800"
+        }, h(EditIcon, { size: 14 })),
+        h("span", { className: toggleDisabled ? "opacity-40" : "" }, h(BoolToggle, {
+          value: !!entry[TASK_KEY_PREFIX + t.id],
+          onChange: v => onToggle(TASK_KEY_PREFIX + t.id, v),
+          disabled: toggleDisabled
+        }))
+      ))),
+    h("div", { className: "mt-3 flex items-center gap-2 pt-3 border-t border-slate-100" },
+      h("input", {
+        type: "text",
+        value: newLabel,
+        maxLength: MAX_LABEL,
+        placeholder: "নতুন টাস্কের নাম",
+        disabled: manageDisabled || active.length >= MAX_ACTIVE,
+        onChange: e => setNewLabel(e.target.value),
+        onKeyDown: e => { if (e.key === "Enter") add(); },
+        "aria-label": "নতুন টাস্কের নাম",
+        className: "min-w-0 flex-1 h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800 disabled:opacity-40"
+      }),
+      h("button", { type: "button", onClick: add, disabled: !canAdd, className: small + " h-10 bg-emerald-800 text-white border-emerald-800" }, busy ? "…" : "সেভ")
+    ),
+    active.length >= MAX_ACTIVE && h("p", { className: "mt-2 text-[11px] text-amber-700" }, "সর্বোচ্চ " + MAX_ACTIVE + "টি সক্রিয় টাস্ক। নতুন যোগ করতে পুরনো কোনোটি আর্কাইভ করুন।"),
+    error && h("p", { role: "alert", className: "mt-2 text-xs text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।"),
+    archived.length > 0 && h("div", { className: "mt-3" },
+      h("button", {
+        type: "button",
+        onClick: () => setShowArchived(v => !v),
+        className: "text-xs font-bold text-slate-500"
+      }, (showArchived ? "▾ " : "▸ ") + "আর্কাইভ করা (" + archived.length + ")"),
+      showArchived && h("ul", { className: "mt-2 space-y-2" }, archived.map(t => h("li", {
+        key: t.id,
+        className: "flex items-center justify-between gap-2 opacity-70"
+      }, h("span", { className: "text-xs text-slate-600 min-w-0 break-words" }, t.label),
+        !manageDisabled && h("button", {
+          type: "button",
+          onClick: () => commit(setArchived(list, t.id, false)),
+          disabled: busy || active.length >= MAX_ACTIVE,
+          className: small + " bg-white text-emerald-800 border-emerald-800"
+        }, "ফিরিয়ে আনুন")
+      )))
+    )
+  );
 }
 
 export function DailyEntrySection({
@@ -376,6 +517,7 @@ export function DailyEntrySection({
   setCodeChangeNotice,
   setRecoveryMessage,
   setShowAddCustom,
+  onSaveTasks,
   setShowExcuseInfoModal,
   setViewDate,
   updateExcuse,
@@ -593,51 +735,43 @@ export function DailyEntrySection({
       });
     });
     return m; })(),
-    other: fold => /*#__PURE__*/React.createElement(CollapsibleCard, {
-    title: "অন্যান্য",
-    icon: ClipboardListIcon,
-    fold: fold,
-    defaultOpen: fold === "open",
-    categoryId: "other:" + fold
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-sm font-bold text-emerald-900"
-  }, "কাস্টম টাস্ক (ব্যক্তিগত লক্ষ্য)"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowAddCustom(true),
-    className: "text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"
-  }, /*#__PURE__*/React.createElement(Plus, {
-    size: 12
-  }), " নতুন টাস্ক")), customFields.filter(f => !f.category || f.category === "other").length === 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col items-center gap-2 text-center py-4"
-  }, /*#__PURE__*/React.createElement(ClipboardListIcon, {
-    size: 28,
-    color: "#B9C2B2"
-  }), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400"
-  }, "কোন কাস্টম টাস্ক নেই। উপরে বোতামে ক্লিক করে যোগ করুন।")) : customFields.filter(f => !f.category || f.category === "other").map(f => /*#__PURE__*/React.createElement("div", {
-    key: f.key,
-    className: "flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0" + (isFutureDate(viewDate) || isLockedForThisDevice ? " opacity-40" : "")
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-medium text-slate-700"
-  }, /*#__PURE__*/React.createElement(LabelText, {
-    text: f.label
-  })), /*#__PURE__*/React.createElement(BoolToggle, {
-    value: !!entry[f.key],
-    onChange: v => updateField(f.key, v),
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice
-  })))), /*#__PURE__*/React.createElement("div", {
-    className: "pt-4 mt-4 border-t border-slate-100"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "block text-sm font-bold text-slate-800 mb-2"
-  }, "দিনের নোট / আত্ম-সমালোচনা"), /*#__PURE__*/React.createElement("textarea", {
-    value: entry.note || "",
-    onChange: e => updateField("note", e.target.value),
-    rows: 2,
-    placeholder: "আজকের অনুভূতি, অর্জন বা শেখা বিষয় লিখুন...",
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice,
-    className: "w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
-  })))
+    other: fold => {
+    const tFields = taskFields(selectedMember && selectedMember.customTasks);
+    const tScore = tFields.length ? dailyScore(entry, selectedMember, tFields) : null;
+    return /*#__PURE__*/React.createElement(CollapsibleCard, {
+      title: "কাস্টম টাস্ক",
+      icon: ClipboardListIcon,
+      fold: fold,
+      defaultOpen: fold === "open",
+      categoryId: "other:" + fold,
+      percent: tScore === null ? null : Math.round(tScore * 100),
+      percentColor: tScore === null ? undefined : scoreColor(tScore),
+      toBn: toBn
+    }, /*#__PURE__*/React.createElement(CustomTasksBody, {
+      tasks: selectedMember && selectedMember.customTasks,
+      entry: entry,
+      toggleDisabled: isFutureDate(viewDate) || isLockedForThisDevice,
+      manageDisabled: isLockedForThisDevice || isLockedForSwitch,
+      onToggle: updateField,
+      onSaveTasks: onSaveTasks
+    }));
+    },
+    dayNote: fold => /*#__PURE__*/React.createElement(CollapsibleCard, {
+      title: "দিনের নোট",
+      icon: EditIcon,
+      fold: fold,
+      defaultOpen: fold === "open",
+      categoryId: "dayNote:" + fold
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      className: "block text-sm font-bold text-slate-800 mb-2"
+    }, "দিনের নোট / আত্ম-সমালোচনা"), /*#__PURE__*/React.createElement("textarea", {
+      value: entry.note || "",
+      onChange: e => updateField("note", e.target.value),
+      rows: 2,
+      placeholder: "আজকের অনুভূতি, অর্জন বা শেখা বিষয় লিখুন...",
+      disabled: isFutureDate(viewDate) || isLockedForThisDevice,
+      className: "w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
+    })))
   }), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between px-1"
   }, /*#__PURE__*/React.createElement("span", {

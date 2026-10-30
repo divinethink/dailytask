@@ -43,7 +43,7 @@ import {
   migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadTazkirahCustom, saveTazkirahCustom, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
-  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout
+  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout, saveCustomTasks
 } from "./memberData.js";
 import {
   isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
@@ -605,6 +605,7 @@ import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
 const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
 const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
 import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
+import { taskFields } from "./customTasks.js";
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
@@ -1334,10 +1335,17 @@ function App() {
   // §লেবেল ম্যানেজ(ধাপ গ): রিনেম/লুকানো override প্রয়োগ। override না থাকলে তালিকা আগের মতোই।
   const deenFieldsView = useMemo(() => applyOverrides(DEFAULT_DEEN_FIELDS, fieldOverrides), [fieldOverrides]);
   const duniyaFieldsView = useMemo(() => applyOverrides(DEFAULT_DUNIYA_FIELDS, fieldOverrides), [fieldOverrides]);
-  const customFieldsView = useMemo(() => applyOverrides(customFields, fieldOverrides), [customFields, fieldOverrides]);
+  // পরিবার-স্তরের পুরনো "অন্যান্য" কাস্টম টাস্ক(ক্যাটেগরি-বিহীন)এখন আর ফর্ম/হিসাবে ধরা হয় না(owner-সিদ্ধান্ত);
+  // ডেটা Firestore-এ অক্ষত থাকে। ক্যাটেগরিসহ লেবেল(ধাপ গ)আগের মতোই চলে।
+  const customFieldsView = useMemo(() => applyOverrides(customFields.filter(f => f.category && f.category !== "other"), fieldOverrides), [customFields, fieldOverrides]);
+  // নির্বাচিত সদস্যের নিজের কাস্টম টাস্ক — শুধু তার হিসাবেই ঢোকে(সব হিসাব selectedMember + allFields দিয়ে চলে)।
+  const memberTaskFields = useMemo(() => {
+    const m = (members || []).find(x => x.id === selectedId);
+    return taskFields(m && m.customTasks);
+  }, [members, selectedId]);
   const allFields = useMemo(() => {
-    return [...deenFieldsView, ...duniyaFieldsView, ...customFieldsView];
-  }, [deenFieldsView, duniyaFieldsView, customFieldsView]);
+    return [...deenFieldsView, ...duniyaFieldsView, ...customFieldsView, ...memberTaskFields];
+  }, [deenFieldsView, duniyaFieldsView, customFieldsView, memberTaskFields]);
   async function handleSaveFieldManager(nextOverrides, nextCustomFields) {
     if (isLockedForSwitch) throw new Error("locked");
     if (JSON.stringify(nextCustomFields) !== JSON.stringify(customFields)) {
@@ -1346,6 +1354,11 @@ function App() {
     }
     await saveFieldOverrides(nextOverrides);
     setFieldOverrides(nextOverrides);
+  }
+  async function handleSaveCustomTasks(next) {
+    if (isLockedForSwitch) throw new Error("locked");
+    await saveCustomTasks(migrationState, selectedId, next);
+    setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, customTasks: next } : x));
   }
   async function handleSaveTazkirah(next) {
     if (isLockedForSwitch) throw new Error("locked");
@@ -3067,6 +3080,7 @@ function App() {
   }, React.createElement(DailyEntrySection, {
     codeChangeNotice: codeChangeNotice,
     customFields: customFieldsView,
+    onSaveTasks: handleSaveCustomTasks,
     dismissMonthlyReminder: dismissMonthlyReminder,
     dismissWeeklyReminder: dismissWeeklyReminder,
     entry: entry,
