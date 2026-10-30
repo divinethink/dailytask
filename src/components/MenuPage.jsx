@@ -44,6 +44,7 @@ export function MenuPage({
   setShowFeedbackModal,
   onOpenHomeLayout,
   onOpenFieldManager,
+  onOpenTazkirah,
   themeColorPickerEl
 }) {
   return React.createElement(
@@ -234,6 +235,19 @@ export function MenuPage({
               },
               React.createElement(EditIcon, { size: 14 }),
               " লেবেল ম্যানেজ (নাম বদল/লুকান/নতুন)"
+            )
+          ),
+          onOpenTazkirah && React.createElement(
+            "div",
+            { className: "py-1" },
+            React.createElement(
+              "button",
+              {
+                onClick: () => { onOpenTazkirah(); },
+                className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+              },
+              React.createElement(EditIcon, { size: 14 }),
+              " তাযকিরাহ ম্যানেজ (নিজের বাণী যোগ/লুকান)"
             )
           ),
           onOpenHomeLayout && React.createElement("div", { className: "border-t border-slate-100 my-1" }),

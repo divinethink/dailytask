@@ -565,6 +565,20 @@ async function saveFieldOverrides(overrides) {
   await appStorage.set("field_overrides", JSON.stringify(overrides), true);
 }
 
+// §তাযকিরাহ ম্যানেজ(ধাপ খ, owner-approved): family-স্তরের ঐচ্ছিক "tazkirah_custom" doc —
+// custom_fields/field_overrides-এর হুবহু একই storage-পথ(appStorage shared), তাই নতুন Rules লাগে না।
+async function loadTazkirahCustom() {
+  try {
+    const res = await appStorage.get("tazkirah_custom", true);
+    return res ? JSON.parse(res.value) : null;
+  } catch {
+    return null;
+  }
+}
+async function saveTazkirahCustom(data) {
+  await appStorage.set("tazkirah_custom", JSON.stringify(data), true);
+}
+
 async function loadEntry(migrationState, memberId, key) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -722,6 +736,8 @@ export {
   saveCustomFields,
   loadFieldOverrides,
   saveFieldOverrides,
+  loadTazkirahCustom,
+  saveTazkirahCustom,
   loadEntry,
   saveEntry,
   entryDocId,

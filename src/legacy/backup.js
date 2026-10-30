@@ -231,7 +231,7 @@ async function readAllFamilyDataForBackup(migrationState) {
     const legacySnap = await getDocs(collection(db, getCollectionName()));
     legacySnap.docs.forEach(docSnap => {
       const id = docSnap.id;
-      if (id === "custom_fields" || id.startsWith("meeting_rows_v2:")) {
+      if (id === "custom_fields" || id === "field_overrides" || id === "tazkirah_custom" || id.startsWith("meeting_rows_v2:")) {
         result[id] = docSnap.data();
       }
     });

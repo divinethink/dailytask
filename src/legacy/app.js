@@ -41,7 +41,7 @@ import {
   releaseMemberDoc,
   createMemberWithKey,
   migrateMembersIfNeeded,
-  loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadEntry, saveEntry, entryDocId, pushEntryHistory,
+  loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadTazkirahCustom, saveTazkirahCustom, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
   updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout
 } from "./memberData.js";
@@ -601,6 +601,8 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // করলে এই chunk লোড হবে না।
 import { renderHomeBelow } from "../components/HomeFold.jsx";
 import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
+import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
+const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
 const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
 import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
@@ -883,6 +885,8 @@ function App() {
   const [customFields, setCustomFields] = useState([]);
   const [fieldOverrides, setFieldOverrides] = useState({});
   const [showFieldManager, setShowFieldManager] = useState(false);
+  const [showTazkirah, setShowTazkirah] = useState(false);
+  const [tazkirahData, setTazkirahData] = useState(() => sanitizeTazkirah(null));
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
@@ -1228,6 +1232,7 @@ function App() {
       const cf = await loadCustomFields();
       setCustomFields(cf);
       setFieldOverrides(sanitizeOverrides(await loadFieldOverrides()));
+      setTazkirahData(sanitizeTazkirah(await loadTazkirahCustom()));
       let last = null;
       try {
         // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
@@ -1341,6 +1346,11 @@ function App() {
     }
     await saveFieldOverrides(nextOverrides);
     setFieldOverrides(nextOverrides);
+  }
+  async function handleSaveTazkirah(next) {
+    if (isLockedForSwitch) throw new Error("locked");
+    await saveTazkirahCustom(next);
+    setTazkirahData(next);
   }
   const selectedMember = useMemo(() => (members || []).find(m => m.id === selectedId) || null, [members, selectedId]);
   // True when this member has been claimed ("দায়িত্ব নিন") by a different
@@ -2811,7 +2821,14 @@ function App() {
           setShowFeedbackModal: setShowFeedbackModal,
           onOpenHomeLayout: () => setShowHomeLayout(true),
           onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
+          onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
+        })),
+        showTazkirah && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(TazkirahManagerScreen, {
+          builtins: DAILY_INSPIRATIONS,
+          data: tazkirahData,
+          onSave: handleSaveTazkirah,
+          onClose: () => setShowTazkirah(false)
         })),
         showFieldManager && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(FieldManagerScreen, {
           deenFields: DEFAULT_DEEN_FIELDS,
@@ -3089,7 +3106,7 @@ function App() {
     scoreColor: scoreColor,
     dateKey: dateKey,
     formatBnDateTime: formatBnDateTime,
-    getDailyInspiration: getDailyInspiration,
+    getDailyInspiration: d => pickInspiration(d, DAILY_INSPIRATIONS, tazkirahData),
     getHijriDate: getHijriDate,
     isFutureDate: isFutureDate,
     toBn: toBn,
