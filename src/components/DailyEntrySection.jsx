@@ -516,7 +516,6 @@ export function DailyEntrySection({
   selectedMember,
   setCodeChangeNotice,
   setRecoveryMessage,
-  setShowAddCustom,
   onSaveTasks,
   setShowExcuseInfoModal,
   setViewDate,

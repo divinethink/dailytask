@@ -746,37 +746,6 @@ export function DeleteAccountWarningModal({
   }, "হ্যাঁ, ডিলিট করুন"))));
 }
 
-export function AddCustomFieldModal({
-  handleAddCustomField,
-  isLockedForSwitch,
-  newCustomLabel,
-  setNewCustomLabel,
-  setShowAddCustom,
-  showAddCustom
-}) {
-  return showAddCustom && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm mb-2 text-slate-800"
-  }, "নতুন কাস্টম টাস্কের নাম"), /*#__PURE__*/React.createElement("input", {
-    value: newCustomLabel,
-    onChange: e => setNewCustomLabel(e.target.value),
-    placeholder: "যেমন: ২ লিটার পানি পান",
-    className: "w-full h-10 border border-slate-200 rounded-xl px-3 text-xs mb-4 outline-none font-medium focus:border-emerald-800"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleAddCustomField,
-    disabled: isLockedForSwitch,
-    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold"
-  }, "যোগ করুন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowAddCustom(false),
-    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
-  }, "বাতিল"))));
-}
-
 export function FeedbackModal({
   feedbackMsg,
   feedbackSending,

@@ -577,7 +577,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
-import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, AddCustomFieldModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
+import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
 // rotating card। selectDailyInsight() pure-compute(কোনো নতুন Firestore read/
@@ -888,8 +888,6 @@ function App() {
   const [showFieldManager, setShowFieldManager] = useState(false);
   const [showTazkirah, setShowTazkirah] = useState(false);
   const [tazkirahData, setTazkirahData] = useState(() => sanitizeTazkirah(null));
-  const [newCustomLabel, setNewCustomLabel] = useState("");
-  const [showAddCustom, setShowAddCustom] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
   const [entry, setEntry] = useState({});
   const [saving, setSaving] = useState(false);
@@ -2049,30 +2047,6 @@ function App() {
       setSavingMeeting(false);
     }
   }
-  async function handleAddCustomField() {
-    if (!newCustomLabel.trim()) return;
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    const key = `custom_${Date.now()}`;
-    const newField = {
-      key,
-      label: newCustomLabel.trim(),
-      shortLabel: newCustomLabel.trim(),
-      type: "bool",
-      isCustom: true
-    };
-    const updated = [...customFields, newField];
-    setCustomFields(updated);
-    setNewCustomLabel("");
-    setShowAddCustom(false);
-    try {
-      await saveCustomFields(updated);
-    } catch (err) {
-      alert("কাস্টম টাস্ক সিংক করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
   // §Member Key সেশন — এই বাটন এখন শুধু Admin-এর(স্মার্টফোন-বিহীন
   // সদস্যকে সরাসরি যোগ করার জন্য — যেমন বাবা/মা)। সাধারণ সদস্য এখন
   // "সদস্য হোন" দিয়ে অনুরোধ করেন(handleRequestToBecomeMember)। ownerUid
@@ -3098,7 +3072,6 @@ function App() {
     selectedMember: selectedMember,
     setCodeChangeNotice: setCodeChangeNotice,
     setRecoveryMessage: setRecoveryMessage,
-    setShowAddCustom: setShowAddCustom,
     setShowExcuseInfoModal: setShowExcuseInfoModal,
     setViewDate: setViewDate,
     updateExcuse: updateExcuse,
@@ -3313,14 +3286,7 @@ function App() {
     handleDeleteGoogleAccount: handleDeleteGoogleAccount,
     setShowDeleteAccountWarning: setShowDeleteAccountWarning,
     showDeleteAccountWarning: showDeleteAccountWarning
-  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), /*#__PURE__*/React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }), /*#__PURE__*/React.createElement(CoachMarkModal, { show: showCoachMark, onClose: () => setShowCoachMark(false) }), React.createElement(AddCustomFieldModal, {
-    handleAddCustomField: handleAddCustomField,
-    isLockedForSwitch: isLockedForSwitch,
-    newCustomLabel: newCustomLabel,
-    setNewCustomLabel: setNewCustomLabel,
-    setShowAddCustom: setShowAddCustom,
-    showAddCustom: showAddCustom
-  }), React.createElement(FeedbackModal, {
+  }), /*#__PURE__*/React.createElement(MemberInfoModal, { show: showMemberInfoModal, onClose: () => setShowMemberInfoModal(false) }), /*#__PURE__*/React.createElement(ExcuseInfoModal, { show: showExcuseInfoModal, onClose: () => setShowExcuseInfoModal(false) }), /*#__PURE__*/React.createElement(WeeklyInfoModal, { show: showWeeklyInfoModal, onClose: () => setShowWeeklyInfoModal(false) }), /*#__PURE__*/React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }), /*#__PURE__*/React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }), /*#__PURE__*/React.createElement(CoachMarkModal, { show: showCoachMark, onClose: () => setShowCoachMark(false) }), React.createElement(FeedbackModal, {
     feedbackMsg: feedbackMsg,
     feedbackSending: feedbackSending,
     feedbackStatus: feedbackStatus,
