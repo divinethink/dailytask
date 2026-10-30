@@ -43,7 +43,7 @@ import {
   migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
-  updateBestScoreIfNeeded, saveTomorrowFocus
+  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout
 } from "./memberData.js";
 import {
   isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
@@ -599,6 +599,9 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, একই pattern): TAB_SETTINGS-এ ট্যাপ না
 // করলে এই chunk লোড হবে না।
+import { renderHomeBelow } from "../components/HomeFold.jsx";
+import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
+const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 // §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
@@ -930,6 +933,7 @@ function App() {
   }, []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showHomeLayout, setShowHomeLayout] = useState(false);
   // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
   // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
   // EditIcon → দুই-অপশনের choice পপআপে merge করা হয়েছে (নিচে দেখুন)।
@@ -2787,7 +2791,16 @@ function App() {
           setArchiveMonth0: setArchiveMonth0,
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
+          onOpenHomeLayout: () => setShowHomeLayout(true),
           themeColorPickerEl: themeColorPickerEl
+        })),
+        showHomeLayout && selectedMember && React.createElement(React.Suspense, { fallback: null }, React.createElement(HomeLayoutScreen, {
+          member: selectedMember,
+          onSave: async layout => {
+            await saveHomeLayout(migrationState, selectedId, layout);
+            setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, homeLayout: layout } : x));
+          },
+          onClose: () => setShowHomeLayout(false)
         })),
         React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})),
         React.createElement(FamilyCodeChoiceModal, {
@@ -3056,15 +3069,8 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable
-  }), /*#__PURE__*/React.createElement("div", {
-    // §Layout fix(১৭ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): এই তিনটা card আগে
-    // কোনো horizontal-padding wrapper ছাড়াই top-level sibling ছিল বলে সরাসরি
-    // স্ক্রিন-edge-এ লেগে যাচ্ছিল(checklist card-গুলো DailyEntrySection.jsx-এর
-    // নিজস্ব "px-5" wrapper-এর ভিতরে থাকায় তাদের সঠিক margin ছিল, কিন্তু এই
-    // তিনটা তা পায়নি)। MonthlyOverviewSection নিজেই নিজের "px-5 mt-8" রাখে
-    // বলে touch করা হয়নি — শুধু এই gap-টুকু পূরণ করা হলো, presentation-only।
-    className: "px-5"
-  }, /*#__PURE__*/React.createElement(StreakCard, {
+  }), ...renderHomeBelow(selectedMember, {
+    streak: () => /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
     toBn: toBn,
     // §Stable "আজকের অগ্রগতি"(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড bug): আগে
@@ -3096,16 +3102,19 @@ function App() {
       }
       return { mode: "today", primaryPercent: null, comparisonPercent: null };
     })()
-  }), /*#__PURE__*/React.createElement(DailyInsightCard, {
+  }),
+    insight: () => /*#__PURE__*/React.createElement(DailyInsightCard, {
     insight: dailyInsight,
     toBn: toBn
-  }), /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
+  }),
+    focus: () => /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
     member: selectedMember,
     allFields: allFields,
     tomorrowKey: tomorrowKey,
     suggestedFieldKey: suggestedFocusKey,
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
-  })), /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+  }),
+    monthly: () => /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
@@ -3145,7 +3154,9 @@ function App() {
       toBn: toBn,
       monthCursor: monthCursor
     })
-  }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
+  }),
+    weekly: fold => /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
+    fold: fold,
     addWeeklyRow: addWeeklyRow,
     handleSaveWeekly: handleSaveWeekly,
     isLockedForSwitch: isLockedForSwitch,
@@ -3165,7 +3176,9 @@ function App() {
     weeklyDirtyRef: weeklyDirtyRef,
     meetingDirtyRef: meetingDirtyRef,
     BN_MONTHS: BN_MONTHS
-  }), /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+  }),
+    meeting: fold => /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+    fold: fold,
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,
     isLockedForSwitch: isLockedForSwitch,
@@ -3182,6 +3195,7 @@ function App() {
     setMonthRefreshKey: setMonthRefreshKey,
     weeklyDirtyRef: weeklyDirtyRef,
     meetingDirtyRef: meetingDirtyRef
+  })
   })), React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})), React.createElement(FamilyCodeChoiceModal, {
     show: showFamilyCodeChoiceModal,
     onClose: () => setShowFamilyCodeChoiceModal(false),

@@ -1094,6 +1094,19 @@ service cloud.firestore {
           && request.resource.data.tomorrowFocus.targetDateKey is string
           && request.resource.data.tomorrowFocus.source in ['auto', 'manual'];
 
+        // Home layout(ধাপ ক, owner-approved) — সদস্যভিত্তিক হোম-কার্ডের ক্রম/দৃশ্যমানতা/ভাঁজ
+        // (memberData.js: saveHomeLayout(), explicit user-action, saveEntry() batch-এর অংশ না)।
+        // tomorrowFocus-clause-এর হুবহু একই caller-নিয়ম; শুধু homeLayout+updatedAt বদলাতে পারে,
+        // ঠিক {entry, below} দুটো তালিকা(প্রতিটা সর্বোচ্চ ২০টি) — এর বাইরের কিছু অনুমোদিত নয়।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['homeLayout', 'updatedAt'])
+          && request.resource.data.homeLayout.keys().hasOnly(['entry', 'below'])
+          && request.resource.data.homeLayout.entry is list
+          && request.resource.data.homeLayout.entry.size() <= 20
+          && request.resource.data.homeLayout.below is list
+          && request.resource.data.homeLayout.below.size() <= 20;
+
         // --- §Google-Login Identity Migration(2_4 §৪-৬, dual-path) ---
         // সম্পূর্ণ additive — উপরের ownerUids-based clause-গুলো অপরিবর্তিত।
         // এই নতুন clause-গুলো শুধু তখনই relevant যখন member doc-এ

@@ -319,6 +319,7 @@ function MonthNavControl({
 }
 
 export function WeeklyReflectionSection({
+  fold,
   addWeeklyRow,
   handleSaveWeekly,
   isLockedForSwitch,
@@ -343,13 +344,13 @@ export function WeeklyReflectionSection({
   // ডিফল্টে বন্ধ থাকবে। ভিতরের প্রতি-সপ্তাহ আলাদা accordion(openWeeks)
   // owner-অনুরোধে(১৬ সেপ্টেম্বর, দ্বিতীয় দফা) সরানো হয়েছে — সেকশন খোলা
   // থাকলে প্রতিটা সপ্তাহ এখন সবসময় দেখা যাবে, দ্বিতীয়-স্তর টগল আর নেই।
-  const [sectionOpen, setSectionOpen] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(fold === "open" || fold === "fixed");
   return React.createElement("div", {
     className: "mx-5 mt-5 p-4 rounded-2xl bg-white shadow-sm",
     style: { border: "1px solid #EADFBE" }
   }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => setSectionOpen(o => !o),
-    className: "flex items-center justify-between mb-2 cursor-pointer select-none"
+    onClick: () => fold === "fixed" ? undefined : setSectionOpen(o => !o),
+    className: "flex items-center justify-between mb-2 select-none" + (fold === "fixed" ? "" : " cursor-pointer")
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -364,7 +365,7 @@ export function WeeklyReflectionSection({
     title: "তথ্য"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
-  }))), /*#__PURE__*/React.createElement(ChevronDown, {
+  }))), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 18,
     className: "text-slate-400 transition-transform" + (sectionOpen ? " rotate-180" : "")
   })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -593,6 +594,7 @@ export function MonthlyOverviewSection({
 }
 
 export function MeetingMinutesSection({
+  fold,
   addMeetingRow,
   handleSaveMeeting,
   isLockedForSwitch,
@@ -614,14 +616,14 @@ export function MeetingMinutesSection({
   // Reflection-এর মতোই, পুরো সেকশন ডিফল্টে বন্ধ। ভিতরের প্রতিটা row-এর
   // আলাদা accordion(openRows) owner-অনুরোধে(১৬ সেপ্টেম্বর, দ্বিতীয় দফা)
   // সরানো হয়েছে — সেকশন খোলা থাকলে প্রতিটা row এখন সবসময় দেখা যাবে।
-  const [sectionOpen, setSectionOpen] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(fold === "open" || fold === "fixed");
   const rows = meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : [];
   return React.createElement("div", {
     className: "mx-5 mt-4 p-4 rounded-2xl bg-white shadow-sm",
     style: { border: "1px solid #EADFBE" }
   }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => setSectionOpen(o => !o),
-    className: "flex items-center justify-between mb-2 cursor-pointer select-none"
+    onClick: () => fold === "fixed" ? undefined : setSectionOpen(o => !o),
+    className: "flex items-center justify-between mb-2 select-none" + (fold === "fixed" ? "" : " cursor-pointer")
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("h2", {
@@ -640,7 +642,7 @@ export function MeetingMinutesSection({
     className: "text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 10
-  }), "লাইভ সিংক")), /*#__PURE__*/React.createElement(ChevronDown, {
+  }), "লাইভ সিংক")), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 18,
     className: "text-slate-400 transition-transform" + (sectionOpen ? " rotate-180" : "")
   })), sectionOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {

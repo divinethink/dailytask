@@ -630,6 +630,20 @@ async function saveTomorrowFocus(migrationState, memberId, focus) {
   }, { merge: true });
 }
 
+// §Home layout(ধাপ ক, owner-approved): সদস্যভিত্তিক হোম-কার্ড সাজানো/ভাঁজ — member-ডকের ঐচ্ছিক
+// homeLayout ফিল্ড। saveTomorrowFocus()-এর মতোই explicit user-action, saveEntry() batch-এর অংশ না।
+async function saveHomeLayout(migrationState, memberId, layout) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, {
+    homeLayout: {
+      entry: layout.entry.map(c => ({ id: c.id, visible: c.visible, fold: c.fold })),
+      below: layout.below.map(c => ({ id: c.id, visible: c.visible, fold: c.fold }))
+    },
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -698,5 +712,6 @@ export {
   pushEntryHistory,
   fetchEntryHistory,
   updateBestScoreIfNeeded,
-  saveTomorrowFocus
+  saveTomorrowFocus,
+  saveHomeLayout
 };

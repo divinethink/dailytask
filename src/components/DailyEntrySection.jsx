@@ -8,6 +8,7 @@
 // previously module-scope closures (fieldApplies/isExcused/isFieldExcusable/toBn),
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
+import { homeEntryCards } from "./HomeFold.jsx";
 import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon } from "./icons.jsx";
 
 // §B৭ Home category-header icon map(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
@@ -191,10 +192,12 @@ function FieldGroup({
   percent,
   percentColor,
   defaultOpen,
-  categoryId
+  categoryId,
+  fold
 }) {
   const storageKey = categoryId ? "dt_home_accordion_" + categoryId : null;
   const [open, setOpen] = React.useState(() => {
+    if (fold === "fixed") return true;
     if (storageKey) {
       try {
         const saved = sessionStorage.getItem(storageKey);
@@ -203,7 +206,7 @@ function FieldGroup({
     }
     return !!defaultOpen;
   });
-  const toggleOpen = () => setOpen(o => {
+  const toggleOpen = () => fold === "fixed" ? undefined : setOpen(o => {
     const next = !o;
     if (storageKey) {
       try { sessionStorage.setItem(storageKey, next ? "1" : "0"); } catch {}
@@ -245,7 +248,7 @@ function FieldGroup({
       color: percentColor || "#5B6B64",
       background: "var(--color-primary-soft, #E8F0EE)"
     }
-  }, percentLabel), /*#__PURE__*/React.createElement(ChevronDown, {
+  }, percentLabel), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 15,
     color: "#8A9A8F",
     className: "transition-transform" + (open ? " rotate-180" : "")
@@ -309,10 +312,12 @@ function CollapsibleCard({
   icon,
   children,
   defaultOpen,
-  categoryId
+  categoryId,
+  fold
 }) {
   const storageKey = categoryId ? "dt_home_accordion_" + categoryId : null;
   const [open, setOpen] = React.useState(() => {
+    if (fold === "fixed") return true;
     if (storageKey) {
       try {
         const saved = sessionStorage.getItem(storageKey);
@@ -321,7 +326,7 @@ function CollapsibleCard({
     }
     return !!defaultOpen;
   });
-  const toggleOpen = () => setOpen(o => {
+  const toggleOpen = () => fold === "fixed" ? undefined : setOpen(o => {
     const next = !o;
     if (storageKey) {
       try { sessionStorage.setItem(storageKey, next ? "1" : "0"); } catch {}
@@ -343,7 +348,7 @@ function CollapsibleCard({
     color: "var(--theme-primary)"
   })), /*#__PURE__*/React.createElement("h3", {
     className: "text-sm font-bold text-emerald-950 text-left"
-  }, title)), /*#__PURE__*/React.createElement(ChevronDown, {
+  }, title)), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 15,
     color: "#8A9A8F",
     className: "transition-transform" + (open ? " rotate-180" : "")
@@ -516,8 +521,9 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement(ChevronRight, {
     size: 16
   })))), /*#__PURE__*/React.createElement("div", {
-    className: "px-5 mt-3"
-  }, (() => {
+    className: "px-5 mt-5 space-y-4"
+  }, ...homeEntryCards(selectedMember, {
+    tazkirah: () => (() => {
     const insp = getDailyInspiration(viewDate);
     const tagLabel = insp.type === "ayat" ? "আয়াত" : insp.type === "hadith" ? "হাদীস" : "উক্তি";
     return /*#__PURE__*/React.createElement("div", {
@@ -535,9 +541,9 @@ export function DailyEntrySection({
     }, insp.text), /*#__PURE__*/React.createElement("p", {
       className: "text-[10px] text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
-  })()), /*#__PURE__*/React.createElement("div", {
-    className: "px-5 mt-5 space-y-4"
-  }, /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
+  })(),
+    ...(() => { const m = {};
+    /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
        আগে এখানে ২টা flat FieldGroup(দৈনন্দিন আমল = পুরো DEFAULT_DEEN_FIELDS একসাথে,
        ব্যক্তিগত ও পারিবারিক অভ্যাস = DEFAULT_DUNIYA_FIELDS) ছিল — এখন ৪টা collapsible
        category(সালাত/কুরআন ও ইলম/যিকির ও দাওয়াহ/ব্যক্তিগত ও পারিবারিক অভ্যাস) হিসেবে,
@@ -560,10 +566,10 @@ export function DailyEntrySection({
       icon: CATEGORY_ICON_COMPONENTS.duniya,
       fields: DEFAULT_DUNIYA_FIELDS,
       showInfo: false
-    }].map((c, idx) => {
+    }].forEach((c, idx) => {
       const score = dailyScore(entry, selectedMember, c.fields);
       const percent = score === null ? null : Math.round(score * 100);
-      return /*#__PURE__*/React.createElement(FieldGroup, {
+      m[c.id] = fold => /*#__PURE__*/React.createElement(FieldGroup, {
         key: c.id,
         title: c.title,
         icon: c.icon,
@@ -580,14 +586,18 @@ export function DailyEntrySection({
         toBn: toBn,
         percent: percent,
         percentColor: score === null ? undefined : scoreColor(score),
-        defaultOpen: idx === 0,
-        categoryId: c.id
+        fold: fold,
+        defaultOpen: fold === "open",
+        categoryId: c.id + ":" + fold
       });
-    }), /*#__PURE__*/React.createElement(CollapsibleCard, {
+    });
+    return m; })(),
+    other: fold => /*#__PURE__*/React.createElement(CollapsibleCard, {
     title: "অন্যান্য",
     icon: ClipboardListIcon,
-    defaultOpen: false,
-    categoryId: "other"
+    fold: fold,
+    defaultOpen: fold === "open",
+    categoryId: "other:" + fold
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("h3", {
@@ -626,7 +636,8 @@ export function DailyEntrySection({
     placeholder: "আজকের অনুভূতি, অর্জন বা শেখা বিষয় লিখুন...",
     disabled: isFutureDate(viewDate) || isLockedForThisDevice,
     className: "w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
-  }))), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
+  })))
+  }), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between px-1"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-slate-400 font-medium"
