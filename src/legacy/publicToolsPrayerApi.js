@@ -86,4 +86,11 @@ async function fetchMonthlyPrayerTimes({ lat, lon, madhab, year, month }) {
   }
 }
 
-export { fetchDailyPrayerTimes, fetchMonthlyPrayerTimes };
+// §তাৎক্ষণিক cache-পাঠ(network ছাড়া) — ট্যাব খুললেই সর্বশেষ সিংক-করা সময় দেখাতে।
+function peekCachedDailyTimings({ lat, lon, madhab, date }) {
+  const cache = readCache(DAILY_CACHE_KEY);
+  const id = `${dateKeyFor(date)}_${lat.toFixed(2)}_${lon.toFixed(2)}_${madhab}`;
+  return cache && cache.id === id && cache.timings ? cache : null;
+}
+
+export { fetchDailyPrayerTimes, fetchMonthlyPrayerTimes, peekCachedDailyTimings };

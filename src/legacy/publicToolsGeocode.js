@@ -57,4 +57,21 @@ async function reverseGeocodeBangladesh(lat, lon) {
   return name;
 }
 
-export { searchBangladeshLocation, reverseGeocodeBangladesh };
+// Nominatim ব্যর্থ/ধীর হলে fallback: বিদ্যমান জেলা-dataset থেকে নিকটতম জেলা(কোনো network লাগে না)।
+async function nearestDistrictName(lat, lon) {
+  const mod = await import("./bangladeshGeoData.js");
+  let best = null;
+  let bestD = Infinity;
+  for (const d of mod.BD_DISTRICTS) {
+    const dy = d.lat - lat;
+    const dx = (d.lon - lon) * Math.cos((lat * Math.PI) / 180);
+    const dist = dx * dx + dy * dy;
+    if (dist < bestD) {
+      bestD = dist;
+      best = d;
+    }
+  }
+  return best ? best.name : "";
+}
+
+export { searchBangladeshLocation, reverseGeocodeBangladesh, nearestDistrictName };

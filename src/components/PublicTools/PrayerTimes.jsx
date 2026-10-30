@@ -14,8 +14,8 @@ import {
   detectGpsLocation,
   MANUAL_LOCATIONS,
 } from "../../legacy/publicToolsSettings.js";
-import { fetchDailyPrayerTimes } from "../../legacy/publicToolsPrayerApi.js";
-import { searchBangladeshLocation, reverseGeocodeBangladesh } from "../../legacy/publicToolsGeocode.js";
+import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../../legacy/publicToolsPrayerApi.js";
+import { searchBangladeshLocation, reverseGeocodeBangladesh, nearestDistrictName } from "../../legacy/publicToolsGeocode.js";
 import { ChevronDown, Loader2 } from "../icons.jsx";
 
 const { useState, useEffect, useMemo, useRef } = React;
@@ -131,7 +131,17 @@ const WAQT_CHIP = {
 export function PrayerTimes() {
   const [location, setLocationState] = useState(() => getSavedLocation());
   const [madhab, setMadhabState] = useState(() => getSavedMadhab());
-  const [timings, setTimings] = useState(null);
+  // §লোড-ব্যাকগ্রাউন্ডে: সর্বশেষ সিংক-করা সময় প্রথম render-এই দেখানো হয়, নেটওয়ার্ক আপডেট নিচে চলে।
+  const [timings, setTimings] = useState(() => {
+    const l = getSavedLocation();
+    const c = l && peekCachedDailyTimings({ lat: l.lat, lon: l.lon, madhab: getSavedMadhab(), date: new Date() });
+    return c ? c.timings : null;
+  });
+  const [syncedAt, setSyncedAt] = useState(() => {
+    const l = getSavedLocation();
+    const c = l && peekCachedDailyTimings({ lat: l.lat, lon: l.lon, madhab: getSavedMadhab(), date: new Date() });
+    return c ? c.fetchedAt : null;
+  });
   const [approximate, setApproximate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -169,10 +179,14 @@ export function PrayerTimes() {
     const myReqId = ++reqIdRef.current;
     setLoading(true);
     setError(null);
+    const cachedNow = peekCachedDailyTimings({ lat: location.lat, lon: location.lon, madhab, date: new Date() });
+    setTimings(cachedNow ? cachedNow.timings : null);
+    setSyncedAt(cachedNow ? cachedNow.fetchedAt : null);
     fetchDailyPrayerTimes({ lat: location.lat, lon: location.lon, madhab, date: new Date() })
       .then((res) => {
         if (myReqId !== reqIdRef.current) return;
         setTimings(res.timings);
+        setSyncedAt(res.fetchedAt || null);
         setApproximate(!!res.approximate);
       })
       .catch((err) => {
@@ -242,13 +256,49 @@ export function PrayerTimes() {
   // "গুলশান, ঢাকা") — জেনেরিক "GPS অবস্থান" লেবেলের বদলে। reverse-geocode fail
   // করলেও lat/lon সঠিক থাকে বলে generic label-এ gracefully fallback করে(সময়সূচি
   // ভুল হয় না, শুধু লেবেল কম-informative থাকে)।
+  // নাম বের করা: Nominatim → ব্যর্থ হলে নিকটতম জেলা → শেষে জেনেরিক।
+  function resolveGpsName(loc) {
+    return reverseGeocodeBangladesh(loc.lat, loc.lon)
+      .catch(() => nearestDistrictName(loc.lat, loc.lon))
+      .then((n) => n || "GPS অবস্থান")
+      .catch(() => "GPS অবস্থান");
+  }
+
+  // §ব্যাকগ্রাউন্ড GPS রিফ্রেশ: ট্যাব খুললে UI আটকায় না; আগে সংরক্ষিত তথ্য দেখায়,
+  // পাশে নীরবে GPS+নাম আপডেট করে। ব্যর্থ হলে পুরনো তথ্যই থাকে, কোনো error দেখায় না।
+  useEffect(() => {
+    const saved = getSavedLocation();
+    if (!saved || saved.source !== "gps") return;
+    let cancelled = false;
+    (async () => {
+      const needName = !saved.name || saved.name === "GPS অবস্থান";
+      let fresh = saved;
+      try {
+        const g = await detectGpsLocation();
+        const moved = Math.abs(g.lat - saved.lat) > 0.01 || Math.abs(g.lon - saved.lon) > 0.01;
+        if (moved) fresh = g;
+      } catch {}
+      if (cancelled) return;
+      if (fresh !== saved || needName) {
+        const name = fresh === saved && !needName ? saved.name : await resolveGpsName(fresh);
+        if (cancelled) return;
+        const next = { ...fresh, name, source: "gps" };
+        if (next.lat !== saved.lat || next.lon !== saved.lon || next.name !== saved.name) {
+          setLocationState(next);
+          saveLocation(next);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function handleUseGps() {
     setGpsBusy(true);
     detectGpsLocation()
       .then((loc) =>
-        reverseGeocodeBangladesh(loc.lat, loc.lon)
-          .then((name) => applyLocation({ ...loc, name }))
-          .catch(() => applyLocation(loc))
+        resolveGpsName(loc).then((name) => applyLocation({ ...loc, name }))
       )
       .catch((err) => {
         setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি");
@@ -693,9 +743,16 @@ export function PrayerTimes() {
       !timings &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 text-xs text-slate-500 flex items-center gap-1.5" },
+        { className: "mx-4 mb-2 rounded-2xl min-h-[92px] bg-slate-200/70 animate-pulse flex items-center justify-center text-xs text-slate-500 gap-1.5" },
         /*#__PURE__*/React.createElement(Loader2, { size: 14, className: "animate-spin" }),
         "সময়সূচি আনা হচ্ছে..."
+      ),
+    timings &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "mx-4 mb-1.5 text-[10px] text-slate-400 flex items-center justify-end gap-1" },
+        loading && /*#__PURE__*/React.createElement(Loader2, { size: 10, className: "animate-spin" }),
+        loading ? "আপডেট হচ্ছে…" : syncedAt ? `সর্বশেষ সিংক: ${formatHHMM(new Date(syncedAt))}` : ""
       ),
     waqtInfo &&
       /*#__PURE__*/React.createElement(
