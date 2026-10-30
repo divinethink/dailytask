@@ -345,7 +345,8 @@ export function WeeklyReflectionSection({
   // থাকলে প্রতিটা সপ্তাহ এখন সবসময় দেখা যাবে, দ্বিতীয়-স্তর টগল আর নেই।
   const [sectionOpen, setSectionOpen] = useState(false);
   return React.createElement("div", {
-    className: "px-5 mt-8"
+    className: "mx-5 mt-5 p-4 rounded-2xl bg-white shadow-sm",
+    style: { border: "1px solid #EADFBE" }
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => setSectionOpen(o => !o),
     className: "flex items-center justify-between mb-2 cursor-pointer select-none"
@@ -616,7 +617,8 @@ export function MeetingMinutesSection({
   const [sectionOpen, setSectionOpen] = useState(false);
   const rows = meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : [];
   return React.createElement("div", {
-    className: "px-5 mt-8"
+    className: "mx-5 mt-4 p-4 rounded-2xl bg-white shadow-sm",
+    style: { border: "1px solid #EADFBE" }
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => setSectionOpen(o => !o),
     className: "flex items-center justify-between mb-2 cursor-pointer select-none"
