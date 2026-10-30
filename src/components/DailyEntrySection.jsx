@@ -10,7 +10,7 @@
 // except React and icons.jsx imports).
 import { homeEntryCards } from "./HomeFold.jsx";
 import { sanitizeTasks, activeTasks, archivedTasks, addTask, renameTask, setArchived, taskFields, MAX_ACTIVE, MAX_LABEL, TASK_KEY_PREFIX } from "../legacy/customTasks.js";
-import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon, EditIcon } from "./icons.jsx";
+import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon, EditIcon, Trash } from "./icons.jsx";
 
 // §B৭ Home category-header icon map(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // DEEN_CATEGORY_GROUPS/duniya-bucket-এর id অনুযায়ী emoji("🕌📖🤲🏃")-এর বদলে
@@ -386,6 +386,7 @@ function CustomTasksBody({
   const [editId, setEditId] = React.useState(null);
   const [editLabel, setEditLabel] = React.useState("");
   const [showArchived, setShowArchived] = React.useState(false);
+  const [showAdd, setShowAdd] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(false);
   async function commit(next) {
@@ -405,7 +406,10 @@ function CustomTasksBody({
   async function add() {
     const next = addTask(list, newLabel);
     if (next === list) return;
-    if (await commit(next)) setNewLabel("");
+    if (await commit(next)) {
+      setNewLabel("");
+      setShowAdd(false);
+    }
   }
   async function saveEdit() {
     const next = renameTask(list, editId, editLabel);
@@ -422,11 +426,18 @@ function CustomTasksBody({
   const small = "shrink-0 h-9 px-3 rounded-xl text-xs font-bold border disabled:opacity-40";
   const canAdd = !manageDisabled && !busy && newLabel.trim() && active.length < MAX_ACTIVE;
   return h("div", null,
+    !manageDisabled && h("div", { className: "flex justify-end mb-1" }, h("button", {
+      type: "button",
+      onClick: () => setShowAdd(v => !v),
+      "aria-label": showAdd ? "বন্ধ করুন" : "নতুন টাস্ক যোগ করুন",
+      "aria-expanded": showAdd,
+      className: "w-10 h-10 flex items-center justify-center rounded-xl border border-emerald-800 text-emerald-800 transition-transform" + (showAdd ? " rotate-45 bg-emerald-50" : "")
+    }, h(Plus, { size: 18 }))),
     active.length === 0 && h("div", {
       className: "flex flex-col items-center gap-2 text-center py-3"
     }, h(ClipboardListIcon, { size: 28, color: "#B9C2B2" }), h("p", {
       className: "text-xs text-slate-400"
-    }, "কোনো কাস্টম টাস্ক নেই। নিচে নাম লিখে সেভ করুন।")),
+    }, "কোনো কাস্টম টাস্ক নেই। উপরের + চাপ দিয়ে যোগ করুন।")),
     active.map(t => editId === t.id ? h("div", {
       key: t.id,
       className: "py-2 border-b border-slate-100 space-y-2"
@@ -449,6 +460,13 @@ function CustomTasksBody({
       h("div", { className: "flex items-center gap-2 shrink-0" },
         !manageDisabled && h("button", {
           type: "button",
+          onClick: () => archive(t.id),
+          disabled: busy,
+          "aria-label": t.label + " ডিলিট",
+          className: "w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-700 disabled:opacity-40"
+        }, h(Trash, { size: 14 })),
+        !manageDisabled && h("button", {
+          type: "button",
           onClick: () => { setEditId(t.id); setEditLabel(t.label); },
           "aria-label": t.label + " এডিট",
           className: "w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-800"
@@ -459,13 +477,14 @@ function CustomTasksBody({
           disabled: toggleDisabled
         }))
       ))),
-    h("div", { className: "mt-3 flex items-center gap-2 pt-3 border-t border-slate-100" },
+    showAdd && !manageDisabled && h("div", { className: "mt-3 flex items-center gap-2 pt-3 border-t border-slate-100" },
       h("input", {
         type: "text",
         value: newLabel,
         maxLength: MAX_LABEL,
         placeholder: "নতুন টাস্কের নাম",
         disabled: manageDisabled || active.length >= MAX_ACTIVE,
+        autoFocus: true,
         onChange: e => setNewLabel(e.target.value),
         onKeyDown: e => { if (e.key === "Enter") add(); },
         "aria-label": "নতুন টাস্কের নাম",
