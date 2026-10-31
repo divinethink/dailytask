@@ -16,11 +16,57 @@ import {
 } from "../../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../../legacy/publicToolsPrayerApi.js";
 import { searchBangladeshLocation, reverseGeocodeBangladesh, nearestDistrictName } from "../../legacy/publicToolsGeocode.js";
-import { ChevronDown, ChevronLeft, Loader2 } from "../icons.jsx";
+import { ChevronDown, ChevronLeft, Loader2, RefreshIcon, X } from "../icons.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 
 const { useState, useEffect, useMemo, useRef } = React;
+
+// §GPS-বন্ধ নোটিশ(owner-approved): লোকেশন বন্ধ/অনুমতি-নেই ধরা পড়লে সময় ও ধরন localStorage-এ থাকে;
+// ✕ চাপলে ব্যানার লুকায়, পরের ব্যর্থতায় আবার আসে। শুধু per-device UI-flag, কোনো ডেটা/Rules নেই।
+const GPS_FLAG_KEY = "dt_pt_gps_issue";
+const GPS_DISMISS_KEY = "dt_pt_gps_issue_dismissed";
+function readGpsIssue() {
+  try {
+    const raw = localStorage.getItem(GPS_FLAG_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    const dismissedAt = Number(localStorage.getItem(GPS_DISMISS_KEY) || 0);
+    if (!v || !v.kind || !(v.at > dismissedAt)) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+function writeGpsIssue(kind) {
+  try {
+    if (kind) localStorage.setItem(GPS_FLAG_KEY, JSON.stringify({ kind, at: Date.now() }));
+    else localStorage.removeItem(GPS_FLAG_KEY);
+  } catch {}
+}
+function dismissGpsIssue() {
+  try {
+    localStorage.setItem(GPS_DISMISS_KEY, String(Date.now()));
+  } catch {}
+}
+// code 1=অনুমতি নেই, 2=লোকেশন বন্ধ/অনুপলব্ধ(ফোনের সেটিংস বন্ধ থাকলে সাধারণত এটাই)
+function gpsIssueKind(err) {
+  if (err && err.code === 1) return "denied";
+  if (err && err.code === 2) return "off";
+  return null;
+}
+const GPS_TEXT = {
+  off: {
+    title: "ফোনে লোকেশন বন্ধ আছে",
+    body: "নামাজের সঠিক সময়ের জন্য অনুগ্রহ করে ফোনের লোকেশন (জিপিএস) চালু করুন। এরপর আবার রিফ্রেশ করুন।",
+    short: "সঠিক সময়ের জন্য লোকেশন চালু করে রিফ্রেশ করুন।",
+  },
+  denied: {
+    title: "লোকেশনের অনুমতি দেওয়া হয়নি",
+    body: "নামাজের সঠিক সময়ের জন্য অনুগ্রহ করে ব্রাউজার বা অ্যাপের সেটিংসে লোকেশনের অনুমতি দিন। এরপর আবার রিফ্রেশ করুন।",
+    short: "সঠিক সময়ের জন্য অনুমতি দিয়ে রিফ্রেশ করুন।",
+  },
+};
 
 function parseTimeOnDate(baseDate, hhmm) {
   if (!hhmm || typeof hhmm !== "string") return null;
@@ -203,6 +249,8 @@ export function PrayerTimes() {
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [madhabPanelOpen, setMadhabPanelOpen] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [gpsPopup, setGpsPopup] = useState(null);
+  const [gpsIssue, setGpsIssue] = useState(() => readGpsIssue());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -321,47 +369,127 @@ export function PrayerTimes() {
       .catch(() => "GPS অবস্থান");
   }
 
-  // §ব্যাকগ্রাউন্ড GPS রিফ্রেশ: ট্যাব খুললে UI আটকায় না; আগে সংরক্ষিত তথ্য দেখায়,
-  // পাশে নীরবে GPS+নাম আপডেট করে। ব্যর্থ হলে পুরনো তথ্যই থাকে, কোনো error দেখায় না।
+  // §ট্যাব খুললে আর স্বয়ংক্রিয় GPS চাওয়া হয় না(owner-approved: পুরো-পেজ লোকেশন-ডায়ালগ বিরক্তিকর ছিল)।
+  // শুধু সংরক্ষিত GPS-লোকেশনের নাম জেনেরিক থাকলে নীরবে নাম বের করা হয়(এতে GPS লাগে না, শুধু নেটওয়ার্ক)।
+  // নতুন GPS পড়া হয় কেবল "রিফ্রেশ" বা "GPS দিয়ে সঠিক অবস্থান নিন" বাটনে।
   useEffect(() => {
     const saved = getSavedLocation();
     if (!saved || saved.source !== "gps") return;
+    const needName = !saved.name || saved.name === "GPS অবস্থান";
+    if (!needName) return;
     let cancelled = false;
-    (async () => {
-      const needName = !saved.name || saved.name === "GPS অবস্থান";
-      let fresh = saved;
-      try {
-        const g = await detectGpsLocation();
-        const moved = Math.abs(g.lat - saved.lat) > 0.01 || Math.abs(g.lon - saved.lon) > 0.01;
-        if (moved) fresh = g;
-      } catch {}
-      if (cancelled) return;
-      if (fresh !== saved || needName) {
-        const name = fresh === saved && !needName ? saved.name : await resolveGpsName(fresh);
-        if (cancelled) return;
-        const next = { ...fresh, name, source: "gps" };
-        if (next.lat !== saved.lat || next.lon !== saved.lon || next.name !== saved.name) {
-          setLocationState(next);
-          saveLocation(next);
-        }
-      }
-    })();
+    resolveGpsName(saved).then((name) => {
+      if (cancelled || !name || name === saved.name) return;
+      const next = { ...saved, name, source: "gps" };
+      setLocationState(next);
+      saveLocation(next);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  function handleGpsFailure(err) {
+    const kind = gpsIssueKind(err);
+    if (kind) {
+      writeGpsIssue(kind);
+      setGpsIssue({ kind, at: Date.now() });
+      setGpsPopup(kind);
+    } else {
+      setError(
+        err && err.code === 3
+          ? "অবস্থান পেতে দেরি হচ্ছে। ফোনের লোকেশন চালু আছে কিনা দেখে আবার চেষ্টা করুন।"
+          : err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি"
+      );
+    }
+  }
+
   function handleUseGps() {
     setGpsBusy(true);
     detectGpsLocation()
       .then((loc) =>
-        resolveGpsName(loc).then((name) => applyLocation({ ...loc, name }))
+        resolveGpsName(loc).then((name) => {
+          writeGpsIssue(null);
+          setGpsIssue(null);
+          applyLocation({ ...loc, name });
+        })
       )
-      .catch((err) => {
-        setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি");
-      })
+      .catch(handleGpsFailure)
       .finally(() => setGpsBusy(false));
   }
+
+  // §রিফ্রেশ: GPS-অবস্থান হলে নতুন করে GPS চায়(বন্ধ থাকলে পপআপ); ম্যানুয়াল অবস্থান হলে শুধু সময় নতুন করে আনে।
+  function handleRefresh() {
+    if (gpsBusy || loading) return;
+    if (!location || location.source !== "gps") {
+      if (location) setLocationState({ ...location });
+      return;
+    }
+    setGpsBusy(true);
+    detectGpsLocation()
+      .then((g) => {
+        writeGpsIssue(null);
+        setGpsIssue(null);
+        const moved = Math.abs(g.lat - location.lat) > 0.01 || Math.abs(g.lon - location.lon) > 0.01;
+        const base = moved ? g : location;
+        const needName = moved || !location.name || location.name === "GPS অবস্থান";
+        return (needName ? resolveGpsName(base) : Promise.resolve(location.name)).then((name) => {
+          const next = { ...base, name, source: "gps" };
+          setLocationState(next);
+          saveLocation(next);
+        });
+      })
+      .catch(handleGpsFailure)
+      .finally(() => setGpsBusy(false));
+  }
+
+  // ব্যানার(দুই লাইন, ✕ সহ) ও পপআপ — বন্ধ/অনুমতি-নেই অবস্থায়
+  const gpsBanner = gpsIssue
+    ? /*#__PURE__*/React.createElement(
+        "div",
+        { className: "mx-4 mb-2 flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2" },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "flex-1" },
+          /*#__PURE__*/React.createElement("div", { className: "font-bold" }, GPS_TEXT[gpsIssue.kind].title),
+          /*#__PURE__*/React.createElement("div", null, GPS_TEXT[gpsIssue.kind].short)
+        ),
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            "aria-label": "বন্ধ করুন",
+            onClick: () => {
+              dismissGpsIssue();
+              setGpsIssue(null);
+            },
+            className: "w-8 h-8 -mr-1 -mt-1 flex items-center justify-center text-amber-800",
+          },
+          /*#__PURE__*/React.createElement(X, { size: 16 })
+        )
+      )
+    : null;
+  const gpsPopupEl = gpsPopup
+    ? /*#__PURE__*/React.createElement(
+        "div",
+        { className: "fixed inset-0 z-50 flex items-center justify-center px-6", style: { background: "rgba(0,0,0,0.45)" } },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "bg-white rounded-2xl p-5 w-full max-w-sm shadow-md" },
+          /*#__PURE__*/React.createElement("div", { className: "text-base font-bold text-emerald-950 mb-2" }, GPS_TEXT[gpsPopup].title),
+          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-600 leading-relaxed mb-4" }, GPS_TEXT[gpsPopup].body),
+          /*#__PURE__*/React.createElement(
+            "button",
+            {
+              type: "button",
+              onClick: () => setGpsPopup(null),
+              className: "w-full h-11 rounded-xl font-bold text-white text-sm bg-emerald-900",
+            },
+            "ঠিক আছে"
+          )
+        )
+      )
+    : null;
 
   function handleMadhabChange(m) {
     setMadhabState(m);
@@ -819,12 +947,20 @@ export function PrayerTimes() {
               )
           )
         ),
-        timings &&
+        location &&
           /*#__PURE__*/React.createElement(
-            "div",
-            { className: "text-[10px] text-slate-400 flex items-center gap-1 shrink-0" },
-            loading && /*#__PURE__*/React.createElement(Loader2, { size: 10, className: "animate-spin" }),
-            loading ? "আপডেট হচ্ছে…" : syncedAt ? `সর্বশেষ সিংক: ${formatHHMM(new Date(syncedAt))}` : ""
+            "button",
+            {
+              type: "button",
+              onClick: handleRefresh,
+              disabled: gpsBusy || loading,
+              "aria-label": "রিফ্রেশ করুন",
+              className: "text-[11px] text-slate-500 flex items-center gap-1 shrink-0 px-2 py-2 -my-2 rounded-lg active:opacity-60 disabled:opacity-70",
+            },
+            gpsBusy || loading
+              ? /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" })
+              : /*#__PURE__*/React.createElement(RefreshIcon, { size: 12 }),
+            gpsBusy || loading ? "আপডেট হচ্ছে…" : "রিফ্রেশ" + (syncedAt ? ` · ${formatHHMM(new Date(syncedAt))}` : "")
           )
       ),
       locationPanelOpen &&
@@ -834,6 +970,8 @@ export function PrayerTimes() {
           renderLocationPicker()
         )
     ),
+    gpsBanner,
+    gpsPopupEl,
     approximate &&
       /*#__PURE__*/React.createElement(
         "div",
