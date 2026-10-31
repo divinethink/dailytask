@@ -2604,6 +2604,14 @@ function App() {
   const tomorrowKey = useMemo(() => dateKey(new Date(Date.now() + 86400000)), []);
   // "আজকের মুহাসাবা" কার্ডের "গতকাল ভরা হয়নি" ব্যানার: শুধু আজকের দিন দেখার সময়, চলতি মাসে, মাসের ২ তারিখ থেকে,
   // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে(নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
+  // "গতকালের মতো বসান" শর্টকাটের উৎস: একই শর্তে(চলতি মাস, ২ তারিখ থেকে) গতকালের সেভ-করা এন্ট্রি, নইলে null।
+  const yesterdayEntry = useMemo(() => {
+    const now = new Date();
+    if (dateKey(viewDate) !== dateKey(now)) return null;
+    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
+    if (now.getDate() < 2) return null;
+    return (monthEntries && monthEntries[pad2(now.getDate() - 1)]) || null;
+  }, [viewDate, monthCursor, monthEntries]);
   const yesterdayMissing = useMemo(() => {
     const now = new Date();
     if (dateKey(viewDate) !== dateKey(now)) return false;
@@ -3170,7 +3178,8 @@ function App() {
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable,
     streak: streak,
-    yesterdayMissing: yesterdayMissing
+    yesterdayMissing: yesterdayMissing,
+    yesterdayEntry: yesterdayEntry
   }), ...renderHomeBelow(selectedMember, {
     streak: () => /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,

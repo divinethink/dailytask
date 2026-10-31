@@ -2,6 +2,7 @@
 // সেভ হয়েছে কি না, স্ট্রিক, আর "গতকাল ভরা হয়নি" ব্যানার। শুধু দেখায় — কোনো ডেটা লেখে না, স্কোর-গণনা বদলায় না।
 // "যোগ হয়েছে" = কার্ডে অন্তত একটি প্রযোজ্য ফিল্ডে টিক/সংখ্যা আছে(কাযা-কাউন্ট ০ ভালো, তাই তা গণ্য নয়)।
 // React global(window.React, globals.js)।
+import { getHijriDate } from "../legacy/appHelpers.js";
 
 const DISMISS_PREFIX = "yb_dismissed_";
 
@@ -25,13 +26,20 @@ export function countFilledCards(cats, entry, member, fieldApplies) {
   return { total, filled };
 }
 
-export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty, yesterdayMissing, todayKey, onGoYesterday, toBn }) {
+export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty, yesterdayMissing, todayKey, onGoYesterday, canCopy, onCopyYesterday, toBn }) {
   const { total, filled } = countFilledCards(cats, entry, member, fieldApplies);
   const saved = !!(entry && entry.lastEditedAt) && !dirty;
   const [hideYb, setHideYb] = React.useState(() => {
     try { return !!localStorage.getItem(DISMISS_PREFIX + todayKey); } catch { return false; }
   });
   const showYb = yesterdayMissing && !hideYb;
+  // নতুন হিজরি মাসের প্রথম ২ দিনে একটা ছোট নিয়ত-স্মরণ(প্রতি মাসে একবার বন্ধ করা যায়)। তারিখ ≈±১ দিন, তাই "সম্ভাব্য"।
+  const hj = getHijriDate(new Date());
+  const hmKey = "hm_dismissed_" + hj.year + "_" + hj.month;
+  const [hideHm, setHideHm] = React.useState(() => {
+    try { return !!localStorage.getItem(hmKey); } catch { return false; }
+  });
+  const showHm = hj.day <= 2 && !hideHm;
 
   let msg;
   if (total > 0 && filled === total) msg = saved ? "মাশাআল্লাহ — আজকের মুহাসাবা পূর্ণ।" : "সব কার্ড ভরা — এবার নিচে সেভ করুন।";
@@ -50,6 +58,21 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
   return React.createElement(
     "div",
     { className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
+    showHm && React.createElement(
+      "div",
+      { className: "mb-3 flex items-start gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2" },
+      React.createElement("span", { className: "text-base", "aria-hidden": true }, "🌙"),
+      React.createElement("p", { className: "flex-1 text-[11px] font-semibold text-emerald-900 leading-snug" }, "নতুন হিজরি মাস " + hj.month + " শুরু (সম্ভাব্য)। এ মাসের জন্য একটা ছোট নিয়ত ঠিক করুন — যেমন বাড়তি এক ওয়াক্ত জামায়াত বা রোজ এক পৃষ্ঠা কুরআন।"),
+      React.createElement("button", {
+        type: "button",
+        "aria-label": "বন্ধ করুন",
+        onClick: () => {
+          try { localStorage.setItem(hmKey, "1"); } catch {}
+          setHideHm(true);
+        },
+        className: "shrink-0 px-1 text-sm text-emerald-700"
+      }, "✕")
+    ),
     showYb && React.createElement(
       "div",
       { className: "mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2" },
@@ -84,6 +107,11 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
       )
     ),
     total > 0 && React.createElement("div", { className: "flex gap-1 mb-2", "aria-hidden": true }, segs),
-    React.createElement("p", { className: "text-[11px] text-slate-600" }, msg)
+    React.createElement("p", { className: "text-[11px] text-slate-600" }, msg),
+    canCopy && filled === 0 && !dirty && React.createElement("button", {
+      type: "button",
+      onClick: onCopyYesterday,
+      className: "mt-2.5 w-full rounded-xl border border-emerald-200 bg-emerald-50/60 py-2 text-[11px] font-bold text-emerald-900 active:scale-[0.98]"
+    }, "↩︎ গতকালের মতো বসান")
   );
 }

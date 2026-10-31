@@ -552,7 +552,8 @@ export function DailyEntrySection({
   isExcused,
   isFieldExcusable,
   streak,
-  yesterdayMissing
+  yesterdayMissing,
+  yesterdayEntry
 }) {
   // "আজকের মুহাসাবা" কার্ডের জন্য ক্যাটাগরি-তালিকা(নিচের কার্ড-তালিকার হুবহু একই ফিল্ড-গ্রুপ; শুধু গণনার জন্য)।
   const muhasabaCats = [...DEEN_CATEGORY_GROUPS.map(g => ({
@@ -565,6 +566,19 @@ export function DailyEntrySection({
     id: "other",
     fields: taskFields(selectedMember && selectedMember.customTasks)
   }];
+  // "গতকালের মতো বসান": শুধু আজকের দিনে, আজকের কার্ডে কিছু না থাকলে। কাযা-কাউন্ট/ওজর/নোট কপি হয় না;
+  // শুধু গতকালের টিক ও সংখ্যা(>০) আজকের খসড়ায় বসে — সদস্য দেখে ঠিক করে নিজে সেভ করবেন।
+  const copyKeys = [];
+  muhasabaCats.forEach(c => c.fields.forEach(f => {
+    if (!fieldApplies(f, selectedMember) || f.key === "fardPrayers") return;
+    const v = yesterdayEntry ? yesterdayEntry[f.key] : undefined;
+    if (f.type === "bool" ? !!v : (f.type === "count" || f.type === "number") && (Number(v) || 0) > 0) copyKeys.push([f.key, v]);
+  }));
+  const copyYesterday = () => {
+    if (!copyKeys.length) return;
+    if (!window.confirm("গতকালের টিক ও সংখ্যা আজকের জন্য বসানো হবে। দেখে ঠিক করে নিয়ে নিজে সেভ করুন। এগিয়ে যাবেন?")) return;
+    copyKeys.forEach(([k, v]) => updateField(k, v));
+  };
   const goYesterday = () => {
     if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
     setViewDate(d => {
@@ -727,6 +741,8 @@ export function DailyEntrySection({
       yesterdayMissing: !!yesterdayMissing && !recoveryMessage,
       todayKey: dateKey(new Date()),
       onGoYesterday: goYesterday,
+      canCopy: !isLockedForThisDevice && !isLockedForSwitch && dateKey(viewDate) === dateKey(new Date()) && copyKeys.length > 0,
+      onCopyYesterday: copyYesterday,
       toBn: toBn
     }),
     ...(() => { const m = {};
