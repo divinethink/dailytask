@@ -99,8 +99,8 @@ function PremiumTile({ icon, label, onClick, cfg }) {
         style: {
           width: cfg.disc,
           height: cfg.disc,
-          background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, #E3EEEA 100%)",
-          boxShadow: "inset 0 0 0 1px #D3E3DD",
+          background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, var(--theme-tint, #E3EEEA) 100%)",
+          boxShadow: "inset 0 0 0 1px var(--theme-line, #D3E3DD)",
         },
       },
       React.createElement(ToolIcon, { name: icon, size: cfg.icon, color: PRIMARY })
@@ -205,7 +205,7 @@ export function PageHeader({ title, subtitle }) {
     "header",
     {
       className: "mb-3 rounded-2xl border px-4 py-3",
-      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
+      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, var(--theme-wash, #F2F7F4) 100%)", borderColor: "var(--theme-line, #D3E3DD)" },
     },
     React.createElement("h1", { className: "text-[19px] leading-tight", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } }, title),
     subtitle && React.createElement("p", { className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle)
@@ -220,7 +220,7 @@ export function DetailHeader({ icon, title, subtitle }) {
     "header",
     {
       className: "mb-3 rounded-2xl border px-4 py-3.5 flex items-center gap-3",
-      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
+      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, var(--theme-wash, #F2F7F4) 100%)", borderColor: "var(--theme-line, #D3E3DD)" },
     },
     icon &&
       React.createElement(
@@ -228,8 +228,8 @@ export function DetailHeader({ icon, title, subtitle }) {
         {
           className: "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
           style: {
-            background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, #E3EEEA 100%)",
-            boxShadow: "inset 0 0 0 1px #D3E3DD",
+            background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, var(--theme-tint, #E3EEEA) 100%)",
+            boxShadow: "inset 0 0 0 1px var(--theme-line, #D3E3DD)",
           },
         },
         React.createElement(ToolIcon, { name: icon, size: 22, color: PRIMARY })

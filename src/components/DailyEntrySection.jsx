@@ -682,7 +682,7 @@ export function DailyEntrySection({
     return /*#__PURE__*/React.createElement("div", {
       className: "rounded-2xl p-4 shadow-sm",
       style: {
-        background: "linear-gradient(135deg, var(--theme-primary), #153f39)"
+        background: "linear-gradient(135deg, var(--theme-primary), var(--theme-deep, #153f39))"
       }
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-[10px] font-bold mb-1.5",
