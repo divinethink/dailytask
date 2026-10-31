@@ -8,7 +8,24 @@
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        // §থিম ধাপ ২: emerald-স্কেল থিম-টোকেনে(index.html :root-এ ডিফল্ট=Tailwind-এর আসল emerald)
+        emerald: {
+          50: "rgb(var(--e-50) / <alpha-value>)",
+          100: "rgb(var(--e-100) / <alpha-value>)",
+          200: "rgb(var(--e-200) / <alpha-value>)",
+          300: "rgb(var(--e-300) / <alpha-value>)",
+          400: "rgb(var(--e-400) / <alpha-value>)",
+          500: "rgb(var(--e-500) / <alpha-value>)",
+          600: "rgb(var(--e-600) / <alpha-value>)",
+          700: "rgb(var(--e-700) / <alpha-value>)",
+          800: "rgb(var(--e-800) / <alpha-value>)",
+          900: "rgb(var(--e-900) / <alpha-value>)",
+          950: "rgb(var(--e-950) / <alpha-value>)"
+        },
+      },
+    },
   },
   plugins: [],
 };

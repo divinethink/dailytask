@@ -37,17 +37,19 @@ function useFonts() {
 
 // §থিম ধাপ ১(owner-approved, ১০টা): color=প্রধান রং(localStorage "theme_color"-এ এই hex-ই
 // সংরক্ষিত — schema/backup অপরিবর্তিত); accent=সোনালি-স্থানের রং; page=পেজ ব্যাকগ্রাউন্ড।
+const EMERALD_DEFAULT = ["236 253 245", "209 250 229", "167 243 208", "110 231 183", "52 211 153", "16 185 129", "5 150 105", "4 120 87", "6 95 70", "6 78 59", "2 44 34"];
+const EMERALD_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 const THEME_PRESETS = [
-  { id: "green", name: "সবুজ (ডিফল্ট)", color: "#0E4B43", accent: "#C89B3C", page: "#F4F7F1" },
-  { id: "nord", name: "নর্ড", color: "#3E6092", accent: "#7F9CC4", page: "#EAEEF6" },
-  { id: "pink", name: "গোলাপি", color: "#DB2777", accent: "#F06BA8", page: "#FDF2F8" },
-  { id: "purple", name: "বেগুনি", color: "#6D28D9", accent: "#A98AE8", page: "#F4F0FD" },
-  { id: "teal-lemon", name: "টিল + লেমন", color: "#3F8F7A", accent: "#D8C95A", page: "#FDFBE8" },
-  { id: "green-butter", name: "গাঢ় সবুজ + বাটার", color: "#043D36", accent: "#DDB93F", page: "#FEF9E1" },
-  { id: "terracotta", name: "টেরাকোটা", color: "#B85034", accent: "#DE9A5E", page: "#FBF3EC" },
-  { id: "olive", name: "অলিভ", color: "#657834", accent: "#BFA94A", page: "#F4F6EA" },
-  { id: "mocha", name: "মোকা", color: "#855C41", accent: "#CF9F6E", page: "#F7F1EA" },
-  { id: "ledger", name: "লেজার পেপার", color: "#5B4636", accent: "#B08D57", page: "#F5ECD7" }
+  { id: "green", name: "সবুজ (ডিফল্ট)", color: "#0E4B43", accent: "#C89B3C", page: "#F4F7F1", pal: EMERALD_DEFAULT },
+  { id: "nord", name: "নর্ড", color: "#3E6092", accent: "#7F9CC4", page: "#EAEEF6", pal: ["241 244 249", "223 230 241", "191 206 228", "148 173 209", "105 140 191", "64 99 150", "47 73 111", "36 56 86", "29 45 68", "24 38 57", "14 21 32"] },
+  { id: "pink", name: "গোলাপি", color: "#DB2777", accent: "#F06BA8", page: "#FDF2F8", pal: ["250 240 244", "246 218 231", "237 182 206", "224 133 173", "212 84 141", "171 43 100", "126 32 74", "98 24 57", "78 19 45", "65 16 38", "37 9 21"] },
+  { id: "purple", name: "বেগুনি", color: "#6D28D9", accent: "#A98AE8", page: "#F4F0FD", pal: ["244 240 250", "229 218 246", "203 182 237", "168 133 224", "134 84 212", "93 43 171", "69 32 126", "53 24 98", "42 19 78", "35 16 65", "20 9 37"] },
+  { id: "teal-lemon", name: "টিল + লেমন", color: "#3F8F7A", accent: "#D8C95A", page: "#FDFBE8", pal: ["241 249 247", "223 241 236", "191 227 218", "149 208 193", "106 189 168", "66 149 127", "48 110 94", "37 85 72", "30 67 57", "25 57 48", "14 32 27"] },
+  { id: "green-butter", name: "গাঢ় সবুজ + বাটার", color: "#043D36", accent: "#DDB93F", page: "#FEF9E1", pal: ["240 250 249", "218 246 242", "182 237 230", "133 224 213", "84 212 196", "43 171 156", "32 126 115", "24 98 89", "19 78 70", "16 65 59", "9 37 33"] },
+  { id: "terracotta", name: "টেরাকোটা", color: "#B85034", accent: "#DE9A5E", page: "#FBF3EC", pal: ["250 242 240", "245 225 219", "235 194 183", "221 154 136", "208 113 88", "167 73 47", "123 54 35", "95 41 27", "76 33 21", "64 28 18", "36 16 10"] },
+  { id: "olive", name: "অলিভ", color: "#657834", accent: "#BFA94A", page: "#F4F6EA", pal: ["247 249 241", "236 241 223", "217 227 191", "192 209 148", "167 190 106", "126 149 65", "93 110 48", "72 85 37", "57 68 29", "48 57 25", "27 32 14"] },
+  { id: "mocha", name: "মোকা", color: "#855C41", accent: "#CF9F6E", page: "#F7F1EA", pal: ["248 244 241", "240 230 224", "225 206 193", "205 173 152", "185 140 111", "144 100 70", "106 73 52", "82 57 40", "65 45 32", "55 38 27", "31 21 15"] },
+  { id: "ledger", name: "লেজার পেপার", color: "#5B4636", accent: "#B08D57", page: "#F5ECD7", pal: ["247 244 242", "238 231 226", "221 208 197", "198 176 159", "175 144 121", "134 103 80", "99 76 59", "77 59 46", "61 47 36", "51 39 30", "29 22 17"] }
 ];
 function hexToRgba(hex, alpha) {
   const h = (hex || "#0E4B43").replace("#", "");
@@ -70,6 +72,9 @@ function applyThemeColor(color) {
   root.setProperty("--theme-primary", color);
   root.setProperty("--theme-accent", t ? t.accent : THEME_PRESETS[0].accent);
   root.setProperty("--theme-page", t ? t.page : THEME_PRESETS[0].page);
+  // §থিম ধাপ ২: Tailwind emerald-স্কেল(tailwind.config.js-এ --e-* এ বাঁধা) থিম অনুযায়ী
+  const pal = t ? t.pal : EMERALD_DEFAULT;
+  EMERALD_STEPS.forEach((n, i) => root.setProperty("--e-" + n, pal[i]));
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", color);
 }
