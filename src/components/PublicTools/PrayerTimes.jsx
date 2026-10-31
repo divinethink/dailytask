@@ -16,7 +16,9 @@ import {
 } from "../../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../../legacy/publicToolsPrayerApi.js";
 import { searchBangladeshLocation, reverseGeocodeBangladesh, nearestDistrictName } from "../../legacy/publicToolsGeocode.js";
-import { ChevronDown, Loader2 } from "../icons.jsx";
+import { ChevronDown, ChevronLeft, Loader2 } from "../icons.jsx";
+import { Qibla } from "./Qibla.jsx";
+import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 
 const { useState, useEffect, useMemo, useRef } = React;
 
@@ -128,6 +130,44 @@ const WAQT_CHIP = {
   isha: { emoji: "🌙", bg: "linear-gradient(135deg,#C9D6E3,#EDF1F5)" },
 };
 
+// §এখন করণীয়: ওয়াক্তভিত্তিক রাকাত-সংখ্যা(হানাফী / অন্যান্য) ও সংক্ষিপ্ত আমল।
+const WAQT_GUIDE = {
+  1: {
+    fajr: "সুন্নত ২ (ফরজের আগে) · ফরজ ২",
+    dhuhr: "সুন্নত ৪ · ফরজ ৪ · সুন্নত ২ · নফল ২",
+    asr: "ফরজ ৪ (আগে ৪ রাকাত গায়রে-মুয়াক্কাদা সুন্নত)",
+    maghrib: "ফরজ ৩ · সুন্নত ২ · নফল ২",
+    isha: "ফরজ ৪ · সুন্নত ২ · নফল ২ · বিতর ৩",
+  },
+  0: {
+    fajr: "সুন্নত ২ (ফরজের আগে) · ফরজ ২",
+    dhuhr: "সুন্নত ২ · ফরজ ৪ · সুন্নত ২",
+    asr: "ফরজ ৪ রাকাত",
+    maghrib: "ফরজ ৩ · সুন্নত ২",
+    isha: "ফরজ ৪ · সুন্নত ২ · বিতর (১–১১)",
+  },
+};
+const WAQT_AMOL = {
+  fajr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "সকালের আযকার"],
+  dhuhr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ"],
+  asr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ"],
+  maghrib: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "সন্ধ্যার আযকার"],
+  isha: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "শোয়ার আগের আযকার"],
+};
+const WAQT_NAME = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা" };
+const DONE_KEY = "dt_pt_done";
+function dayKey(d) {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function readDone(d) {
+  try {
+    const o = JSON.parse(localStorage.getItem(DONE_KEY) || "null");
+    return o && o.d === dayKey(d) && o.k ? o.k : {};
+  } catch {
+    return {};
+  }
+}
+
 export function PrayerTimes() {
   const [location, setLocationState] = useState(() => getSavedLocation());
   const [madhab, setMadhabState] = useState(() => getSavedMadhab());
@@ -165,6 +205,9 @@ export function PrayerTimes() {
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
   const [districtSearchQuery, setDistrictSearchQuery] = useState("");
   const reqIdRef = useRef(0);
+  // §ওয়াক্ত ✓(শুধু এই ডিভাইসে, দিন বদলালে নিজে রিসেট; হোম-ডেটা/Firestore-এ কিছু লেখে না)
+  const [done, setDone] = useState(() => readDone(new Date()));
+  const [sub, setSub] = useState(null);
   const searchReqIdRef = useRef(0);
 
   // প্রতি সেকেন্ডে countdown আপডেট(existing timer-pattern reuse, 3_2 §৪.২ item ৩)
@@ -362,7 +405,7 @@ export function PrayerTimes() {
     if (!schedule) return null;
     const { fajr, sunrise, dhuhr, asr, maghrib, isha, nextFajr } = schedule;
     if (now < fajr) {
-      return { name: "ইশা", label: "শেষ হতে বাকি", target: fajr, currentKey: "isha" };
+      return { name: "ইশা", label: "শেষ হতে বাকি", target: fajr, currentKey: "isha", start: addMinutes(isha, -1440) };
     }
     const windows = [
       { key: "fajr", name: "ফজর", start: fajr, end: sunrise },
@@ -372,10 +415,10 @@ export function PrayerTimes() {
       { key: "isha", name: "ইশা", start: isha, end: nextFajr },
     ];
     const active = windows.find((w) => now >= w.start && now < w.end);
-    if (active) return { name: active.name, label: "শেষ হতে বাকি", target: active.end, currentKey: active.key };
+    if (active) return { name: active.name, label: "শেষ হতে বাকি", target: active.end, currentKey: active.key, start: active.start };
     const upcoming = windows.find((w) => now < w.start);
-    if (upcoming) return { name: upcoming.name, label: "শুরু হতে বাকি", target: upcoming.start, currentKey: null };
-    return { name: "ফজর", label: "শুরু হতে বাকি", target: nextFajr, currentKey: null };
+    if (upcoming) return { name: upcoming.name, label: "শুরু হতে বাকি", target: upcoming.start, currentKey: null, nextKey: upcoming.key };
+    return { name: "ফজর", label: "শুরু হতে বাকি", target: nextFajr, currentKey: null, nextKey: "fajr" };
   }, [schedule, now]);
 
   // §রমজান সেহরি/ইফতার countdown — data-layer/schema(owner-instruction, ১৮
@@ -436,6 +479,30 @@ export function PrayerTimes() {
       { key: "isha", label: "ইশা", start: isha, end: null },
     ];
   }, [schedule]);
+
+  const dk = dayKey(now);
+  const doneToday = done;
+  function toggleDone(key) {
+    const cur = readDone(new Date());
+    const next = { ...cur, [key]: !cur[key] };
+    try {
+      localStorage.setItem(DONE_KEY, JSON.stringify({ d: dayKey(new Date()), k: next }));
+    } catch {}
+    setDone(next);
+  }
+  // দিন বদলালে(মধ্যরাত) ✓ রিসেট
+  useEffect(() => {
+    setDone(readDone(new Date()));
+  }, [dk]);
+
+  const activeForbidden = useMemo(() => forbiddenWindows.find((w) => now >= w.start && now < w.end) || null, [forbiddenWindows, now]);
+  const guideKey = waqtInfo ? waqtInfo.currentKey || waqtInfo.nextKey || null : null;
+  const waqtProgress = useMemo(() => {
+    if (!waqtInfo || !waqtInfo.currentKey || !waqtInfo.start) return null;
+    const total = waqtInfo.target.getTime() - waqtInfo.start.getTime();
+    if (total <= 0) return null;
+    return Math.min(1, Math.max(0, (now.getTime() - waqtInfo.start.getTime()) / total));
+  }, [waqtInfo, now]);
 
   // ---- এলাকা-সার্চ+quick-shortcut+GPS — একই panel initial-state ও header দুই
   // জায়গাতেই reuse হয়(§Nominatim-নোট, publicToolsGeocode.js) ----
@@ -610,6 +677,22 @@ export function PrayerTimes() {
     );
   }
 
+  // ---- শর্টকাট: কিবলা/মাসিক সূচি এই পেজের ভেতরেই খোলে, "← সময়সূচি" দিয়ে ফেরত ----
+  if (sub) {
+    const SubComp = sub === "qibla" ? Qibla : MonthlyPrayerSchedule;
+    return /*#__PURE__*/React.createElement(
+      "div",
+      { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
+      /*#__PURE__*/React.createElement(
+        "button",
+        { type: "button", onClick: () => setSub(null), className: "flex items-center gap-1 px-4 pt-4 pb-2 text-sm font-semibold text-emerald-950" },
+        /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+        "সময়সূচি"
+      ),
+      /*#__PURE__*/React.createElement(SubComp, null)
+    );
+  }
+
   // ---- Location সেটআপ এখনো করা হয়নি(প্রথমবার) ----
   if (!location) {
     return /*#__PURE__*/React.createElement(
@@ -754,6 +837,13 @@ export function PrayerTimes() {
         loading && /*#__PURE__*/React.createElement(Loader2, { size: 10, className: "animate-spin" }),
         loading ? "আপডেট হচ্ছে…" : syncedAt ? `সর্বশেষ সিংক: ${formatHHMM(new Date(syncedAt))}` : ""
       ),
+    activeForbidden &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        { role: "status", className: "mx-4 mb-2 text-xs text-red-700 bg-red-50 border border-dashed border-red-300 rounded-xl px-3 py-1.5 flex items-center gap-1.5" },
+        "⛔",
+        /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, `এখন নিষিদ্ধ সময়: ${activeForbidden.label}`), ` · ${formatHHMM(activeForbidden.end)} পর্যন্ত নামাজ নয়`)
+      ),
     waqtInfo &&
       /*#__PURE__*/React.createElement(
         "div",
@@ -767,7 +857,24 @@ export function PrayerTimes() {
           "div",
           { className: "relative text-2xl font-bold tracking-wide mt-1", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
           formatCountdown(waqtInfo.target.getTime() - now.getTime())
-        )
+        ),
+        waqtProgress !== null &&
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "relative mt-2" },
+            /*#__PURE__*/React.createElement(
+              "div",
+              { className: "h-[5px] rounded-full bg-white/20 overflow-hidden", role: "progressbar", "aria-valuenow": Math.round(waqtProgress * 100), "aria-valuemin": 0, "aria-valuemax": 100 },
+              /*#__PURE__*/React.createElement("div", { className: "h-full rounded-full", style: { width: `${Math.round(waqtProgress * 100)}%`, background: "#E3C26B" } })
+            ),
+            /*#__PURE__*/React.createElement(
+              "div",
+              { className: "flex justify-between text-[10px] opacity-70 mt-0.5" },
+              /*#__PURE__*/React.createElement("span", null, formatHHMM(waqtInfo.start)),
+              /*#__PURE__*/React.createElement("span", null, `${toBn(Math.round(waqtProgress * 100))}% সময় পার`),
+              /*#__PURE__*/React.createElement("span", null, formatHHMM(waqtInfo.target))
+            )
+          )
       ),
     // §রমজান সেহরি/ইফতার countdown(schema উপরে, isRamadan true হলেই সক্রিয় —
     // এখন hijri মাস রমজান না বলে null, কিছুই render হয় না)। ভিন্ন gradient(সোনালী/
@@ -811,6 +918,25 @@ export function PrayerTimes() {
                 "span",
                 { className: "text-xs whitespace-nowrap", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
                 r.end ? `${formatHHMM(r.start)}–${formatHHMM(r.end)}` : formatHHMM(r.start)
+              ),
+              /*#__PURE__*/React.createElement(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => toggleDone(r.key),
+                  "aria-label": `${r.label} পড়া হয়েছে`,
+                  "aria-pressed": !!doneToday[r.key],
+                  className: "shrink-0 w-6 h-6 -mr-1 flex items-center justify-center",
+                },
+                /*#__PURE__*/React.createElement(
+                  "span",
+                  {
+                    className:
+                      "w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center text-[11px] leading-none text-white " +
+                      (doneToday[r.key] ? "bg-emerald-900 border-emerald-900" : "border-slate-300"),
+                  },
+                  doneToday[r.key] ? "✓" : ""
+                )
               )
             )
           )
@@ -902,6 +1028,34 @@ export function PrayerTimes() {
             /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-amber-900 whitespace-nowrap" }, `সন্ধ্যা ${formatHHMM(schedule.maghrib)}`)
           )
         )
+      ),
+    // §এখন করণীয়(চলতি ওয়াক্ত, না থাকলে পরবর্তী ওয়াক্ত)
+    schedule &&
+      guideKey &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "mx-4 mt-2 rounded-2xl px-3 py-2.5 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.3)]", style: { background: "#F3F9F6" } },
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "text-xs font-bold text-emerald-950 mb-1" },
+          `📖 ${WAQT_NAME[guideKey]} · ${waqtInfo.currentKey ? "এখন করণীয়" : "পরবর্তী ওয়াক্ত"}`
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "text-[12px] text-slate-700" }, WAQT_GUIDE[madhab === 1 ? 1 : 0][guideKey]),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "flex flex-wrap gap-1 mt-1.5" },
+          WAQT_AMOL[guideKey].map((t) =>
+            /*#__PURE__*/React.createElement("span", { key: t, className: "text-[11px] font-semibold text-emerald-900 bg-[#E3EFEA] rounded-full px-2.5 py-0.5" }, t)
+          )
+        )
+      ),
+    // §শর্টকাট
+    schedule &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "mx-4 mt-2 grid grid-cols-2 gap-2" },
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("qibla"), className: "bg-white rounded-xl py-2 text-xs font-bold text-emerald-900 border border-[#C89B3C]/50" }, "🧭 কিবলা দেখুন"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("monthly"), className: "bg-white rounded-xl py-2 text-xs font-bold text-emerald-900 border border-[#C89B3C]/50" }, "📅 মাসিক সূচি")
       )
   );
 }
