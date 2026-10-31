@@ -89,7 +89,7 @@ export function DashboardHeader({
     style: {
       background: "var(--theme-primary)"
     },
-    className: "px-5 pt-6 pb-9 shadow-md relative"
+    className: "px-5 pt-4 pb-4 shadow-md relative"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", {
@@ -97,7 +97,7 @@ export function DashboardHeader({
   }, /*#__PURE__*/React.createElement(AppLogo, {
     size: 34
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
-    className: "text-xl font-bold tracking-tight",
+    className: "text-lg font-bold tracking-tight leading-tight",
     style: {
       fontFamily: "'Noto Serif Bengali', serif",
       color: "#F4F7F1"
@@ -105,7 +105,7 @@ export function DashboardHeader({
   }, "Daily Task"), /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-emerald-200/80 -mt-1 font-medium"
   }, "আমল ও পারিবারিক ট্র্যাকার")))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mt-4"
+    className: "flex items-center justify-between mt-2.5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {

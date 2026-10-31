@@ -247,7 +247,7 @@ function FieldGroup({
     className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
-      color: percentColor || "#5B6B64",
+      color: percent === 0 ? "#7A8B84" : percentColor || "#5B6B64",
       background: "var(--color-primary-soft, #E8F0EE)"
     }
   }, percentLabel), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
@@ -359,7 +359,7 @@ function CollapsibleCard({
     className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
-      color: percentColor || "#5B6B64",
+      color: percent === 0 ? "#7A8B84" : percentColor || "#5B6B64",
       background: "var(--color-primary-soft, #E8F0EE)"
     }
   }, toBn(percent) + "%"), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
@@ -696,7 +696,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement(ChevronRight, {
     size: 16
   })))), /*#__PURE__*/React.createElement("div", {
-    className: "px-5 mt-5 space-y-4"
+    className: "px-5 mt-4 space-y-3"
   }, ...homeEntryCards(selectedMember, {
     tazkirah: () => (() => {
     const insp = getDailyInspiration(viewDate);
