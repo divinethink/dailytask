@@ -35,31 +35,20 @@ function useFonts() {
   }, []);
 }
 
-const THEME_PRESETS = [{
-  id: "green",
-  name: "সবুজ (ডিফল্ট)",
-  color: "#0E4B43"
-}, {
-  id: "pink",
-  name: "পিংক",
-  color: "#E0559A"
-}, {
-  id: "maroon",
-  name: "মেরুন",
-  color: "#9F1239"
-}, {
-  id: "purple",
-  name: "বেগুনি",
-  color: "#6D28D9"
-}, {
-  id: "blue",
-  name: "নীল",
-  color: "#1D4ED8"
-}, {
-  id: "teal",
-  name: "টিল",
-  color: "#0F766E"
-}];
+// §থিম ধাপ ১(owner-approved, ১০টা): color=প্রধান রং(localStorage "theme_color"-এ এই hex-ই
+// সংরক্ষিত — schema/backup অপরিবর্তিত); accent=সোনালি-স্থানের রং; page=পেজ ব্যাকগ্রাউন্ড।
+const THEME_PRESETS = [
+  { id: "green", name: "সবুজ (ডিফল্ট)", color: "#0E4B43", accent: "#C89B3C", page: "#F4F7F1" },
+  { id: "nord", name: "নর্ড", color: "#3E6092", accent: "#7F9CC4", page: "#EAEEF6" },
+  { id: "pink", name: "গোলাপি", color: "#DB2777", accent: "#F06BA8", page: "#FDF2F8" },
+  { id: "purple", name: "বেগুনি", color: "#6D28D9", accent: "#A98AE8", page: "#F4F0FD" },
+  { id: "teal-lemon", name: "টিল + লেমন", color: "#3F8F7A", accent: "#D8C95A", page: "#FDFBE8" },
+  { id: "green-butter", name: "গাঢ় সবুজ + বাটার", color: "#043D36", accent: "#DDB93F", page: "#FEF9E1" },
+  { id: "terracotta", name: "টেরাকোটা", color: "#B85034", accent: "#DE9A5E", page: "#FBF3EC" },
+  { id: "olive", name: "অলিভ", color: "#657834", accent: "#BFA94A", page: "#F4F6EA" },
+  { id: "mocha", name: "মোকা", color: "#855C41", accent: "#CF9F6E", page: "#F7F1EA" },
+  { id: "ledger", name: "লেজার পেপার", color: "#5B4636", accent: "#B08D57", page: "#F5ECD7" }
+];
 function hexToRgba(hex, alpha) {
   const h = (hex || "#0E4B43").replace("#", "");
   const full = h.length === 3 ? h.split("").map(c => c + c).join("") : h;
@@ -75,7 +64,12 @@ function getThemeColor(fallback) {
   return v || fallback;
 }
 function applyThemeColor(color) {
-  document.documentElement.style.setProperty("--theme-primary", color);
+  const t = THEME_PRESETS.find(x => x.color.toLowerCase() === String(color).toLowerCase());
+  // অজানা/পুরনো সংরক্ষিত রং: শুধু প্রধান রং বদলায়, বাকি ডিফল্ট(আগের আচরণ অপরিবর্তিত)
+  const root = document.documentElement.style;
+  root.setProperty("--theme-primary", color);
+  root.setProperty("--theme-accent", t ? t.accent : THEME_PRESETS[0].accent);
+  root.setProperty("--theme-page", t ? t.page : THEME_PRESETS[0].page);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", color);
 }

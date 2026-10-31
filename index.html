@@ -105,6 +105,8 @@
 <style>
   :root {
     --theme-primary: #0E4B43;
+    --theme-accent: #C89B3C;
+    --theme-page: #F4F7F1;
     /* §B২.১ Design Tokens(2_5 Part B, ১৫ সেপ্টেম্বর ২০২৬) — additive, visual output অপরিবর্তিত।
        বিদ্যমান কোনো component এখনো এই token-গুলো reference করে না(Phase ১, foundation-only)। */
     --color-primary: #0E4B43;
@@ -119,7 +121,7 @@
     --color-text-primary: #1A2621;
     --color-text-secondary: #5B6B64;
   }
-  html, body { background: #F4F7F1; margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
+  html, body { background: var(--theme-page, #F4F7F1); margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
   .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
@@ -129,9 +131,16 @@
      করে appHelpers.js: useDisplayMode()। "light"(ডিফল্ট) attribute ফাঁকা রাখা হয়
      বলে এই দুই rule তখন match করে না — বর্তমান visual সম্পূর্ণ অপরিবর্তিত। */
   html[data-display-mode="sepia"] { filter: sepia(0.28) contrast(1.08) brightness(1.02) saturate(1.05); }
-  html[data-display-mode="dark"] { filter: invert(1) hue-rotate(180deg); background: #F4F7F1; }
+  html[data-display-mode="dark"] { filter: invert(1) hue-rotate(180deg); background: var(--theme-page, #F4F7F1); }
   html[data-display-mode="dark"] img,
   html[data-display-mode="dark"] svg { filter: invert(1) hue-rotate(180deg); }
+
+  /* §থিম ধাপ ১: পেজ-ব্যাকগ্রাউন্ড ও সোনালি-স্থান থিম-টোকেনে(fallback=আগের রং, তাই ডিফল্টে কোনো পরিবর্তন নেই) */
+  .bg-\[\#F4F7F1\] { background-color: var(--theme-page, #F4F7F1) !important; }
+  .bg-\[\#C89B3C\] { background-color: var(--theme-accent, #C89B3C) !important; }
+  .border-\[\#C89B3C\] { border-color: var(--theme-accent, #C89B3C) !important; }
+  .border-\[\#C89B3C\]\/50 { border-color: color-mix(in srgb, var(--theme-accent, #C89B3C) 50%, transparent) !important; }
+  .border-\[\#C89B3C\]\/40 { border-color: color-mix(in srgb, var(--theme-accent, #C89B3C) 40%, transparent) !important; }
 
   @media print {
     html { filter: none !important; }

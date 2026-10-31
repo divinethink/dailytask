@@ -2748,14 +2748,25 @@ function App() {
     type: "button",
     onClick: () => setThemeColor(t.color),
     title: t.name,
-    className: "w-7 h-7 rounded-full flex items-center justify-center transition-transform active:scale-90 border-2",
+    className: "rounded-xl overflow-hidden text-left border-2 transition-transform active:scale-95",
     style: {
-      background: t.color,
-      borderColor: themeColor === t.color ? "#16302B" : "transparent"
+      width: "calc(50% - 4px)",
+      background: t.page,
+      borderColor: themeColor === t.color ? t.color : "#E4E7E2"
     }
-  }, themeColor === t.color && /*#__PURE__*/React.createElement("span", {
-    className: "text-white text-xs font-bold"
-  }, "✓"))))));
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-5",
+    style: { background: t.color }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1 px-2 pt-1.5"
+  }, [t.color, t.accent, t.page].map((c, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "h-1.5 flex-1 rounded-full",
+    style: { background: c, border: "1px solid rgba(0,0,0,0.08)" }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-2 py-1.5 text-xs font-bold",
+    style: { color: t.color }
+  }, (themeColor === t.color ? "✓ " : "") + t.name))))));
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing

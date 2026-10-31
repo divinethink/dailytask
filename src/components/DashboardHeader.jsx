@@ -117,7 +117,7 @@ export function DashboardHeader({
     },
     className: "px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform",
     style: {
-      background: "#C89B3C",
+      background: "var(--theme-accent, #C89B3C)",
       color: "#16302B"
     }
   }, /*#__PURE__*/React.createElement(User, {

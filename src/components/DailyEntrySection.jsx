@@ -274,8 +274,8 @@ function FieldGroup({
       onClick: () => onToggleExcuse(f.key, !excused),
       className: "px-2 py-1 rounded-lg text-[10px] font-bold border shrink-0 transition-all",
       style: excused ? {
-        background: "#C89B3C",
-        borderColor: "#C89B3C",
+        background: "var(--theme-accent, #C89B3C)",
+        borderColor: "var(--theme-accent, #C89B3C)",
         color: "#16302B"
       } : {
         background: "#fff",
@@ -687,7 +687,7 @@ export function DailyEntrySection({
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-[10px] font-bold mb-1.5",
       style: {
-        color: "#C89B3C"
+        color: "var(--theme-accent, #C89B3C)"
       }
     }, "✦ আজকের তাযকিরাহ · ", tagLabel), /*#__PURE__*/React.createElement("p", {
       className: "text-[12px] text-white leading-relaxed"
