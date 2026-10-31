@@ -42,7 +42,7 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
   const showHm = hj.day <= 2 && !hideHm;
 
   let msg;
-  if (total > 0 && filled === total) msg = saved ? "মাশাআল্লাহ — আজকের মুহাসাবা পূর্ণ।" : "সব কার্ড ভরা — এবার নিচে সেভ করুন।";
+  if (total > 0 && filled === total) msg = saved ? "মাশাআল্লাহ — আজকের মুহাসাবা পূর্ণ।" : "সব কার্ড পূরণ করা হয়েছে — এবার নিচে সেভ করুন।";
   else if (filled === 0) msg = saved ? "আজকের হিসাব সেভ আছে।" : "বিসমিল্লাহ — আজকের হিসাব শুরু করুন।";
   else msg = "আলহামদুলিল্লাহ — আর " + toBn(total - filled) + "টি কার্ড বাকি।";
 
@@ -77,12 +77,12 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
       "div",
       { className: "mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2" },
       React.createElement("span", { className: "text-base", "aria-hidden": true }, "🕰️"),
-      React.createElement("p", { className: "flex-1 text-[11px] font-semibold text-amber-900 leading-snug" }, "গতকালের হিসাব ভরা হয়নি।"),
+      React.createElement("p", { className: "flex-1 text-[11px] font-semibold text-amber-900 leading-snug" }, "গতকালের হিসাব পূরণ করা হয়নি।"),
       React.createElement("button", {
         type: "button",
         onClick: onGoYesterday,
         className: "shrink-0 rounded-lg bg-amber-600 px-2.5 py-1.5 text-[11px] font-bold text-white active:scale-95"
-      }, "এখনই ভরুন"),
+      }, "এখনই পূরণ করুন"),
       React.createElement("button", {
         type: "button",
         "aria-label": "বন্ধ করুন",
