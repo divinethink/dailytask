@@ -689,7 +689,7 @@ export function DailyEntrySection({
       style: {
         color: "var(--theme-accent, #C89B3C)"
       }
-    }, "✦ আজকের তাযকিরাহ · ", tagLabel), /*#__PURE__*/React.createElement("p", {
+    }, "✦ আজকের বাণী · ", tagLabel), /*#__PURE__*/React.createElement("p", {
       className: "text-[12px] text-white leading-relaxed"
     }, insp.text), /*#__PURE__*/React.createElement("p", {
       className: "text-[10px] text-emerald-200/70 mt-1.5 text-right"

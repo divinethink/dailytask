@@ -18,7 +18,7 @@ const d = (id, title, defaultFold) => ({ id, title, defaultFold });
 // ক্রম ও ডিফল্ট fold = বর্তমান হোম পেজের হুবহু আচরণ।
 export const CARD_DEFS = {
   entry: [
-    d("tazkirah", "আজকের তাযকিরাহ", "fixed"),
+    d("tazkirah", "আজকের বাণী", "fixed"),
     d("salah", "সালাত ও সিয়াম", "open"),
     d("quranIlm", "কুরআন ও ইলম", "closed"),
     d("dhikrDawah", "যিকির ও দাওয়াহ", "closed"),
