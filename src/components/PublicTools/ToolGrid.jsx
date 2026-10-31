@@ -22,7 +22,7 @@ function Tile({ icon, label, onClick }) {
       "div",
       {
         className: "w-11 h-11 rounded-full flex items-center justify-center border border-emerald-900/10",
-        style: { background: "#E8F0EE" },
+        style: { background: "var(--theme-soft, #E8F0EE)" },
       },
       React.createElement(ToolIcon, { name: icon, size: 20, color: PRIMARY })
     ),
@@ -52,7 +52,7 @@ function ListRow({ icon, label, subtitle, onClick }) {
       "div",
       {
         className: "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-        style: { background: "#E8F0EE" },
+        style: { background: "var(--theme-soft, #E8F0EE)" },
       },
       React.createElement(ToolIcon, { name: icon, size: 18, color: PRIMARY })
     ),
@@ -205,7 +205,7 @@ export function PageHeader({ title, subtitle }) {
     "header",
     {
       className: "mb-3 rounded-2xl border px-4 py-3",
-      style: { background: "linear-gradient(135deg, #E8F0EE 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
+      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
     },
     React.createElement("h1", { className: "text-[19px] leading-tight", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } }, title),
     subtitle && React.createElement("p", { className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle)
@@ -220,7 +220,7 @@ export function DetailHeader({ icon, title, subtitle }) {
     "header",
     {
       className: "mb-3 rounded-2xl border px-4 py-3.5 flex items-center gap-3",
-      style: { background: "linear-gradient(135deg, #E8F0EE 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
+      style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, #F2F7F4 100%)", borderColor: "#D3E3DD" },
     },
     icon &&
       React.createElement(
@@ -255,7 +255,7 @@ export function VerseCard({ text, source }) {
       className: "rounded-[20px] px-5 py-4 text-center flex flex-col items-center justify-center gap-1.5",
       style: {
         minHeight: 92,
-        background: "linear-gradient(160deg, #0E4B43 0%, #0A3A34 100%)",
+        background: "linear-gradient(160deg, var(--theme-primary, #0E4B43) 0%, var(--theme-deep, #0A3A34) 100%)",
         boxShadow: "0 4px 14px rgba(14,75,67,0.22)",
       },
     },

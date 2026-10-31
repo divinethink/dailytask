@@ -98,13 +98,13 @@ function CountStepper({
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, "−"), /*#__PURE__*/React.createElement("span", {
     className: "w-8 text-center font-bold text-sm",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -113,7 +113,7 @@ function CountStepper({
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, "+"));
 }
@@ -142,13 +142,13 @@ function NumberField({
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, "\u2212"), /*#__PURE__*/React.createElement("span", {
     className: "w-8 text-center font-bold text-sm",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, toBn(v)), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -157,7 +157,7 @@ function NumberField({
     className: "w-9 h-9 rounded-lg bg-white border flex items-center justify-center text-lg font-bold shadow-sm",
     style: {
       borderColor: "#D8DED3",
-      color: "#16302B"
+      color: "var(--theme-ink, #16302B)"
     }
   }, "+")));
   // `target` prop intentionally unused/not rendered (owner request: hide the
@@ -276,7 +276,7 @@ function FieldGroup({
       style: excused ? {
         background: "var(--theme-accent, #C89B3C)",
         borderColor: "var(--theme-accent, #C89B3C)",
-        color: "#16302B"
+        color: "var(--theme-ink, #16302B)"
       } : {
         background: "#fff",
         borderColor: "#D8DED3",

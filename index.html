@@ -107,6 +107,10 @@
     --theme-primary: #0E4B43;
     --theme-accent: #C89B3C;
     --theme-page: #F4F7F1;
+    --theme-ink: #16302B;
+    --theme-deep: #0A3A34;
+    --theme-soft: #E8F0EE;
+    --theme-accent-soft: #E4D3A8;
     --e-50: 236 253 245;
     --e-100: 209 250 229;
     --e-200: 167 243 208;
@@ -152,6 +156,16 @@
   .border-\[\#C89B3C\] { border-color: var(--theme-accent, #C89B3C) !important; }
   .border-\[\#C89B3C\]\/50 { border-color: color-mix(in srgb, var(--theme-accent, #C89B3C) 50%, transparent) !important; }
   .border-\[\#C89B3C\]\/40 { border-color: color-mix(in srgb, var(--theme-accent, #C89B3C) 40%, transparent) !important; }
+
+  .bg-\[\#0E4B43\] { background-color: var(--theme-primary, #0E4B43) !important; }
+  .text-\[\#0E4B43\] { color: var(--theme-primary, #0E4B43) !important; }
+  .focus\:border-\[\#0E4B43\]:focus { border-color: var(--theme-primary, #0E4B43) !important; }
+  .bg-\[\#16302B\] { background-color: var(--theme-ink, #16302B) !important; }
+  .text-\[\#16302B\] { color: var(--theme-ink, #16302B) !important; }
+  .bg-\[\#E8F0EE\] { background-color: var(--theme-soft, #E8F0EE) !important; }
+  .border-\[\#E4D3A8\] { border-color: var(--theme-accent-soft, #E4D3A8) !important; }
+  .from-\[\#0E4B43\] { --tw-gradient-from: var(--theme-primary, #0E4B43) var(--tw-gradient-from-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(14 75 67 / 0)) !important; }
+  .to-\[\#153f39\] { --tw-gradient-to: var(--theme-deep, #153f39) var(--tw-gradient-to-position) !important; }
 
   @media print {
     html { filter: none !important; }

@@ -133,7 +133,7 @@ export function TasbihCounter() {
             type: "button",
             onClick: () => handleSelectTarget(t),
             className: "flex-1 text-xs font-semibold py-1.5 rounded-full transition-colors",
-            style: t === target ? { background: "#0E4B43", color: "#fff" } : { color: "#5B6B64" },
+            style: t === target ? { background: "var(--theme-primary, #0E4B43)", color: "#fff" } : { color: "#5B6B64" },
           },
           toBn(t)
         )

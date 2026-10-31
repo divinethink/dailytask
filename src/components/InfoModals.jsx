@@ -47,7 +47,7 @@ export function CoachMarkModal({
     key: i,
     className: "w-1.5 h-1.5 rounded-full",
     style: {
-      background: i === step ? "#0E4B43" : "#E4E7E2"
+      background: i === step ? "var(--theme-primary, #0E4B43)" : "#E4E7E2"
     }
   }))), /*#__PURE__*/React.createElement("button", {
     onClick: finish,
@@ -68,7 +68,7 @@ export function CoachMarkModal({
     onClick: () => isLast ? finish() : setStep(step + 1),
     className: "flex items-center gap-1 text-sm font-bold text-white px-4 py-2 rounded-xl",
     style: {
-      background: "#0E4B43"
+      background: "var(--theme-primary, #0E4B43)"
     }
   }, isLast ? "শুরু করুন" : "পরবর্তী", !isLast && /*#__PURE__*/React.createElement(ChevronRight, {
     size: 14,
@@ -211,7 +211,7 @@ export function MonthlyOverviewInfoModal({ show, onClose }) {
     className: "text-xs text-slate-700 leading-relaxed mb-4 space-y-2"
   },
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
-    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#0E4B43" } }),
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "var(--theme-primary, #0E4B43)" } }),
     "৮৫% বা তার বেশি — চমৎকার"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },

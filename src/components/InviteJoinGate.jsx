@@ -142,7 +142,7 @@ export function InviteJoinGate({ familyId, token, familyCode, onSuccess, onBackT
         type: "button",
         onClick: () => pendingSuccess && onSuccess(pendingSuccess.familyId, pendingSuccess.memberId),
         className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
-        style: { background: "#0E4B43", borderColor: "#0E4B43", color: "#fff" }
+        style: { background: "var(--theme-primary, #0E4B43)", borderColor: "var(--theme-primary, #0E4B43)", color: "#fff" }
       }, "ড্যাশবোর্ডে যান")
     );
   }

@@ -867,7 +867,7 @@ export function PrayerTimes() {
         "div",
         {
           className: "mx-4 mb-2 rounded-2xl px-3 py-2 text-white shadow-sm relative overflow-hidden border border-[#C89B3C]/50 shadow-[0_0_12px_rgba(200,155,60,0.35)]",
-          style: { background: "linear-gradient(135deg, #0E4B43, #16302B)" },
+          style: { background: "linear-gradient(135deg, var(--theme-primary, #0E4B43), var(--theme-ink, #16302B))" },
         },
         /*#__PURE__*/React.createElement(MosqueSilhouette, null),
         /*#__PURE__*/React.createElement(
@@ -1043,7 +1043,7 @@ export function PrayerTimes() {
         { className: "mx-4 mb-2 grid grid-cols-2 gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "#E8F0EE" } },
+          { className: "rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "var(--theme-soft, #E8F0EE)" } },
           /*#__PURE__*/React.createElement("span", { className: "text-[11px] text-emerald-800" }, "🍽️ সেহরি"),
           /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-emerald-900 whitespace-nowrap" }, `ভোর ${formatHHMM(schedule.fajr)}`)
         ),
