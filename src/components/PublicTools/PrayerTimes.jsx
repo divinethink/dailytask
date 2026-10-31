@@ -1058,22 +1058,22 @@ export function PrayerTimes() {
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 bg-white rounded-2xl p-2.5 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.35)]" },
-        /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-emerald-950 mb-1" }, "🕌 সালাতের সময়সূচি"),
+        { className: "mx-4 mb-3 bg-white rounded-2xl p-4 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.35)]" },
+        /*#__PURE__*/React.createElement("div", { className: "text-sm font-bold text-emerald-950 mb-2" }, "🕌 সালাতের সময়সূচি"),
         rows.map((r) =>
           /*#__PURE__*/React.createElement(
             "div",
             {
               key: r.key,
               className:
-                "flex items-center gap-2 text-xs py-1 px-1 rounded-lg " +
+                "flex items-center gap-3 text-sm py-3 px-2 rounded-xl " +
                 (waqtInfo && waqtInfo.currentKey === r.key ? "bg-[#E8F0EE] font-bold" : ""),
             },
             /*#__PURE__*/React.createElement(WaqtIconChip, WAQT_CHIP[r.key]),
             /*#__PURE__*/React.createElement("span", { className: "flex-1 text-slate-800" }, r.label),
             /*#__PURE__*/React.createElement(
               "span",
-              { className: "text-xs font-semibold whitespace-nowrap", style: { fontFamily: "'Hind Siliguri', sans-serif", color: WAQT_TIME_COLOR[r.key] } },
+              { className: "text-[13px] font-semibold whitespace-nowrap text-slate-600", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
               r.end ? `${formatHHMM(r.start)}–${formatHHMM(r.end)}` : formatHHMM(r.start)
             ),
             /*#__PURE__*/React.createElement(
@@ -1083,13 +1083,13 @@ export function PrayerTimes() {
                 onClick: () => toggleDone(r.key),
                 "aria-label": `${r.label} পড়া হয়েছে`,
                 "aria-pressed": !!doneToday[r.key],
-                className: "shrink-0 w-6 h-6 -mr-1 flex items-center justify-center",
+                className: "shrink-0 w-9 h-9 -mr-2 flex items-center justify-center",
               },
               /*#__PURE__*/React.createElement(
                 "span",
                 {
                   className:
-                    "w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center text-[11px] leading-none text-white " +
+                    "w-[22px] h-[22px] rounded-full border-[1.5px] flex items-center justify-center text-xs leading-none text-white " +
                     (doneToday[r.key] ? "bg-emerald-900 border-emerald-900" : "border-slate-300"),
                 },
                 doneToday[r.key] ? "✓" : ""
@@ -1098,24 +1098,21 @@ export function PrayerTimes() {
           )
         )
       ),
+    // §নিষিদ্ধ সময়(owner-instruction): লাল রঙে, একটাই লাইনে — ছোট ফোনে লাইন না ভেঙে পাশে স্ক্রল হয়।
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 rounded-2xl px-2.5 py-2 border border-[#F2C6C0]", style: { background: "#FCEEEC" } },
-        /*#__PURE__*/React.createElement("div", { className: "text-xs font-bold text-red-800 mb-1" }, "⛔ নিষিদ্ধ সময়"),
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "grid grid-cols-3 gap-1.5" },
-          forbiddenWindows.map((w) =>
+        { className: "mx-4 mb-3 rounded-2xl px-3 py-3 border border-[#F2C6C0] flex items-center gap-3 overflow-x-auto", style: { background: "#FCEEEC", scrollbarWidth: "none" } },
+        /*#__PURE__*/React.createElement("span", { className: "text-xs shrink-0", "aria-label": "নিষিদ্ধ সময়" }, "⛔"),
+        forbiddenWindows.map((w) =>
+          /*#__PURE__*/React.createElement(
+            "span",
+            { key: w.label, className: "text-[11px] whitespace-nowrap shrink-0" },
+            /*#__PURE__*/React.createElement("span", { className: "text-slate-700" }, w.label + " "),
             /*#__PURE__*/React.createElement(
-              "div",
-              { key: w.label, className: "text-[11px] leading-tight" },
-              /*#__PURE__*/React.createElement("div", { className: "text-slate-800" }, w.label),
-              /*#__PURE__*/React.createElement(
-                "div",
-                { className: "whitespace-nowrap font-semibold", style: { fontFamily: "'Hind Siliguri', sans-serif", color: "#B42318" } },
-                `${formatHHMM(w.start)}–${formatHHMM(w.end)}`
-              )
+              "span",
+              { className: "font-semibold", style: { fontFamily: "'Hind Siliguri', sans-serif", color: "#B42318" } },
+              `${formatHHMM(w.start)}–${formatHHMM(w.end)}`
             )
           )
         )
@@ -1124,24 +1121,24 @@ export function PrayerTimes() {
     otherTimes &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 bg-white rounded-2xl border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.35)] overflow-hidden" },
-        /*#__PURE__*/React.createElement("div", { className: "px-3 pt-2 pb-1 text-xs font-bold text-emerald-950" }, "✨ অন্যান্য সালাত"),
+        { className: "mx-4 mb-3 bg-white rounded-2xl border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.35)] overflow-hidden" },
+        /*#__PURE__*/React.createElement("div", { className: "px-4 pt-4 pb-2 text-sm font-bold text-emerald-950" }, "✨ অন্যান্য সালাত"),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "px-3 pb-2 grid grid-cols-2 gap-x-3 gap-y-1" },
+          { className: "px-4 pb-4 grid grid-cols-2 gap-x-4 gap-y-3" },
           OTHER_ITEMS.map((it) =>
             /*#__PURE__*/React.createElement(
               "div",
-              { key: it.k, className: "flex items-center justify-between gap-1 text-[11px] whitespace-nowrap" },
+              { key: it.k, className: "flex flex-col gap-0.5 whitespace-nowrap" },
               /*#__PURE__*/React.createElement(
                 "span",
-                { className: "text-slate-800" },
+                { className: "text-xs text-slate-800" },
                 /*#__PURE__*/React.createElement("span", { style: { color: it.color } }, "● "),
                 it.label
               ),
               /*#__PURE__*/React.createElement(
                 "span",
-                { className: "font-semibold", style: { color: it.color } },
+                { className: "text-[13px] font-semibold text-slate-600 pl-3" },
                 `${formatHHMM(otherTimes[it.k].start)}–${formatHHMM(otherTimes[it.k].end)}`
               )
             )
@@ -1153,22 +1150,22 @@ export function PrayerTimes() {
       guideKey &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 rounded-2xl px-3 py-2 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.3)] bg-white" },
+        { className: "mx-4 mb-3 rounded-2xl px-4 py-3.5 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.3)] bg-white" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "flex flex-wrap items-center gap-1" },
+          { className: "flex flex-wrap items-center gap-1.5" },
           /*#__PURE__*/React.createElement(
             "span",
             { className: "text-xs font-bold text-emerald-950 mr-1 whitespace-nowrap" },
             `${waqtInfo.currentKey ? "এখন" : "পরবর্তী"}: ${WAQT_NAME[guideKey]}`
           ),
           WAQT_GUIDE[madhab === 1 ? 1 : 0][guideKey].split(" · ").map((t, i) =>
-            /*#__PURE__*/React.createElement("span", { key: i, className: "text-[11px] rounded-full px-2 py-px whitespace-nowrap " + rakatPillClass(t) }, t)
+            /*#__PURE__*/React.createElement("span", { key: i, className: "text-[11px] rounded-full px-2.5 py-0.5 whitespace-nowrap " + rakatPillClass(t) }, t)
           )
         ),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "flex flex-wrap gap-1 mt-1.5" },
+          { className: "flex flex-wrap gap-x-2 gap-y-1 mt-3" },
           WAQT_AMOL[guideKey].map((t) =>
             /*#__PURE__*/React.createElement("span", { key: t, className: "text-[11px] text-slate-600" }, `💡 ${t}`)
           )
@@ -1178,16 +1175,16 @@ export function PrayerTimes() {
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-2 grid grid-cols-2 gap-2" },
+        { className: "mx-4 mb-3 grid grid-cols-2 gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "var(--theme-soft, #E8F0EE)" } },
+          { className: "rounded-xl px-3 py-3 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "var(--theme-soft, #E8F0EE)" } },
           /*#__PURE__*/React.createElement("span", { className: "text-[11px] text-emerald-800" }, "🍽️ সেহরি"),
           /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-emerald-900 whitespace-nowrap" }, `ভোর ${formatHHMM(schedule.fajr)}`)
         ),
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "#FDF1E4" } },
+          { className: "rounded-xl px-3 py-3 flex items-center justify-between gap-1 border border-[#C89B3C]/50", style: { background: "#FDF1E4" } },
           /*#__PURE__*/React.createElement("span", { className: "text-[11px] text-amber-800" }, "🌆 ইফতার"),
           /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-amber-900 whitespace-nowrap" }, `সন্ধ্যা ${formatHHMM(schedule.maghrib)}`)
         )
@@ -1197,8 +1194,8 @@ export function PrayerTimes() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "mx-4 grid grid-cols-2 gap-2" },
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("qibla"), className: "bg-white rounded-xl py-2 text-xs font-bold text-emerald-900 border border-[#C89B3C]/50" }, "🧭 কিবলা দেখুন"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("monthly"), className: "bg-white rounded-xl py-2 text-xs font-bold text-emerald-900 border border-[#C89B3C]/50" }, "📅 মাসিক সূচি")
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("qibla"), className: "bg-white rounded-xl py-3.5 text-sm font-bold text-emerald-900 border border-[#C89B3C]/50" }, "🧭 কিবলা দেখুন"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("monthly"), className: "bg-white rounded-xl py-3.5 text-sm font-bold text-emerald-900 border border-[#C89B3C]/50" }, "📅 মাসিক সূচি")
       )
   );
 }
