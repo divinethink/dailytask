@@ -43,6 +43,7 @@ export function MenuPage({
   monthCursor,
   setShowFeedbackModal,
   onOpenHomeLayout,
+  onOpenPrayerLayout,
   onOpenFieldManager,
   onOpenTazkirah,
   themeColorPickerEl
@@ -222,6 +223,19 @@ export function MenuPage({
               },
               React.createElement(EditIcon, { size: 14 }),
               " হোম কাস্টমাইজ (কার্ড সাজান/ভাঁজ)"
+            )
+          ),
+          onOpenPrayerLayout && React.createElement(
+            "div",
+            { className: "py-1" },
+            React.createElement(
+              "button",
+              {
+                onClick: () => { onOpenPrayerLayout(); },
+                className: "w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+              },
+              React.createElement(EditIcon, { size: 14 }),
+              " সময়সূচি কাস্টমাইজ (কার্ড সাজান)"
             )
           ),
           onOpenFieldManager && React.createElement(

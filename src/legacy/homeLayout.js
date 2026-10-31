@@ -96,3 +96,43 @@ export function updateCard(list, id, patch) {
 export function sameLayout(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+// ---- সময়সূচি-পেজের কার্ড সাজানো(owner-approved): শুধু ক্রম; member.prayerLayout = id-এর তালিকা ----
+// না থাকলে/অবৈধ হলে ডিফল্ট ক্রম = আগের আচরণ হুবহু। অচেনা/ডুপ্লিকেট id বাদ, বাদ-পড়া কার্ড ডিফল্ট ক্রমে শেষে।
+export const PRAYER_CARD_DEFS = [
+  { id: "schedule", title: "সালাতের সময়সূচি" },
+  { id: "forbidden", title: "নিষিদ্ধ সময়" },
+  { id: "other", title: "অন্যান্য সালাত" },
+  { id: "guide", title: "এখন করণীয়" },
+  { id: "meal", title: "সেহরি ও ইফতার" },
+  { id: "shortcuts", title: "কিবলা ও মাসিক সূচি বাটন" }
+];
+export function defaultPrayerOrder() {
+  return PRAYER_CARD_DEFS.map(x => x.id);
+}
+export function sanitizePrayerOrder(raw) {
+  const known = new Set(defaultPrayerOrder());
+  const seen = new Set();
+  const out = [];
+  if (Array.isArray(raw)) {
+    for (const id of raw.slice(0, 20)) {
+      if (typeof id !== "string" || !known.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const id of defaultPrayerOrder()) if (!seen.has(id)) out.push(id);
+  return out;
+}
+export function prayerCardTitle(id) {
+  const f = PRAYER_CARD_DEFS.find(x => x.id === id);
+  return f ? f.title : id;
+}
+export function movePrayerId(list, id, dir) {
+  const i = list.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return [...list];
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}

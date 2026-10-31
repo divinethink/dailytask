@@ -43,7 +43,7 @@ import {
   migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadTazkirahCustom, saveTazkirahCustom, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
-  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout, saveCustomTasks
+  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout, savePrayerLayout, saveCustomTasks
 } from "./memberData.js";
 import {
   isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
@@ -606,6 +606,7 @@ const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahMan
 const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
 import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
 import { taskFields } from "./customTasks.js";
+const PrayerLayoutScreen = React.lazy(() => import("../components/PrayerLayoutScreen.jsx").then(m => ({ default: m.PrayerLayoutScreen })));
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
@@ -941,6 +942,7 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showHomeLayout, setShowHomeLayout] = useState(false);
+  const [showPrayerLayout, setShowPrayerLayout] = useState(false);
   // পুরনো "কাস্টম ফ্যামিলি কোড সেট করুন" মোডাল (showFamilyCodeModal,
   // legacy dual-purpose setFamilyCode() ভিত্তিক) সরিয়ে এখন একটি একক
   // EditIcon → দুই-অপশনের choice পপআপে merge করা হয়েছে (নিচে দেখুন)।
@@ -2818,6 +2820,7 @@ function App() {
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
           onOpenHomeLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowHomeLayout(true) : undefined,
+          onOpenPrayerLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowPrayerLayout(true) : undefined,
           onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
           onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
@@ -2835,6 +2838,14 @@ function App() {
           overrides: fieldOverrides,
           onSave: handleSaveFieldManager,
           onClose: () => setShowFieldManager(false)
+        })),
+        showPrayerLayout && selectedMember && React.createElement(React.Suspense, { fallback: null }, React.createElement(PrayerLayoutScreen, {
+          member: selectedMember,
+          onSave: async order => {
+            await savePrayerLayout(migrationState, selectedId, order);
+            setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, prayerLayout: order } : x));
+          },
+          onClose: () => setShowPrayerLayout(false)
         })),
         showHomeLayout && selectedMember && React.createElement(React.Suspense, { fallback: null }, React.createElement(HomeLayoutScreen, {
           member: selectedMember,
@@ -2913,7 +2924,7 @@ function App() {
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
-          React.createElement(PrayerTimes, null)
+          React.createElement(PrayerTimes, { layout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

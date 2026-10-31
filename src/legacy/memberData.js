@@ -672,6 +672,13 @@ async function saveHomeLayout(migrationState, memberId, layout) {
   }, { merge: true });
 }
 
+// §সময়সূচি-কার্ড ক্রম(owner-approved): member-ডকের ঐচ্ছিক prayerLayout(id-তালিকা) ফিল্ড। শুধু explicit সেভ-এ লেখা হয়।
+async function savePrayerLayout(migrationState, memberId, order) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, { prayerLayout: order.map(String), updatedAt: Date.now() }, { merge: true });
+}
+
 // §কাস্টম টাস্ক(সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
 // saveHomeLayout()-এর মতোই explicit user-action, saveEntry() batch-এর অংশ না।
 async function saveCustomTasks(migrationState, memberId, tasks) {
@@ -757,5 +764,6 @@ export {
   updateBestScoreIfNeeded,
   saveTomorrowFocus,
   saveHomeLayout,
+  savePrayerLayout,
   saveCustomTasks
 };
