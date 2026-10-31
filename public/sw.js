@@ -1,6 +1,6 @@
 // v3: /assets/* (Vite hashed build files) এখন cache-first; activate-এ পুরনো
 // "daily-task-v2" cache স্বয়ংক্রিয়ভাবে মুছে যায় (নিচের activate handler)।
-const CACHE = "daily-task-v3";
+const CACHE = "daily-task-v4";
 // /assets/ entry-র সর্বোচ্চ সংখ্যা — প্রতি deploy-এ নতুন hash জমে cache
 // অনির্দিষ্টকাল বাড়া ঠেকাতে; সীমা ছাড়ালে সবচেয়ে পুরনো entry আগে বাদ যায়।
 const MAX_ASSET_ENTRIES = 100;
