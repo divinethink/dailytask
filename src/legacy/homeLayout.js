@@ -19,6 +19,7 @@ const d = (id, title, defaultFold) => ({ id, title, defaultFold });
 export const CARD_DEFS = {
   entry: [
     d("tazkirah", "আজকের বাণী", "fixed"),
+    d("muhasaba", "আজকের মুহাসাবা", "fixed"),
     d("salah", "সালাত ও সিয়াম", "open"),
     d("quranIlm", "কুরআন ও ইলম", "closed"),
     d("dhikrDawah", "যিকির ও দাওয়াহ", "closed"),
@@ -29,6 +30,7 @@ export const CARD_DEFS = {
   below: [
     d("streak", "স্ট্রিক ও আজকের অগ্রগতি", "fixed"),
     d("insight", "দৈনিক অন্তর্দৃষ্টি", "fixed"),
+    d("tomorrow", "আগামীকাল", "fixed"),
     d("focus", "আগামীকালের ফোকাস", "fixed"),
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
     d("weekly", "সাপ্তাহিক রিফ্লেকশন", "closed"),
@@ -66,9 +68,22 @@ export function sanitizeCards(zone, raw) {
       out.push({ id, visible, fold });
     }
   }
-  for (const x of CARD_DEFS[zone]) {
-    if (!seen.has(x.id)) out.push({ id: x.id, visible: true, fold: x.defaultFold });
-  }
+  // নতুন কার্ড(সেভ-করা তালিকায় নেই): ডিফল্ট ক্রমে ঠিক আগের পরিচিত কার্ডের পরে বসে(না পেলে শেষে)।
+  // এতে পুরনো সেভ-করা লেআউটেও নতুন কার্ড যথাস্থানে আসে; সদস্য চাইলে সরাতে/লুকাতে পারবেন।
+  const defs = CARD_DEFS[zone];
+  defs.forEach((x, i) => {
+    if (seen.has(x.id)) return;
+    const card = { id: x.id, visible: true, fold: x.defaultFold };
+    let at = -1;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = out.findIndex(c => c.id === defs[j].id);
+      if (k >= 0) { at = k; break; }
+    }
+    if (at >= 0) out.splice(at + 1, 0, card);
+    else if (Array.isArray(raw) && raw.length) out.push(card);
+    else out.splice(0, 0, card);
+    seen.add(x.id);
+  });
   return out;
 }
 

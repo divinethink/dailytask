@@ -587,6 +587,7 @@ import { DailyInsightCard } from "../components/DailyInsightCard.jsx";
 // §Motivational Layer — Phase 2(নতুন, owner-approved): "আগামীকালের Focus"
 // — DailyInsightCard থেকে ইচ্ছাকৃতভাবে আলাদা component(isolated rollback)।
 import { TomorrowFocusPicker } from "../components/TomorrowFocusPicker.jsx";
+import { TomorrowPreviewCard } from "../components/TomorrowPreviewCard.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
 import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
@@ -938,6 +939,26 @@ function App() {
     };
     window.addEventListener("dt-sw-updated", handler);
     return () => window.removeEventListener("dt-sw-updated", handler);
+  }, []);
+  // §খসড়া ও ভুলে-বেরিয়ে-যাওয়া সতর্কতা(owner-approved): সেভ-না-করা এন্ট্রি ফোনে(localStorage) খসড়া হিসেবে রাখা হয়;
+  // সেভ হলে মুছে যায়। অ্যাপ বন্ধ করতে গেলে(ব্রাউজার সমর্থন করলে) সতর্ক করে। শুধু স্থানীয়, Firestore-এ কিছু লেখে না।
+  function draftStorageKey(memberId, dk) {
+    return "dt_draft_" + getFamilyCode() + "_" + memberId + "_" + dk;
+  }
+  useEffect(() => {
+    if (!entryDirtyRef.current || !selectedId) return;
+    try {
+      localStorage.setItem(draftStorageKey(selectedId, dateKey(viewDate)), JSON.stringify({ ts: Date.now(), entry }));
+    } catch (e) {}
+  }, [entry]);
+  useEffect(() => {
+    const onBeforeUnload = e => {
+      if (!entryDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -1401,6 +1422,21 @@ function App() {
       setEntry(data || {});
       originalEntryRef.current = data || null;
       entryDirtyRef.current = false;
+      // §খসড়া(owner-approved): আগের সেশনে সেভ-না-করা পরিবর্তন থাকলে ফিরিয়ে আনার প্রস্তাব। সেভড ডেটা কখনো নিজে থেকে বদলায় না।
+      try {
+        const dk = draftStorageKey(selectedId, dateKey(viewDate));
+        const raw = localStorage.getItem(dk);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        const fresh = d && d.entry && typeof d.ts === "number" && Date.now() - d.ts < 3 * 86400000;
+        const differs = fresh && JSON.stringify(d.entry) !== JSON.stringify(data || {});
+        if (differs && window.confirm("এই দিনের সেভ-না-করা খসড়া পাওয়া গেছে। ফিরিয়ে আনবেন?")) {
+          setEntry(d.entry);
+          entryDirtyRef.current = true;
+        } else {
+          localStorage.removeItem(dk);
+        }
+      } catch (e) {}
     });
   }, [selectedId, viewDate, migrationState]);
 
@@ -2512,6 +2548,7 @@ function App() {
       originalEntryRef.current = toSave;
       setEntry(toSave);
       entryDirtyRef.current = false;
+      try { localStorage.removeItem(draftStorageKey(selectedId, key)); } catch (e) {}
       localStorage.setItem("last_active_date", dateKey(new Date()));
       // §Motivational Layer — Phase 1.5: শুধু "আজ"-এর save-এই ট্রিগার হয়(পুরনো
       // দিনের backfill-edit বাদ, dailyInsight.js-এর মতোই "আজ"-কেন্দ্রিক scope)।
@@ -2565,6 +2602,16 @@ function App() {
   // §Motivational Layer — Phase 2: আগামীকালের auto-suggested Focus(শুধু আজ
   // real-month-এ browse করলে অর্থবহ — dailyInsight-এর একই month-scope guard)।
   const tomorrowKey = useMemo(() => dateKey(new Date(Date.now() + 86400000)), []);
+  // "আজকের মুহাসাবা" কার্ডের "গতকাল ভরা হয়নি" ব্যানার: শুধু আজকের দিন দেখার সময়, চলতি মাসে, মাসের ২ তারিখ থেকে,
+  // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে(নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
+  const yesterdayMissing = useMemo(() => {
+    const now = new Date();
+    if (dateKey(viewDate) !== dateKey(now)) return false;
+    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return false;
+    if (now.getDate() < 2) return false;
+    if (!monthEntries || Object.keys(monthEntries).length === 0) return false;
+    return !monthEntries[pad2(now.getDate() - 1)];
+  }, [viewDate, monthCursor, monthEntries]);
   const suggestedFocusKey = useMemo(() => {
     const now = new Date();
     if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
@@ -3121,7 +3168,9 @@ function App() {
     toBn: toBn,
     fieldApplies: fieldApplies,
     isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable
+    isFieldExcusable: isFieldExcusable,
+    streak: streak,
+    yesterdayMissing: yesterdayMissing
   }), ...renderHomeBelow(selectedMember, {
     streak: () => /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
@@ -3158,6 +3207,9 @@ function App() {
   }),
     insight: () => /*#__PURE__*/React.createElement(DailyInsightCard, {
     insight: dailyInsight,
+    toBn: toBn
+  }),
+    tomorrow: () => /*#__PURE__*/React.createElement(TomorrowPreviewCard, {
     toBn: toBn
   }),
     focus: () => /*#__PURE__*/React.createElement(TomorrowFocusPicker, {

@@ -39,7 +39,7 @@ export function homeEntryCards(member, nodes) {
       React.createElement(
         React.Fragment,
         { key },
-        c.id === "tazkirah"
+        c.id === "tazkirah" || c.id === "muhasaba"
           ? React.createElement(FoldWrap, { fold: c.fold, title: cardTitle("entry", c.id) }, nodes[c.id]())
           : nodes[c.id](c.fold)
       )
@@ -49,7 +49,7 @@ export function homeEntryCards(member, nodes) {
 }
 
 // সেভ-বাটনের নিচের সেকশন। weekly/meeting-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
-const PX_WRAPPED = { streak: true, insight: true, focus: true };
+const PX_WRAPPED = { streak: true, insight: true, focus: true, tomorrow: true };
 export function renderHomeBelow(member, nodes) {
   const out = [];
   sanitizeLayout(member && member.homeLayout).below.forEach(c => {

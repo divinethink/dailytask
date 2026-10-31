@@ -9,6 +9,7 @@
 // applied proactively per the G1 toBn prop-miss lesson (nothing assumed global
 // except React and icons.jsx imports).
 import { homeEntryCards } from "./HomeFold.jsx";
+import { MuhasabaStrip } from "./MuhasabaStrip.jsx";
 import { sanitizeTasks, activeTasks, archivedTasks, addTask, renameTask, setArchived, taskFields, MAX_ACTIVE, MAX_LABEL, TASK_KEY_PREFIX } from "../legacy/customTasks.js";
 import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon, EditIcon, Trash } from "./icons.jsx";
 
@@ -549,8 +550,29 @@ export function DailyEntrySection({
   toBn,
   fieldApplies,
   isExcused,
-  isFieldExcusable
+  isFieldExcusable,
+  streak,
+  yesterdayMissing
 }) {
+  // "আজকের মুহাসাবা" কার্ডের জন্য ক্যাটাগরি-তালিকা(নিচের কার্ড-তালিকার হুবহু একই ফিল্ড-গ্রুপ; শুধু গণনার জন্য)।
+  const muhasabaCats = [...DEEN_CATEGORY_GROUPS.map(g => ({
+    id: g.id,
+    fields: [...DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)), ...customFields.filter(f => f.category === g.id)]
+  })), {
+    id: "duniya",
+    fields: [...DEFAULT_DUNIYA_FIELDS, ...customFields.filter(f => f.category === "duniya")]
+  }, {
+    id: "other",
+    fields: taskFields(selectedMember && selectedMember.customTasks)
+  }];
+  const goYesterday = () => {
+    if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+    setViewDate(d => {
+      const n = new Date(d);
+      n.setDate(n.getDate() - 1);
+      return n;
+    });
+  };
   return /*#__PURE__*/React.createElement(React.Fragment, null, recoveryMessage && /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-3"
   }, /*#__PURE__*/React.createElement("div", {
@@ -695,6 +717,18 @@ export function DailyEntrySection({
       className: "text-[10px] text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
   })(),
+    muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(MuhasabaStrip, {
+      cats: muhasabaCats,
+      entry: entry,
+      member: selectedMember,
+      fieldApplies: fieldApplies,
+      streak: streak || 0,
+      dirty: !!entryDirtyRef.current,
+      yesterdayMissing: !!yesterdayMissing && !recoveryMessage,
+      todayKey: dateKey(new Date()),
+      onGoYesterday: goYesterday,
+      toBn: toBn
+    }),
     ...(() => { const m = {};
     /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
        আগে এখানে ২টা flat FieldGroup(দৈনন্দিন আমল = পুরো DEFAULT_DEEN_FIELDS একসাথে,
