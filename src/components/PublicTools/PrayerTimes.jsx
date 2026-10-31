@@ -1066,11 +1066,21 @@ export function PrayerTimes() {
             {
               key: r.key,
               className:
-                "flex items-center gap-3 text-sm py-3 px-2 rounded-xl " +
-                (waqtInfo && waqtInfo.currentKey === r.key ? "bg-[#E8F0EE] font-bold" : ""),
+                "relative flex items-center gap-3 text-sm py-1.5 px-2 rounded-xl " +
+                (waqtInfo && waqtInfo.currentKey === r.key
+                  ? "bg-[#F3EEDD] font-bold"
+                  : r.end && now >= r.end ? "opacity-60" : ""),
             },
+            waqtInfo && waqtInfo.currentKey === r.key &&
+              /*#__PURE__*/React.createElement("span", { className: "absolute left-0 top-2 bottom-2 w-1 rounded-full", style: { background: "#C89B3C" }, "aria-hidden": true }),
             /*#__PURE__*/React.createElement(WaqtIconChip, WAQT_CHIP[r.key]),
-            /*#__PURE__*/React.createElement("span", { className: "flex-1 text-slate-800" }, r.label),
+            /*#__PURE__*/React.createElement(
+              "span",
+              { className: "flex-1 text-slate-800 flex items-center gap-1.5" },
+              r.label,
+              waqtInfo && waqtInfo.currentKey === r.key &&
+                /*#__PURE__*/React.createElement("span", { className: "text-[9px] font-bold text-white rounded-full px-1.5 py-[1px]", style: { background: "#C89B3C" } }, "এখন")
+            ),
             /*#__PURE__*/React.createElement(
               "span",
               { className: "text-[13px] font-semibold whitespace-nowrap text-slate-600", style: { fontFamily: "'Hind Siliguri', sans-serif" } },
@@ -1102,7 +1112,7 @@ export function PrayerTimes() {
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "mx-4 mb-3 rounded-2xl px-3 py-3 border border-[#F2C6C0] flex items-center gap-3 overflow-x-auto", style: { background: "#FCEEEC", scrollbarWidth: "none" } },
+        { className: "mx-4 mb-3 rounded-2xl px-3 py-2 border border-[#F2C6C0] flex items-center gap-3 overflow-x-auto", style: { background: "#FCEEEC", scrollbarWidth: "none" } },
         /*#__PURE__*/React.createElement("span", { className: "text-xs shrink-0", "aria-label": "নিষিদ্ধ সময়" }, "⛔"),
         forbiddenWindows.map((w) =>
           /*#__PURE__*/React.createElement(

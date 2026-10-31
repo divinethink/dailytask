@@ -2817,7 +2817,7 @@ function App() {
           setArchiveMonth0: setArchiveMonth0,
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
-          onOpenHomeLayout: () => setShowHomeLayout(true),
+          onOpenHomeLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowHomeLayout(true) : undefined,
           onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
           onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
