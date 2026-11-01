@@ -1275,6 +1275,69 @@ service cloud.firestore {
           && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, weeklyId)) || isAdminOfFamily(familyId));
       }
 
+      // --- reviews: ব্যক্তিগত সাপ্তাহিক মুহাসাবা (শুধু মালিক দেখবে) ---
+      // doc id: "<memberId>_<weekKey>", weekKey = সপ্তাহ-শুরুর তারিখ YYYY-MM-DD।
+      // read/write/delete: শুধু ওই member-এর আসল owner uid (ownerUids বা googleUid)।
+      // কোনো admin বা অন্য সদস্য পড়তে পারে না। একমাত্র ব্যতিক্রম: কেউ এখনো
+      // claim করেনি এমন proxy member (googleUid == null)-এর জন্য পরিবারের admin।
+      // weekly-র মতো "unowned ⇒ সবার জন্য খোলা" নীতি এখানে নেই — ফাঁকা owner = কেউ না।
+      // list বন্ধ: ক্লায়েন্ট id ধরে get করে।
+      function isReviewOwner(fid, reviewId) {
+        let owners = currentMemberOwnerV2(fid, reviewId);
+        return owners != null && owners.hasAny([request.auth.uid]);
+      }
+      function isUnclaimedProxyAdmin(fid, reviewId) {
+        let mp = /databases/$(database)/documents/families/$(fid)/members/$(reviewId.split('_')[0]);
+        return exists(mp)
+          && ('googleUid' in get(mp).data)
+          && get(mp).data.googleUid == null
+          && isAdminOfFamily(fid);
+      }
+      function canAccessReview(fid, reviewId) {
+        return request.auth != null
+          && (isReviewOwner(fid, reviewId) || isUnclaimedProxyAdmin(fid, reviewId));
+      }
+      function reviewStr(d, k, max) {
+        return !(k in d) || (d[k] is string && d[k].size() <= max);
+      }
+      function reviewList(d, k) {
+        return !(k in d) || (d[k] is list && d[k].size() <= 8);
+      }
+      // সীমা src/legacy/reviewSchema.js-এর LIMITS-এর সাথে মেলে। "বদ্ধ ঘর" ফিল্ড whitelist-এ নেই।
+      function validReview(reviewId) {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['v', 'memberId', 'weekKey', 'updatedAt', 'step', 'done', 'goalResult',
+                                 'goalText', 'hardMoment', 'nextGoal', 'ifText', 'thenText', 'gratitude', 'gapKey',
+                                 'blockers', 'gapReasons', 'haqq'])
+          && d.keys().hasAll(['v', 'memberId', 'weekKey', 'updatedAt'])
+          && d.v == 1
+          && d.memberId is string
+          && d.weekKey is string
+          && d.weekKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && reviewId == d.memberId + '_' + d.weekKey
+          && d.updatedAt is number
+          && (!('step' in d) || (d.step is int && d.step >= 1 && d.step <= 5))
+          && (!('done' in d) || d.done is bool)
+          && (!('goalResult' in d) || d.goalResult in ['done', 'partial', 'none'])
+          && reviewStr(d, 'goalText', 200)
+          && reviewStr(d, 'hardMoment', 300)
+          && reviewStr(d, 'nextGoal', 200)
+          && reviewStr(d, 'ifText', 200)
+          && reviewStr(d, 'thenText', 200)
+          && reviewStr(d, 'gratitude', 300)
+          && reviewStr(d, 'gapKey', 40)
+          && reviewList(d, 'blockers')
+          && reviewList(d, 'gapReasons')
+          && reviewList(d, 'haqq');
+      }
+
+      match /reviews/{reviewId} {
+        allow get: if canAccessReview(familyId, reviewId);
+        allow list: if false;
+        allow create, update: if canAccessReview(familyId, reviewId) && validReview(reviewId);
+        allow delete: if canAccessReview(familyId, reviewId);
+      }
+
       // --- §keyIndex(Direct-identify, pre-approval routing-only) ---
       // Content শুধু {memberId: string} — কোনো authorization field নেই।
       // Get শুধু "কোন memberId" বলে, actual claim/authorization member
