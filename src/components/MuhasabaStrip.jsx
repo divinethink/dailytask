@@ -62,7 +62,7 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
       "div",
       { className: "mb-3 flex items-start gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2" },
       React.createElement("span", { className: "text-base", "aria-hidden": true }, "🌙"),
-      React.createElement("p", { className: "flex-1 text-[11px] font-semibold text-emerald-900 leading-snug" }, "নতুন হিজরি মাস " + hj.month + " শুরু (সম্ভাব্য)। এ মাসের জন্য একটা ছোট নিয়ত ঠিক করুন — যেমন বাড়তি এক ওয়াক্ত জামায়াত বা রোজ এক পৃষ্ঠা কুরআন।"),
+      React.createElement("p", { className: "flex-1 text-xs font-semibold text-emerald-900 leading-snug" }, "নতুন হিজরি মাস " + hj.month + " শুরু (সম্ভাব্য)। এ মাসের জন্য একটা ছোট নিয়ত ঠিক করুন — যেমন বাড়তি এক ওয়াক্ত জামায়াত বা রোজ এক পৃষ্ঠা কুরআন।"),
       React.createElement("button", {
         type: "button",
         "aria-label": "বন্ধ করুন",
@@ -77,11 +77,11 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
       "div",
       { className: "mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2" },
       React.createElement("span", { className: "text-base", "aria-hidden": true }, "🕰️"),
-      React.createElement("p", { className: "flex-1 text-[11px] font-semibold text-amber-900 leading-snug" }, "গতকালের হিসাব পূরণ করা হয়নি।"),
+      React.createElement("p", { className: "flex-1 text-xs font-semibold text-amber-900 leading-snug" }, "গতকালের হিসাব পূরণ করা হয়নি।"),
       React.createElement("button", {
         type: "button",
         onClick: onGoYesterday,
-        className: "shrink-0 rounded-lg bg-amber-600 px-2.5 py-1.5 text-[11px] font-bold text-white active:scale-95"
+        className: "shrink-0 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-bold text-white active:scale-95"
       }, "এখনই পূরণ করুন"),
       React.createElement("button", {
         type: "button",
@@ -100,18 +100,18 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
       React.createElement(
         "div",
         { className: "flex items-center gap-1.5" },
-        streak > 0 && React.createElement("span", { className: "rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-[10px] font-bold text-orange-700" }, "🔥 " + toBn(streak) + " দিন"),
+        streak > 0 && React.createElement("span", { className: "rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-xs font-bold text-orange-700" }, "🔥 " + toBn(streak) + " দিন"),
         React.createElement("span", {
-          className: "rounded-full px-2 py-0.5 text-[10px] font-bold " + (saved ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200")
+          className: "rounded-full px-2 py-0.5 text-xs font-bold " + (saved ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200")
         }, saved ? "সেভ ✓" : "সেভ বাকি")
       )
     ),
     total > 0 && React.createElement("div", { className: "flex gap-1 mb-2", "aria-hidden": true }, segs),
-    React.createElement("p", { className: "text-[11px] text-slate-600" }, msg),
+    React.createElement("p", { className: "text-xs text-slate-600" }, msg),
     canCopy && filled === 0 && !dirty && React.createElement("button", {
       type: "button",
       onClick: onCopyYesterday,
-      className: "mt-2.5 w-full rounded-xl border border-emerald-200 bg-emerald-50/60 py-2 text-[11px] font-bold text-emerald-900 active:scale-[0.98]"
+      className: "mt-2.5 w-full rounded-xl border border-emerald-200 bg-emerald-50/60 py-2 text-xs font-bold text-emerald-900 active:scale-[0.98]"
     }, "↩︎ গতকালের মতো বসান")
   );
 }

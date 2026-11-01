@@ -44,12 +44,12 @@ export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPerce
   return /*#__PURE__*/React.createElement("div", {
     className: "w-full mt-2 rounded-xl bg-[#f0ede4] px-4 py-3 flex items-center justify-center flex-nowrap overflow-x-auto gap-x-1.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-emerald-900 flex-shrink-0"
+    className: "text-sm font-bold text-emerald-900 flex-shrink-0"
   }, label), /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-bold text-emerald-900 flex-shrink-0",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(primaryPercent), "%"), hasDelta && /*#__PURE__*/React.createElement("span", {
-    className: (delta >= 0 ? "text-emerald-700" : "text-red-700") + " text-[10px] font-medium whitespace-nowrap flex-shrink-0"
+    className: (delta >= 0 ? "text-emerald-700" : "text-red-700") + " text-xs font-medium whitespace-nowrap flex-shrink-0"
   }, deltaPrefix, toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
 }
 
@@ -90,9 +90,9 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
     className: "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 shadow-sm",
     style: { background: color }
   }, toBn(rank)), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-500 flex-1"
+    className: "text-xs text-slate-500 flex-1"
   }, rankPrefix), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold text-[11px]",
+    className: "font-bold text-xs",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
   }, toBn(pct), "%")), /*#__PURE__*/React.createElement("div", {
     className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1 shadow-inner"
@@ -100,7 +100,7 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
     className: "h-full rounded-full transition-all duration-500",
     style: { width: `${pct}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
   })), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-700 leading-snug pl-6"
+    className: "text-sm text-slate-700 leading-snug pl-6"
   }, labels.join(", ")));
 }
 
@@ -110,7 +110,7 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
 function TierColumn({ heading, headingColor, tiers, rankPrefix, toBn }) {
   if (tiers.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-bold mb-2.5 text-center",
+    className: "text-sm font-bold mb-2.5 text-center",
     style: { color: headingColor }
   }, heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
     key: t.pct,
@@ -253,9 +253,9 @@ export function TopBottomActivityRanking({
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm leading-none"
   }, qazaJamaatBlock.goalMet ? "✅" : "⚠️"), /*#__PURE__*/React.createElement("div", {
-    className: qazaJamaatBlock.goalMet ? "text-xs font-bold text-[#215339] leading-relaxed" : "text-xs font-bold text-[#712b13] leading-relaxed"
+    className: qazaJamaatBlock.goalMet ? "text-sm font-bold text-[#215339] leading-relaxed" : "text-sm font-bold text-[#712b13] leading-relaxed"
   }, qazaJamaatBlock.infoText))), qazaJamaatBlock && /*#__PURE__*/React.createElement("div", {
-    className: qazaJamaatBlock.goalMet ? "text-xs text-[#215339] leading-relaxed mt-1.5 pl-6" : "text-xs text-[#712b13] leading-relaxed mt-1.5 pl-6"
+    className: qazaJamaatBlock.goalMet ? "text-sm text-[#215339] leading-relaxed mt-1.5 pl-6" : "text-sm text-[#712b13] leading-relaxed mt-1.5 pl-6"
   }, qazaJamaatBlock.goalText));
 }
 
@@ -298,7 +298,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(ChevronLeft, {
     size: 14
   })), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold px-1"
+    className: "text-sm font-bold px-1"
   }, BN_MONTHS[monthCursor.month0], " ", /*#__PURE__*/React.createElement("span", {
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
@@ -372,7 +372,7 @@ export function WeeklyReflectionSection({
     className: "flex items-center justify-between mb-3"
   }, weeklyRowCount < getWeekRanges(monthStats.total).length ? /*#__PURE__*/React.createElement("button", {
     onClick: addWeeklyRow,
-    className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
+    className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
   }), " সারি যোগ করুন") : /*#__PURE__*/React.createElement("div", null), /*#__PURE__*/React.createElement(MonthNavControl, {
@@ -397,45 +397,45 @@ export function WeeklyReflectionSection({
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-2 px-3.5 py-2.5"
     }, /*#__PURE__*/React.createElement("span", {
-      className: "bg-emerald-900 text-white text-xs font-bold px-2.5 py-1 rounded-full",
+      className: "bg-emerald-900 text-white text-sm font-bold px-2.5 py-1 rounded-full",
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "সপ্তাহ ", toBn(w)), /*#__PURE__*/React.createElement("span", {
-      className: "text-[11px] text-slate-400 font-semibold",
+      className: "text-xs text-slate-400 font-semibold",
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement("div", {
       className: "px-3.5 pb-3.5 space-y-2.5"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "যা ভালো হয়েছে"), /*#__PURE__*/React.createElement("textarea", {
       value: weekly[w]?.good || "",
       onChange: e => updateWeekly(w, "good", e.target.value),
       placeholder: "এই সপ্তাহে যা ভালো হয়েছে...",
       rows: 2,
       disabled: isLockedForThisDevice,
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "কোথায় ঘাটতি ছিল"), /*#__PURE__*/React.createElement("textarea", {
       value: weekly[w]?.gap || "",
       onChange: e => updateWeekly(w, "gap", e.target.value),
       placeholder: "কোথায় ঘাটতি ছিল...",
       rows: 2,
       disabled: isLockedForThisDevice,
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "আগামী সপ্তাহের পরিকল্পনা"), /*#__PURE__*/React.createElement("textarea", {
       value: weekly[w]?.plan || "",
       onChange: e => updateWeekly(w, "plan", e.target.value),
       placeholder: "আগামী সপ্তাহের পরিকল্পনা...",
       rows: 2,
       disabled: isLockedForThisDevice,
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none disabled:opacity-50 disabled:bg-slate-50"
     }))));
   }), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveWeekly,
     disabled: isLockedForThisDevice || isLockedForSwitch,
-    className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
+    className: "w-full h-11 rounded-2xl font-bold text-white text-sm bg-emerald-900 flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
   }, savingWeekly ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
@@ -514,22 +514,22 @@ export function MonthlyOverviewSection({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3 pb-3 border-b border-slate-100"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-[10px] text-slate-400 font-bold"
+    className: "text-xs text-slate-400 font-bold"
   }, "গড় স্কোর"), /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.avgPct), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-[10px] text-slate-400 font-bold"
+    className: "text-xs text-slate-400 font-bold"
   }, "পূরণ করা দিন"), /*#__PURE__*/React.createElement("div", {
     className: "text-xl font-bold text-emerald-950",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.filled), "/", toBn(total))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPrintMode(true),
-    className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
+    className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
   }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-4 mb-2"
+    className: "flex items-center gap-1.5 text-sm font-bold text-slate-600 mt-4 mb-2"
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 13,
     color: "var(--theme-primary)"
@@ -539,7 +539,7 @@ export function MonthlyOverviewSection({
     className: "grid grid-cols-7 gap-1.5"
   }, BN_WEEKDAYS.map(w => /*#__PURE__*/React.createElement("div", {
     key: w,
-    className: "text-center text-[9px] font-bold text-slate-400"
+    className: "text-center text-[11px] font-bold text-slate-400"
   }, w)), Array.from({
     length: leadBlanks
   }).map((_, i) => /*#__PURE__*/React.createElement("div", {
@@ -557,7 +557,7 @@ export function MonthlyOverviewSection({
         if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
         setViewDate(cellDate);
       },
-      className: "h-7 w-full rounded-xl flex items-center justify-center text-[10px] font-bold transition-transform active:scale-90",
+      className: "h-7 w-full rounded-xl flex items-center justify-center text-xs font-bold transition-transform active:scale-90",
       style: {
         background: scoreColor(s),
         color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
@@ -586,7 +586,7 @@ export function MonthlyOverviewSection({
     className: "w-2.5 h-2.5 rounded-full" + (item.border ? " border border-slate-300" : ""),
     style: { background: item.c }
   }), /*#__PURE__*/React.createElement("span", {
-    className: "text-[9px] font-medium text-slate-500"
+    className: "text-[11px] font-medium text-slate-500"
   }, item.l, /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-slate-700",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
@@ -639,7 +639,7 @@ export function MeetingMinutesSection({
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+    className: "text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 10
   }), "লাইভ সিংক")), fold === "fixed" ? null : /*#__PURE__*/React.createElement(ChevronDown, {
@@ -649,7 +649,7 @@ export function MeetingMinutesSection({
     className: "flex items-center justify-between mb-3 flex-wrap gap-y-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: addMeetingRow,
-    className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
+    className: "px-2.5 py-1 bg-emerald-800 text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-emerald-900 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 12
   }), " সারি যোগ করুন"), /*#__PURE__*/React.createElement(MonthNavControl, {
@@ -672,10 +672,10 @@ export function MeetingMinutesSection({
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-2 min-w-0"
     }, /*#__PURE__*/React.createElement("span", {
-      className: "bg-[#C89B3C] text-emerald-950 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0",
+      className: "bg-[#C89B3C] text-emerald-950 text-sm font-bold px-2.5 py-1 rounded-full flex-shrink-0",
       style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
     }, "ক্র. ", toBn(idx + 1)), row.topic && /*#__PURE__*/React.createElement("span", {
-      className: "text-xs text-slate-500 truncate"
+      className: "text-sm text-slate-500 truncate"
     }, row.topic)), rows.length > 1 && /*#__PURE__*/React.createElement("button", {
       onClick: () => removeMeetingRow(idx),
       className: "text-red-400 hover:text-red-600 p-1 flex-shrink-0"
@@ -684,34 +684,34 @@ export function MeetingMinutesSection({
     }))), /*#__PURE__*/React.createElement("div", {
       className: "px-3.5 pb-3.5 space-y-2.5"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "বিষয়"), /*#__PURE__*/React.createElement("textarea", {
       value: row.topic || "",
       onChange: e => updateMeetingRow(idx, "topic", e.target.value),
       placeholder: "বিষয়...",
       rows: 2,
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-semibold bg-white resize-none"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-semibold bg-white resize-none"
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "কার্যপরিধি/সিদ্ধান্ত"), /*#__PURE__*/React.createElement("textarea", {
       value: row.decision || "",
       onChange: e => updateMeetingRow(idx, "decision", e.target.value),
       placeholder: "কার্যপরিধি/সিদ্ধান্ত...",
       rows: 2,
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none"
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "text-[11px] font-bold text-slate-500 mb-1"
+      className: "text-xs font-bold text-slate-500 mb-1"
     }, "বাস্তবায়নকারী"), /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: row.person || "",
       onChange: e => updateMeetingRow(idx, "person", e.target.value),
       placeholder: "বাস্তবায়নকারী",
-      className: "w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-medium bg-white"
+      className: "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 font-medium bg-white"
     }))));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveMeeting,
     disabled: isLockedForSwitch,
-    className: "w-full h-11 rounded-2xl font-bold text-white text-xs bg-emerald-900 flex items-center justify-center gap-2 shadow-sm"
+    className: "w-full h-11 rounded-2xl font-bold text-white text-sm bg-emerald-900 flex items-center justify-center gap-2 shadow-sm"
   }, savingMeeting ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 16
@@ -734,15 +734,15 @@ export function DeleteAccountWarningModal({
   }, "⚠️"), /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800"
   }, "গুগল একাউন্ট ডিলিট নিশ্চিত করুন")), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 leading-relaxed mb-4"
+    className: "text-sm text-slate-600 leading-relaxed mb-4"
   }, "এটি আপনার ডিভাইস থেকে গুগল অ্যাকাউন্ট সরিয়ে ফেলবে এবং সাইন আউট করে দেবে। তবে এতে আপনার অ্যাপের মূল ডেটার কোনো ক্ষতি হবে না — আপনার সম্পূর্ণ ডেটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত থাকবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDeleteAccountWarning(false),
-    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+    className: "flex-1 h-9 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold"
   }, "বাতিল"), /*#__PURE__*/React.createElement("button", {
     onClick: handleDeleteGoogleAccount,
-    className: "flex-1 h-9 bg-red-600 text-white rounded-xl text-xs font-bold"
+    className: "flex-1 h-9 bg-red-600 text-white rounded-xl text-sm font-bold"
   }, "হ্যাঁ, ডিলিট করুন"))));
 }
 
@@ -776,24 +776,24 @@ export function FeedbackModal({
     size: 18,
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 mb-3"
+    className: "text-xs text-slate-500 mb-3"
   }, "কোনো সমস্যা বা পরামর্শ আমাদের জানান।"), /*#__PURE__*/React.createElement("textarea", {
     value: feedbackMsg,
     onChange: e => setFeedbackMsg(e.target.value),
     rows: 4,
     placeholder: "আপনার অমূল্য পরামর্শ লিখুন...",
     disabled: feedbackSending,
-    className: "w-full rounded-2xl border border-slate-200 p-3 text-xs outline-none focus:border-emerald-800 resize-none mb-2 bg-slate-50/50 disabled:opacity-60"
+    className: "w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-emerald-800 resize-none mb-2 bg-slate-50/50 disabled:opacity-60"
   }), feedbackStatus === "error" && /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-red-600 mb-2"
+    className: "text-xs text-red-600 mb-2"
   }, "পাঠাতে সমস্যা হয়েছে, আবার চেষ্টা করুন।"), feedbackStatus === "sent" && /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-emerald-700 mb-2"
+    className: "text-xs text-emerald-700 mb-2"
   }, "ধন্যবাদ! আপনার পরামর্শ পাঠানো হয়েছে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2 mt-1"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: handleSendFeedback,
     disabled: feedbackSending || !feedbackMsg.trim(),
-    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-60"
+    className: "flex-1 h-9 bg-emerald-800 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-60"
   }, feedbackSending ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
@@ -804,7 +804,7 @@ export function FeedbackModal({
       setShowFeedbackModal(false);
       setFeedbackStatus(null);
     },
-    className: "h-9 px-4 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+    className: "h-9 px-4 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold"
   }, "বাতিল"))));
 }
 
@@ -837,10 +837,10 @@ export function WeeklySummaryToast({
   }, "\ud83d\udcca"), /*#__PURE__*/React.createElement("div", {
     className: "flex-1"
   }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold",
+    className: "text-sm font-bold",
     style: { color: "#0E4B43" }
   }, "\u0997\u09a4 \u09b8\u09aa\u09cd\u09a4\u09be\u09b9\u09c7\u09b0 \u09b8\u09be\u09b0\u09be\u0982\u09b6"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 mt-0.5"
+    className: "text-sm text-slate-600 mt-0.5"
   }, "\u0997\u09a1\u09bc \u09b8\u09cd\u0995\u09cb\u09b0 ", /*#__PURE__*/React.createElement("span", {
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
   }, toBn(avgPct) + "%"), " \u00b7 ", toBn(filled), "/", toBn(totalDays), " \u09a6\u09bf\u09a8 \u09b8\u09ae\u09cd\u09aa\u09c2\u09b0\u09cd\u09a3")), /*#__PURE__*/React.createElement("button", {
@@ -881,7 +881,7 @@ export function MilestoneToast({
       color: "#C89B3C"
     }
   }, "অভিনন্দন!"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-200 mt-0.5"
+    className: "text-sm text-slate-200 mt-0.5"
   }, /*#__PURE__*/React.createElement("span", {
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(milestoneToast)), " দিনের ধারাবাহিকতা পূর্ণ হয়েছে — মাশাআল্লাহ, চালিয়ে যান!")), /*#__PURE__*/React.createElement("button", {

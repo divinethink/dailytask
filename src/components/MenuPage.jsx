@@ -89,13 +89,13 @@ export function MenuPage({
         )
       : React.createElement(
           "div",
-          { className: "bg-white mx-3 mt-3 rounded-2xl shadow-sm border border-slate-100 py-2 text-slate-800 text-xs" },
+          { className: "bg-white mx-3 mt-3 rounded-2xl shadow-sm border border-slate-100 py-2 text-slate-800 text-sm" },
           React.createElement(
             "div",
             { className: "px-4 py-2 border-b border-slate-100 bg-slate-50/70" },
             React.createElement(
               "div",
-              { className: "flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider" },
+              { className: "flex items-center gap-1 text-xs font-bold text-slate-400 uppercase tracking-wider" },
               "ফ্যামিলি ইউজারনেম"
             ),
             React.createElement(
@@ -107,7 +107,7 @@ export function MenuPage({
                 { className: "flex items-center gap-2 shrink-0 ml-2" },
                 copiedCode && React.createElement(
                   "span",
-                  { className: "text-[9px] text-emerald-600 font-bold shrink-0" },
+                  { className: "text-[11px] text-emerald-600 font-bold shrink-0" },
                   "কপি হয়েছে!"
                 ),
                 React.createElement(
@@ -161,7 +161,7 @@ export function MenuPage({
               {
                 type: "button",
                 onClick: async () => { try { await handleShareInviteLink(); } catch {} },
-                className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-[11px] hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
+                className: "w-full text-left px-4 py-1.5 text-emerald-800 font-semibold text-xs hover:bg-slate-50 flex items-center gap-1.5 whitespace-nowrap"
               },
               React.createElement(ShareIcon, { size: 12 }),
               "আমন্ত্রণ লিংক শেয়ার করুন"
@@ -173,7 +173,7 @@ export function MenuPage({
             { className: "py-1" },
             React.createElement(
               "div",
-              { className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider" },
+              { className: "px-4 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider" },
               "ডেটা ম্যানেজমেন্ট"
             ),
             React.createElement(

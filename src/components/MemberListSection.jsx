@@ -36,7 +36,7 @@ export function MemberListSection({
   return /*#__PURE__*/React.createElement("div", {
     className: "py-1"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between gap-1"
+    className: "px-4 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between gap-1"
   }, /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1"
   }, /*#__PURE__*/React.createElement(UsersIcon, {
@@ -53,7 +53,7 @@ export function MemberListSection({
       setIsMenuOpen(false);
       setAddingMember(true);
     },
-    className: "flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case",
+    className: "flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case",
     title: "নতুন সদস্য যোগ করুন"
   }, /*#__PURE__*/React.createElement(Plus, { size: 11 }), " নতুন সদস্য")), /*#__PURE__*/React.createElement("div", {
     className: "max-h-36 overflow-y-auto custom-scrollbar px-2"
@@ -79,7 +79,7 @@ export function MemberListSection({
       handleReleaseMember(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
+    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
     title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
   }, "আপনি") : /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1"
@@ -87,7 +87,7 @@ export function MemberListSection({
     onClick: e => {
       e.stopPropagation();
     },
-    className: "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0 flex items-center gap-0.5 cursor-default",
+    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0 flex items-center gap-0.5 cursor-default",
     title: "অন্য ডিভাইসের দায়িত্বে আছে"
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 10
@@ -97,7 +97,7 @@ export function MemberListSection({
       handleMakeAdmin(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 whitespace-nowrap",
+    className: "text-[11px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 whitespace-nowrap",
     title: "এডমিন করুন"
   }, "Make Admin"), isAdmin && !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).some(u => adminUidsList.includes(u)) && !(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
@@ -105,7 +105,7 @@ export function MemberListSection({
       handleRemoveAdmin(m);
     },
     disabled: isLockedForSwitch,
-    className: "text-[8px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
+    className: "text-[11px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
     title: "এডমিন পদ থেকে বাদ দিন"
   }, "Remove Admin"), isAdmin && /*#__PURE__*/React.createElement("button", {
     onClick: e => {

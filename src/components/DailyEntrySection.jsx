@@ -244,7 +244,7 @@ function FieldGroup({
   }))), /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1.5 shrink-0"
   }, percentLabel && /*#__PURE__*/React.createElement("span", {
-    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
+    className: "text-xs font-bold px-1.5 py-0.5 rounded-md",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: percent === 0 ? "#7A8B84" : percentColor || "#5B6B64",
@@ -264,7 +264,7 @@ function FieldGroup({
       key: f.key,
       className: "flex items-center justify-between gap-3" + (disabled ? " opacity-40" : "")
     }, /*#__PURE__*/React.createElement("span", {
-      className: "text-xs font-medium text-slate-700"
+      className: "text-sm font-medium text-slate-700"
     }, /*#__PURE__*/React.createElement(LabelText, {
       text: f.label
     })), /*#__PURE__*/React.createElement("div", {
@@ -273,7 +273,7 @@ function FieldGroup({
       type: "button",
       disabled: disabled,
       onClick: () => onToggleExcuse(f.key, !excused),
-      className: "px-2 py-1 rounded-lg text-[10px] font-bold border shrink-0 transition-all",
+      className: "px-2 py-1 rounded-lg text-xs font-bold border shrink-0 transition-all",
       style: excused ? {
         background: "var(--theme-accent, #C89B3C)",
         borderColor: "var(--theme-accent, #C89B3C)",
@@ -356,7 +356,7 @@ function CollapsibleCard({
   }, title)), /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1.5 shrink-0"
   }, percent !== null && percent !== undefined && toBn && /*#__PURE__*/React.createElement("span", {
-    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
+    className: "text-xs font-bold px-1.5 py-0.5 rounded-md",
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
       color: percent === 0 ? "#7A8B84" : percentColor || "#5B6B64",
@@ -424,13 +424,13 @@ function CustomTasksBody({
     if (!window.confirm("টাস্কটি রিমুভ করবেন? এটি ফর্ম ও হিসাব থেকে সরবে, পুরনো রেকর্ড অক্ষত থাকবে। পরে ফিরিয়ে আনা যাবে।")) return;
     if (await commit(setArchived(list, id, true))) setEditId(null);
   }
-  const small = "shrink-0 h-9 px-3 rounded-xl text-xs font-bold border disabled:opacity-40";
+  const small = "shrink-0 h-9 px-3 rounded-xl text-sm font-bold border disabled:opacity-40";
   const canAdd = !manageDisabled && !busy && newLabel.trim() && active.length < MAX_ACTIVE;
   return h("div", null,
     active.length === 0 && h("div", {
       className: "flex flex-col items-center gap-2 text-center py-3"
     }, h(ClipboardListIcon, { size: 28, color: "#B9C2B2" }), h("p", {
-      className: "text-xs text-slate-400"
+      className: "text-sm text-slate-400"
     }, "কোনো কাস্টম টাস্ক নেই। নিচে নতুন টাস্ক চাপ দিয়ে যোগ করুন।")),
     active.map(t => editId === t.id ? h("div", {
       key: t.id,
@@ -442,7 +442,7 @@ function CustomTasksBody({
       autoFocus: true,
       onChange: e => setEditLabel(e.target.value),
       "aria-label": "টাস্কের নাম",
-      className: "w-full h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800"
+      className: "w-full h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-800"
     }), h("div", { className: "flex gap-2" },
       h("button", { type: "button", onClick: saveEdit, disabled: busy || !editLabel.trim(), className: small + " bg-emerald-800 text-white border-emerald-800" }, "সেভ"),
       h("button", { type: "button", onClick: () => archive(t.id), disabled: busy, "aria-label": "টাস্ক রিমুভ", className: small + " bg-slate-50 text-red-700 border-slate-200 flex items-center gap-1" }, h(Trash, { size: 13 }), "রিমুভ"),
@@ -468,12 +468,12 @@ function CustomTasksBody({
       !manageDisabled && !showAdd && active.length < MAX_ACTIVE && h("button", {
         type: "button",
         onClick: () => setShowAdd(true),
-        className: "flex items-center gap-1 text-xs font-bold text-emerald-800"
+        className: "flex items-center gap-1 text-sm font-bold text-emerald-800"
       }, h(Plus, { size: 13 }), "নতুন টাস্ক"),
       archived.length > 0 && h("button", {
         type: "button",
         onClick: () => setShowArchived(v => !v),
-        className: "text-xs font-bold text-slate-500"
+        className: "text-sm font-bold text-slate-500"
       }, (showArchived ? "▾ " : "▸ ") + "আর্কাইভ করা (" + archived.length + ")")),
     showAdd && !manageDisabled && h("div", { className: "mt-2 flex items-center gap-2" },
       h("input", {
@@ -486,18 +486,18 @@ function CustomTasksBody({
         onChange: e => setNewLabel(e.target.value),
         onKeyDown: e => { if (e.key === "Enter") add(); },
         "aria-label": "নতুন টাস্কের নাম",
-        className: "min-w-0 flex-1 h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-emerald-800 disabled:opacity-40"
+        className: "min-w-0 flex-1 h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-800 disabled:opacity-40"
       }),
       h("button", { type: "button", onClick: add, disabled: !canAdd, className: small + " h-10 bg-emerald-800 text-white border-emerald-800" }, busy ? "…" : "সেভ"),
       h("button", { type: "button", onClick: () => { setShowAdd(false); setNewLabel(""); }, "aria-label": "বাতিল", className: "shrink-0 w-8 h-10 flex items-center justify-center text-slate-400" }, h(X, { size: 16 }))
     ),
-    active.length >= MAX_ACTIVE && h("p", { className: "mt-2 text-[11px] text-amber-700" }, "সর্বোচ্চ " + MAX_ACTIVE + "টি সক্রিয় টাস্ক। নতুন যোগ করতে পুরনো কোনোটি আর্কাইভ করুন।"),
-    error && h("p", { role: "alert", className: "mt-2 text-xs text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।"),
+    active.length >= MAX_ACTIVE && h("p", { className: "mt-2 text-xs text-amber-700" }, "সর্বোচ্চ " + MAX_ACTIVE + "টি সক্রিয় টাস্ক। নতুন যোগ করতে পুরনো কোনোটি আর্কাইভ করুন।"),
+    error && h("p", { role: "alert", className: "mt-2 text-sm text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।"),
     archived.length > 0 && h("div", null,
       showArchived && h("ul", { className: "mt-2 space-y-2" }, archived.map(t => h("li", {
         key: t.id,
         className: "flex items-center justify-between gap-2 opacity-70"
-      }, h("span", { className: "text-xs text-slate-600 min-w-0 break-words" }, t.label),
+      }, h("span", { className: "text-sm text-slate-600 min-w-0 break-words" }, t.label),
         !manageDisabled && h("button", {
           type: "button",
           onClick: () => commit(setArchived(list, t.id, false)),
@@ -598,7 +598,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
   }, "আবার শুরু করুন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-emerald-100/90 leading-relaxed mt-0.5"
+    className: "text-xs text-emerald-100/90 leading-relaxed mt-0.5"
   }, "আগের দিনগুলো নিয়ে ভাববেন না — আজ থেকেই নতুনভাবে শুরু করুন।")), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       localStorage.setItem("recovery_dismissed_on", dateKey(new Date()));
@@ -618,7 +618,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
   }, "সাপ্তাহিক রিফ্লেকশন করতে ভুলবেন না যেন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
+    className: "text-xs text-white/80 leading-relaxed mt-0.5"
   }, "এই সপ্তাহের ভালো-মন্দ ও পরিকল্পনা লিখে রাখুন — নিচে স্ক্রল করে পূরণ করতে পারবেন।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissWeeklyReminder,
     className: "text-white/70 hover:text-white shrink-0"
@@ -635,7 +635,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
   }, "আজ মাসিক পারিবারিক পর্যালোচনার দিন"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
+    className: "text-xs text-white/80 leading-relaxed mt-0.5"
   }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডেটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissMonthlyReminder,
     className: "text-white/70 hover:text-white shrink-0"
@@ -652,7 +652,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
   }, "আপনাদের ফ্যামিলি ইউজারনেম এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-white/80 leading-relaxed mt-0.5"
+    className: "text-xs text-white/80 leading-relaxed mt-0.5"
   }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
     onClick: () => setCodeChangeNotice(null),
     className: "text-white/70 hover:text-white shrink-0"
@@ -688,7 +688,7 @@ export function DailyEntrySection({
   }, toBn(viewDate.getDate())), " ", BN_MONTHS[viewDate.getMonth()], " ", /*#__PURE__*/React.createElement("span", {
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", fontWeight: 700 }
   }, toBn(viewDate.getFullYear())))), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] font-semibold text-slate-400"
+    className: "text-xs font-semibold text-slate-400"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
@@ -721,14 +721,14 @@ export function DailyEntrySection({
         background: "linear-gradient(135deg, var(--theme-primary), var(--theme-deep, #153f39))"
       }
     }, /*#__PURE__*/React.createElement("p", {
-      className: "text-[10px] font-bold mb-1.5",
+      className: "text-xs font-bold mb-1.5",
       style: {
         color: "var(--theme-accent, #C89B3C)"
       }
     }, "✦ আজকের বাণী · ", tagLabel), /*#__PURE__*/React.createElement("p", {
-      className: "text-[12px] text-white leading-relaxed"
+      className: "text-sm text-white leading-relaxed"
     }, insp.text), /*#__PURE__*/React.createElement("p", {
-      className: "text-[10px] text-emerald-200/70 mt-1.5 text-right"
+      className: "text-xs text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
   })(),
     muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(MuhasabaStrip, {
@@ -831,22 +831,22 @@ export function DailyEntrySection({
       rows: 2,
       placeholder: "আজকের অনুভূতি, অর্জন বা শেখা বিষয় লিখুন...",
       disabled: isFutureDate(viewDate) || isLockedForThisDevice,
-      className: "w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
+      className: "w-full rounded-xl border border-slate-200 p-2.5 text-sm outline-none focus:border-emerald-700 transition-all resize-none bg-slate-50/50 focus:bg-white disabled:opacity-40"
     })))
   }), entry.lastEditedAt && !isFutureDate(viewDate) && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between px-1"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400 font-medium"
+    className: "text-xs text-slate-400 font-medium"
   }, "সর্বশেষ পরিবর্তন: ", formatBnDateTime(entry.lastEditedAt)), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openHistoryModal,
-    className: "flex items-center gap-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950"
+    className: "flex items-center gap-1 text-xs font-bold text-emerald-800 hover:text-emerald-950"
   }, /*#__PURE__*/React.createElement(ClockIcon, {
     size: 12
   }), " ইতিহাস দেখুন")), isFutureDate(viewDate) && /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-xl py-2 px-3"
+    className: "text-xs text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-xl py-2 px-3"
   }, "ভবিষ্যতের তারিখের জন্য আমল টিক দেওয়া যাবে না — আজকের তারিখে ফিরে যান।"), isLockedForThisDevice && /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-center text-slate-600 bg-slate-100 border border-slate-200 rounded-xl py-2 px-3"
+    className: "text-xs text-center text-slate-600 bg-slate-100 border border-slate-200 rounded-xl py-2 px-3"
   }, "এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে শুধু দেখা যাবে, এডিট করা যাবে না।"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSave,
     disabled: isFutureDate(viewDate) || isLockedForThisDevice || isLockedForSwitch,

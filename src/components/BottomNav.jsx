@@ -41,7 +41,7 @@ export function BottomNav({ activeTab, onChange }) {
           key: item.id,
           type: "button",
           onClick: () => onChange(item.id),
-          className: "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] transition-colors",
+          className: "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-xs transition-colors",
           style: { color }
         },
         React.createElement(item.Icon, iconProps),
