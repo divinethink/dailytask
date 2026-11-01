@@ -663,7 +663,7 @@ export function DailyEntrySection({
   }, /*#__PURE__*/React.createElement("div", {
     onTouchStart: handleDateTouchStart,
     onTouchEnd: handleDateTouchEnd,
-    className: "bg-white rounded-2xl shadow-sm px-4 py-2.5 flex items-center justify-between border border-slate-200/80"
+    className: "bg-white rounded-2xl shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] px-4 py-2.5 flex items-center justify-between border border-[#E4D3A8]"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
