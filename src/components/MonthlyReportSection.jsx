@@ -128,15 +128,10 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     if (onSendToMeeting(rows)) setSent(true);
   };
 
-  const headRow = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
-    <h2 className="font-bold text-base text-slate-800">📊 {T.title}</h2>,
-    fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
-  );
-  const head = (
-    <div>
-      {headRow}
-      <div className="mt-1.5"><MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} /></div>
-    </div>
+  const head = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center gap-1.5 select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
+    <h2 className="flex-1 min-w-0 font-bold text-[15px] text-slate-800">📊 {T.title}</h2>,
+    <MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} />,
+    fold === "fixed" ? null : <ChevronDown size={18} className={"shrink-0 text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
   );
 
   let body = null;

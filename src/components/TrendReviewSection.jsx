@@ -194,26 +194,28 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
   }
 
   const canToggle = fold !== "fixed";
+  const toggle = () => canToggle && setOpen(o => !o);
   return (
     <div className="mx-5 mt-5 p-4 rounded-2xl bg-white shadow-sm" style={{ border: "1px solid #EADFBE" }}>
-      <button
-        type="button"
-        onClick={() => canToggle && setOpen(o => !o)}
-        aria-expanded={open}
-        className={"w-full text-left flex items-start justify-between gap-2 select-none" + (canToggle ? "" : " cursor-default")}
-        style={{ minHeight: 44 }}
-      >
-        <div className="min-w-0">
-          <h2 className="font-bold text-base text-slate-800">📈 {T.title}</h2>
+      <div className="flex items-start gap-1.5">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className={"flex-1 min-w-0 text-left select-none" + (canToggle ? "" : " cursor-default")}
+          style={{ minHeight: 32 }}
+        >
+          <h2 className="font-bold text-[15px] text-slate-800">📈 {T.title}</h2>
           <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+        </button>
+        <div className="mt-0.5">
+          <MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} label={tag} />
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: "#FBF3E1", color: "#7A5A00", border: "1px solid #EFDDB0" }}>{tag}</span>
-          {canToggle && <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
-        </div>
-      </button>
-      <div className="mt-1.5">
-        <MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} />
+        {canToggle && (
+          <button type="button" onClick={toggle} aria-label={open ? "বন্ধ করুন" : "খুলুন"} className="shrink-0 mt-0.5 h-7 flex items-center">
+            <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
+          </button>
+        )}
       </div>
       {body}
     </div>

@@ -282,7 +282,7 @@ function MonthNavControl({
   }, /*#__PURE__*/React.createElement(RefreshIcon, {
     size: 13
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 bg-[#FDFBF5] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950"
+    className: "flex items-center bg-[#FDFBF5] px-0.5 rounded-lg border border-[#C89B3C] shadow-sm text-emerald-950"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -294,11 +294,11 @@ function MonthNavControl({
         month0: c.month0 - 1
       });
     },
-    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-black/10"
+    className: "relative w-5 h-7 flex items-center justify-center rounded-md hover:bg-black/10 before:content-[''] before:absolute before:-inset-x-1 before:-inset-y-2"
   }, /*#__PURE__*/React.createElement(ChevronLeft, {
-    size: 14
+    size: 11
   })), /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-bold px-1"
+    className: "text-[10px] font-bold px-0.5 whitespace-nowrap"
   }, BN_MONTHS[monthCursor.month0], " ", /*#__PURE__*/React.createElement("span", {
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
@@ -312,9 +312,9 @@ function MonthNavControl({
         month0: c.month0 + 1
       });
     },
-    className: "w-6 h-6 flex items-center justify-center rounded-lg hover:bg-black/10"
+    className: "relative w-5 h-7 flex items-center justify-center rounded-md hover:bg-black/10 before:content-[''] before:absolute before:-inset-x-1 before:-inset-y-2"
   }, /*#__PURE__*/React.createElement(ChevronRight, {
-    size: 14
+    size: 11
   }))));
 }
 
