@@ -45,8 +45,41 @@ function fastingLine(toBn) {
     const m = hhmm(c && c.timings && c.timings.Maghrib);
     if (f == null || m == null || m <= f) return null;
     const len = m - f;
-    return "কাল সিয়ামের সময় প্রায় " + toBn(Math.floor(len / 60)) + " ঘণ্টা " + toBn(len % 60) + " মিনিট — সাহরি শেষ প্রায় " + clock12(f, toBn) + ", ইফতার প্রায় " + clock12(m, toBn) + "।";
+    return "সাহরি শেষ প্রায় " + clock12(f, toBn) + ", ইফতার প্রায় " + clock12(m, toBn) + " — রোজা হবে প্রায় " + toBn(Math.floor(len / 60)) + " ঘণ্টা " + toBn(len % 60) + " মিনিটের।";
   } catch { return null; }
+}
+
+// ছোট রঙ-প্যালেট: প্রতিটা বার্তার ধরন অনুযায়ী পটভূমি/বর্ডার/আইকন-টাইল
+const TONES = {
+  fast: { box: "bg-[#FFF8E7] border-[#EBD9A8]", tile: "bg-[#F6E7BD]" },
+  ibadat: { box: "bg-emerald-50/70 border-emerald-100", tile: "bg-emerald-100" },
+  special: { box: "bg-[#FFF3D6] border-[#E8CF8F]", tile: "bg-[#F3DB9B]" },
+  dua: { box: "bg-[#F4F8F5] border-emerald-100", tile: "bg-emerald-100" },
+  time: { box: "bg-sky-50 border-sky-100", tile: "bg-sky-100" },
+  history: { box: "bg-[#F6F3EC] border-stone-200", tile: "bg-stone-200" },
+  sleep: { box: "bg-slate-50 border-slate-100", tile: "bg-slate-100" },
+};
+
+function Row({ n, muted }) {
+  const t = TONES[n.tone] || TONES.ibadat;
+  return React.createElement(
+    "li",
+    { className: "flex items-start gap-2.5 rounded-xl border px-3 py-2.5 " + t.box + (muted ? " opacity-80" : "") },
+    React.createElement("span", { "aria-hidden": true, className: "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-base " + t.tile }, n.icon),
+    React.createElement(
+      "div",
+      { className: "min-w-0 flex-1" },
+      n.title && React.createElement("p", { className: "text-sm font-bold text-emerald-950 leading-snug" }, n.title),
+      React.createElement("p", { className: "text-sm leading-relaxed " + (muted ? "text-slate-500" : "text-slate-700") + (n.title ? " mt-0.5" : "") }, n.text),
+      n.dua && React.createElement(
+        "div",
+        { className: "mt-2 rounded-lg bg-white/90 border border-emerald-100 px-3 py-2" },
+        React.createElement("p", { dir: "rtl", lang: "ar", className: "text-[19px] leading-[2] text-emerald-950 text-center", style: { fontFamily: "'Noto Naskh Arabic','Amiri','Traditional Arabic',serif" } }, n.dua.ar),
+        React.createElement("p", { className: "mt-1 text-[13px] leading-relaxed text-slate-600" }, n.dua.bn)
+      ),
+      n.src && React.createElement("span", { className: "inline-block mt-1.5 rounded-full bg-white/80 border border-black/5 px-2 py-0.5 text-[11px] text-slate-500" }, "📚 " + n.src)
+    )
+  );
 }
 
 export function TomorrowPreviewCard({ toBn }) {
@@ -55,42 +88,39 @@ export function TomorrowPreviewCard({ toBn }) {
   const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri);
   if (fastingDay) {
     const fl = fastingLine(toBn);
-    if (fl) notes.push({ icon: "⏱️", text: fl });
+    if (fl) notes.push({ tone: "time", icon: "⏱️", title: "কালকের রোজার সময়", text: fl });
   }
+  history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: "ইতিহাসের পাতায় কাল", text: t }));
   const ms = nextMilestone(date);
-  const sleep = { icon: "🛏️", text: "ঘুমানোর আগে: ওযু, আয়াতুল কুরসী, তিন কুল, তাসবীহে ফাতিমী (৩৩-৩৩-৩৪)।" };
-
-  const row = (n, i, muted) =>
-    React.createElement(
-      "li",
-      { key: i, className: "flex items-start gap-2 text-[12px] leading-relaxed " + (muted ? "text-slate-500" : "text-slate-700") },
-      React.createElement("span", { "aria-hidden": true, className: "shrink-0" }, n.icon),
-      React.createElement(
-        "span",
-        null,
-        n.text,
-        n.src && React.createElement("span", { className: "text-[10px] text-slate-400" }, " (" + n.src + ")")
-      )
-    );
+  const hasMore = notes.length > 0;
+  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", text: "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।" };
 
   return React.createElement(
     "div",
     { className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4" },
     React.createElement(
       "div",
-      { className: "flex items-baseline justify-between gap-2 mb-2" },
-      React.createElement("h3", { className: "text-sm font-bold text-emerald-950" }, "🌅 আগামীকাল · " + WEEKDAYS_BN[date.getDay()]),
-      React.createElement("span", { className: "text-[10px] font-semibold text-slate-400" }, toBn(hijri.day) + " " + hijri.month)
+      { className: "flex items-center justify-between gap-2 mb-3" },
+      React.createElement(
+        "div",
+        { className: "flex items-center gap-2" },
+        React.createElement("h3", { className: "text-sm font-bold text-emerald-950" }, "🌅 আগামীকাল"),
+        React.createElement("span", { className: "rounded-full bg-emerald-900 text-white text-xs font-semibold px-2.5 py-0.5" }, WEEKDAYS_BN[date.getDay()])
+      ),
+      React.createElement("span", { className: "text-xs font-semibold text-[#A47E24]" }, toBn(hijri.day) + " " + hijri.month)
     ),
     React.createElement(
       "ul",
-      { className: "space-y-1.5" },
-      notes.map((n, i) => row(n, i, false)),
-      history.map((t, i) => row({ icon: "📜", text: "ইসলামের ইতিহাসে কাল — " + t }, "h" + i, false)),
-      row(sleep, "sleep", notes.length > 0 || history.length > 0)
+      { className: "space-y-2" },
+      notes.map((n, i) => React.createElement(Row, { key: i, n })),
+      React.createElement(Row, { key: "sleep", n: sleep, muted: hasMore })
     ),
-    ms && React.createElement("p", { className: "mt-2 text-[11px] font-semibold text-emerald-800" }, "⏳ " + ms.label + " আর প্রায় " + toBn(ms.days + 1) + " দিন বাকি (সম্ভাব্য)"),
-    history.length > 0 && React.createElement("p", { className: "mt-1 text-[10px] text-slate-400" }, "ঐতিহাসিক তারিখ সর্বাধিক প্রচলিত মত অনুযায়ী; ঐতিহাসিকদের মধ্যে ভিন্ন মতও আছে।"),
-    special && React.createElement("p", { className: "mt-1 text-[10px] text-slate-400" }, "হিজরি তারিখ ১ দিন এদিক-ওদিক হতে পারে; চাঁদ দেখা সাপেক্ষে।")
+    ms && React.createElement(
+      "div",
+      { className: "mt-3 flex items-center justify-center" },
+      React.createElement("span", { className: "rounded-full bg-[#FFF8E7] border border-[#EBD9A8] px-3 py-1 text-xs font-semibold text-[#8A6A1C]" }, "⏳ " + ms.label + " — আর প্রায় " + toBn(ms.days + 1) + " দিন (সম্ভবত)")
+    ),
+    history.length > 0 && React.createElement("p", { className: "mt-2 text-[11px] text-slate-400 text-center" }, "ইতিহাসের তারিখ সর্বাধিক প্রচলিত মত অনুযায়ী; ভিন্ন মতও আছে।"),
+    special && React.createElement("p", { className: "mt-1 text-[11px] text-slate-400 text-center" }, "হিজরি তারিখ ১ দিন এদিক-ওদিক হতে পারে; চাঁদ দেখা সাপেক্ষে।")
   );
 }
