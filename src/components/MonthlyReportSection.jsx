@@ -3,6 +3,7 @@
 // একবার one-shot পড়া; সাপ্তাহিক লক্ষ্যের ফল = নিজের reviews (শুধু মালিক, id ধরে ≤৫টা get)।
 // "সভায় পাঠান": শুধু আমলের হিসাব থেকে তৈরি সিদ্ধান্ত, সম্পাদনাযোগ্য; ব্যক্তিগত মুহাসাবার লেখা কখনো যায় না।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
+import { MonthPillNav } from "./MonthPillNav.jsx";
 import { REVIEW_TEXT } from "../legacy/reviewText.js";
 import { chunkCount, chunkRange, chunkWeekKey } from "../legacy/reviewSchema.js";
 import { buildMonthlyReport, goalSummary, suggestDecisions, elapsedDays, prevMonthOf, fill } from "../legacy/reviewMonthly.js";
@@ -67,7 +68,7 @@ function WeekdayBars({ avgs, weakest, names, toBn }) {
   );
 }
 
-export function MonthlyReportSection({ fold, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS, BN_WEEKDAYS, onSendToMeeting }) {
+export function MonthlyReportSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS, BN_WEEKDAYS, onSendToMeeting }) {
   const { year, month0 } = monthCursor;
   const [open, setOpen] = useState(fold === "open" || fold === "fixed");
   const [prev, setPrev] = useState({ status: "idle", entries: null }); // idle | loading | ready | error
@@ -127,11 +128,14 @@ export function MonthlyReportSection({ fold, migrationState, memberId, member, l
     if (onSendToMeeting(rows)) setSent(true);
   };
 
-  const head = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
+  const headRow = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
     <h2 className="font-bold text-base text-slate-800">📊 {T.title}</h2>,
-    <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#F3EEDD", color: "#5B4A1E", border: "1px solid #E4D3A8" }}>{BN_MONTHS[monthCursor.month0]} {toBn(monthCursor.year)}</span>
-      {fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
+    fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
+  );
+  const head = (
+    <div>
+      {headRow}
+      <div className="mt-1.5"><MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} /></div>
     </div>
   );
 

@@ -3292,6 +3292,7 @@ function App() {
   })),
     monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
     fold: fold,
+    onShiftMonth: swipeShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
@@ -3310,6 +3311,7 @@ function App() {
   })),
     weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
+    onShiftMonth: swipeShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,

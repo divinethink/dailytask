@@ -626,14 +626,9 @@ export function MeetingMinutesSection({
     className: "flex items-center justify-between mb-2 select-none" + (fold === "fixed" ? "" : " cursor-pointer")
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col items-start gap-1"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "font-bold text-base text-slate-800"
-  }, "মাসিক পারিবারিক সভা ও সিদ্ধান্ত"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap",
-    style: { background: "#F3EEDD", color: "#5B4A1E", border: "1px solid #E4D3A8" }
-  }, BN_MONTHS[monthCursor.month0] + " " + toBn(monthCursor.year))), /*#__PURE__*/React.createElement("button", {
+  }, "মাসিক পারিবারিক সভা ও সিদ্ধান্ত"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => {
       e.stopPropagation();

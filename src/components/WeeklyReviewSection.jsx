@@ -2,6 +2,7 @@
 // ডেটা: families/<id>/reviews (শুধু মালিক, firestore.rules)। বদ্ধ ঘর শুধু এই কম্পোনেন্টের state-এ থাকে,
 // কোথাও সেভ/লগ হয় না; সপ্তাহ বদলালে বা পাতা ছাড়লে মুছে যায়।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
+import { MonthPillNav } from "./MonthPillNav.jsx";
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk } from "../legacy/reviewSchema.js";
 import { weeklyGap, countFieldTotal } from "../legacy/reviewCalc.js";
@@ -16,7 +17,7 @@ const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emeral
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
-export function WeeklyReviewSection({ fold, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS }) {
+export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS }) {
   const { year, month0 } = monthCursor;
   const now = new Date();
   const isCurMonth = now.getFullYear() === year && now.getMonth() === month0;
@@ -114,13 +115,16 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
     }
   }
 
-  const head = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
+  const headRow = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
     <div className="flex items-center gap-2">
       <h2 className="font-bold text-base text-slate-800">🌙 {T.title}</h2>
     </div>,
-    <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#F3EEDD", color: "#5B4A1E", border: "1px solid #E4D3A8" }}>{BN_MONTHS[monthCursor.month0]} {toBn(monthCursor.year)}</span>
-      {fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
+    fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
+  );
+  const head = (
+    <div>
+      {headRow}
+      <div className="mt-1.5"><MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} /></div>
     </div>
   );
 
