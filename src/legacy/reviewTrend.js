@@ -92,12 +92,16 @@ function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
 
   // মনোযোগ: ↓ ধারা অথবা শেষ (নির্বাচিত) মাস ৪০%-এর নিচে। শেষ মাসের মান কম আগে; সর্বোচ্চ ৩।
   const cur = r => (r.vals[2] ? r.vals[2].pct : null);
-  const attention = rows
+  const attentionAll = rows
     .filter(r => r.dir === "down" || (cur(r) !== null && cur(r) < ATTENTION_BELOW))
-    .sort((a, b) => (cur(a) === null ? 101 : cur(a)) - (cur(b) === null ? 101 : cur(b)))
-    .slice(0, MAX_ATTENTION);
+    .sort((a, b) => (cur(a) === null ? 101 : cur(a)) - (cur(b) === null ? 101 : cur(b)));
+  const attention = attentionAll.slice(0, MAX_ATTENTION);
+  const upCount = rows.filter(r => r.dir === "up").length;
 
-  return { ok: rows.length > 0, months, sections, best, attention, rowCount: rows.length };
+  // নির্বাচিত মাসে এখনো কোনো সারির মান নেই (যেমন মাস সবে শুরু) ⇒ UI ছোট ব্যাখ্যা দেখায়।
+  const curEmpty = rows.length > 0 && rows.every(r => r.vals[2] === null);
+
+  return { ok: rows.length > 0, months, sections, best, attention, attentionCount: attentionAll.length, upCount, curEmpty, rowCount: rows.length };
 }
 
 export { TREND_DELTA, ATTENTION_BELOW, MAX_ATTENTION, tierOf, threeMonths, monthValue, trendOf, buildTrend };

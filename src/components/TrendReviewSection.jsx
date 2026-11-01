@@ -9,6 +9,7 @@ import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
 import { ChevronDown } from "./icons.jsx";
+import { MonthPillNav } from "./MonthPillNav.jsx";
 
 const T = REVIEW_TEXT.trend;
 const { useState, useEffect, useMemo, useRef } = React;
@@ -53,7 +54,7 @@ function monthTag(months, BN_MONTHS, toBn) {
   return nm(a) + "–" + nm(c);
 }
 
-export function TrendReviewSection({ fold, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS }) {
+export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS }) {
   const { year, month0 } = monthCursor;
   const [open, setOpen] = useState(fold === "open" || fold === "fixed");
   const [data, setData] = useState({ key: null, status: "idle", entries: [null, null] }); // idle | loading | ready | error
@@ -103,8 +104,10 @@ export function TrendReviewSection({ fold, migrationState, memberId, member, loc
   // বন্ধ অবস্থার সারাংশ: ডেটা এসে থাকলেই দেখায় (বন্ধ থাকলে নতুন রিড করে না)।
   let subtitle = T.subtitle;
   if (trend && trend.ok) {
-    const upN = trend.sections.reduce((t, s) => t + s.rows.filter(r => r.dir === "up").length, 0);
-    subtitle = fill(T.summary, { up: toBn(upN), att: toBn(trend.attention.length) });
+    const parts = [];
+    if (trend.upCount) parts.push(fill(T.summaryUp, { n: toBn(trend.upCount) }));
+    if (trend.attentionCount) parts.push(fill(T.summaryAtt, { n: toBn(trend.attentionCount) }));
+    subtitle = parts.length ? parts.join(" · ") : T.summarySteady;
   }
 
   let body = null;
@@ -124,17 +127,26 @@ export function TrendReviewSection({ fold, migrationState, memberId, member, loc
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="rounded-xl p-3" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
             <div className="text-xs font-bold text-emerald-900 mb-1">🌱 {T.bestTitle}</div>
-            <div className="text-xs text-emerald-950 leading-relaxed">
-              {trend.best ? fill(T.bestLine, { label: trend.best.label, from: toBn(trend.best.from.pct), to: toBn(trend.best.to.pct) }) : T.noBest}
-            </div>
+            {trend.best ? (
+              <div className="text-emerald-950 leading-relaxed">
+                <div className="text-sm font-bold">{trend.best.label}</div>
+                <div className="text-xs whitespace-nowrap">{toBn(trend.best.from.pct)}% → {toBn(trend.best.to.pct)}%</div>
+              </div>
+            ) : (
+              <div className="text-xs text-emerald-950 leading-relaxed">{T.noBest}</div>
+            )}
           </div>
           <div className="rounded-xl p-3" style={{ background: "#FBF3E1", border: "1px solid #EFDDB0" }}>
-            <div className="text-xs font-bold mb-1" style={{ color: "#7A5A00" }}>🤍 {T.attTitle}</div>
+            <div className="text-xs font-bold mb-1" style={{ color: "#7A5A00" }}>💛 {T.attTitle}</div>
             <div className="text-xs leading-relaxed" style={{ color: "#5C4300" }}>
               {trend.attention.length ? trend.attention.map(r => r.label).join(", ") : T.attNone}
             </div>
           </div>
         </div>
+
+        {trend.curEmpty && (
+          <p className="text-xs text-slate-500 mb-2 leading-relaxed">{fill(T.curEmpty, { month: BN_MONTHS[month0] })}</p>
+        )}
 
         <div className="flex items-end gap-1 pb-1 border-b border-slate-200 text-slate-500" style={{ fontSize: 10.5 }}>
           <span className="flex-1 min-w-0">{T.labelCol}</span>
@@ -153,7 +165,7 @@ export function TrendReviewSection({ fold, migrationState, memberId, member, loc
                 <div key={r.key} className="flex items-center gap-1 py-2.5 border-b border-dashed border-slate-200">
                   <div className="flex-1 min-w-0 pr-1">
                     <div className="font-bold text-sm text-slate-800 leading-snug">{r.label}</div>
-                    <div className="text-xs text-slate-500 leading-snug">{T.comment[r.kind]}</div>
+                    <div className="text-xs text-slate-500 leading-snug">{fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })}</div>
                   </div>
                   {r.vals.map((v, i) => (
                     <Pill key={i} v={v} monthName={BN_MONTHS[trend.months[i].month0]} toBn={toBn} />
@@ -200,6 +212,9 @@ export function TrendReviewSection({ fold, migrationState, memberId, member, loc
           {canToggle && <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
         </div>
       </button>
+      <div className="mt-1.5">
+        <MonthPillNav monthCursor={monthCursor} BN_MONTHS={BN_MONTHS} toBn={toBn} onShift={onShiftMonth} />
+      </div>
       {body}
     </div>
   );

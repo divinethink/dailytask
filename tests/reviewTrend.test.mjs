@@ -112,6 +112,9 @@ test("গ্রুপ, সবচেয়ে উন্নতি, মনোযো
   assert.equal(t.best.key, "x");
   assert.equal(t.best.from.pct, 30); assert.equal(t.best.to.pct, 75);
   assert.equal(t.attention.length, 3);
+  assert.equal(t.attentionCount, 4);   // সত্যিকারের সংখ্যা (কার্ডে তালিকা ৩টায় কাটা)
+  assert.equal(t.upCount, 1);
+  assert.equal(t.curEmpty, false);
   assert.deepEqual(t.attention.map(r => r.key), ["s", "p", "q"]); // শেষ মাসের মান কম আগে: ২০, ৩০, ৩৫ ; r (৩৮) সীমার বাইরে কাটা
 });
 
@@ -147,4 +150,18 @@ test("লেখা: সব মন্তব্য-কী ও মাসের ১�
   for (const k of ["rising", "risingSome", "falling", "fallingSome", "steadyGreat", "steady", "few"]) assert.ok(T.comment[k], k);
   assert.equal(T.monthShort.length, 12);
   for (const k of ["great", "good", "mid", "low", "none"]) assert.ok(T.legend[k]);
+});
+
+test("মাস সবে শুরু: নির্বাচিত মাসে সব সারির মান নেই ⇒ curEmpty", () => {
+  const f = fBool("x");
+  const t = buildTrend({ year: 2026, month0: 10, now: new Date(2026, 10, 1), entriesByMonth: [month("x", 30, 20), month("x", 31, 25), month("x", 1, 1)], h: h([f]), groups });
+  assert.equal(t.curEmpty, true);
+  assert.equal(t.sections[0].rows[0].vals[2], null);
+  assert.ok(t.sections[0].rows[0].dir !== null); // দুই আগের মাস থেকে ধারা চলে
+});
+
+test("লেখা: মন্তব্যে {n} শুধু পয়েন্ট-বাক্যে", () => {
+  const C = REVIEW_TEXT.trend.comment;
+  assert.ok(C.risingSome.includes("{n}") && C.fallingSome.includes("{n}"));
+  assert.ok(!C.rising.includes("{n}") && !C.steady.includes("{n}"));
 });

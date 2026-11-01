@@ -3312,6 +3312,7 @@ function App() {
   })),
     trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
     fold: fold,
+    onShiftMonth: swipeShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
