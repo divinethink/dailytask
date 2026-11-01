@@ -307,11 +307,45 @@ const WAQT_GUIDE = {
   },
 };
 const WAQT_AMOL = {
-  fajr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "সকালের আযকার"],
-  dhuhr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ"],
-  asr: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ"],
-  maghrib: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "সন্ধ্যার আযকার"],
-  isha: ["ফরজের পর আয়াতুল কুরসি ও তাসবীহ", "শোয়ার আগের আযকার"],
+  fajr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "সকালের আযকার"],
+  dhuhr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ"],
+  asr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ"],
+  maghrib: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "সন্ধ্যার আযকার"],
+  isha: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "শোয়ার আগের আযকার"],
+};
+// §ওয়াক্তভিত্তিক আমল-গাইড (Owner-দেওয়া): শুধু চলতি সময়ের অংশ কার্ডে দেখায়।
+const WAQT_AMAL = {
+  fajr: { icon: "🌅", title: "ফজরের পরের আমল", items: [
+    "সালাত শেষে সূর্যোদয় পর্যন্ত নিজ স্থানে বসে মাসনুন যিকির, তাসবীহ ও দুআ পড়া",
+    "সূর্যোদয়ের ১৫-২০ মিনিট পর ২ বা ৪ রাকাত ইশরাক ও দুহার সালাত আদায় করা",
+    "অর্থ বুঝে কুরআন তিলাওয়াত করা",
+  ] },
+  dhuhr: { icon: "☀️", title: "যোহরের আমল", items: [
+    "লেনদেন, কথাবার্তা ও আচরণে সততা ও সুন্নাহর অনুসরণ করা",
+    "জবানকে সর্বদা যিকির, দরূদ ও তাওবায় মশগুল রাখা",
+    "সামর্থ্য অনুযায়ী ছোট হলেও কিছু সদকা করা",
+  ] },
+  asr: { icon: "🔆", title: "আসরের আমল", items: [
+    "সূর্যাস্তের আগের সময়টি দুআ কবুলের অন্যতম গুরুত্বপূর্ণ সময়; মাগরিবের আগে বেশি বেশি দুআ ও ইস্তেগফার করা",
+  ] },
+  maghrib: { icon: "🌇", title: "মাগরিবের আমল", items: [
+    "সন্ধ্যার মাসনুন যিকির ও দুআ সম্পন্ন করা",
+    "মাগরিব ও ইশার মাঝের সময়ে রাতের খাবার খাওয়া",
+    "দিনে অন্তত একবার মা-বাবা/আত্মীয়দের খোঁজ নেওয়া বা সাহায্য করা",
+  ] },
+  isha: { icon: "🌙", title: "ইশার আমল", muhasaba: true, items: [
+    "বিসমিল্লাহ বলে মুহাসাবা শুরু করা",
+    "তাহাজ্জুদ ও ফজরে সময়মতো ওঠার নিয়তে অপ্রয়োজনীয় কথা না বলে দ্রুত ঘুমের প্রস্তুতি নেওয়া",
+    "সূরা বাকারার শেষ দুই আয়াত (২৮৫-২৮৬) পড়া",
+    "আয়াতুল কুরসি পড়া",
+    "সূরা ইখলাস, ফালাক ও নাস ৩ বার পড়ে দুই হাতে ফুঁ দিয়ে মাথা-মুখসহ পুরো শরীরে যতদূর সম্ভব মাসাহ করা (এভাবে ৩ বার)",
+    "ঘুমের দুআ পড়া: আল্লাহুম্মা বিসমিকা আমূতু ওয়া আহইয়া",
+    "ঘুম না আসা পর্যন্ত সুন্নাহসম্মত যিকির, ইস্তেগফার ও দরূদ পড়তে থাকা",
+  ] },
+  night: { icon: "🌌", title: "শেষ রাতের আমল", items: [
+    "তাহাজ্জুদ বা কিয়ামুল লাইল আদায় করা (রাসূলুল্লাহ সা. সাধারণত ৮ রাকাত পড়তেন); সেজদায় ও শেষ রাতে কেঁদে কেঁদে দুআ করা",
+    "সেহরির শেষ সময়ে (সুবহে সাদিকের আগে) বেশি বেশি ইস্তেগফার করা",
+  ] },
 };
 const WAQT_NAME = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা" };
 const WAQT_TIME_COLOR = { fajr: "#185FA5", dhuhr: "#0E4B43", asr: "#B3610E", maghrib: "#B23A25", isha: "#4B4FA8" };
@@ -341,7 +375,7 @@ function readDone(d) {
   }
 }
 
-export function PrayerTimes({ layout } = {}) {
+export function PrayerTimes({ layout, onOpenHome } = {}) {
   const [location, setLocationState] = useState(() => getSavedLocation());
   const [madhab, setMadhabState] = useState(() => getSavedMadhab());
   // §লোড-ব্যাকগ্রাউন্ডে: সর্বশেষ সিংক-করা সময় প্রথম render-এই দেখানো হয়, নেটওয়ার্ক আপডেট নিচে চলে।
@@ -383,6 +417,7 @@ export function PrayerTimes({ layout } = {}) {
   // §ওয়াক্ত ✓(শুধু এই ডিভাইসে, দিন বদলালে নিজে রিসেট; হোম-ডেটা/Firestore-এ কিছু লেখে না)
   const [done, setDone] = useState(() => readDone(new Date()));
   const [sub, setSub] = useState(null);
+  const [amalOpen, setAmalOpen] = useState(true);
   const searchReqIdRef = useRef(0);
 
   // প্রতি সেকেন্ডে countdown আপডেট(existing timer-pattern reuse, 3_2 §৪.২ item ৩)
@@ -752,6 +787,22 @@ export function PrayerTimes({ layout } = {}) {
 
   const activeForbidden = useMemo(() => forbiddenWindows.find((w) => now >= w.start && now < w.end) || null, [forbiddenWindows, now]);
   const guideKey = waqtInfo ? waqtInfo.currentKey || waqtInfo.nextKey || null : null;
+  // §আমল-গাইডের চলতি অংশ: ফজর→যোহর = ফজরের পরের আমল; ইশা→শেষ-রাত-শুরু = ইশা; শেষ রাত→ফজর = শেষ রাত।
+  const amalKey = useMemo(() => {
+    if (!schedule || !otherTimes) return null;
+    const { fajr, dhuhr, asr, maghrib, isha } = schedule;
+    const nightStart = otherTimes.tahajjud.start;
+    if (now < fajr) return now >= addMinutes(nightStart, -1440) ? "night" : "isha";
+    if (now < dhuhr) return "fajr";
+    if (now < asr) return "dhuhr";
+    if (now < maghrib) return "asr";
+    if (now < isha) return "maghrib";
+    return now >= nightStart ? "night" : "isha";
+  }, [schedule, otherTimes, now]);
+  // নতুন ওয়াক্ত শুরু হলে ভাঁজ-করা অংশ আবার নিজে খুলে যায়
+  useEffect(() => {
+    setAmalOpen(true);
+  }, [amalKey]);
   const waqtProgress = useMemo(() => {
     if (!waqtInfo || !waqtInfo.currentKey || !waqtInfo.start) return null;
     const total = waqtInfo.target.getTime() - waqtInfo.start.getTime();
@@ -1117,7 +1168,38 @@ export function PrayerTimes({ layout } = {}) {
           WAQT_AMOL[guideKey].map((t) =>
             /*#__PURE__*/React.createElement("span", { key: t, className: "text-xs text-slate-600" }, `💡 ${t}`)
           )
-        )
+        ),
+        amalKey && WAQT_AMAL[amalKey] &&
+          /*#__PURE__*/React.createElement(
+            "div",
+            { className: "mt-3 pt-3 border-t border-dashed border-[#C89B3C]/50" },
+            /*#__PURE__*/React.createElement(
+              "button",
+              { type: "button", onClick: () => setAmalOpen((v) => !v), "aria-expanded": amalOpen, className: "w-full min-h-[44px] flex items-center justify-between gap-2 rounded-xl px-3 py-2 border border-[#C89B3C] bg-[#FFFAF0] text-left" },
+              /*#__PURE__*/React.createElement("span", { className: "text-sm font-bold text-emerald-950" }, `${WAQT_AMAL[amalKey].icon} ${WAQT_AMAL[amalKey].title}`),
+              /*#__PURE__*/React.createElement("span", { className: "flex items-center gap-2" },
+                /*#__PURE__*/React.createElement("span", { className: "text-[11px] text-white bg-[#C89B3C] rounded-full px-2 py-0.5" }, "এখন"),
+                /*#__PURE__*/React.createElement("span", { className: "text-slate-500 text-xs" }, amalOpen ? "▲" : "▼")
+              )
+            ),
+            amalOpen &&
+              /*#__PURE__*/React.createElement(
+                "div",
+                { className: "mt-2 px-1" },
+                /*#__PURE__*/React.createElement(
+                  "ul",
+                  { className: "space-y-1.5" },
+                  WAQT_AMAL[amalKey].items.map((t) =>
+                    /*#__PURE__*/React.createElement("li", { key: t, className: "flex gap-2 text-sm text-slate-800 leading-relaxed" },
+                      /*#__PURE__*/React.createElement("span", { className: "mt-2 w-1.5 h-1.5 rounded-full bg-emerald-900 shrink-0" }),
+                      /*#__PURE__*/React.createElement("span", null, t)
+                    )
+                  )
+                ),
+                WAQT_AMAL[amalKey].muhasaba && onOpenHome &&
+                  /*#__PURE__*/React.createElement("button", { type: "button", onClick: onOpenHome, className: "mt-3 w-full min-h-[44px] rounded-xl bg-emerald-900 text-white text-sm font-bold" }, "📝 মুহাসাবা শুরু করুন")
+              )
+          )
       )
     ),
     meal: (

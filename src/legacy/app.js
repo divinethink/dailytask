@@ -2979,7 +2979,7 @@ function App() {
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
-          React.createElement(PrayerTimes, { layout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null })
+          React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
