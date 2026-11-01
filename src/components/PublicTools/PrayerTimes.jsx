@@ -1170,7 +1170,7 @@ export function PrayerTimes({ layout } = {}) {
         { className: "flex items-start justify-between gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "min-w-0 max-w-[68%] flex flex-col items-start gap-1.5" },
+          { className: "min-w-0 flex-1 flex items-start" },
           /*#__PURE__*/React.createElement(
             "div",
             { className: "max-w-full flex items-center gap-1.5 bg-white rounded-xl border border-slate-200 px-2 py-1 shadow-sm" },
@@ -1186,7 +1186,11 @@ export function PrayerTimes({ layout } = {}) {
                   (location.name || "").split(",").slice(1).join(",").trim()
                 )
             )
-          ),
+          )
+        ),
+        /*#__PURE__*/React.createElement(
+          "div",
+          { className: "shrink-0 flex items-start gap-1.5" },
           location &&
             /*#__PURE__*/React.createElement(
               "button",
@@ -1201,17 +1205,17 @@ export function PrayerTimes({ layout } = {}) {
                 ? /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" })
                 : /*#__PURE__*/React.createElement(RefreshIcon, { size: 12 }),
               gpsBusy || loading ? "আপডেট হচ্ছে…" : "রিফ্রেশ" + (syncedAt ? ` · ${formatHHMM(new Date(syncedAt))}` : "")
-            )
-        ),
-        /*#__PURE__*/React.createElement(
-          "button",
-          {
-            type: "button",
-            onClick: () => setSub("qibla"),
-            "aria-label": "কিবলা দেখুন",
-            className: "shrink-0 mt-0.5 bg-white rounded-xl border border-[#C89B3C]/60 px-2 py-1 text-[13px] font-bold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap shadow-sm active:opacity-60",
-          },
-          "🧭 কিবলা"
+            ),
+          /*#__PURE__*/React.createElement(
+            "button",
+            {
+              type: "button",
+              onClick: () => setSub("qibla"),
+              "aria-label": "কিবলা দেখুন",
+              className: "shrink-0 mt-0.5 bg-white rounded-xl border border-[#C89B3C]/60 px-2 py-1 text-[13px] font-bold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap shadow-sm active:opacity-60",
+            },
+            "🧭 কিবলা"
+          )
         )
       ),
       locationPanelOpen &&
