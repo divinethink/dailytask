@@ -1167,22 +1167,41 @@ export function PrayerTimes({ layout } = {}) {
       { className: "px-4 pb-1.5 relative" },
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex items-stretch justify-between gap-2" },
+        { className: "flex items-start justify-between gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "min-w-0 flex-1 flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-1.5" },
-          /*#__PURE__*/React.createElement(PinIcon, { size: 16, className: "text-emerald-800 shrink-0" }),
+          { className: "min-w-0 max-w-[68%] flex flex-col items-start gap-1.5" },
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "leading-tight min-w-0" },
-            /*#__PURE__*/React.createElement("div", { className: "text-sm text-emerald-950 font-semibold truncate" }, (location.name || "").split(",")[0].trim()),
-            (location.name || "").split(",").length > 1 &&
-              /*#__PURE__*/React.createElement(
-                "div",
-                { className: "text-xs text-slate-500 truncate" },
-                (location.name || "").split(",").slice(1).join(",").trim()
-              )
-          )
+            { className: "max-w-full flex items-center gap-1.5 bg-white rounded-xl border border-slate-200 px-2 py-1 shadow-sm" },
+            /*#__PURE__*/React.createElement(PinIcon, { size: 15, className: "text-emerald-800 shrink-0" }),
+            /*#__PURE__*/React.createElement(
+              "div",
+              { className: "leading-tight min-w-0" },
+              /*#__PURE__*/React.createElement("div", { className: "text-sm text-emerald-950 font-semibold truncate" }, (location.name || "").split(",")[0].trim()),
+              (location.name || "").split(",").length > 1 &&
+                /*#__PURE__*/React.createElement(
+                  "div",
+                  { className: "text-[11px] text-slate-500 truncate" },
+                  (location.name || "").split(",").slice(1).join(",").trim()
+                )
+            )
+          ),
+          location &&
+            /*#__PURE__*/React.createElement(
+              "button",
+              {
+                type: "button",
+                onClick: handleRefresh,
+                disabled: gpsBusy || loading,
+                "aria-label": "রিফ্রেশ করুন",
+                className: "bg-white rounded-xl border border-slate-200 px-2 py-1 text-[11px] font-semibold text-emerald-900 flex items-center gap-1 whitespace-nowrap shadow-sm active:opacity-60 disabled:opacity-70",
+              },
+              gpsBusy || loading
+                ? /*#__PURE__*/React.createElement(Loader2, { size: 12, className: "animate-spin" })
+                : /*#__PURE__*/React.createElement(RefreshIcon, { size: 12 }),
+              gpsBusy || loading ? "আপডেট হচ্ছে…" : "রিফ্রেশ" + (syncedAt ? ` · ${formatHHMM(new Date(syncedAt))}` : "")
+            )
         ),
         /*#__PURE__*/React.createElement(
           "button",
@@ -1190,26 +1209,11 @@ export function PrayerTimes({ layout } = {}) {
             type: "button",
             onClick: () => setSub("qibla"),
             "aria-label": "কিবলা দেখুন",
-            className: "shrink-0 bg-white rounded-2xl border border-[#C89B3C]/60 px-3.5 text-sm font-bold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap active:opacity-60",
+            className: "shrink-0 mt-0.5 bg-white rounded-xl border border-[#C89B3C]/60 px-2 py-1 text-[13px] font-bold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap shadow-sm active:opacity-60",
           },
           "🧭 কিবলা"
         )
       ),
-        location &&
-        /*#__PURE__*/React.createElement(
-            "button",
-            {
-              type: "button",
-              onClick: handleRefresh,
-              disabled: gpsBusy || loading,
-              "aria-label": "রিফ্রেশ করুন",
-              className: "mt-1.5 w-full bg-white rounded-xl border border-slate-200 py-1.5 text-xs font-semibold text-emerald-900 flex items-center justify-center gap-1.5 whitespace-nowrap active:opacity-60 disabled:opacity-70",
-            },
-            gpsBusy || loading
-              ? /*#__PURE__*/React.createElement(Loader2, { size: 13, className: "animate-spin" })
-              : /*#__PURE__*/React.createElement(RefreshIcon, { size: 13 }),
-            gpsBusy || loading ? "আপডেট হচ্ছে…" : "রিফ্রেশ" + (syncedAt ? ` · ${formatHHMM(new Date(syncedAt))}` : "")
-          ),
       locationPanelOpen &&
         /*#__PURE__*/React.createElement(
           "div",
