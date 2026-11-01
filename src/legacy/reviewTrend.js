@@ -1,4 +1,4 @@
-// reviewTrend.js — "গত তিন মাসের ধারা" কার্ডের হিসাব। Pure (Firebase/UI/অ্যাপ-হেল্পার import ছাড়া)।
+// reviewTrend.js — "গত তিন মাসের চিত্র" কার্ডের হিসাব। Pure (Firebase/UI/অ্যাপ-হেল্পার import ছাড়া)।
 // অ্যাপের হিসাব-ফাংশনগুলো h হিসেবে ঢোকানো হয়, তাই Node-এ সরাসরি টেস্ট করা যায়। কোনো .limit() নেই।
 // তিন মাস = নির্বাচিত মাস + আগের দুই মাস। কাস্টম লেবেল (isCustom) বাদ। সব শতাংশ পূর্ণসংখ্যা।
 import { MIN_DAYS, elapsedDays, prevMonthOf } from "./reviewMonthly.js";

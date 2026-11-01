@@ -30,12 +30,12 @@ export const CARD_DEFS = {
   below: [
     d("streak", "স্ট্রিক ও আজকের অগ্রগতি", "fixed"),
     d("insight", "দৈনিক অন্তর্দৃষ্টি", "fixed"),
-    d("tomorrow", "আগামীকাল", "fixed"),
     d("focus", "আগামীকালের ফোকাস", "fixed"),
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
+    d("tomorrow", "আগামীকাল", "fixed"),
     d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "closed"),
     d("weekly", "সাপ্তাহিক মুহাসাবা", "closed"),
-    d("trend", "গত তিন মাসের ধারা", "closed"),
+    d("trend", "গত তিন মাসের চিত্র", "closed"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")
   ]
 };

@@ -1,4 +1,4 @@
-// গত তিন মাসের ধারা কার্ড। "মাসিক সভা"-র ঠিক উপরে নিজস্ব accordion-কার্ড (weekly/meeting/monthlyReport-এর মতো)।
+// গত তিন মাসের চিত্র কার্ড। "মাসিক সভা"-র ঠিক উপরে নিজস্ব accordion-কার্ড (weekly/meeting/monthlyReport-এর মতো)।
 // ডিফল্ট বন্ধ। বন্ধ থাকলে বাড়তি রিড শূন্য; খুললে আগের দুই মাস একবার করে (loadMonthEntriesOnce ×২) পড়ে।
 // নির্বাচিত মাস = বিদ্যমান live monthEntries (বাড়তি পড়া নেই)। শুধু নিজের সদস্যে দেখায় (locked হলে লুকানো)।
 // সব হিসাব reviewTrend.js-এ (pure); সব বাংলা লেখা reviewText.js-এ। React global (window.React) — বাকিদের মতোই।
