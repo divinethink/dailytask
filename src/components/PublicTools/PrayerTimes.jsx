@@ -117,7 +117,7 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
   ];
   const hasBar = waqtProgress !== null;
   const pct = hasBar ? Math.round(waqtProgress * 100) : 0;
-  const H = hasBar ? 212 : 182; // viewBox-উচ্চতা = আসল px-উচ্চতা, তাই আকৃতি লম্বায় বিকৃত হয় না(শুধু প্রস্থে scale)
+  const H = hasBar ? 224 : 194; // viewBox-উচ্চতা = আসল px-উচ্চতা, তাই আকৃতি লম্বায় বিকৃত হয় না(শুধু প্রস্থে scale)
   const stroke = { stroke: GOLD, strokeOpacity: 0.6, strokeWidth: 1.5, vectorEffect: "non-scaling-stroke" };
   const dot = (left, top) => h("span", { "aria-hidden": true, className: "absolute rounded-full", style: { left, top, width: 7, height: 7, background: GOLD, transform: "translateX(-50%)" } });
   const minaretDecor = (x) => [
@@ -132,6 +132,7 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
       "svg",
       { viewBox: `0 0 400 ${H}`, preserveAspectRatio: "none", className: "absolute inset-0 w-full h-full pointer-events-none", "aria-hidden": true },
       h("defs", null,
+        h("clipPath", { id: "wq-clip" }, h("rect", { x: 0, y: 0, width: 400, height: 98 })),
         h("linearGradient", { id: "wq-grad", x1: 0, y1: 0, x2: 1, y2: 1 },
           h("stop", { offset: 0, style: { stopColor: "var(--theme-primary, #0E4B43)" } }),
           h("stop", { offset: 1, style: { stopColor: "var(--theme-ink, #16302B)" } }))),
@@ -141,23 +142,19 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
       }),
       h("path", {
         d: `M38 ${H} V148 C38 96 132 62 200 24 C268 62 362 96 362 148 V${H}`,
-        fill: "none", stroke: GOLD, strokeOpacity: 0.45, vectorEffect: "non-scaling-stroke",
+        fill: "none", stroke: GOLD, strokeOpacity: 0.45, vectorEffect: "non-scaling-stroke", clipPath: "url(#wq-clip)",
       }),
       minaretDecor(12), minaretDecor(388)
     ),
     dot("3%", 38), dot("50%", 4), dot("97%", 38),
     h(
       "div",
-      { className: "relative flex flex-col items-center px-9", style: { paddingTop: 62 } },
+      { className: "relative flex flex-col items-center px-9", style: { paddingTop: 54 } },
+      h("div", { className: "text-3xl font-bold leading-none" }, waqtInfo.name),
+      h("div", { className: "text-xs opacity-85 mt-1.5" }, waqtInfo.currentKey ? h("span", { style: { color: GOLD } }, "● ") : null, waqtInfo.label),
       h(
         "div",
-        { className: "flex items-baseline justify-center gap-2 whitespace-nowrap" },
-        h("span", { className: "text-3xl font-bold leading-none" }, waqtInfo.name),
-        h("span", { className: "text-xs opacity-85" }, waqtInfo.currentKey ? h("span", { style: { color: GOLD } }, "● ") : null, waqtInfo.label)
-      ),
-      h(
-        "div",
-        { className: "flex gap-2 w-full mt-2.5", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
+        { className: "flex gap-2 w-full mt-3", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
         parts.map(([n, u]) =>
           h(
             "div",
@@ -1049,7 +1046,7 @@ export function PrayerTimes({ layout } = {}) {
         forbiddenWindows.map((w) =>
           /*#__PURE__*/React.createElement(
             "span",
-            { key: w.label, className: "text-xs whitespace-nowrap shrink-0" },
+            { key: w.label, className: "text-[11px] whitespace-nowrap shrink-0" },
             /*#__PURE__*/React.createElement("span", { className: "text-slate-700" }, w.label + " "),
             /*#__PURE__*/React.createElement(
               "span",
@@ -1177,7 +1174,7 @@ export function PrayerTimes({ layout } = {}) {
         "div",
         null,
         /*#__PURE__*/React.createElement("div", { className: "text-sm font-bold text-emerald-950" }, formatGregorianDate(now)),
-        /*#__PURE__*/React.createElement("div", { className: "text-sm text-slate-500" }, formatHijriDate(now))
+        /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 whitespace-nowrap" }, formatHijriDate(now))
       ),
       /*#__PURE__*/React.createElement(
         "div",
