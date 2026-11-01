@@ -35,6 +35,7 @@ export const CARD_DEFS = {
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
     d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "closed"),
     d("weekly", "সাপ্তাহিক মুহাসাবা", "closed"),
+    d("trend", "গত তিন মাসের ধারা", "closed"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")
   ]
 };

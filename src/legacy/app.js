@@ -579,6 +579,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
+import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
@@ -3308,6 +3309,21 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
+  })),
+    trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
+    fold: fold,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice || isLockedForSwitch,
+    monthCursor: monthCursor,
+    monthEntries: monthEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS
   })),
     weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
