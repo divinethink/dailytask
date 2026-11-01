@@ -743,7 +743,8 @@ export function DailyEntrySection({
       onGoYesterday: goYesterday,
       canCopy: !isLockedForThisDevice && !isLockedForSwitch && dateKey(viewDate) === dateKey(new Date()) && copyKeys.length > 0,
       onCopyYesterday: copyYesterday,
-      toBn: toBn
+      toBn: toBn,
+      isToday: dateKey(viewDate) === dateKey(new Date())
     }),
     ...(() => { const m = {};
     /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
