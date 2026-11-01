@@ -1034,10 +1034,23 @@ export function PrayerTimes({ layout } = {}) {
         /*#__PURE__*/React.createElement(
           "div",
           { className: "px-4 pb-3 grid grid-cols-2 gap-x-4 gap-y-2" },
-          OTHER_ITEMS.map((it) =>
-            /*#__PURE__*/React.createElement(
+          OTHER_ITEMS.map((it) => {
+            // §চলমান নফল সালাত হাইলাইট(১ নভেম্বর ২০২৬, owner-requested): ফরজ সারির মতোই
+            // হালকা সোনালি ব্যাকগ্রাউন্ড+বাম-বার+গাঢ় নাম, শুধু `now` ও otherTimes-এর window থেকে
+            // নির্ধারিত(কোনো নতুন state/data নয়)। তাহাজ্জুদ রাত পেরিয়ে ফজরে শেষ হয় — তাই
+            // গতকালের window(-২৪ঘ)-ও যাচাই হয়, যাতে মধ্যরাতের পরেও হাইলাইট থাকে।
+            const w = otherTimes[it.k];
+            const DAY = 86400000;
+            const active = !!(now && ((now >= w.start && now < w.end) ||
+              (it.k === "tahajjud" && now.getTime() >= w.start.getTime() - DAY && now.getTime() < w.end.getTime() - DAY)));
+            return /*#__PURE__*/React.createElement(
               "div",
-              { key: it.k, className: "flex items-center justify-between gap-1 whitespace-nowrap" },
+              {
+                key: it.k,
+                className: "relative flex items-center justify-between gap-1 whitespace-nowrap rounded-xl px-2 py-1 -mx-2 " + (active ? "bg-[#F3EEDD] font-bold" : ""),
+                "aria-current": active ? "true" : undefined
+              },
+              active && /*#__PURE__*/React.createElement("span", { className: "absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full", style: { background: "#C89B3C" }, "aria-hidden": true }),
               /*#__PURE__*/React.createElement(
                 "span",
                 { className: "text-sm text-slate-800" },
@@ -1047,10 +1060,10 @@ export function PrayerTimes({ layout } = {}) {
               /*#__PURE__*/React.createElement(
                 "span",
                 { className: "text-sm font-semibold text-slate-600" },
-                `${formatHHMM(otherTimes[it.k].start)}–${formatHHMM(otherTimes[it.k].end)}`
+                `${formatHHMM(w.start)}–${formatHHMM(w.end)}`
               )
-            )
-          )
+            );
+          })
         )
       )
     ),
