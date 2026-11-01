@@ -579,6 +579,8 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
+import { SwipeMonth } from "../components/SwipeMonth.jsx";
+import { shiftMonthCursor } from "./swipeMonth.js";
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
@@ -929,6 +931,11 @@ function App() {
   // discarding them — mirrors the existing meetingDirtyRef pattern.
   const entryDirtyRef = useRef(false);
   const weeklyDirtyRef = useRef(false);
+  // সোয়াইপে মাস বদল (মাসিক ওভারভিউ/সাপ্তাহিক মুহাসাবা/মাসিক মুহাসাবা) — ◀ ▶ বাটনের হুবহু একই dirty-confirm।
+  const swipeShiftMonth = (delta) => {
+    if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+    setMonthCursor((c) => shiftMonthCursor(c, delta));
+  };
   // Auto-update reload(fresh-load-only, dt-sw-updated event — dispatch হয়
   // top-level SW-registration কোড থেকে, দেখুন ফাইলের শুরুর দিকে)। Unsaved
   // entry/weekly/meeting থাকলে reload skip করা হয়(data-loss এড়াতে); পরের
@@ -3248,7 +3255,7 @@ function App() {
     suggestedFieldKey: suggestedFocusKey,
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
   }),
-    monthly: () => /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+    monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
@@ -3288,8 +3295,8 @@ function App() {
       toBn: toBn,
       monthCursor: monthCursor
     })
-  }),
-    monthlyReport: fold => /*#__PURE__*/React.createElement(MonthlyReportSection, {
+  })),
+    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
@@ -3306,8 +3313,8 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
-  }),
-    weekly: fold => /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+  })),
+    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
