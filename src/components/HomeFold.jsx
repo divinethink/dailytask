@@ -48,7 +48,7 @@ export function homeEntryCards(member, nodes) {
   return out;
 }
 
-// সেভ-বাটনের নিচের সেকশন। weekly/meeting-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
+// সেভ-বাটনের নিচের সেকশন। weekly/meeting/monthlyReport-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
 const PX_WRAPPED = { streak: true, insight: true, focus: true, tomorrow: true };
 export function renderHomeBelow(member, nodes) {
   const out = [];
@@ -57,7 +57,7 @@ export function renderHomeBelow(member, nodes) {
     const key = c.id + ":" + c.fold;
     const title = cardTitle("below", c.id);
     let el;
-    if (c.id === "weekly" || c.id === "meeting") {
+    if (c.id === "weekly" || c.id === "meeting" || c.id === "monthlyReport") {
       el = nodes[c.id](c.fold);
     } else if (c.fold === "fixed") {
       el = PX_WRAPPED[c.id] ? React.createElement("div", { className: "px-5" }, nodes[c.id]()) : nodes[c.id]();

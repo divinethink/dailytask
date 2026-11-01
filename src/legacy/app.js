@@ -578,6 +578,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
+import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
 import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
@@ -2020,6 +2021,22 @@ function App() {
       }]
     }));
   }
+  // মাসিক রিপোর্ট থেকে "সভায় পাঠান": সারিগুলো শুধু সভার local state-এ বসে (সেভ নয়; সেভ ব্যবহারকারী নিজে করেন)।
+  // id নির্দিষ্ট ("mr-..."), তাই আবার পাঠালে একই সারি বদলায়, ডুপ্লিকেট হয় না। খালি placeholder সারি সরে যায়।
+  function handleSendToMeeting(rows) {
+    if (isGuestMode) { setShowGuestSignIn(true); return false; }
+    if (!Array.isArray(rows) || !rows.length) return false;
+    meetingDirtyRef.current = true;
+    setMeetingState(prev => {
+      const cur = Array.isArray(prev.rows) ? prev.rows : [];
+      const base = cur.filter(r => r && (r.topic || r.decision || r.person));
+      const incoming = new Map(rows.map(r => [r.id, r]));
+      const merged = base.map(r => incoming.get(r.id) || r);
+      const added = rows.filter(r => !base.some(b => b.id === r.id));
+      return { ...prev, rows: [...merged, ...added] };
+    });
+    return true;
+  }
   function removeMeetingRow(idx) {
     if (isGuestMode) { setShowGuestSignIn(true); return; }
     meetingDirtyRef.current = true;
@@ -3269,6 +3286,24 @@ function App() {
       toBn: toBn,
       monthCursor: monthCursor
     })
+  }),
+    monthlyReport: fold => /*#__PURE__*/React.createElement(MonthlyReportSection, {
+    fold: fold,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice || isLockedForSwitch,
+    monthCursor: monthCursor,
+    monthEntries: monthEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS,
+    BN_WEEKDAYS: BN_WEEKDAYS,
+    onSendToMeeting: handleSendToMeeting
   }),
     weekly: fold => /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
