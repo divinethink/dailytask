@@ -117,56 +117,60 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
   ];
   const hasBar = waqtProgress !== null;
   const pct = hasBar ? Math.round(waqtProgress * 100) : 0;
+  const H = hasBar ? 212 : 182; // viewBox-উচ্চতা = আসল px-উচ্চতা, তাই আকৃতি লম্বায় বিকৃত হয় না(শুধু প্রস্থে scale)
   const stroke = { stroke: GOLD, strokeOpacity: 0.6, strokeWidth: 1.5, vectorEffect: "non-scaling-stroke" };
-  const dot = (left) => h("span", { "aria-hidden": true, className: "absolute rounded-full", style: { left, top: 4, width: 8, height: 8, background: GOLD, transform: "translateX(-50%)" } });
+  const dot = (left, top) => h("span", { "aria-hidden": true, className: "absolute rounded-full", style: { left, top, width: 7, height: 7, background: GOLD, transform: "translateX(-50%)" } });
   const minaretDecor = (x) => [
-    h("line", { key: "a" + x, x1: x - 12, y1: 80, x2: x + 12, y2: 80, ...stroke }),
-    h("line", { key: "b" + x, x1: x - 12, y1: 140, x2: x + 12, y2: 140, ...stroke }),
-    h("rect", { key: "c" + x, x: x - 3, y: 102, width: 6, height: 16, rx: 3, fill: GOLD, fillOpacity: 0.5 }),
+    h("line", { key: "a" + x, x1: x - 8, y1: 92, x2: x + 8, y2: 92, ...stroke }),
+    h("line", { key: "b" + x, x1: x - 8, y1: 140, x2: x + 8, y2: 140, ...stroke }),
+    h("rect", { key: "c" + x, x: x - 2.5, y: 106, width: 5, height: 14, rx: 2.5, fill: GOLD, fillOpacity: 0.5 }),
   ];
   return h(
     "div",
-    { className: "relative text-white text-center", style: { height: hasBar ? 288 : 246 } },
+    { className: "relative text-white text-center", style: { height: H } },
     h(
       "svg",
-      { viewBox: "0 0 400 270", preserveAspectRatio: "none", className: "absolute inset-0 w-full h-full pointer-events-none", "aria-hidden": true },
+      { viewBox: `0 0 400 ${H}`, preserveAspectRatio: "none", className: "absolute inset-0 w-full h-full pointer-events-none", "aria-hidden": true },
       h("defs", null,
         h("linearGradient", { id: "wq-grad", x1: 0, y1: 0, x2: 1, y2: 1 },
           h("stop", { offset: 0, style: { stopColor: "var(--theme-primary, #0E4B43)" } }),
           h("stop", { offset: 1, style: { stopColor: "var(--theme-ink, #16302B)" } }))),
       h("path", {
-        d: "M0 270 V58 L17 8 L34 58 V140 C34 80 130 44 200 8 C270 44 366 80 366 140 V58 L383 8 L400 58 V270 Z",
+        d: `M0 ${H} V74 L12 42 L24 74 V140 C24 80 124 44 200 8 C276 44 376 80 376 140 V74 L388 42 L400 74 V${H} Z`,
         fill: "url(#wq-grad)", stroke: GOLD, strokeWidth: 1.6, strokeLinejoin: "round", vectorEffect: "non-scaling-stroke",
       }),
       h("path", {
-        d: "M46 270 V150 C46 96 136 62 200 24 C264 62 354 96 354 150 V270",
+        d: `M38 ${H} V148 C38 96 132 62 200 24 C268 62 362 96 362 148 V${H}`,
         fill: "none", stroke: GOLD, strokeOpacity: 0.45, vectorEffect: "non-scaling-stroke",
       }),
-      minaretDecor(17), minaretDecor(383)
+      minaretDecor(12), minaretDecor(388)
     ),
-    dot("4.25%"), dot("50%"), dot("95.75%"),
+    dot("3%", 38), dot("50%", 4), dot("97%", 38),
     h(
       "div",
-      { className: "relative flex flex-col items-center px-10", style: { paddingTop: 54 } },
-      h("div", { className: "text-[13px] font-bold", style: { color: GOLD } }, waqtInfo.currentKey ? "🟢 এখন চলছে" : "⏳ পরবর্তী ওয়াক্ত"),
-      h("div", { className: "text-4xl font-bold leading-none mt-1.5" }, waqtInfo.name),
-      h("div", { className: "text-[13px] opacity-80 mt-1.5" }, waqtInfo.label),
+      { className: "relative flex flex-col items-center px-9", style: { paddingTop: 62 } },
       h(
         "div",
-        { className: "flex gap-2 w-full mt-3.5", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
+        { className: "flex items-baseline justify-center gap-2 whitespace-nowrap" },
+        h("span", { className: "text-3xl font-bold leading-none" }, waqtInfo.name),
+        h("span", { className: "text-xs opacity-85" }, waqtInfo.currentKey ? h("span", { style: { color: GOLD } }, "● ") : null, waqtInfo.label)
+      ),
+      h(
+        "div",
+        { className: "flex gap-2 w-full mt-2.5", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
         parts.map(([n, u]) =>
           h(
             "div",
-            { key: u, className: "flex-1 min-w-0 rounded-2xl border border-white/20 bg-white/10 py-1.5" },
-            h("b", { className: "block text-[32px] leading-[1.1]", style: { fontFamily: "'Hind Siliguri', sans-serif" } }, toBn(String(n).padStart(2, "0"))),
-            h("small", { className: "text-xs opacity-80" }, u)
+            { key: u, className: "flex-1 min-w-0 rounded-xl border border-white/20 bg-white/10 py-1" },
+            h("b", { className: "block text-[26px] leading-[1.15]", style: { fontFamily: "'Hind Siliguri', sans-serif" } }, toBn(String(n).padStart(2, "0"))),
+            h("small", { className: "text-[11px] opacity-80" }, u)
           )
         )
       ),
       hasBar &&
         h(
           "div",
-          { className: "w-full mt-5" },
+          { className: "w-full mt-3" },
           h(
             "div",
             { className: "h-[5px] rounded-full bg-white/20 overflow-hidden", role: "progressbar", "aria-valuenow": pct, "aria-valuemin": 0, "aria-valuemax": 100 },
@@ -976,12 +980,12 @@ export function PrayerTimes({ layout } = {}) {
       /*#__PURE__*/React.createElement(
         "div",
         {
-          className: "bg-white p-4 " + (waqtInfo ? "rounded-b-3xl" : "rounded-3xl"),
+          className: "bg-white px-4 pt-3 pb-2 " + (waqtInfo ? "rounded-b-3xl" : "rounded-3xl"),
           style: { border: "1.5px solid #E3C26B", borderTop: waqtInfo ? "2px dashed #E3C26B" : "1.5px solid #E3C26B", marginTop: waqtInfo ? -1 : 0 },
         },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "text-sm font-bold text-emerald-950 mb-2 flex items-center gap-1.5" },
+          { className: "text-sm font-bold text-emerald-950 mb-1 flex items-center gap-1.5" },
           /*#__PURE__*/React.createElement(MosqueLineIcon, { size: 20, style: { color: "var(--theme-primary, #0E4B43)" } }),
           "সালাতের সময়সূচি"
         ),
@@ -991,7 +995,7 @@ export function PrayerTimes({ layout } = {}) {
             {
               key: r.key,
               className:
-                "relative flex items-center gap-3 text-sm py-1 px-2 rounded-xl " +
+                "relative flex items-center gap-3 text-sm py-0.5 px-2 rounded-xl " +
                 (waqtInfo && waqtInfo.currentKey === r.key
                   ? "bg-[#F3EEDD] font-bold"
                   : r.end && now >= r.end ? "opacity-60" : ""),
@@ -1018,7 +1022,7 @@ export function PrayerTimes({ layout } = {}) {
                 onClick: () => toggleDone(r.key),
                 "aria-label": `${r.label} পড়া হয়েছে`,
                 "aria-pressed": !!doneToday[r.key],
-                className: "shrink-0 w-8 h-8 -mr-1 flex items-center justify-center",
+                className: "shrink-0 w-8 h-7 -mr-1 flex items-center justify-center",
               },
               /*#__PURE__*/React.createElement(
                 "span",
