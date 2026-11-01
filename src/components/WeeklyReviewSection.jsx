@@ -27,6 +27,7 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
   const [prevGoal, setPrevGoal] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [errCode, setErrCode] = useState(""); // সর্বশেষ Firestore error code (যেমন permission-denied)
   const [closed, setClosed] = useState([]); // বদ্ধ ঘর — কখনো সেভ হয় না
   const isProxy = !!(member && "googleUid" in member && member.googleUid === null);
   const weekKey = chunkWeekKey(year, month0, week);
@@ -42,7 +43,7 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
     setClosed([]); setStep(1); setSaveState("idle");
     if (!open || locked || migrationState !== "v2" || !memberId) { setStatus("idle"); return undefined; }
     let alive = true;
-    setStatus("loading");
+    setStatus("loading"); setErrCode("");
     const p = prevChunk(year, month0, week);
     Promise.all([
       loadReview(migrationState, memberId, weekKey),
@@ -53,7 +54,12 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
       setPrevGoal(g);
       setForm(cur ? { ...cur } : { goalText: g });
       setStatus("ready");
-    }).catch(() => { if (alive) setStatus("error"); });
+    }).catch(e => {
+      // পড়া ব্যর্থ হলেও ফর্ম খোলা থাকবে (লেখা যাবে); সেভের সময় আবার চেষ্টা হবে
+      if (!alive) return;
+      setErrCode((e && e.code) || "unknown");
+      setPrevGoal(""); setForm({}); setStatus("ready");
+    });
     return () => { alive = false; };
   }, [open, locked, migrationState, memberId, weekKey]);
 
@@ -102,7 +108,8 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
       Object.keys(data).forEach(k => { if (data[k] === "" || (Array.isArray(data[k]) && !data[k].length)) delete data[k]; });
       await saveReview(migrationState, memberId, weekKey, data);
       setSaveState("saved");
-    } catch {
+    } catch (e) {
+      setErrCode((e && e.code) || "unknown");
       setSaveState("error");
     }
   }
@@ -120,9 +127,9 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
     if (locked) body = <p className="text-sm text-slate-500 mt-3">{T.lockedNote}</p>;
     else if (migrationState !== "v2") body = <p className="text-sm text-slate-500 mt-3">{T.errors.needV2}</p>;
     else if (status === "loading" || status === "idle") body = <p className="text-sm text-slate-400 mt-3">…</p>;
-    else if (status === "error") body = <p className="text-sm text-red-700 mt-3">{T.errors.saveFailed}</p>;
     else body = (
       <div className="mt-3">
+        {errCode && <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 p-2 mb-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.loadFailed}</p>}
         <div className="flex flex-wrap gap-1.5 mb-2">
           {Array.from({ length: chunkCount(year, month0) }, (_, i) => i + 1).map(w => (
             <button key={w} type="button" onClick={() => setWeek(w)} className={chip(w === week)}>সপ্তাহ {toBn(w)}</button>
@@ -226,7 +233,7 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
             <input maxLength={300} value={form.gratitude || ""} onChange={e => set("gratitude", e.target.value)} className={box + " mb-3"} />
             <button type="button" disabled={saveState === "saving"} onClick={onSave} className="w-full py-3 rounded-2xl bg-emerald-900 text-white font-bold disabled:opacity-60">✔ {T.next.save}</button>
             {saveState === "saved" && <p className="text-sm text-emerald-800 text-center mt-2">{T.saved}</p>}
-            {saveState === "error" && <p className="text-sm text-red-700 text-center mt-2">{T.errors.saveFailed}</p>}
+            {saveState === "error" && <p className="text-sm text-red-700 text-center mt-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.saveFailed}</p>}
             <p className="text-[11px] text-slate-500 text-center mt-2">🔒 {T.next.privacy}</p>
             <p className="text-xs text-slate-500 mt-2">🔁 {T.next.loop}</p>
           </div>
