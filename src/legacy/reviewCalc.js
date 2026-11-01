@@ -56,4 +56,37 @@ function monthDelta(prevPct, curPct) {
   return Math.round(curPct) - Math.round(prevPct);
 }
 
-export { weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
+// days: [{ day, entry|null }] ; fields: ফিল্ড-তালিকা ; ratioOf(field, entry) ⇒ 0..1 বা null ;
+// applies(field) ⇒ bool ; excused(field, entry) ⇒ bool (ওজরের দিন গণনার বাইরে)।
+// ফেরত: ঘাটতির তালিকা (সবচেয়ে বেশি দিন ছুটে যাওয়া আগে)। ২ দিনের কম ডেটা থাকলে ফিল্ড বাদ।
+function weeklyGap({ days, fields, ratioOf, applies, excused }) {
+  const rows = [];
+  for (const f of fields || []) {
+    if (!applies(f)) continue;
+    let logged = 0, missed = 0, sum = 0;
+    for (const d of days || []) {
+      if (!d || !d.entry || excused(f, d.entry)) continue;
+      const r = ratioOf(f, d.entry);
+      if (r === null || r === undefined || !Number.isFinite(r)) continue;
+      logged += 1; sum += r;
+      if (r < 1) missed += 1;
+    }
+    if (logged >= 2 && missed > 0) rows.push({ key: f.key, logged, missed, avgPct: Math.round((sum / logged) * 100) });
+  }
+  rows.sort((a, b) => b.missed - a.missed || a.avgPct - b.avgPct || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return rows;
+}
+
+// count-ধরনের ফিল্ডের (যেমন জামায়াত, max=৫) সপ্তাহের মোট: { sum, possible, days }
+function countFieldTotal(days, key, max) {
+  let sum = 0, n = 0;
+  for (const d of days || []) {
+    if (!d || !d.entry) continue;
+    const v = Number(d.entry[key]);
+    if (!Number.isFinite(v)) continue;
+    sum += Math.min(max, Math.max(0, v)); n += 1;
+  }
+  return { sum, possible: max * n, days: n };
+}
+
+export { weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };

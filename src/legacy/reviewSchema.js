@@ -16,11 +16,24 @@ const WEEK_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 
-// সপ্তাহ শুরু = রবিবার (মক-আপের সাথে মিল)। key = সেই রবিবারের স্থানীয় তারিখ YYYY-MM-DD।
-function weekKeyOf(date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setDate(d.getDate() - d.getDay());
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+// অ্যাপের সাপ্তাহিক রিফ্লেকশনের মতোই সপ্তাহ = মাসের ৭-দিনের খণ্ড (১-৭, ৮-১৪, ... শেষটা ছোট হতে পারে)।
+// weekKey = খণ্ডের প্রথম দিনের তারিখ YYYY-MM-DD (মাস পেরোনো জটিলতা নেই)।
+function daysInMonthOf(year, month0) { return new Date(year, month0 + 1, 0).getDate(); }
+function chunkCount(year, month0) { return Math.ceil(daysInMonthOf(year, month0) / 7); }
+function chunkOfDay(day) { return Math.floor((day - 1) / 7) + 1; }
+function chunkRange(year, month0, week) {
+  const start = (week - 1) * 7 + 1;
+  return { start, end: Math.min(start + 6, daysInMonthOf(year, month0)) };
+}
+function chunkWeekKey(year, month0, week) {
+  return `${year}-${pad2(month0 + 1)}-${pad2((week - 1) * 7 + 1)}`;
+}
+// আগের খণ্ড: week>1 হলে একই মাসের week-1, নইলে আগের মাসের শেষ খণ্ড।
+function prevChunk(year, month0, week) {
+  if (week > 1) return { year, month0, week: week - 1 };
+  const y = month0 === 0 ? year - 1 : year;
+  const m = month0 === 0 ? 11 : month0 - 1;
+  return { year: y, month0: m, week: chunkCount(y, m) };
 }
 
 function reviewDocId(memberId, weekKey) {
@@ -64,4 +77,4 @@ function validateReview(input) {
   return { ok: true, value: out };
 }
 
-export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, weekKeyOf, reviewDocId, validateReview };
+export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview };

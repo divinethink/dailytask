@@ -577,6 +577,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
+import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
@@ -3269,7 +3270,21 @@ function App() {
       monthCursor: monthCursor
     })
   }),
-    weekly: fold => /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
+    weekly: fold => /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+    fold: fold,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice || isLockedForSwitch,
+    monthCursor: monthCursor,
+    monthEntries: monthEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS
+  }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
     fold: fold,
     addWeeklyRow: addWeeklyRow,
     handleSaveWeekly: handleSaveWeekly,
@@ -3290,7 +3305,7 @@ function App() {
     weeklyDirtyRef: weeklyDirtyRef,
     meetingDirtyRef: meetingDirtyRef,
     BN_MONTHS: BN_MONTHS
-  }),
+  })),
     meeting: fold => /*#__PURE__*/React.createElement(MeetingMinutesSection, {
     fold: fold,
     addMeetingRow: addMeetingRow,

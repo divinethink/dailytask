@@ -20,7 +20,7 @@ const MILESTONES = [7, 30, 100, 365];
 // single-field ratio(0..1) দরকার(dailyScore() পুরো aggregate করে দেয়) — তাই
 // existing tested dailyScore() স্পর্শ না করে ছোট, independent helper রাখা হলো
 // (Owner Rule 1: existing/প্রমাণিত ফাংশন অপরিবর্তিত রাখা)।
-function fieldRatioToday(field, entry) {
+export function fieldRatioToday(field, entry) {
   if (!entry) return null;
   if (field.type === "bool") return entry[field.key] ? 1 : 0;
   if (field.type === "count") {

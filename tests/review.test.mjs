@@ -1,16 +1,22 @@
 // চালান: node --test tests/   (কোনো dependency লাগে না)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { weekKeyOf, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
-import { weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
+import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
+import { weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 
 const base = { memberId: "m-1", weekKey: "2026-11-01", updatedAt: 1 };
 
-test("weekKeyOf: রবিবার-শুরু", () => {
-  assert.equal(weekKeyOf(new Date(2026, 10, 1)), "2026-11-01");   // রবি
-  assert.equal(weekKeyOf(new Date(2026, 10, 7)), "2026-11-01");   // শনি
-  assert.equal(weekKeyOf(new Date(2026, 10, 8)), "2026-11-08");   // পরের রবি
-  assert.equal(weekKeyOf(new Date(2027, 0, 2)), "2026-12-27");    // বছর পেরোনো
+test("সপ্তাহ-খণ্ড", () => {
+  assert.equal(chunkCount(2026, 10), 5);           // নভেম্বর ৩০ দিন ⇒ ৫ (শেষটা ২ দিনের)
+  assert.equal(chunkCount(2026, 1), 4);            // ফেব্রুয়ারি ২৮ ⇒ ৪
+  assert.deepEqual(chunkRange(2026, 10, 5), { start: 29, end: 30 });
+  assert.deepEqual(chunkRange(2026, 10, 1), { start: 1, end: 7 });
+  assert.equal(chunkOfDay(7), 1); assert.equal(chunkOfDay(8), 2); assert.equal(chunkOfDay(30), 5);
+  assert.equal(chunkWeekKey(2026, 10, 1), "2026-11-01");
+  assert.equal(chunkWeekKey(2026, 10, 5), "2026-11-29");
+  assert.deepEqual(prevChunk(2026, 10, 3), { year: 2026, month0: 10, week: 2 });
+  assert.deepEqual(prevChunk(2026, 10, 1), { year: 2026, month0: 9, week: 5 });  // অক্টোবর ৩১ ⇒ ৫
+  assert.deepEqual(prevChunk(2026, 0, 1), { year: 2025, month0: 11, week: 5 });  // বছর পেরোনো
 });
 test("reviewDocId", () => assert.equal(reviewDocId("m-1", "2026-11-01"), "m-1_2026-11-01"));
 
@@ -66,4 +72,24 @@ test("monthDelta", () => {
   assert.equal(monthDelta(61, 67), 6);
   assert.equal(monthDelta(67.4, 61.2), -6);
   assert.equal(monthDelta(null, 50), null);
+});
+
+test("weeklyGap: বেশি ছুটে যাওয়া আগে, ওজর ও অল্প ডেটা বাদ", () => {
+  const fields = [{ key: "a" }, { key: "b" }, { key: "c" }, { key: "d" }];
+  const vals = {
+    a: [1, 0, 0], b: [1, 1, 0], c: [1, 1, 1], d: [0],
+  };
+  const days = [0, 1, 2].map(i => ({ day: i + 1, entry: { i } }));
+  const rows = weeklyGap({
+    days, fields,
+    ratioOf: (f, e) => (vals[f.key][e.i] === undefined ? null : vals[f.key][e.i]),
+    applies: f => f.key !== "zzz",
+    excused: (f, e) => f.key === "b" && e.i === 2,
+  });
+  assert.deepEqual(rows.map(r => r.key), ["a"]);     // b: ওজর বাদে ২ দিনই পূর্ণ; c পূর্ণ; d ১ দিন
+  assert.equal(rows[0].missed, 2); assert.equal(rows[0].avgPct, 33);
+});
+test("countFieldTotal", () => {
+  const r = countFieldTotal([{ entry: { j: 5 } }, { entry: { j: 9 } }, { entry: {} }, { entry: null }], "j", 5);
+  assert.deepEqual(r, { sum: 10, possible: 10, days: 2 });
 });
