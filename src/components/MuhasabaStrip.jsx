@@ -47,7 +47,7 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
 
   return React.createElement(
     "div",
-    { className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
+    { className: "bg-[#FFF8E7] rounded-2xl p-4 border-2 border-[#C89B3C]/70 shadow-[0_3px_12px_-3px_rgba(160,120,40,0.3)]" },
     showHm && React.createElement(
       "div",
       { className: "mb-3 flex items-start gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2" },

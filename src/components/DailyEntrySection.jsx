@@ -731,7 +731,7 @@ export function DailyEntrySection({
       className: "text-xs text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
   })(),
-    muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(MuhasabaStrip, {
+    muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MuhasabaStrip, {
       cats: muhasabaCats,
       entry: entry,
       member: selectedMember,
@@ -745,7 +745,11 @@ export function DailyEntrySection({
       onCopyYesterday: copyYesterday,
       toBn: toBn,
       isToday: dateKey(viewDate) === dateKey(new Date())
-    }),
+    }), /*#__PURE__*/React.createElement("div", { className: "flex items-center gap-2 mt-5 -mb-1 px-1", "aria-hidden": false },
+      /*#__PURE__*/React.createElement("span", { className: "flex-1 h-px bg-[#C89B3C]/40" }),
+      /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-emerald-900 whitespace-nowrap" }, "📝 আজকের আমল ট্র্যাকার"),
+      /*#__PURE__*/React.createElement("span", { className: "flex-1 h-px bg-[#C89B3C]/40" })
+    )),
     ...(() => { const m = {};
     /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
        আগে এখানে ২টা flat FieldGroup(দৈনন্দিন আমল = পুরো DEFAULT_DEEN_FIELDS একসাথে,

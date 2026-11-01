@@ -1084,16 +1084,6 @@ export function PrayerTimes({ layout } = {}) {
         )
       )
     ),
-    shortcuts: (
-    // §শর্টকাট
-    schedule &&
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "mx-4 grid grid-cols-2 gap-2" },
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("qibla"), className: "bg-white rounded-xl py-3.5 text-sm font-bold text-emerald-900 border border-[#C89B3C]/50" }, "🧭 কিবলা দেখুন"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSub("monthly"), className: "bg-white rounded-xl py-3.5 text-sm font-bold text-emerald-900 border border-[#C89B3C]/50" }, "📅 মাসিক সূচি")
-      )
-    ),
   };
   const orderedSections = sanitizePrayerOrder(layout).map((k) => sectionEls[k]);
 
@@ -1180,7 +1170,7 @@ export function PrayerTimes({ layout } = {}) {
         { className: "flex items-stretch justify-between gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "min-w-0 flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-2" },
+          { className: "min-w-0 flex-1 flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-1.5" },
           /*#__PURE__*/React.createElement(PinIcon, { size: 16, className: "text-emerald-800 shrink-0" }),
           /*#__PURE__*/React.createElement(
             "div",
@@ -1194,22 +1184,32 @@ export function PrayerTimes({ layout } = {}) {
               )
           )
         ),
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => setSub("qibla"),
+            "aria-label": "কিবলা দেখুন",
+            className: "shrink-0 bg-white rounded-2xl border border-[#C89B3C]/60 px-3.5 text-sm font-bold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap active:opacity-60",
+          },
+          "🧭 কিবলা"
+        )
+      ),
         location &&
-          /*#__PURE__*/React.createElement(
+        /*#__PURE__*/React.createElement(
             "button",
             {
               type: "button",
               onClick: handleRefresh,
               disabled: gpsBusy || loading,
               "aria-label": "রিফ্রেশ করুন",
-              className: "shrink-0 bg-white rounded-2xl border border-slate-200 px-3 text-xs font-semibold text-emerald-900 flex items-center gap-1.5 whitespace-nowrap active:opacity-60 disabled:opacity-70",
+              className: "mt-1.5 w-full bg-white rounded-xl border border-slate-200 py-1.5 text-xs font-semibold text-emerald-900 flex items-center justify-center gap-1.5 whitespace-nowrap active:opacity-60 disabled:opacity-70",
             },
             gpsBusy || loading
               ? /*#__PURE__*/React.createElement(Loader2, { size: 13, className: "animate-spin" })
               : /*#__PURE__*/React.createElement(RefreshIcon, { size: 13 }),
             gpsBusy || loading ? "আপডেট হচ্ছে…" : "রিফ্রেশ" + (syncedAt ? ` · ${formatHHMM(new Date(syncedAt))}` : "")
-          )
-      ),
+          ),
       locationPanelOpen &&
         /*#__PURE__*/React.createElement(
           "div",

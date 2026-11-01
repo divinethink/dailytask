@@ -19,7 +19,7 @@ const d = (id, title, defaultFold) => ({ id, title, defaultFold });
 export const CARD_DEFS = {
   entry: [
     d("tazkirah", "আজকের বাণী", "fixed"),
-    d("muhasaba", "আজকের মুহাসাবা", "fixed"),
+    d("muhasaba", "পরবর্তী সালাত ও আমল", "fixed"),
     d("salah", "সালাত ও সিয়াম", "open"),
     d("quranIlm", "কুরআন ও ইলম", "closed"),
     d("dhikrDawah", "যিকির ও দাওয়াহ", "closed"),
@@ -118,8 +118,7 @@ export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },
   { id: "forbidden", title: "নিষিদ্ধ সময়" },
   { id: "other", title: "অন্যান্য সালাত" },
-  { id: "meal", title: "সেহরি ও ইফতার" },
-  { id: "shortcuts", title: "কিবলা ও মাসিক সূচি বাটন" }
+  { id: "meal", title: "সেহরি ও ইফতার" }
 ];
 export function defaultPrayerOrder() {
   return PRAYER_CARD_DEFS.map(x => x.id);

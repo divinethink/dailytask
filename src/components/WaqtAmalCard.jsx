@@ -169,7 +169,7 @@ export function WaqtAmalCard() {
     React.createElement(
       "div",
       { className: "flex flex-wrap items-center gap-1.5" },
-      React.createElement("span", { className: "text-sm font-bold text-emerald-950 mr-1 whitespace-nowrap" }, (guide.current ? "এখন" : "পরবর্তী") + ": " + WAQT_NAME[guide.key]),
+      React.createElement("span", { className: "text-sm font-bold text-emerald-950 mr-1 whitespace-nowrap" }, (guide.current ? "চলতি সালাত" : "পরবর্তী সালাত") + ": " + WAQT_NAME[guide.key]),
       pills.map((x, i) => React.createElement("span", { key: i, className: "text-xs rounded-full px-2.5 py-0.5 whitespace-nowrap " + rakatPillClass(x.label) }, x.label))
     ),
     notes.length > 0 && React.createElement("div", { className: "text-xs text-slate-500 mt-1.5" }, notes.join(" · ")),
