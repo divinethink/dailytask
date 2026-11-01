@@ -326,7 +326,7 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
         expanded[item.itemId] &&
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "px-4 pb-3 text-sm text-slate-600 whitespace-pre-line border-t border-slate-100 pt-2" },
+            { className: "px-4 pb-3 text-sm text-slate-600 leading-relaxed whitespace-pre-line border-t border-slate-100 pt-2" },
             item.body
           )
       )

@@ -60,7 +60,7 @@ function ListRow({ icon, label, subtitle, onClick }) {
       "div",
       { className: "flex-1 min-w-0" },
       React.createElement("div", { className: "text-sm font-semibold text-slate-800 truncate" }, label),
-      subtitle && React.createElement("div", { className: "text-xs text-slate-500 mt-0.5 truncate" }, subtitle)
+      subtitle && React.createElement("div", { className: "text-sm text-slate-500 mt-0.5 truncate" }, subtitle)
     ),
     React.createElement(ToolIcon, { name: "chevronRight", size: 15, color: GOLD })
   );

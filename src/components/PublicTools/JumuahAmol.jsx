@@ -102,7 +102,7 @@ export function JumuahAmol() {
             },
             item.title
           ),
-          /*#__PURE__*/React.createElement("p", { className: "text-xs text-slate-500 mt-0.5" }, item.body)
+          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-500 leading-relaxed mt-0.5" }, item.body)
         )
       )
     ),
