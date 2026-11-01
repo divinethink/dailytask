@@ -931,7 +931,9 @@ function App() {
   // discarding them — mirrors the existing meetingDirtyRef pattern.
   const entryDirtyRef = useRef(false);
   const weeklyDirtyRef = useRef(false);
-  // সোয়াইপে মাস বদল (মাসিক ওভারভিউ/সাপ্তাহিক মুহাসাবা/মাসিক মুহাসাবা) — ◀ ▶ বাটনের হুবহু একই dirty-confirm।
+  // সোয়াইপে মাস বদল (মাসিক ওভারভিউ/মাসিক মুহাসাবা/সাপ্তাহিক মুহাসাবা/পারিবারিক সভা) — ◀ ▶ বাটনের হুবহু একই dirty-confirm।
+  // সোয়াইপ-পরবর্তী ছোট টোস্টে দেখানোর মাসের নাম(দৃশ্যমান ফিডব্যাক — ভাঁজ-বন্ধ কার্ডেও মাস বদল বোঝা যায়)
+  const swipeMonthLabel = (c) => BN_MONTHS[c.month0] + " " + toBn(c.year);
   const swipeShiftMonth = (delta) => {
     if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
     setMonthCursor((c) => shiftMonthCursor(c, delta));
@@ -3247,7 +3249,7 @@ function App() {
     suggestedFieldKey: suggestedFocusKey,
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
   }),
-    monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+    monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
@@ -3288,7 +3290,7 @@ function App() {
       monthCursor: monthCursor
     })
   })),
-    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
+    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
@@ -3306,7 +3308,7 @@ function App() {
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
   })),
-    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
@@ -3321,7 +3323,7 @@ function App() {
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
-    meeting: fold => /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
     fold: fold,
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,
@@ -3339,7 +3341,7 @@ function App() {
     setMonthRefreshKey: setMonthRefreshKey,
     weeklyDirtyRef: weeklyDirtyRef,
     meetingDirtyRef: meetingDirtyRef
-  })
+  }))
   })), React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})), React.createElement(FamilyCodeChoiceModal, {
     show: showFamilyCodeChoiceModal,
     onClose: () => setShowFamilyCodeChoiceModal(false),
