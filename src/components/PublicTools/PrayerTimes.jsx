@@ -1173,7 +1173,7 @@ export function PrayerTimes({ layout } = {}) {
           { className: "min-w-0 flex-1 flex items-start" },
           /*#__PURE__*/React.createElement(
             "div",
-            { className: "max-w-full flex items-center gap-1.5 bg-white rounded-xl border border-slate-200 px-2 py-1 shadow-sm" },
+            { className: "max-w-full flex items-center gap-1.5 py-1" },
             /*#__PURE__*/React.createElement(PinIcon, { size: 15, className: "text-emerald-800 shrink-0" }),
             /*#__PURE__*/React.createElement(
               "div",
