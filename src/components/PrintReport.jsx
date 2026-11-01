@@ -4,8 +4,13 @@
 // printMode is true (same control-flow, just delegated). All module-level helpers
 // passed as explicit props (not assumed global — see G1 toBn lesson).
 import { Printer } from "./icons.jsx";
+import { loadReviewsForWeeks } from "../legacy/reviewData.js";
+import { chunkWeekKey } from "../legacy/reviewSchema.js";
 
-const { useEffect } = React;
+const { useEffect, useState } = React;
+
+// "লক্ষ্য ও ফল" কলামের আইকন। শুধু লক্ষ্যের লেখা ও ফল ছাপা হয়; হক/বাধা/কারণ/শুকরিয়া বা বদ্ধ ঘর কখনো নয়।
+const GOAL_ICON = { done: "✅", partial: "🟡", none: "❌" };
 
 // PDF filename suggestion: browser's "Save as PDF" print-dialog uses
 // document.title as the default filename. English month names used here
@@ -19,6 +24,8 @@ export function PrintReport({
   monthCursor,
   monthEntries,
   monthStats,
+  migrationState,
+  locked,
   printMode,
   selectedMember,
   setPrintMode,
@@ -44,6 +51,21 @@ export function PrintReport({
       document.title = prevTitle;
     };
   }, [printMode, selectedMember, monthCursor]);
+  // নিজের সাপ্তাহিক লক্ষ্য ও ফল (reviews): শুধু নিজের প্রোফাইল (locked নয়) ও v2। না পেলে/ব্যর্থ হলে কলাম বাদ, PDF আগের মতো।
+  const [goalRows, setGoalRows] = useState({});
+  useEffect(() => {
+    if (!printMode || locked || migrationState !== "v2" || !selectedMember || !selectedMember.id) { setGoalRows({}); return undefined; }
+    let alive = true;
+    const keys = getWeekRanges(monthStats.total).slice(0, weeklyRowCount).map(r => chunkWeekKey(monthCursor.year, monthCursor.month0, r.week));
+    loadReviewsForWeeks(migrationState, selectedMember.id, keys).then(list => {
+      if (!alive) return;
+      const m = {};
+      list.forEach(r => { if (r.goalText || r.goalResult) m[r.weekKey] = { text: r.goalText || "", result: r.goalResult || "" }; });
+      setGoalRows(m);
+    });
+    return () => { alive = false; };
+  }, [printMode, locked, migrationState, selectedMember, monthCursor, weeklyRowCount, monthStats.total, getWeekRanges]);
+  const showGoalCol = Object.keys(goalRows).length > 0;
   const total = monthStats.total;
     const rows = Array.from({
       length: total
@@ -207,21 +229,27 @@ export function PrintReport({
       style: {
         width: "10%"
       }
-    }, "সপ্তাহ"), /*#__PURE__*/React.createElement("th", {
+    }, "সপ্তাহ"), showGoalCol && /*#__PURE__*/React.createElement("th", {
       style: {
-        width: "30%",
+        width: "22%",
+        textAlign: "left",
+        paddingLeft: "8px"
+      }
+    }, "লক্ষ্য ও ফল"), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: showGoalCol ? "23%" : "30%",
         textAlign: "left",
         paddingLeft: "8px"
       }
     }, "যা ভালো হয়েছে"), /*#__PURE__*/React.createElement("th", {
       style: {
-        width: "30%",
+        width: showGoalCol ? "23%" : "30%",
         textAlign: "left",
         paddingLeft: "8px"
       }
     }, "কোথায় ঘাটতি ছিল"), /*#__PURE__*/React.createElement("th", {
       style: {
-        width: "30%",
+        width: showGoalCol ? "22%" : "30%",
         textAlign: "left",
         paddingLeft: "8px"
       }
@@ -242,7 +270,15 @@ export function PrintReport({
         fontWeight: 400,
         color: "#555"
       }
-    }, "(", toBn(start), "-", toBn(end), ")")), /*#__PURE__*/React.createElement("td", {
+    }, "(", toBn(start), "-", toBn(end), ")")), showGoalCol && /*#__PURE__*/React.createElement("td", {
+      style: {
+        verticalAlign: "top",
+        whiteSpace: "pre-wrap"
+      }
+    }, (() => {
+      const g = goalRows[chunkWeekKey(monthCursor.year, monthCursor.month0, w)];
+      return g ? (GOAL_ICON[g.result] ? GOAL_ICON[g.result] + " " : "") + g.text : "";
+    })()), /*#__PURE__*/React.createElement("td", {
       style: {
         verticalAlign: "top",
         whiteSpace: "pre-wrap"

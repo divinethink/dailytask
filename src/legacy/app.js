@@ -3056,6 +3056,8 @@ function App() {
     monthCursor: monthCursor,
     monthEntries: monthEntries,
     monthStats: monthStats,
+    migrationState: migrationState,
+    locked: isLockedForThisDevice || isLockedForSwitch,
     printMode: printMode,
     selectedMember: selectedMember,
     setPrintMode: setPrintMode,
