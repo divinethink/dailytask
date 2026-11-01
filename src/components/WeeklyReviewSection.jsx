@@ -117,7 +117,6 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
   const head = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
     <div className="flex items-center gap-2">
       <h2 className="font-bold text-base text-slate-800">🌙 {T.title}</h2>
-      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">{T.oldTag}</span>
     </div>,
     fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
   );

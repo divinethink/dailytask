@@ -34,7 +34,7 @@ export const CARD_DEFS = {
     d("focus", "আগামীকালের ফোকাস", "fixed"),
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
     d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "closed"),
-    d("weekly", "সাপ্তাহিক রিফ্লেকশন", "closed"),
+    d("weekly", "সাপ্তাহিক মুহাসাবা", "closed"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")
   ]
 };

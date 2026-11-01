@@ -579,7 +579,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
-import { WeeklyReflectionSection, MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
+import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
 // rotating card। selectDailyInsight() pure-compute(কোনো নতুন Firestore read/
@@ -3320,27 +3320,6 @@ function App() {
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable,
     toBn: toBn,
-    BN_MONTHS: BN_MONTHS
-  }), /*#__PURE__*/React.createElement(WeeklyReflectionSection, {
-    fold: fold,
-    addWeeklyRow: addWeeklyRow,
-    handleSaveWeekly: handleSaveWeekly,
-    isLockedForSwitch: isLockedForSwitch,
-    isLockedForThisDevice: isLockedForThisDevice,
-    monthStats: monthStats,
-    savingWeekly: savingWeekly,
-    setShowWeeklyInfoModal: setShowWeeklyInfoModal,
-    updateWeekly: updateWeekly,
-    weekly: weekly,
-    weeklyRowCount: weeklyRowCount,
-    weeklySavedTick: weeklySavedTick,
-    getWeekRanges: getWeekRanges,
-    toBn: toBn,
-    monthCursor: monthCursor,
-    setMonthCursor: setMonthCursor,
-    setMonthRefreshKey: setMonthRefreshKey,
-    weeklyDirtyRef: weeklyDirtyRef,
-    meetingDirtyRef: meetingDirtyRef,
     BN_MONTHS: BN_MONTHS
   })),
     meeting: fold => /*#__PURE__*/React.createElement(MeetingMinutesSection, {
