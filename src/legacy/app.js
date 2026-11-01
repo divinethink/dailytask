@@ -2798,57 +2798,49 @@ function App() {
   // §Order swap(১৬ সেপ্টেম্বর ২০২৬, owner-approved): ডিসপ্লে মোড এখন থিম
   // কালার-এর উপরে — শুধু render-order বদলেছে, দুই ব্লকের ভিতরের
   // logic/structure/props অপরিবর্তিত(byte-identical, শুধু অবস্থান বদল)।
-  const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "ডিসপ্লে মোড (চোখের সুরক্ষা)"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
-  }, DISPLAY_MODES.map(m => /*#__PURE__*/React.createElement("button", {
-    key: m.id,
-    type: "button",
-    onClick: () => setDisplayMode(m.id),
-    className: "px-3 h-8 rounded-full text-xs font-bold border-2 transition-transform active:scale-95",
-    style: {
-      borderColor: displayMode === m.id ? "#16302B" : "#E4E7E2",
-      background: displayMode === m.id ? "#16302B" : "#FFFFFF",
-      color: displayMode === m.id ? "#FFFFFF" : "#5B6B64"
-    }
-  }, m.name)))),
-  /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 my-1"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-  }, "থিম কালার"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-4 py-1 flex-wrap"
-  }, THEME_PRESETS.map(t => /*#__PURE__*/React.createElement("button", {
-    key: t.id,
-    type: "button",
-    onClick: () => setThemeColor(t.color),
-    title: t.name,
-    className: "rounded-xl overflow-hidden text-left border-2 transition-transform active:scale-95",
-    style: {
-      width: "calc(50% - 4px)",
-      background: t.page,
-      borderColor: themeColor === t.color ? t.color : "#E4E7E2"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-5",
-    style: { background: t.color }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-1 px-2 pt-1.5"
-  }, [t.color, t.accent, t.page].map((c, i) => /*#__PURE__*/React.createElement("span", {
-    key: i,
-    className: "h-1.5 flex-1 rounded-full",
-    style: { background: c, border: "1px solid rgba(0,0,0,0.08)" }
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "px-2 py-1.5 text-xs font-bold",
-    style: { color: t.color }
-  }, (themeColor === t.color ? "✓ " : "") + t.name))))));
+  // §Menu UI polish(১ নভেম্বর ২০২৬): ডিসপ্লে মোড + থিম এখন একটাই "অ্যাপের চেহারা" কার্ড
+  // (segmented-control + ৩-কলাম থিম গ্রিড)। logic(setDisplayMode/setThemeColor/তুলনা) অপরিবর্তিত।
+  const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "px-2 pt-1 text-[11px] font-bold tracking-wider text-slate-500" }, "অ্যাপের চেহারা"),
+    React.createElement("div", {
+      className: "bg-white rounded-2xl shadow-sm border p-4 space-y-4",
+      style: { borderColor: "var(--theme-line, #E2E8F0)" }
+    },
+      React.createElement("div", null,
+        React.createElement("div", { className: "text-xs font-bold text-slate-600 mb-2" }, "ডিসপ্লে মোড (চোখের সুরক্ষা)"),
+        React.createElement("div", { className: "grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-100", role: "group" },
+          DISPLAY_MODES.map(m => React.createElement("button", {
+            key: m.id,
+            type: "button",
+            onClick: () => setDisplayMode(m.id),
+            "aria-pressed": displayMode === m.id,
+            className: "min-h-[40px] px-1 rounded-lg text-xs font-bold leading-tight transition-colors active:scale-95",
+            style: displayMode === m.id
+              ? { background: "var(--theme-primary)", color: "#FFFFFF" }
+              : { background: "transparent", color: "#5B6B64" }
+          }, m.name)))),
+      React.createElement("div", null,
+        React.createElement("div", { className: "text-xs font-bold text-slate-600 mb-2" }, "থিম কালার"),
+        React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+          THEME_PRESETS.map(t => {
+            const on = themeColor === t.color;
+            return React.createElement("button", {
+              key: t.id,
+              type: "button",
+              onClick: () => setThemeColor(t.color),
+              title: t.name,
+              "aria-pressed": on,
+              className: "rounded-xl overflow-hidden text-left border-2 transition-transform active:scale-95",
+              style: { background: t.page, borderColor: on ? t.color : "#E4E7E2", boxShadow: on ? "0 0 0 2px " + t.color + "33" : "none" }
+            },
+              React.createElement("div", { className: "h-6", style: { background: t.color } }),
+              React.createElement("div", { className: "flex gap-1 px-2 pt-1.5" }, [t.color, t.accent, t.page].map((c, i) => React.createElement("span", {
+                key: i,
+                className: "h-1.5 flex-1 rounded-full",
+                style: { background: c, border: "1px solid rgba(0,0,0,0.08)" }
+              }))),
+              React.createElement("div", { className: "px-2 py-1.5 text-[11px] font-bold leading-tight", style: { color: t.color } }, (on ? "✓ " : "") + t.name));
+          })))));
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing

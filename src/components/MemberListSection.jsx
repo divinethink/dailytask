@@ -16,6 +16,9 @@
 // Rules-level এখন blocked(উভয় real family-ই ইতিমধ্যে google-only)।
 import { InfoIcon, Plus, Trash, User, UsersIcon } from "./icons.jsx";
 
+// §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested): শুধু লেআউট/স্টাইল — সব onClick/শর্ত/
+// guard(dirty-confirm, isAdmin, isLockedForSwitch, uid-যাচাই) আগের মতোই অপরিবর্তিত।
+// সারি এখন দুই-স্তর(নাম+অবতার উপরে, অ্যাকশন নিচে wrap-সহ) — মোবাইলে বাটন ঠাসাঠাসি/স্ক্রল নেই।
 export function MemberListSection({
   members,
   selectedId,
@@ -32,90 +35,102 @@ export function MemberListSection({
   handleRemoveAdmin,
   handleRemoveMember,
   setAddingMember
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    className: "py-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between gap-1"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1"
-  }, /*#__PURE__*/React.createElement(UsersIcon, {
-    size: 12
-  }), " সদস্যবৃন্দ"),
-  // §Add-Member-button fix(১২ সেপ্টেম্বর ২০২৬, owner-reported): আগে
-  // addingMember ফর্ম শুধু family-তে সদস্য একদম শূন্য থাকলে(প্রথম-সদস্য
-  // setup) auto-open হতো — এরপর কোনো persistent "+" বাটন কোথাও ছিল না,
-  // ফলে admin ২য়/৩য় সদস্য যোগ করতে পারতেন না। এটা এই সেশনের কোনো
-  // পরিবর্তনের কারণে হয়নি(pre-existing gap), এখন fix করা হলো।
-  isAdmin && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      setIsMenuOpen(false);
-      setAddingMember(true);
+}) {  const h = React.createElement;
+  const uidsOf = m => m.googleUid ? [m.googleUid] : (m.ownerUids || []);
+  const myUid = auth.currentUser && auth.currentUser.uid;
+  return h("div", null,
+    h("div", {
+      className: "px-4 py-3 flex items-center justify-between gap-2 border-b",
+      style: { borderColor: "var(--theme-line, #E2E8F0)" }
     },
-    className: "flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case",
-    title: "নতুন সদস্য যোগ করুন"
-  }, /*#__PURE__*/React.createElement(Plus, { size: 11 }), " নতুন সদস্য")), /*#__PURE__*/React.createElement("div", {
-    className: "max-h-36 overflow-y-auto custom-scrollbar px-2"
-  }, members.map(m => /*#__PURE__*/React.createElement("div", {
-    key: m.id,
-    onClick: () => {
-      if (m.id !== selectedId && (entryDirtyRef.current || weeklyDirtyRef.current) && !window.confirm("সেভ না করা পরিবর্তন আছে (দৈনিক এন্ট্রি/সাপ্তাহিক রিফ্লেকশন)। সদস্য পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
-      setSelectedId(m.id);
-      setIsMenuOpen(false);
-    },
-    className: `flex items-center justify-between flex-nowrap gap-x-1 px-2 py-1.5 rounded-lg cursor-pointer group ${m.id === selectedId ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"}`
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1.5 shrink-0"
-  }, /*#__PURE__*/React.createElement(User, {
-    size: 13
-  }), " ", m.name), /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center flex-nowrap justify-end gap-0.5 overflow-x-auto"
-  }, m.id === selectedId && /*#__PURE__*/React.createElement("span", {
-    className: "w-2 h-2 rounded-full bg-emerald-600"
-  }), (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(auth.currentUser && auth.currentUser.uid) ? /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      handleReleaseMember(m);
-    },
-    disabled: isLockedForSwitch,
-    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0",
-    title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
-  }, "আপনি") : /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-1"
-  }, !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && /*#__PURE__*/React.createElement("span", {
-    onClick: e => {
-      e.stopPropagation();
-    },
-    className: "text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0 flex items-center gap-0.5 cursor-default",
-    title: "অন্য ডিভাইসের দায়িত্বে আছে"
-  }, /*#__PURE__*/React.createElement(InfoIcon, {
-    size: 10
-  }))), isAdmin && !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).some(u => !adminUidsList.includes(u)) && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      handleMakeAdmin(m);
-    },
-    disabled: isLockedForSwitch,
-    className: "text-[11px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shrink-0 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 whitespace-nowrap",
-    title: "এডমিন করুন"
-  }, "Make Admin"), isAdmin && !!(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).length && (m.googleUid ? [m.googleUid] : (m.ownerUids || [])).some(u => adminUidsList.includes(u)) && !(m.googleUid ? [m.googleUid] : (m.ownerUids || [])).includes(auth.currentUser && auth.currentUser.uid) && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      handleRemoveAdmin(m);
-    },
-    disabled: isLockedForSwitch,
-    className: "text-[11px] font-bold px-1 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100 shrink-0 hover:bg-red-50 hover:text-red-600 hover:border-red-200 whitespace-nowrap",
-    title: "এডমিন পদ থেকে বাদ দিন"
-  }, "Remove Admin"), isAdmin && /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      handleRemoveMember(m);
-    },
-    disabled: isLockedForSwitch,
-    className: "p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 shrink-0",
-    title: "সদস্য বাদ দিন"
-  }, /*#__PURE__*/React.createElement(Trash, {
-    size: 12
-  })))))));
+      h("span", { className: "flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-slate-500" },
+        h(UsersIcon, { size: 13 }), " সদস্যবৃন্দ"),
+      // §Add-Member-button fix(১২ সেপ্টেম্বর ২০২৬): persistent "নতুন সদস্য" বাটন(admin-only)।
+      isAdmin && h("button", {
+        type: "button",
+        onClick: e => {
+          e.stopPropagation();
+          setIsMenuOpen(false);
+          setAddingMember(true);
+        },
+        className: "flex items-center gap-1 text-xs font-bold px-3 h-8 rounded-full active:scale-95 transition-transform",
+        style: { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary)" },
+        title: "নতুন সদস্য যোগ করুন"
+      }, h(Plus, { size: 12 }), " নতুন সদস্য")),
+    h("div", { className: "p-2 space-y-1" }, members.map(m => {
+      const selected = m.id === selectedId;
+      const uids = uidsOf(m);
+      const isMine = uids.includes(myUid);
+      const hasOwner = !!uids.length;
+      return h("div", {
+        key: m.id,
+        onClick: () => {
+          if (m.id !== selectedId && (entryDirtyRef.current || weeklyDirtyRef.current) && !window.confirm("সেভ না করা পরিবর্তন আছে (দৈনিক এন্ট্রি/সাপ্তাহিক রিফ্লেকশন)। সদস্য পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+          setSelectedId(m.id);
+          setIsMenuOpen(false);
+        },
+        className: "rounded-xl px-3 py-2.5 cursor-pointer transition-colors " + (selected ? "" : "hover:bg-slate-50 active:bg-slate-50"),
+        style: selected ? { background: "var(--theme-soft, #E8F0EE)" } : undefined
+      },
+        h("div", { className: "flex items-center gap-2.5" },
+          h("span", {
+            className: "w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold",
+            style: selected
+              ? { background: "var(--theme-primary)", color: "#FFFFFF" }
+              : { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary)" },
+            "aria-hidden": "true"
+          }, String(m.name || "?").trim().charAt(0).toUpperCase() || h(User, { size: 14 })),
+          h("span", {
+            className: "flex-1 min-w-0 truncate text-sm " + (selected ? "font-bold" : "font-medium text-slate-700"),
+            style: selected ? { color: "var(--theme-ink, #16302B)" } : undefined
+          }, m.name),
+          selected && h("span", { className: "w-2 h-2 rounded-full shrink-0", style: { background: "var(--theme-primary)" }, "aria-label": "নির্বাচিত" }),
+          isAdmin && h("button", {
+            type: "button",
+            onClick: e => {
+              e.stopPropagation();
+              handleRemoveMember(m);
+            },
+            disabled: isLockedForSwitch,
+            className: "w-9 h-9 -mr-1 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0 disabled:opacity-40",
+            title: "সদস্য বাদ দিন",
+            "aria-label": "সদস্য বাদ দিন"
+          }, h(Trash, { size: 15 }))),
+        (hasOwner || isMine) && h("div", { className: "flex items-center flex-wrap gap-1.5 mt-2 pl-[46px]" },
+          isMine ? h("button", {
+            type: "button",
+            onClick: e => {
+              e.stopPropagation();
+              handleReleaseMember(m);
+            },
+            disabled: isLockedForSwitch,
+            className: "text-xs font-bold px-2.5 h-7 rounded-full border shrink-0",
+            style: { background: "#FFFFFF", color: "var(--theme-primary)", borderColor: "var(--theme-primary)" },
+            title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
+          }, "আপনি") : h("span", {
+            onClick: e => { e.stopPropagation(); },
+            className: "text-xs font-bold px-2 h-7 rounded-full bg-slate-100 text-slate-500 shrink-0 flex items-center gap-1 cursor-default",
+            title: "অন্য ডিভাইসের দায়িত্বে আছে"
+          }, h(InfoIcon, { size: 11 }), " অন্য ডিভাইস"),
+          isAdmin && hasOwner && uids.some(u => !adminUidsList.includes(u)) && h("button", {
+            type: "button",
+            onClick: e => {
+              e.stopPropagation();
+              handleMakeAdmin(m);
+            },
+            disabled: isLockedForSwitch,
+            className: "text-xs font-bold px-2.5 h-7 rounded-full bg-white text-slate-600 border border-slate-200 shrink-0 whitespace-nowrap hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 disabled:opacity-40",
+            title: "এডমিন করুন"
+          }, "Make Admin"),
+          isAdmin && hasOwner && uids.some(u => adminUidsList.includes(u)) && !isMine && h("button", {
+            type: "button",
+            onClick: e => {
+              e.stopPropagation();
+              handleRemoveAdmin(m);
+            },
+            disabled: isLockedForSwitch,
+            className: "text-xs font-bold px-2.5 h-7 rounded-full bg-white text-slate-500 border border-slate-200 shrink-0 whitespace-nowrap hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-40",
+            title: "এডমিন পদ থেকে বাদ দিন"
+          }, "Remove Admin")));
+    })));
 }
