@@ -289,31 +289,7 @@ const WAQT_CHIP = {
   isha: { emoji: "🌙", bg: "linear-gradient(135deg,#C9D6E3,#EDF1F5)" },
 };
 
-// §এখন করণীয়: ওয়াক্তভিত্তিক রাকাত-সংখ্যা(হানাফী / অন্যান্য) ও সংক্ষিপ্ত আমল।
-const WAQT_GUIDE = {
-  1: {
-    fajr: "সুন্নত ২ (ফরজের আগে) · ফরজ ২",
-    dhuhr: "সুন্নত ৪ · ফরজ ৪ · সুন্নত ২ · নফল ২",
-    asr: "ফরজ ৪ (আগে ৪ রাকাত গায়রে-মুয়াক্কাদা সুন্নত)",
-    maghrib: "ফরজ ৩ · সুন্নত ২ · নফল ২",
-    isha: "ফরজ ৪ · সুন্নত ২ · নফল ২ · বিতর ৩",
-  },
-  0: {
-    fajr: "সুন্নত ২ (ফরজের আগে) · ফরজ ২",
-    dhuhr: "সুন্নত ২ · ফরজ ৪ · সুন্নত ২",
-    asr: "ফরজ ৪ রাকাত",
-    maghrib: "ফরজ ৩ · সুন্নত ২",
-    isha: "ফরজ ৪ · সুন্নত ২ · বিতর (১–১১)",
-  },
-};
-const WAQT_AMOL = {
-  fajr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "সকালের আযকার"],
-  dhuhr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ"],
-  asr: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ"],
-  maghrib: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "সন্ধ্যার আযকার"],
-  isha: ["ফরজ নামাজের পর আয়াতুল কুরসি ও তাসবীহ", "শোয়ার আগের আযকার"],
-};
-const WAQT_NAME = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা" };
+// ("পরবর্তী ওয়াক্ত + আমল" কার্ড হোম-ট্যাবে সরানো হয়েছে — components/WaqtAmalCard.jsx)
 const WAQT_TIME_COLOR = { fajr: "#185FA5", dhuhr: "#0E4B43", asr: "#B3610E", maghrib: "#B23A25", isha: "#4B4FA8" };
 const OTHER_ITEMS = [
   { k: "tahajjud", label: "তাহাজ্জুদ", color: "#4B4FA8" },
@@ -321,13 +297,6 @@ const OTHER_ITEMS = [
   { k: "chasht", label: "চাশত", color: "#0F6E56" },
   { k: "awabin", label: "আওয়াবিন", color: "#B23A25" },
 ];
-function rakatPillClass(t) {
-  if (t.startsWith("ফরজ")) return "bg-emerald-900 text-white";
-  if (t.startsWith("সুন্নত")) return "bg-amber-100 text-amber-800";
-  if (t.startsWith("নফল")) return "bg-sky-100 text-sky-800";
-  if (t.startsWith("বিতর")) return "bg-indigo-100 text-indigo-800";
-  return "bg-slate-100 text-slate-700";
-}
 const DONE_KEY = "dt_pt_done";
 function dayKey(d) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -751,7 +720,6 @@ export function PrayerTimes({ layout } = {}) {
   }, [dk]);
 
   const activeForbidden = useMemo(() => forbiddenWindows.find((w) => now >= w.start && now < w.end) || null, [forbiddenWindows, now]);
-  const guideKey = waqtInfo ? waqtInfo.currentKey || waqtInfo.nextKey || null : null;
   const waqtProgress = useMemo(() => {
     if (!waqtInfo || !waqtInfo.currentKey || !waqtInfo.start) return null;
     const total = waqtInfo.target.getTime() - waqtInfo.start.getTime();
@@ -1082,40 +1050,6 @@ export function PrayerTimes({ layout } = {}) {
                 `${formatHHMM(otherTimes[it.k].start)}–${formatHHMM(otherTimes[it.k].end)}`
               )
             )
-          )
-        )
-      )
-    ),
-    guide: (
-    // §পরবর্তী/চলতি ওয়াক্ত — ২ লাইন: (১) নাম+রাকাত-পিল (২) আমল-পিল
-    schedule &&
-      guideKey &&
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "mx-4 mb-3 rounded-2xl px-4 py-3.5 border border-[#C89B3C]/50 shadow-[0_0_10px_rgba(200,155,60,0.3)] bg-white" },
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "flex flex-wrap items-center gap-1.5" },
-          /*#__PURE__*/React.createElement(
-            "span",
-            { className: "text-sm font-bold text-emerald-950 mr-1 whitespace-nowrap" },
-            `${waqtInfo.currentKey ? "এখন" : "পরবর্তী"}: ${WAQT_NAME[guideKey]}`
-          ),
-          WAQT_GUIDE[madhab === 1 ? 1 : 0][guideKey].split(" · ").map((t, i) => {
-            const m = t.match(/^(.*?)\s*\((.{11,})\)\s*$/);
-            const label = m ? m[1] : t;
-            return /*#__PURE__*/React.createElement("span", { key: i, className: "text-xs rounded-full px-2.5 py-0.5 whitespace-nowrap " + rakatPillClass(label) }, label);
-          })
-        ),
-        (() => {
-          const notes = WAQT_GUIDE[madhab === 1 ? 1 : 0][guideKey].split(" · ").map((t) => { const m = t.match(/^(.*?)\s*\((.{11,})\)\s*$/); return m ? m[2] : null; }).filter(Boolean);
-          return notes.length ? /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 mt-1.5" }, notes.join(" · ")) : null;
-        })(),
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "flex flex-wrap gap-x-2 gap-y-1 mt-3" },
-          WAQT_AMOL[guideKey].map((t) =>
-            /*#__PURE__*/React.createElement("span", { key: t, className: "text-xs text-slate-600" }, `💡 ${t}`)
           )
         )
       )

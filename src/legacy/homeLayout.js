@@ -118,7 +118,6 @@ export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },
   { id: "forbidden", title: "নিষিদ্ধ সময়" },
   { id: "other", title: "অন্যান্য সালাত" },
-  { id: "guide", title: "এখন করণীয়" },
   { id: "meal", title: "সেহরি ও ইফতার" },
   { id: "shortcuts", title: "কিবলা ও মাসিক সূচি বাটন" }
 ];
