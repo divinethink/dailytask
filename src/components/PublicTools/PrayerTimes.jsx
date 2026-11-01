@@ -132,7 +132,6 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
       "svg",
       { viewBox: `0 0 400 ${H}`, preserveAspectRatio: "none", className: "absolute inset-0 w-full h-full pointer-events-none", "aria-hidden": true },
       h("defs", null,
-        h("clipPath", { id: "wq-clip" }, h("rect", { x: 0, y: 0, width: 400, height: 98 })),
         h("linearGradient", { id: "wq-grad", x1: 0, y1: 0, x2: 1, y2: 1 },
           h("stop", { offset: 0, style: { stopColor: "var(--theme-primary, #0E4B43)" } }),
           h("stop", { offset: 1, style: { stopColor: "var(--theme-ink, #16302B)" } }))),
@@ -142,7 +141,7 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
       }),
       h("path", {
         d: `M38 ${H} V148 C38 96 132 62 200 24 C268 62 362 96 362 148 V${H}`,
-        fill: "none", stroke: GOLD, strokeOpacity: 0.45, vectorEffect: "non-scaling-stroke", clipPath: "url(#wq-clip)",
+        fill: "none", stroke: GOLD, strokeOpacity: 0.45, vectorEffect: "non-scaling-stroke",
       }),
       minaretDecor(12), minaretDecor(388)
     ),
@@ -150,17 +149,17 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
     h(
       "div",
       { className: "relative flex flex-col items-center px-9", style: { paddingTop: 54 } },
-      h("div", { className: "text-3xl font-bold leading-none" }, waqtInfo.name),
-      h("div", { className: "text-xs opacity-85 mt-1.5" }, waqtInfo.currentKey ? h("span", { style: { color: GOLD } }, "● ") : null, waqtInfo.label),
+      h("div", { className: "text-3xl font-bold leading-none text-center" }, waqtInfo.name),
+      h("div", { className: "text-xs opacity-85 mt-1.5 text-center" }, waqtInfo.currentKey ? h("span", { style: { color: GOLD } }, "● ") : null, waqtInfo.label),
       h(
         "div",
-        { className: "flex gap-2 w-full mt-3", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
+        { className: "flex gap-2 justify-center w-full mt-3", role: "timer", "aria-label": `${waqtInfo.name} ${waqtInfo.label}` },
         parts.map(([n, u]) =>
           h(
             "div",
-            { key: u, className: "flex-1 min-w-0 rounded-xl border border-white/20 bg-white/10 py-1" },
-            h("b", { className: "block text-[26px] leading-[1.15]", style: { fontFamily: "'Hind Siliguri', sans-serif" } }, toBn(String(n).padStart(2, "0"))),
-            h("small", { className: "text-[11px] opacity-80" }, u)
+            { key: u, className: "w-16 shrink-0 rounded-[10px] border border-white/20 bg-white/10 py-[3px]" },
+            h("b", { className: "block text-[18px] leading-[22px]", style: { fontFamily: "'Hind Siliguri', sans-serif" } }, toBn(String(n).padStart(2, "0"))),
+            h("small", { className: "block text-[10px] leading-[13px] opacity-80" }, u)
           )
         )
       ),
