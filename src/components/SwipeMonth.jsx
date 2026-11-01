@@ -1,7 +1,6 @@
 // ডানে-বামে সোয়াইপে মাস বদল। শুধু gesture ধরে; মাস বদলের আসল কাজ (dirty-confirm সহ) onShift-এ।
 // কোনো animation/অতিরিক্ত UI নেই। input/textarea/select ও অনুভূমিক-স্ক্রলযোগ্য অংশ থেকে শুরু হলে উপেক্ষা।
 import { swipeDelta } from "../legacy/swipeMonth.js";
-import { ChevronLeft, ChevronRight } from "./icons.jsx";
 
 const IGNORE = "input, textarea, select, [contenteditable='true'], [data-no-swipe]";
 
@@ -17,7 +16,7 @@ function startsInBlockedArea(target, root) {
   return false;
 }
 
-export function SwipeMonth({ onShift, monthCursor, label, nav, children }) {
+export function SwipeMonth({ onShift, monthCursor, label, children }) {
   const start = React.useRef(null);
   const swiped = React.useRef(false);
   const [toast, setToast] = React.useState(null);
@@ -53,20 +52,6 @@ export function SwipeMonth({ onShift, monthCursor, label, nav, children }) {
         start.current = null;
       }}
     >
-      {nav && label && cy != null && (
-        // মাস-চিপ(‹ মাসের নাম বছর ›): ভাঁজ-বন্ধ কার্ডেও বর্তমান মাস দেখা যায়; ◀ ▶ সোয়াইপের হুবহু একই onShift(dirty-confirm সহ)।
-        <div className="mx-5 mt-4 flex justify-center" data-no-swipe>
-          <div className="flex items-center gap-1.5 bg-[#FDFBF5] px-2 py-1 rounded-xl border border-[#C89B3C] shadow-sm text-emerald-950">
-            <button type="button" onClick={() => onShift(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/10" aria-label="আগের মাস">
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-sm font-bold px-1 min-w-[110px] text-center">{label({ year: cy, month0: cm })}</span>
-            <button type="button" onClick={() => onShift(1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/10" aria-label="পরের মাস">
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      )}
       {children}
       {toast && (
         <div

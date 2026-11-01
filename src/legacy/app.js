@@ -3290,7 +3290,7 @@ function App() {
       monthCursor: monthCursor
     })
   })),
-    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
+    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
@@ -3308,7 +3308,7 @@ function App() {
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
   })),
-    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
     migrationState: migrationState,
     memberId: selectedId,
@@ -3323,7 +3323,7 @@ function App() {
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
-    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel, nav: true }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
     fold: fold,
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,

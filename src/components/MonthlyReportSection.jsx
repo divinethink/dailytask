@@ -129,7 +129,10 @@ export function MonthlyReportSection({ fold, migrationState, memberId, member, l
 
   const head = React.createElement("div", { onClick: () => fold !== "fixed" && setOpen(o => !o), className: "flex items-center justify-between select-none" + (fold === "fixed" ? "" : " cursor-pointer") },
     <h2 className="font-bold text-base text-slate-800">📊 {T.title}</h2>,
-    fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#F3EEDD", color: "#5B4A1E", border: "1px solid #E4D3A8" }}>{BN_MONTHS[monthCursor.month0]} {toBn(monthCursor.year)}</span>
+      {fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
+    </div>
   );
 
   let body = null;

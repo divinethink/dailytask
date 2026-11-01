@@ -118,7 +118,10 @@ export function WeeklyReviewSection({ fold, migrationState, memberId, member, lo
     <div className="flex items-center gap-2">
       <h2 className="font-bold text-base text-slate-800">🌙 {T.title}</h2>
     </div>,
-    fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#F3EEDD", color: "#5B4A1E", border: "1px solid #E4D3A8" }}>{BN_MONTHS[monthCursor.month0]} {toBn(monthCursor.year)}</span>
+      {fold === "fixed" ? null : <ChevronDown size={18} className={"text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
+    </div>
   );
 
   let body = null;
