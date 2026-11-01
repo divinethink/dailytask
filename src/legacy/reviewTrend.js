@@ -61,7 +61,24 @@ function trendOf(vals) {
   return { dir, delta, kind, from: first, to: last };
 }
 
-// h = { member, allFields, fieldApplies, isExcused, isFieldExcusable, ratioOf }
+// সব আমল মিলিয়ে একটা মাসের গড়: প্রতিদিনের dailyScore-এর গড় (মাসিক ওভারভিউয়ের হিসাবের সাথে একই উৎস)।
+// ৩ দিনের কম এন্ট্রি হলে null। h.dailyScoreOf না থাকলে null — তখন UI এই অংশ দেখায় না।
+function monthOverall(entries, upTo, h) {
+  if (!entries || upTo <= 0 || typeof h.dailyScoreOf !== "function") return null;
+  let logged = 0, sum = 0;
+  for (let d = 1; d <= upTo; d++) {
+    const e = entries[pad2(d)];
+    if (!e) continue;
+    const s = h.dailyScoreOf(e);
+    if (s === null || s === undefined || !Number.isFinite(s)) continue;
+    logged += 1; sum += s;
+  }
+  if (logged < MIN_DAYS) return null;
+  const raw = sum / logged;
+  return { pct: Math.round(raw * 100), tier: tierOf(raw), days: logged };
+}
+
+// h = { member, allFields, fieldApplies, isExcused, isFieldExcusable, ratioOf, dailyScoreOf? }
 // entriesByMonth: তিনটা ম্যাপ (পুরনো → নতুন) বা null (না পাওয়া/ব্যর্থ ⇒ ওই মাস "—")
 // groups: [{ id, label, keys:[...] }] — যে ফিল্ড কোনো গ্রুপে নেই সে শেষ গ্রুপে যায়।
 function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
@@ -101,7 +118,11 @@ function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
   // নির্বাচিত মাসে এখনো কোনো সারির মান নেই (যেমন মাস সবে শুরু) ⇒ UI ছোট ব্যাখ্যা দেখায়।
   const curEmpty = rows.length > 0 && rows.every(r => r.vals[2] === null);
 
-  return { ok: rows.length > 0, months, sections, best, attention, attentionCount: attentionAll.length, upCount, curEmpty, rowCount: rows.length };
+  // সব আমল মিলিয়ে তিন মাসের গড় ও ধারা (দুই মাসের বৈধ তথ্য না থাকলে overall = null)
+  const oVals = months.map((m, i) => monthOverall(entriesByMonth ? entriesByMonth[i] : null, upTo[i], h));
+  const overall = oVals.filter(Boolean).length >= 2 ? { vals: oVals, ...trendOf(oVals) } : null;
+
+  return { ok: rows.length > 0, overall, months, sections, best, attention, attentionCount: attentionAll.length, upCount, curEmpty, rowCount: rows.length };
 }
 
 export { TREND_DELTA, ATTENTION_BELOW, MAX_ATTENTION, tierOf, threeMonths, monthValue, trendOf, buildTrend };

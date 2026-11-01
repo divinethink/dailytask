@@ -165,3 +165,18 @@ test("লেখা: মন্তব্যে {n} শুধু পয়েন্
   assert.ok(C.risingSome.includes("{n}") && C.fallingSome.includes("{n}"));
   assert.ok(!C.rising.includes("{n}") && !C.steady.includes("{n}"));
 });
+
+test("overall: dailyScoreOf থাকলে তিন মাসের গড়; ৩ দিনের কম হলে null", () => {
+  const fields = [fBool("x")];
+  const hh = h(fields, { dailyScoreOf: e => (e.x ? 1 : 0) });
+  const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [month("x", 30, 15), month("x", 31, 31), month("x", 2, 2)], h: hh, groups });
+  assert.equal(t.overall.vals[0].pct, 50);
+  assert.equal(t.overall.vals[1].pct, 100);
+  assert.equal(t.overall.vals[2], null);
+  assert.equal(t.overall.dir, "up");
+});
+
+test("overall: dailyScoreOf না থাকলে null", () => {
+  const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [month("x", 30, 15), month("x", 31, 31), month("x", 31, 31)], h: h([fBool("x")]), groups });
+  assert.equal(t.overall, null);
+});

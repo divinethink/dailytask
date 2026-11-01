@@ -3323,6 +3323,9 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
+    tomorrowKey: tomorrowKey,
+    onSetFocus: (focus) => saveTomorrowFocus(migrationState, selectedId, focus),
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
