@@ -1173,7 +1173,7 @@ export function PrayerTimes({ layout } = {}) {
         "div",
         null,
         /*#__PURE__*/React.createElement("div", { className: "text-sm font-bold text-emerald-950" }, formatGregorianDate(now)),
-        /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500 whitespace-nowrap" }, formatHijriDate(now))
+        /*#__PURE__*/React.createElement("div", { className: "text-[13px] font-medium text-emerald-800 whitespace-nowrap" }, formatHijriDate(now))
       ),
       /*#__PURE__*/React.createElement(
         "div",
@@ -1243,10 +1243,10 @@ export function PrayerTimes({ layout } = {}) {
       { className: "px-4 pb-1.5 relative" },
       /*#__PURE__*/React.createElement(
         "div",
-        { className: "flex items-stretch gap-2" },
+        { className: "flex items-stretch justify-between gap-2" },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "flex-1 min-w-0 flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-2" },
+          { className: "min-w-0 flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-2" },
           /*#__PURE__*/React.createElement(PinIcon, { size: 16, className: "text-emerald-800 shrink-0" }),
           /*#__PURE__*/React.createElement(
             "div",
