@@ -204,7 +204,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
             {T.closedRoom.items.map(it => (
               <label key={it.id} className="flex items-start gap-2 py-2 border-b border-dashed border-slate-200 text-sm">
                 <input type="checkbox" checked={closed.includes(it.id)} onChange={() => setClosed(c => toggle(c, it.id))} className="mt-1" />
-                <span>{it.text}</span>
+                <span>{it.text}{it.src && <span className="block text-[11px] text-slate-400">{it.src}</span>}</span>
               </label>
             ))}
             {closed.length > 0 && (
