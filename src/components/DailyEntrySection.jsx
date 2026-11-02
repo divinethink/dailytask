@@ -747,7 +747,7 @@ export function DailyEntrySection({
       isToday: dateKey(viewDate) === dateKey(new Date())
     }), /*#__PURE__*/React.createElement("div", { className: "flex items-center gap-2 mt-5 -mb-1 px-1", "aria-hidden": false },
       /*#__PURE__*/React.createElement("span", { className: "flex-1 h-px bg-[#C89B3C]/40" }),
-      /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-emerald-900 whitespace-nowrap" }, "📝 আজকের আমল ট্র্যাকার"),
+      /*#__PURE__*/React.createElement("span", { className: "text-xs font-bold text-emerald-900 whitespace-nowrap" }, "📝 আমল ট্র্যাকার"),
       /*#__PURE__*/React.createElement("span", { className: "flex-1 h-px bg-[#C89B3C]/40" })
     )),
     ...(() => { const m = {};

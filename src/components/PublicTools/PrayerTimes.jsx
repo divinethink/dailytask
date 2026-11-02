@@ -18,6 +18,7 @@ import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../../legacy/publ
 import { searchBangladeshLocation, reverseGeocodeBangladesh, nearestDistrictName } from "../../legacy/publicToolsGeocode.js";
 import { ChevronDown, ChevronLeft, Loader2, RefreshIcon, X } from "../icons.jsx";
 import { Qibla } from "./Qibla.jsx";
+import { WaqtAmalCard } from "../WaqtAmalCard.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { sanitizePrayerOrder } from "../../legacy/homeLayout.js";
 
@@ -1285,6 +1286,12 @@ export function PrayerTimes({ layout } = {}) {
           formatCountdown(ramadanCountdown.target.getTime() - now.getTime())
         )
       ),
-    ...orderedSections
+    ...orderedSections,
+    // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড হোম থেকে এখানে, সবার নিচে(কাস্টম ক্রমের বাইরে)।
+    /*#__PURE__*/React.createElement(
+      "div",
+      { key: "waqt-amal", className: "mx-4 mb-3 bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
+      /*#__PURE__*/React.createElement(WaqtAmalCard, null)
+    )
   );
 }

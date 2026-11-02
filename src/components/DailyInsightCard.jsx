@@ -51,7 +51,7 @@ function InsightBody({ insight, toBn }) {
           key: i,
           className: "flex justify-between text-sm py-0.5"
         }, /*#__PURE__*/React.createElement("span", { className: "text-slate-700" }, it.label), /*#__PURE__*/React.createElement("span", { className: "font-bold text-[#B8860B]" }, toBn(it.pct), "%"))),
-        /*#__PURE__*/React.createElement("div", { className: "text-xs text-[#0E4B43] mt-2" }, "আগামীকাল একটি Focus করার জন্য বেছে নিন")
+        /*#__PURE__*/React.createElement("div", { className: "text-xs text-[#0E4B43] mt-2" }, "আগামীকাল একটি ফোকাস করার জন্য বেছে নিন")
       );
     default:
       return null;

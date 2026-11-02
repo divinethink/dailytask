@@ -45,7 +45,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
       await onSave({ fieldKey: choice, targetDateKey: targetKey, source: "manual" });
       setEditing(false);
     } catch (err) {
-      alert("Focus সেভ করতে সমস্যা হয়েছে: " + err.message);
+      alert("ফোকাস সেভ করতে সমস্যা হয়েছে: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -61,7 +61,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
   },
-    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, isToday ? "🎯 আজকের Focus" : "🎯 আগামীকালের Focus"),
+    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, isToday ? "🎯 আজকের ফোকাস" : "🎯 আগামীকালের ফোকাস"),
     editing
       ? /*#__PURE__*/React.createElement("div", { className: "flex gap-2 items-center" },
           /*#__PURE__*/React.createElement("select", {

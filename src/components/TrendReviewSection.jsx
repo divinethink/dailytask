@@ -49,7 +49,7 @@ function Pill({ v, monthName, toBn }) {
 }
 
 // প্রথমে দেখানো মূল ৮টি আমল (এই ক্রমে); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
-const KEY_ORDER = ["fardPrayers", "jamaat", "quranPages", "selfStudy", "exercise", "healthyFood", "noLyingBackbitingPride", "noHurtingOthers"];
+const KEY_ORDER = ["fardPrayers", "jamaat", "exercise", "healthyFood", "noLyingBackbitingPride", "dawah", "earlyMorning"];
 
 function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
   const ar = r.dir ? ARROW[r.dir] : null;
@@ -162,6 +162,14 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
   const otherSections = trend && trend.ok
     ? trend.sections.map(sec => ({ ...sec, rows: sec.rows.filter(r => !KEY_ORDER.includes(r.key)) })).filter(sec => sec.rows.length)
     : [];
+  // কুরআন সবার আগে: কুরআনের সারি-সহ সেকশন প্রথমে, সেকশনের ভিতরেও কুরআন প্রথমে(বাকি ক্রম অপরিবর্তিত)।
+  const quranSecIdx = otherSections.findIndex(sec => sec.rows.some(r => r.key === "quranPages"));
+  if (quranSecIdx >= 0) {
+    const qs = otherSections[quranSecIdx];
+    const rowsFirst = [...qs.rows.filter(r => r.key === "quranPages"), ...qs.rows.filter(r => r.key !== "quranPages")];
+    otherSections.splice(quranSecIdx, 1);
+    otherSections.unshift({ ...qs, rows: rowsFirst });
+  }
   const otherCount = otherSections.reduce((n, sec) => n + sec.rows.length, 0);
   const lowest = trend && trend.ok ? trend.attention[0] || null : null;
 

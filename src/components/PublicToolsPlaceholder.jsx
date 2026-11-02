@@ -11,6 +11,6 @@ export function PublicToolsPlaceholder({ title }) {
       { className: "text-lg font-semibold", style: { color: "var(--theme-primary, #0E4B43)", fontFamily: "'Noto Serif Bengali', serif" } },
       title
     ),
-    React.createElement("p", { className: "text-sm text-gray-500" }, "শীঘ্রই আসছে")
+    React.createElement("p", { className: "text-sm text-gray-500" }, "লোড হচ্ছে…")
   );
 }

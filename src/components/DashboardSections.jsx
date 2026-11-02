@@ -76,6 +76,8 @@ function activityTierColor(pct) {
   return "#C1666B";
 }
 const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
+// owner(২ নভেম্বর ২০২৬): প্রতি শতাংশ-স্তরে সর্বোচ্চ ৩টা আমলের নাম(বাকিগুলো দেখানো হয় না)।
+const MAX_LABELS_PER_TIER = 3;
 
 // একটা tier-row: "১ম সর্বোচ্চ: ১০০%" + ঐ শতাংশ-এ থাকা সবগুলো আমলের নাম(comma
 // দিয়ে একসাথে, owner-এর প্ল্যান অনুযায়ী) + একটা পাতলা প্রোগ্রেস-বার(দ্রুত visual
@@ -101,7 +103,7 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
     style: { width: `${pct}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
   })), /*#__PURE__*/React.createElement("div", {
     className: "text-sm text-slate-700 leading-snug pl-6"
-  }, labels.join(", ")));
+  }, labels.slice(0, MAX_LABELS_PER_TIER).join(", ")));
 }
 
 // একটা কলাম(সর্বোচ্চ অথবা সর্বনিম্ন) — সর্বোচ্চ ৩টা distinct শতাংশ-tier(অথবা যত
@@ -183,7 +185,7 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
     if (r.key === "jamaat") return r.pct >= 70;
     return true;
   };
-  const topPercents = [...new Set(results.filter(topEligible).map(r => r.pct))].sort((a, b) => b - a).slice(0, 3);
+  const topPercents = [...new Set(results.filter(topEligible).map(r => r.pct))].filter(p => p > 0).sort((a, b) => b - a).slice(0, 3);
   const topSet = new Set(topPercents);
   const bottomPercents = [...new Set(results.map(r => r.pct))].filter(p => !topSet.has(p)).sort((a, b) => a - b).slice(0, 3);
   const labelsForTop = pct => results.filter(r => r.pct === pct && topEligible(r)).map(r => r.label);
@@ -202,7 +204,7 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
   if (fardResult) {
     const qazaPct = 100 - fardResult.pct;
     const jamaatResult = results.find(r => r.key === "jamaat");
-    const goalMet = jamaatResult ? qazaPct === 0 && jamaatResult.pct >= 70 : qazaPct === 0;
+    const goalMet = qazaPct === 0;
     // টেক্সট আপডেট(৮ সেপ্টেম্বর ২০২৬, owner-চূড়ান্ত ওয়র্ডিং)।
     const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
     const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা এবং যথাসম্ভব জামায়াতে আদায়ের চেষ্টা করা।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা।";

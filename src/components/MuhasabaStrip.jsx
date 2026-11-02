@@ -2,7 +2,6 @@
 // "যোগ হয়েছে" = কার্ডে অন্তত একটি প্রযোজ্য ফিল্ডে টিক/সংখ্যা আছে(কাযা-কাউন্ট ০ ভালো, তাই তা গণ্য নয়)।
 // React global(window.React, globals.js)।
 import { getHijriDate } from "../legacy/appHelpers.js";
-import { WaqtAmalCard } from "./WaqtAmalCard.jsx";
 // ১ নভেম্বর ২০২৬(owner): "আজকের মুহাসাবা" সারাংশ(স্ট্রিক/অগ্রগতি-বার/সেভ-ব্যাজ) সরানো; জায়গায় WaqtAmalCard(চলতি ওয়াক্তের আমল)।
 // গতকাল-ব্যানার, নতুন-হিজরি-মাস নোট ও "গতকালের মতো বসান" বোতাম আগের মতোই আছে।
 
@@ -29,7 +28,6 @@ export function countFilledCards(cats, entry, member, fieldApplies) {
 }
 
 export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty, yesterdayMissing, todayKey, onGoYesterday, canCopy, onCopyYesterday, toBn, isToday }) {
-  const { total, filled } = countFilledCards(cats, entry, member, fieldApplies);
   const [hideYb, setHideYb] = React.useState(() => {
     try { return !!localStorage.getItem(DISMISS_PREFIX + todayKey); } catch { return false; }
   });
@@ -42,8 +40,8 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
   });
   const showHm = hj.day <= 2 && !hideHm;
 
-  const showCopy = !!canCopy && filled === 0 && !dirty;
-  if (!isToday && !showHm && !showYb && !showCopy) return null;
+  // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড সময়সূচি-ট্যাবে সরানো, "গতকালের মতো বসান" বোতাম বাদ — শুধু ব্যানার থাকলে কার্ড দেখায়।
+  if (!showHm && !showYb) return null;
 
   return React.createElement(
     "div",
@@ -83,11 +81,6 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
         className: "shrink-0 px-1 text-sm text-amber-700"
       }, "✕")
     ),
-    isToday && React.createElement(WaqtAmalCard, null),
-    showCopy && React.createElement("button", {
-      type: "button",
-      onClick: onCopyYesterday,
-      className: "mt-3 w-full rounded-xl border border-emerald-200 bg-emerald-50/60 py-2 text-xs font-bold text-emerald-900 active:scale-[0.98]"
-    }, "↩︎ গতকালের মতো বসান")
+    null
   );
 }
