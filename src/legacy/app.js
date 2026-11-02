@@ -3248,6 +3248,7 @@ function App() {
     allFields: allFields,
     tomorrowKey: tomorrowKey,
     suggestedFieldKey: suggestedFocusKey,
+    todayEntry: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? (monthEntries && monthEntries[pad2(n.getDate())]) || null : null; })(),
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
   }),
     monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {

@@ -5,11 +5,24 @@
 // প্রভাবিত করে না, এবং প্রয়োজনে এই component একাই disable/rollback করা যায়।
 // createElement-style(existing codebase convention)।
 
+import { fieldRatioToday } from "../legacy/dailyInsight.js";
+import { dateKey } from "../legacy/appHelpers.js";
+
 const { useState } = React;
 
-export function TomorrowFocusPicker({ member, allFields, tomorrowKey, suggestedFieldKey, onSave }) {
+// todayEntry: আজকের এন্ট্রি (চলতি মাস দেখার সময়), না থাকলে null।
+export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKeyProp, suggestedFieldKey, todayEntry, onSave }) {
+  // তারিখ প্রতি রেন্ডারে নতুন করে নেওয়া হয়, তাই রাত ১২টার পরও ঠিক থাকে।
+  const now = new Date();
+  const todayKey = dateKey(now);
+  const tomorrowKey = dateKey(new Date(now.getTime() + 86400000));
   const stored = member && member.tomorrowFocus;
-  const isStale = !stored || stored.targetDateKey !== tomorrowKey;
+  // গতকাল "আগামীকাল"-এর জন্য বাছা ফোকাস এখন "আজকের ফোকাস", যতক্ষণ না আজ সেটা পূরণ হয়।
+  const storedField = stored ? allFields.find(f => f.key === stored.fieldKey) : null;
+  const ratioToday = storedField ? fieldRatioToday(storedField, todayEntry || null) : null;
+  const isToday = !!(stored && storedField && stored.targetDateKey === todayKey && !(ratioToday !== null && ratioToday >= 1));
+  const targetKey = isToday ? todayKey : tomorrowKey;
+  const isStale = isToday ? false : (!stored || stored.targetDateKey !== tomorrowKey);
   const activeFieldKey = isStale ? suggestedFieldKey : stored.fieldKey;
   const activeSource = isStale ? "auto" : stored.source;
   const activeField = allFields.find(f => f.key === activeFieldKey);
@@ -24,7 +37,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey, suggestedF
     if (!choice) return;
     setSaving(true);
     try {
-      await onSave({ fieldKey: choice, targetDateKey: tomorrowKey, source: "manual" });
+      await onSave({ fieldKey: choice, targetDateKey: targetKey, source: "manual" });
       setEditing(false);
     } catch (err) {
       alert("Focus সেভ করতে সমস্যা হয়েছে: " + err.message);
@@ -43,7 +56,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey, suggestedF
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
   },
-    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, "🎯 আগামীকালের Focus"),
+    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, isToday ? "🎯 আজকের Focus" : "🎯 আগামীকালের Focus"),
     editing
       ? /*#__PURE__*/React.createElement("div", { className: "flex gap-2 items-center" },
           /*#__PURE__*/React.createElement("select", {
