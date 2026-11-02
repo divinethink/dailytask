@@ -14,7 +14,7 @@ const SWITCH_HOUR = 19;
 
 // todaySaved: আজকের ডেটা সেভ হয়েছে কিনা (চলতি মাস না দেখলে true ধরা হয়)।
 // নিয়ম: সন্ধ্যা ৭টার আগে (সেভ হোক বা না হোক) = "আজকের Focus"; ৭টার পর আজকের ডেটা সেভ থাকলে = "আগামীকালের Focus", না থাকলে সেভ না হওয়া পর্যন্ত "আজকের"।
-export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKeyProp, suggestedFieldKey, todaySaved, onSave }) {
+export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKeyProp, suggestedFieldKey, suggestedTodayKey, todaySaved, onSave }) {
   // প্রতি মিনিটে রেন্ডার, যাতে সন্ধ্যা ৭টা ও রাত ১২টায় কার্ড নিজে বদলায়।
   const [, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 60000); return () => clearInterval(id); }, []);
@@ -26,9 +26,9 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
   const storedField = stored ? allFields.find(f => f.key === stored.fieldKey) : null;
   const isToday = !todaySaved || now.getHours() < SWITCH_HOUR;
   const targetKey = isToday ? todayKey : tomorrowKey;
-  // আজকের মোডে শুধু আজকের তারিখে বাছা ফোকাস; কালকের মোডে কালের তারিখে বাছা, নইলে পরামর্শ।
+  // আজকের মোডে আজকের তারিখে বাছা ফোকাস, নইলে গতকালের ডেটা থেকে পরামর্শ; কালকের মোডে কালের তারিখে বাছা, নইলে আজকের ডেটা থেকে পরামর্শ।
   const isStale = isToday ? !(stored && storedField && stored.targetDateKey === todayKey) : (!stored || stored.targetDateKey !== tomorrowKey);
-  const activeFieldKey = isStale ? (isToday ? null : suggestedFieldKey) : stored.fieldKey;
+  const activeFieldKey = isStale ? (isToday ? (suggestedTodayKey || null) : suggestedFieldKey) : stored.fieldKey;
   const activeSource = isStale ? "auto" : stored.source;
   const activeField = allFields.find(f => f.key === activeFieldKey);
 

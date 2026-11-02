@@ -2653,6 +2653,12 @@ function App() {
     if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
     return suggestTomorrowFocus(monthEntries, selectedMember, allFields, now.getDate());
   }, [monthEntries, selectedMember, allFields, monthCursor]);
+  // সকাল/দুপুরে বাছা ফোকাস না থাকলে গতকালের সবচেয়ে দুর্বল আমল "আজকের Focus (পরামর্শ)" হিসেবে (মাসের ১ তারিখে নয়)।
+  const suggestedTodayFocusKey = useMemo(() => {
+    const now = new Date();
+    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0 || now.getDate() < 2) return null;
+    return suggestTomorrowFocus(monthEntries, selectedMember, allFields, now.getDate() - 1);
+  }, [monthEntries, selectedMember, allFields, monthCursor]);
   const [milestoneToast, setMilestoneToast] = useState(null);
   useEffect(() => {
     if (!selectedId || !streak) return;
@@ -3248,6 +3254,7 @@ function App() {
     allFields: allFields,
     tomorrowKey: tomorrowKey,
     suggestedFieldKey: suggestedFocusKey,
+    suggestedTodayKey: suggestedTodayFocusKey,
     todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })(),
     onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
   }),
