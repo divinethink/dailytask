@@ -35,7 +35,7 @@ export const CARD_DEFS = {
     d("tomorrow", "আগামীকাল", "fixed"),
     d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "closed"),
     d("weekly", "সাপ্তাহিক মুহাসাবা", "closed"),
-    d("trend", "গত তিন মাসের চিত্র", "closed"),
+    d("trend", "তিন মাসের চিত্র", "closed"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")
   ]
 };

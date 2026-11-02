@@ -6,7 +6,7 @@ import { REVIEW_TEXT } from "../legacy/reviewText.js";
 import { buildTrend } from "../legacy/reviewTrend.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
-import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
+import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS, dateKey } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
 import { ChevronDown } from "./icons.jsx";
 import { MonthPillNav } from "./MonthPillNav.jsx";
@@ -45,6 +45,27 @@ function Pill({ v, monthName, toBn }) {
     >
       {text}
     </span>
+  );
+}
+
+// প্রথমে দেখানো মূল ৮টি আমল (এই ক্রমে); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
+const KEY_ORDER = ["fardPrayers", "jamaat", "quranPages", "selfStudy", "exercise", "healthyFood", "noLyingBackbitingPride", "noHurtingOthers"];
+
+function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
+  const ar = r.dir ? ARROW[r.dir] : null;
+  return (
+    <div className="flex items-center gap-1 py-2.5 border-b border-dashed border-slate-200">
+      <div className="flex-1 min-w-0 pr-1">
+        <div className="font-bold text-sm text-slate-800 leading-snug">{r.label}</div>
+        {comment && <div className="text-xs text-slate-500 leading-snug">{comment}</div>}
+      </div>
+      {r.vals.map((v, i) => (
+        <Pill key={i} v={v} monthName={BN_MONTHS[months[i].month0]} toBn={toBn} />
+      ))}
+      <span className="w-4 shrink-0 text-center font-bold" style={{ color: ar ? ar.color : "transparent" }} aria-label={ar ? ar.label : undefined}>
+        {ar ? ar.ch : ""}
+      </span>
+    </div>
   );
 }
 
@@ -93,15 +114,16 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
 
   // ফোকাস মানে "কাল"-এর জন্য; তাই শুধু চলতি মাস দেখার সময় বোতাম। আগের মাস দেখলে শুধু পড়া।
   const nowD = new Date();
-  const canFocus = !!(onSetFocus && tomorrowKey) && nowD.getFullYear() === year && nowD.getMonth() === month0;
+  const tomorrowKeyNow = dateKey(new Date(nowD.getTime() + 86400000)); // প্রতি রেন্ডারে নতুন, রাত ১২টার পরও ঠিক
+  const canFocus = !!onSetFocus && nowD.getFullYear() === year && nowD.getMonth() === month0;
   const stored = member && member.tomorrowFocus;
-  const currentFocusKey = focusSet || (stored && stored.targetDateKey === tomorrowKey ? stored.fieldKey : null);
+  const currentFocusKey = focusSet || (stored && stored.targetDateKey === tomorrowKeyNow ? stored.fieldKey : null);
   async function putFocus(fieldKey) {
     if (focusBusy) return; // দুইবার চাপলে একবারই
     setFocusBusy(fieldKey);
     setFocusErr(false);
     try {
-      await onSetFocus({ fieldKey, targetDateKey: tomorrowKey, source: "manual" });
+      await onSetFocus({ fieldKey, targetDateKey: tomorrowKeyNow, source: "manual" });
       setFocusSet(fieldKey);
     } catch (err) {
       setFocusErr(true);
@@ -135,6 +157,14 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
     subtitle = parts.length ? parts.join(" · ") : T.summarySteady;
   }
 
+  const allRows = trend && trend.ok ? trend.sections.flatMap(sec => sec.rows) : [];
+  const keyRows = KEY_ORDER.map(k => allRows.find(r => r.key === k)).filter(Boolean);
+  const otherSections = trend && trend.ok
+    ? trend.sections.map(sec => ({ ...sec, rows: sec.rows.filter(r => !KEY_ORDER.includes(r.key)) })).filter(sec => sec.rows.length)
+    : [];
+  const otherCount = otherSections.reduce((n, sec) => n + sec.rows.length, 0);
+  const lowest = trend && trend.ok ? trend.attention[0] || null : null;
+
   let body = null;
   if (open) {
     if (!memberId) body = <p className="text-sm text-slate-500 mt-3">{T.noMember}</p>;
@@ -148,6 +178,51 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
     else body = (
       <div className="mt-3">
         {data.status === "error" && <p className="text-xs text-orange-700 mb-2">{T.error}</p>}
+
+        {keyRows.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-end gap-1 pb-1 border-b border-slate-200 text-slate-500" style={{ fontSize: 10.5 }}>
+              <span className="flex-1 min-w-0">{T.labelCol}</span>
+              {trend.months.map(m => (
+                <span key={m.year + "-" + m.month0} className="w-11 shrink-0 text-center whitespace-nowrap">{T.monthShort[m.month0]}</span>
+              ))}
+              <span className="w-4 shrink-0" />
+            </div>
+            {keyRows.map(r => <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} />)}
+          </div>
+        )}
+
+        {otherCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(v => !v)}
+            aria-expanded={showAll}
+            className="w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-emerald-900 mb-3"
+            style={{ minHeight: 44 }}
+          >
+            {showAll ? T.detailsHide : fill(T.detailsShow, { n: toBn(otherCount) })}
+          </button>
+        )}
+
+        {showAll && otherSections.map(sec => (
+          <div key={sec.id} className="mb-2">
+            <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A6A12" }}>{sec.label}</div>
+            {sec.rows.map(r => (
+              <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn}
+                comment={fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })} />
+            ))}
+          </div>
+        ))}
+
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1 text-slate-500" style={{ fontSize: 11 }}>
+          {["great", "good", "mid", "low", "none"].map(t => (
+            <span key={t} className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded" style={{ background: TIER_STYLE[t].background, border: "1px solid rgba(0,0,0,0.08)" }} />
+              {T.legend[t]}
+            </span>
+          ))}
+        </div>
+        <p className="text-slate-400 mb-4" style={{ fontSize: 11 }}>{T.legendHint}</p>
 
         {trend.overall && (
           <div className="rounded-xl p-3 mb-3" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
@@ -173,7 +248,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <div className="rounded-xl p-3" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
             <div className="text-xs font-bold text-emerald-900 mb-1">🌱 {T.bestTitle}</div>
             {trend.best ? (
@@ -187,97 +262,36 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </div>
           <div className="rounded-xl p-3" style={{ background: "#FBF3E1", border: "1px solid #EFDDB0" }}>
             <div className="text-xs font-bold mb-1" style={{ color: "#7A5A00" }}>💛 {T.attTitle}</div>
-            {trend.attention.length === 0 && (
+            {!lowest ? (
               <div className="text-xs leading-relaxed" style={{ color: "#5C4300" }}>{T.attNone}</div>
+            ) : (
+              <div style={{ color: "#5C4300" }}>
+                <div className="text-sm font-bold leading-snug">{lowest.label}</div>
+                {lowest.vals[2] && <div className="text-xs">{toBn(lowest.vals[2].pct)}%</div>}
+                {canFocus && (
+                  currentFocusKey === lowest.key ? (
+                    <div className="mt-2 text-xs font-bold text-emerald-800">{T.focusDone}</div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!!focusBusy}
+                      onClick={() => putFocus(lowest.key)}
+                      className="mt-2 w-full rounded-xl px-2 py-2 text-xs font-bold text-white leading-tight disabled:opacity-60"
+                      style={{ background: "#0E4B43", minHeight: 40 }}
+                    >
+                      {focusBusy === lowest.key ? T.focusSaving : T.focusBtn}
+                    </button>
+                  )
+                )}
+              </div>
             )}
-            {trend.attention.map(r => {
-              const isFocus = currentFocusKey === r.key;
-              const busy = focusBusy === r.key;
-              return (
-                <div key={r.key} className="flex items-center gap-2 py-1.5" style={{ minHeight: canFocus ? 44 : undefined }}>
-                  <span className="flex-1 min-w-0 text-sm font-bold leading-snug" style={{ color: "#5C4300" }}>{r.label}</span>
-                  {canFocus && (
-                    isFocus ? (
-                      <span className="shrink-0 text-xs font-bold text-emerald-800">{T.focusDone}</span>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={!!focusBusy}
-                        onClick={() => putFocus(r.key)}
-                        className="shrink-0 rounded-full px-3 text-xs font-bold text-white disabled:opacity-60"
-                        style={{ background: "#0E4B43", minHeight: 36 }}
-                      >
-                        {busy ? T.focusSaving : T.focusBtn}
-                      </button>
-                    )
-                  )}
-                </div>
-              );
-            })}
-            {canFocus && trend.attention.length > 0 && (
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#7A5A00" }}>{T.focusHint}</p>
-            )}
-            {focusErr && <p className="text-xs text-orange-700 mt-1">{T.focusErr}</p>}
           </div>
         </div>
+        {canFocus && lowest && <p className="text-xs mb-2 leading-relaxed" style={{ color: "#7A5A00" }}>{T.focusHint}</p>}
+        {focusErr && <p className="text-xs text-orange-700 mb-2">{T.focusErr}</p>}
 
         {trend.curEmpty && (
           <p className="text-xs text-slate-500 mb-2 leading-relaxed">{fill(T.curEmpty, { month: BN_MONTHS[month0] })}</p>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setShowAll(v => !v)}
-          aria-expanded={showAll}
-          className="w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-emerald-900"
-          style={{ minHeight: 44 }}
-        >
-          {showAll ? T.detailsHide : fill(T.detailsShow, { n: toBn(trend.rowCount) })}
-        </button>
-
-        {showAll && (
-          <div>
-            <div className="flex items-end gap-1 pb-1 mt-3 border-b border-slate-200 text-slate-500" style={{ fontSize: 10.5 }}>
-              <span className="flex-1 min-w-0">{T.labelCol}</span>
-              {trend.months.map(m => (
-                <span key={m.year + "-" + m.month0} className="w-11 shrink-0 text-center whitespace-nowrap">{T.monthShort[m.month0]}</span>
-              ))}
-              <span className="w-4 shrink-0" />
-            </div>
-
-            {trend.sections.map(s => (
-              <div key={s.id}>
-                <div className="text-xs font-bold mt-3 mb-1" style={{ color: "#8A6A12" }}>{s.label}</div>
-                {s.rows.map(r => {
-                  const ar = r.dir ? ARROW[r.dir] : null;
-                  return (
-                    <div key={r.key} className="flex items-center gap-1 py-2.5 border-b border-dashed border-slate-200">
-                      <div className="flex-1 min-w-0 pr-1">
-                        <div className="font-bold text-sm text-slate-800 leading-snug">{r.label}</div>
-                        <div className="text-xs text-slate-500 leading-snug">{fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })}</div>
-                      </div>
-                      {r.vals.map((v, i) => (
-                        <Pill key={i} v={v} monthName={BN_MONTHS[trend.months[i].month0]} toBn={toBn} />
-                      ))}
-                      <span className="w-4 shrink-0 text-center font-bold" style={{ color: ar ? ar.color : "transparent" }} aria-label={ar ? ar.label : undefined}>
-                        {ar ? ar.ch : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-slate-500" style={{ fontSize: 11 }}>
-              {["great", "good", "mid", "low", "none"].map(t => (
-                <span key={t} className="inline-flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded" style={{ background: TIER_STYLE[t].background, border: "1px solid rgba(0,0,0,0.08)" }} />
-                  {T.legend[t]}
-                </span>
-              ))}
-            </div>
-            <p className="text-slate-400 mt-1" style={{ fontSize: 11 }}>{T.legendHint}</p>
-          </div>
         )}
         <p className="text-slate-400 text-center mt-2" style={{ fontSize: 11 }}>{T.footnote}</p>
       </div>
