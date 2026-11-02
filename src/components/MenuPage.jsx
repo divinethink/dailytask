@@ -82,6 +82,8 @@ export function MenuPage({
   setShowFeedbackModal,
   onOpenHomeLayout,
   onOpenPrayerLayout,
+  onOpenAmolLayout,
+  onOpenToolsLayout,
   onOpenFieldManager,
   onOpenTazkirah,
   themeColorPickerEl
@@ -229,8 +231,8 @@ export function MenuPage({
             })
           ),
           // ৪) কাস্টমাইজ(প্রতিটা সারি আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
-          (onOpenHomeLayout || onOpenPrayerLayout || onOpenFieldManager || onOpenTazkirah) && h(SectionLabel, null, "কাস্টমাইজ"),
-          (onOpenHomeLayout || onOpenPrayerLayout || onOpenFieldManager || onOpenTazkirah) && h(
+          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah) && h(SectionLabel, null, "কাস্টমাইজ"),
+          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah) && h(
             "div",
             { className: CARD, style: CARD_STYLE },
             onOpenHomeLayout && h(MenuRow, {
@@ -243,22 +245,36 @@ export function MenuPage({
             onOpenPrayerLayout && h(MenuRow, {
               icon: h(ClockIcon, { size: 15 }),
               title: "সময়সূচি কাস্টমাইজ",
-              hint: "কার্ড সাজান",
+              hint: "কার্ড সাজান/লুকান",
               showDivider: !!onOpenHomeLayout,
               onClick: () => { onOpenPrayerLayout(); }
+            }),
+            onOpenAmolLayout && h(MenuRow, {
+              icon: h(BookIcon, { size: 15 }),
+              title: "আমল কাস্টমাইজ",
+              hint: "কার্ড সাজান/লুকান",
+              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout),
+              onClick: () => { onOpenAmolLayout(); }
+            }),
+            onOpenToolsLayout && h(MenuRow, {
+              icon: h(EditIcon, { size: 15 }),
+              title: "সহায়িকা কাস্টমাইজ",
+              hint: "কার্ড সাজান/লুকান",
+              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout),
+              onClick: () => { onOpenToolsLayout(); }
             }),
             onOpenFieldManager && h(MenuRow, {
               icon: h(EditIcon, { size: 15 }),
               title: "লেবেল ম্যানেজ",
               hint: "নাম বদল/লুকান/নতুন",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout),
+              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout),
               onClick: () => { onOpenFieldManager(); }
             }),
             onOpenTazkirah && h(MenuRow, {
               icon: h(BookIcon, { size: 15 }),
               title: "তাযকিরাহ ম্যানেজ",
               hint: "নিজের বাণী যোগ/লুকান",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenFieldManager),
+              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager),
               onClick: () => { onOpenTazkirah(); }
             })
           ),

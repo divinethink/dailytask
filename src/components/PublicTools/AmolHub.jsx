@@ -15,6 +15,7 @@ import { DhikrCountGuide } from "./DhikrCountGuide.jsx";
 import { DuaSection } from "./DuaSection.jsx";
 import { DuaAcceptanceCard } from "./DuaAcceptanceCard.jsx";
 import { DeathReminderCard } from "./DeathReminderCard.jsx";
+import { visibleIds } from "../../legacy/tabLayout.js";
 
 const { useState } = React;
 
@@ -27,7 +28,7 @@ const HUB_ITEMS = [
   { key: "deathReminder", icon: "hourglass", label: "মৃত্যুর স্মরণ", Component: DeathReminderCard },
 ];
 
-export function AmolHub() {
+export function AmolHub({ tabLayout } = {}) {
   const [activeItem, setActiveItem] = useState(null);
 
   if (activeItem) {
@@ -35,16 +36,35 @@ export function AmolHub() {
     return /*#__PURE__*/React.createElement(item.Component, { onBack: () => setActiveItem(null) });
   }
 
+  // ক্রম+লুকানো(owner-approved ২ নভেম্বর ২০২৬, member.tabLayout): পরপর টাইলগুলো একটা গ্রিডে, তাসবীহ নিজের জায়গায়।
+  // ডিফল্ট = ৬ টাইল গ্রিডে, তারপর তাসবীহ(আগের আচরণ হুবহু)।
+  const blocks = [];
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    blocks.push(/*#__PURE__*/React.createElement(ToolGridSection, {
+      key: "grid" + blocks.length,
+      variant: "compact3",
+      items: run,
+      onSelect: (item) => setActiveItem(item.key),
+    }));
+    run = [];
+  };
+  visibleIds("amol", tabLayout).forEach((id) => {
+    if (id === "tasbih") {
+      flush();
+      blocks.push(/*#__PURE__*/React.createElement(TasbihCounter, { key: "tasbih" }));
+    } else {
+      const it = HUB_ITEMS.find((i) => i.key === id);
+      if (it) run.push(it);
+    }
+  });
+  flush();
+
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     /*#__PURE__*/React.createElement(PageHeader, { title: "আমল ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
-    /*#__PURE__*/React.createElement(ToolGridSection, {
-      variant: "compact3",
-      items: HUB_ITEMS,
-      onSelect: (item) => setActiveItem(item.key),
-    }),
-    // তাসবীহ — গ্রিডের নিচে(owner-request, ১৯ সেপ্টেম্বর ২০২৬)
-    /*#__PURE__*/React.createElement(TasbihCounter, null)
+    ...blocks
   );
 }

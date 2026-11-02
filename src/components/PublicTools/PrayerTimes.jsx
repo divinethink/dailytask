@@ -20,7 +20,7 @@ import { ChevronDown, ChevronLeft, Loader2, RefreshIcon, X } from "../icons.jsx"
 import { Qibla } from "./Qibla.jsx";
 import { WaqtAmalCard } from "../WaqtAmalCard.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
-import { sanitizePrayerOrder } from "../../legacy/homeLayout.js";
+import { visibleIds } from "../../legacy/tabLayout.js";
 
 const { useState, useEffect, useMemo, useRef } = React;
 
@@ -311,7 +311,7 @@ function readDone(d) {
   }
 }
 
-export function PrayerTimes({ layout } = {}) {
+export function PrayerTimes({ layout, tabLayout } = {}) {
   const [location, setLocationState] = useState(() => getSavedLocation());
   const [madhab, setMadhabState] = useState(() => getSavedMadhab());
   // §লোড-ব্যাকগ্রাউন্ডে: সর্বশেষ সিংক-করা সময় প্রথম render-এই দেখানো হয়, নেটওয়ার্ক আপডেট নিচে চলে।
@@ -1098,8 +1098,15 @@ export function PrayerTimes({ layout } = {}) {
         )
       )
     ),
+    // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড হোম থেকে এখানে; ডিফল্টে সবার নিচে, কাস্টমাইজে সরানো/লুকানো যায়।
+    waqt: /*#__PURE__*/React.createElement(
+      "div",
+      { key: "waqt-amal", className: "mx-4 mb-3 bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
+      /*#__PURE__*/React.createElement(WaqtAmalCard, null)
+    ),
   };
-  const orderedSections = sanitizePrayerOrder(layout).map((k) => sectionEls[k]);
+  // ক্রম+লুকানো: member.tabLayout(নতুন); না থাকলে পুরনো member.prayerLayout(ক্রম) fallback; দুটোই না থাকলে ডিফল্ট।
+  const orderedSections = visibleIds("prayer", tabLayout, layout).map((k) => sectionEls[k]);
 
   return /*#__PURE__*/React.createElement(
     "div",
@@ -1286,12 +1293,6 @@ export function PrayerTimes({ layout } = {}) {
           formatCountdown(ramadanCountdown.target.getTime() - now.getTime())
         )
       ),
-    ...orderedSections,
-    // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড হোম থেকে এখানে, সবার নিচে(কাস্টম ক্রমের বাইরে)।
-    /*#__PURE__*/React.createElement(
-      "div",
-      { key: "waqt-amal", className: "mx-4 mb-3 bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
-      /*#__PURE__*/React.createElement(WaqtAmalCard, null)
-    )
+    ...orderedSections
   );
 }

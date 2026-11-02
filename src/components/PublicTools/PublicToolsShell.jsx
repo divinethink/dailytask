@@ -8,6 +8,7 @@
 // React global(window.React, globals.js)।
 
 import { ChevronLeft } from "../icons.jsx";
+import { visibleIds } from "../../legacy/tabLayout.js";
 import { ToolGridSection, PageHeader, VerseCard, DetailHeader } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
@@ -139,7 +140,7 @@ const FRONT_ITEMS = [
   { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
 ];
 
-export function PublicToolsShell() {
+export function PublicToolsShell({ tabLayout } = {}) {
   // "front" | { tool: {key,label} } | { single: {id,label} } |
   // { category: catObj } | { category: catObj, item: {key,label} }
   const [view, setView] = useState("front");
@@ -240,7 +241,7 @@ export function PublicToolsShell() {
     /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
     /*#__PURE__*/React.createElement(ToolGridSection, {
       variant: "hero",
-      items: FRONT_ITEMS,
+      items: visibleIds("tools", tabLayout).map((id) => FRONT_ITEMS.find((i) => (i.key || i.id) === id)).filter(Boolean),
       onSelect: (item) => {
         if (item.kind === "category") {
           setView({ category: CATEGORIES.find((c) => c.id === item.id) });

@@ -120,7 +120,8 @@ export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },
   { id: "forbidden", title: "নিষিদ্ধ সময়" },
   { id: "other", title: "অন্যান্য সালাত" },
-  { id: "meal", title: "সেহরি ও ইফতার" }
+  { id: "meal", title: "সেহরি ও ইফতার" },
+  { id: "waqt", title: "চলমান সালাত" }
 ];
 export function defaultPrayerOrder() {
   return PRAYER_CARD_DEFS.map(x => x.id);

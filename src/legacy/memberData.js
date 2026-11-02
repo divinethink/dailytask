@@ -679,6 +679,17 @@ async function savePrayerLayout(migrationState, memberId, order) {
   await setDoc(memberRef, { prayerLayout: order.map(String), updatedAt: Date.now() }, { merge: true });
 }
 
+// §নেভ-ট্যাব কাস্টমাইজ(সময়সূচি/আমল/সহায়িকা, owner-approved ২ নভেম্বর ২০২৬): member-ডকের ঐচ্ছিক tabLayout
+// ম্যাপ — শুধু এক ট্যাবের <tab>Order/<tab>Hidden(id-তালিকা) লেখে, merge দিয়ে অন্য ট্যাবের মান অক্ষুণ্ণ থাকে।
+async function saveTabLayout(migrationState, memberId, tab, order, hidden) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, {
+    tabLayout: { [tab + "Order"]: order.map(String), [tab + "Hidden"]: hidden.map(String) },
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 // §কাস্টম টাস্ক(সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
 // saveHomeLayout()-এর মতোই explicit user-action, saveEntry() batch-এর অংশ না।
 async function saveCustomTasks(migrationState, memberId, tasks) {
@@ -765,5 +776,6 @@ export {
   saveTomorrowFocus,
   saveHomeLayout,
   savePrayerLayout,
+  saveTabLayout,
   saveCustomTasks
 };

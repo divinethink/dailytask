@@ -1117,6 +1117,27 @@ service cloud.firestore {
           && request.resource.data.customTasks is list
           && request.resource.data.customTasks.size() <= 40;
 
+        // নেভ-ট্যাব কাস্টমাইজ(সময়সূচি/আমল/সহায়িকা, owner-approved ২ নভেম্বর ২০২৬) — member-ডকের ঐচ্ছিক
+        // tabLayout ম্যাপ(memberData.js: saveTabLayout(), explicit user-action, saveEntry() batch-এর অংশ না)।
+        // homeLayout-clause-এর হুবহু একই caller-নিয়ম; শুধু tabLayout+updatedAt বদলাতে পারে, tabLayout-এর
+        // কী শুধু এই ছয়টা(প্রতিটা id-তালিকা, সর্বোচ্চ ২০টি) — এর বাইরের কিছু অনুমোদিত নয়।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tabLayout', 'updatedAt'])
+          && request.resource.data.tabLayout.keys().hasOnly(['prayerOrder', 'prayerHidden', 'amolOrder', 'amolHidden', 'toolsOrder', 'toolsHidden'])
+          && request.resource.data.tabLayout.get('prayerOrder', []) is list
+          && request.resource.data.tabLayout.get('prayerOrder', []).size() <= 20
+          && request.resource.data.tabLayout.get('prayerHidden', []) is list
+          && request.resource.data.tabLayout.get('prayerHidden', []).size() <= 20
+          && request.resource.data.tabLayout.get('amolOrder', []) is list
+          && request.resource.data.tabLayout.get('amolOrder', []).size() <= 20
+          && request.resource.data.tabLayout.get('amolHidden', []) is list
+          && request.resource.data.tabLayout.get('amolHidden', []).size() <= 20
+          && request.resource.data.tabLayout.get('toolsOrder', []) is list
+          && request.resource.data.tabLayout.get('toolsOrder', []).size() <= 20
+          && request.resource.data.tabLayout.get('toolsHidden', []) is list
+          && request.resource.data.tabLayout.get('toolsHidden', []).size() <= 20;
+
         // --- §Google-Login Identity Migration(2_4 §৪-৬, dual-path) ---
         // সম্পূর্ণ additive — উপরের ownerUids-based clause-গুলো অপরিবর্তিত।
         // এই নতুন clause-গুলো শুধু তখনই relevant যখন member doc-এ
