@@ -7,6 +7,12 @@ import { getHijriDate, HIJRI_MONTHS_BN } from "../legacy/appHelpers.js";
 import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
 import { peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { WEEKDAYS_BN, MILESTONES, calendarNotes, historyFor } from "./tomorrowCalendarData.js";
+import { isCreatorAuth } from "../legacy/familyIdentity.js";
+import { fetchSection } from "../legacy/editableContent.js";
+import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor } from "./tomorrowExtras.js";
+import { TomorrowExtrasEditor } from "./TomorrowExtrasEditor.jsx";
+
+const DEFAULT_SLEEP = "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।";
 
 export function tomorrowNotes(date, hijri) {
   const hm = HIJRI_MONTHS_BN.indexOf(hijri.month) + 1;
@@ -83,6 +89,15 @@ function Row({ n, muted }) {
 }
 
 export function TomorrowPreviewCard({ toBn }) {
+  // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
+  const [extras, setExtras] = React.useState({ items: [], sleepText: "" });
+  const [editing, setEditing] = React.useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    fetchSection(EXTRAS_SECTION_ID).then((d) => { if (alive) setExtras(normalizeExtras(d)); });
+    return () => { alive = false; };
+  }, []);
+  const isCreator = isCreatorAuth();
   const date = new Date(Date.now() + 86400000);
   const hijri = getHijriDate(date);
   const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri);
@@ -90,10 +105,11 @@ export function TomorrowPreviewCard({ toBn }) {
     const fl = fastingLine(toBn);
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: "কালকের রোজার সময়", text: fl });
   }
+  extrasFor(extras, date.getDay()).forEach((n) => notes.push(n));
   history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: "ইতিহাসের পাতায় কাল", text: t }));
   const ms = nextMilestone(date);
   const hasMore = notes.length > 0;
-  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", text: "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।" };
+  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", text: extras.sleepText || DEFAULT_SLEEP };
 
   return React.createElement(
     "div",
@@ -109,6 +125,8 @@ export function TomorrowPreviewCard({ toBn }) {
       ),
       React.createElement("span", { className: "text-xs font-semibold text-[#A47E24]" }, toBn(hijri.day) + " " + hijri.month)
     ),
+    isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), className: "mb-3 text-xs font-semibold text-emerald-800 underline" }, "✏️ বাক্য যোগ / সম্পাদনা করুন"),
+    isCreator && editing && React.createElement(TomorrowExtrasEditor, { extras, defaultSleep: DEFAULT_SLEEP, tomorrowWeekday: date.getDay(), onSaved: setExtras, onClose: () => setEditing(false) }),
     React.createElement(
       "ul",
       { className: "space-y-2" },

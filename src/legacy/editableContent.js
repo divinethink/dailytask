@@ -78,6 +78,25 @@ async function saveTable(sectionId, columns, rows) {
   );
 }
 
+// হোম-কার্ডের ক্রিয়েটর-সম্পাদিত বাড়তি বাক্য(যেমন "আগামীকাল" কার্ড) — নিজস্ব doc, তাই অন্য কনটেন্টে প্রভাব নেই।
+// data = { items:[...], sleepText } — গঠন-যাচাই tomorrowExtras.js-এ; Rules-এ শুধু App Creator লিখতে পারে।
+async function saveHomeCardExtras(sectionId, data) {
+  const user = requireCreator();
+  await setDoc(
+    sectionRef(sectionId),
+    {
+      format: "homeCardExtras",
+      homeCardExtras: {
+        items: Array.isArray(data && data.items) ? data.items : [],
+        sleepText: (data && typeof data.sleepText === "string" ? data.sleepText : "").trim(),
+      },
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    },
+    { merge: true }
+  );
+}
+
 // §৪.২ — App Creator-এর UI-তে auto-generate(client-side), ম্যানুয়ালি টাইপ না।
 function makeAccordionItemId() {
   return "item_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -88,5 +107,6 @@ export {
   saveRichtext,
   saveAccordion,
   saveTable,
+  saveHomeCardExtras,
   makeAccordionItemId,
 };
