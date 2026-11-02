@@ -118,6 +118,7 @@ export function sameLayout(a, b) {
 // না থাকলে/অবৈধ হলে ডিফল্ট ক্রম = আগের আচরণ হুবহু। অচেনা/ডুপ্লিকেট id বাদ, বাদ-পড়া কার্ড ডিফল্ট ক্রমে শেষে।
 export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },
+  { id: "jamaat", title: "মসজিদের জামায়াত" },
   { id: "forbidden", title: "নিষিদ্ধ সময়" },
   { id: "other", title: "অন্যান্য সালাত" },
   { id: "meal", title: "সেহরি ও ইফতার" },

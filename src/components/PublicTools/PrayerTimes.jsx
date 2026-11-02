@@ -20,6 +20,7 @@ import { ChevronDown, ChevronLeft, Loader2, RefreshIcon, X } from "../icons.jsx"
 import { Qibla } from "./Qibla.jsx";
 import { WaqtAmalCard } from "../WaqtAmalCard.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
+import { JamaatCard } from "./JamaatCard.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
 
 const { useState, useEffect, useMemo, useRef } = React;
@@ -1004,6 +1005,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       )
       )
     ),
+    // §মসজিদের জামায়াত(owner-request ৩ নভেম্বর ২০২৬): per-device, ওয়াক্ত-হিসাবের উপর নির্ভর, নিজের এডিট-সুবিধা সহ।
+    jamaat: schedule && /*#__PURE__*/React.createElement(JamaatCard, { schedule, now }),
     forbidden: (
     // §নিষিদ্ধ সময়(owner-instruction): লাল রঙে, একটাই লাইনে — ছোট ফোনে লাইন না ভেঙে পাশে স্ক্রল হয়।
     schedule &&
