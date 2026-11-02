@@ -3255,7 +3255,8 @@ function App() {
     toBn: toBn
   }),
     tomorrow: () => /*#__PURE__*/React.createElement(TomorrowPreviewCard, {
-    toBn: toBn
+    toBn: toBn,
+    todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })()
   }),
     focus: () => /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
     member: selectedMember,

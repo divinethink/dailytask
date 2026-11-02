@@ -241,11 +241,9 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
                   <textarea rows={2} maxLength={300} value={textOf(s)} onChange={e => { const v = e.target.value; setEdits(m => ({ ...m, [s.id]: v })); setSent(false); }} className="flex-1 text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none" />
                 </label>
               ))}
-              <p className="text-[11px] text-slate-500 mt-2">🔒 {T.decisionsPrivacy}</p>
               <button type="button" onClick={doSend} className="w-full mt-3 py-3 rounded-2xl bg-emerald-900 text-white font-bold">📨 {T.send}</button>
               {pickErr && <p className="text-sm text-red-700 text-center mt-2">{T.sendPick}</p>}
               {sent && <p className="text-sm text-emerald-800 text-center mt-2">{T.sent}</p>}
-              <p className="text-xs text-slate-500 text-center mt-2">{T.sendNote}</p>
             </div>
           )}
 

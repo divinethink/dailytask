@@ -11,6 +11,7 @@ import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
 import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor } from "./tomorrowExtras.js";
 import { TomorrowExtrasEditor } from "./TomorrowExtrasEditor.jsx";
+import { EditIcon } from "./icons.jsx";
 
 const DEFAULT_SLEEP = "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।";
 
@@ -88,7 +89,8 @@ function Row({ n, muted }) {
   );
 }
 
-export function TomorrowPreviewCard({ toBn }) {
+// todaySaved=false হলে কার্ড "আজ"-এর বার্তা দেখায়; আজকের ডেটা সেভ হলে "আগামীকাল"।
+export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
   const [extras, setExtras] = React.useState({ items: [], sleepText: "" });
   const [editing, setEditing] = React.useState(false);
@@ -98,15 +100,16 @@ export function TomorrowPreviewCard({ toBn }) {
     return () => { alive = false; };
   }, []);
   const isCreator = isCreatorAuth();
-  const date = new Date(Date.now() + 86400000);
+  const isTomorrow = !!todaySaved;
+  const date = new Date(Date.now() + (isTomorrow ? 86400000 : 0));
   const hijri = getHijriDate(date);
   const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri);
   if (fastingDay) {
     const fl = fastingLine(toBn);
-    if (fl) notes.push({ tone: "time", icon: "⏱️", title: "কালকের রোজার সময়", text: fl });
+    if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });
   }
   extrasFor(extras, date.getDay()).forEach((n) => notes.push(n));
-  history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: "ইতিহাসের পাতায় কাল", text: t }));
+  history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: isTomorrow ? "ইতিহাসের পাতায় কাল" : "ইতিহাসের পাতায় আজ", text: t }));
   const ms = nextMilestone(date);
   const hasMore = notes.length > 0;
   const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", text: extras.sleepText || DEFAULT_SLEEP };
@@ -120,12 +123,16 @@ export function TomorrowPreviewCard({ toBn }) {
       React.createElement(
         "div",
         { className: "flex items-center gap-2" },
-        React.createElement("h3", { className: "text-sm font-bold text-emerald-950" }, "🌅 আগামীকাল"),
+        React.createElement("h3", { className: "text-sm font-bold text-emerald-950" }, isTomorrow ? "🌅 আগামীকাল" : "🌅 আজ"),
         React.createElement("span", { className: "rounded-full bg-emerald-900 text-white text-xs font-semibold px-2.5 py-0.5" }, WEEKDAYS_BN[date.getDay()])
       ),
-      React.createElement("span", { className: "text-xs font-semibold text-[#A47E24]" }, toBn(hijri.day) + " " + hijri.month)
+      React.createElement(
+        "div",
+        { className: "flex items-center gap-2" },
+        React.createElement("span", { className: "text-xs font-semibold text-[#A47E24]" }, toBn(hijri.day) + " " + hijri.month),
+        isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-7 h-7 flex items-center justify-center rounded-lg text-emerald-800 hover:bg-black/5" }, React.createElement(EditIcon, { size: 16 }))
+      )
     ),
-    isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), className: "mb-3 text-xs font-semibold text-emerald-800 underline" }, "✏️ বাক্য যোগ / সম্পাদনা করুন"),
     isCreator && editing && React.createElement(TomorrowExtrasEditor, { extras, defaultSleep: DEFAULT_SLEEP, tomorrowWeekday: date.getDay(), onSaved: setExtras, onClose: () => setEditing(false) }),
     React.createElement(
       "ul",
@@ -136,7 +143,7 @@ export function TomorrowPreviewCard({ toBn }) {
     ms && React.createElement(
       "div",
       { className: "mt-3 flex items-center justify-center" },
-      React.createElement("span", { className: "rounded-full bg-[#FFF8E7] border border-[#EBD9A8] px-3 py-1 text-xs font-semibold text-[#8A6A1C]" }, "⏳ " + ms.label + " — আর প্রায় " + toBn(ms.days + 1) + " দিন (সম্ভবত)")
+      React.createElement("span", { className: "rounded-full bg-[#FFF8E7] border border-[#EBD9A8] px-3 py-1 text-xs font-semibold text-[#8A6A1C]" }, "⏳ " + ms.label + " — আর প্রায় " + toBn(isTomorrow ? ms.days + 1 : ms.days) + " দিন (সম্ভবত)")
     ),
     history.length > 0 && React.createElement("p", { className: "mt-2 text-[11px] text-slate-400 text-center" }, "ইতিহাসের তারিখ সর্বাধিক প্রচলিত মত অনুযায়ী; ভিন্ন মতও আছে।"),
     special && React.createElement("p", { className: "mt-1 text-[11px] text-slate-400 text-center" }, "হিজরি তারিখ ১ দিন এদিক-ওদিক হতে পারে; চাঁদ দেখা সাপেক্ষে।")

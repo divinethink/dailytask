@@ -230,7 +230,6 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
             </span>
           ))}
         </div>
-        <p className="text-slate-400 mb-4" style={{ fontSize: 11 }}>{T.legendHint}</p>
 
         {trend.overall && (
           <div className="rounded-xl p-3 mb-3" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
@@ -250,7 +249,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
                 {trend.overall.dir ? ARROW[trend.overall.dir].ch : ""}
               </span>
             </div>
-            {T.overallComment[trend.overall.kind] && (
+            {T.overallComment[trend.overall.kind] && trend.overall.kind !== "fallingSome" && trend.overall.kind !== "steady" && (
               <p className="text-xs text-slate-600 leading-relaxed mt-2">{fill(T.overallComment[trend.overall.kind], { n: trend.overall.delta === null ? "" : toBn(Math.abs(trend.overall.delta)) })}</p>
             )}
           </div>
