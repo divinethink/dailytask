@@ -1,6 +1,6 @@
 name: unzip-upload
 
-# রেপোর ROOT-এ *.zip আপলোড (web "Upload files" → commit to vite-migration) করলে এই workflow
+# রেপোর ROOT-এ *.zip আপলোড (web "Upload files" → commit to main) করলে এই workflow
 # zip খুলে রেপোর উপর বসায়, zip মুছে commit করে এবং CI চালু করে।
 # Cloudflare Pages Git-integration নিজেই এই commit দেখে deploy করে — আলাদা deploy workflow লাগে না।
 # Flat zip বা একটি wrapper-folder-যুক্ত zip — দুটোই চলে। zip-এর ভেতরের .github/ ইচ্ছাকৃতভাবে উপেক্ষিত
@@ -8,7 +8,7 @@ name: unzip-upload
 # নোট: zip শুধু ফাইল যোগ/overwrite করে; মুছতে হলে GitHub-এ হাতে মুছুন।
 on:
   push:
-    branches: [vite-migration]
+    branches: [main]
     paths: ['*.zip']
 
 permissions:
@@ -49,11 +49,11 @@ jobs:
             echo "nothing to commit"
           else
             git commit -m "chore: apply uploaded zip (${zips[*]})"
-            git push origin HEAD:vite-migration
+            git push origin HEAD:main
           fi
 
       # built-in token দিয়ে push করলে অন্য workflow নিজে চালু হয় না — তাই CI স্পষ্টভাবে চালু।
       - name: Trigger CI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run ci.yml --ref vite-migration
+        run: gh workflow run ci.yml --ref main
