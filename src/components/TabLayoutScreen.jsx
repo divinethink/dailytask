@@ -22,8 +22,9 @@ export function TabLayoutScreen({ tab, member, onSave, onClose }) {
     try {
       await onSave(draft);
       onClose();
-    } catch {
-      setError(true);
+    } catch (e) {
+      console.error("tabLayout save failed", e);
+      setError(e && e.code ? String(e.code) : true);
     } finally {
       setBusy(false);
     }
@@ -99,7 +100,7 @@ export function TabLayoutScreen({ tab, member, onSave, onClose }) {
     React.createElement(
       "div",
       { className: "px-5 py-3 bg-white border-t border-slate-200" },
-      error && React.createElement("p", { role: "alert", className: "mb-2 text-center text-sm text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।"),
+      error && React.createElement("p", { role: "alert", className: "mb-2 text-center text-sm text-red-700" }, "সেভ হয়নি। আবার চেষ্টা করুন।" + (typeof error === "string" ? " (" + error + ")" : "") + (error === "permission-denied" ? " — Firestore Rules deploy করা আছে কিনা দেখুন।" : "")),
       React.createElement(
         "button",
         {
