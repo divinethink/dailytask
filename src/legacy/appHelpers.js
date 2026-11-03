@@ -41,7 +41,7 @@ const EMERALD_DEFAULT = ["236 253 245", "209 250 229", "167 243 208", "110 231 1
 const EMERALD_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 const THEME_PRESETS = [
   { id: "green", name: "সবুজ (ডিফল্ট)", color: "#0E4B43", accent: "#C89B3C", page: "#F4F7F1", pal: EMERALD_DEFAULT, ink: "#16302B", deep: "#0A3A34", soft: "#E8F0EE", accentSoft: "#E4D3A8", tint: "#E3EEEA", line: "#D3E3DD", wash: "#F2F7F4" },
-  { id: "nord-frost", name: "নর্ড ফ্রস্ট", color: "#4F7099", accent: "#88C0D0", page: "#ECEFF4", pal: ["234 242 246", "225 234 240", "204 217 229", "177 196 214", "150 175 200", "121 149 182", "101 133 171", "88 122 164", "79 112 153", "65 92 125", "36 50 69"], ink: "#1B2736", deep: "#3F5C80", soft: "#E8EEF4", accentSoft: "#CDE3EA", tint: "#E6EDF2", line: "#D3DEE5", wash: "#F2F6F8" },
+  { id: "nord-frost", name: "নর্ড ফ্রস্ট", color: "#4A78AD", accent: "#88C0D0", page: "#ECEFF4", pal: ["234 242 246", "225 234 240", "204 217 229", "188 208 230", "156 185 217", "128 163 203", "100 140 187", "74 120 173", "61 98 142", "48 76 112", "36 50 69"], ink: "#1B2736", deep: "#2F5385", soft: "#E8EEF4", accentSoft: "#CDE3EA", tint: "#E6EDF2", line: "#D3DEE5", wash: "#F2F6F8" },
   { id: "pink", name: "গোলাপি", color: "#DB2777", accent: "#F06BA8", page: "#FDF2F8", pal: ["250 240 244", "247 231 238", "247 210 227", "243 186 212", "238 159 194", "233 129 175", "227 96 154", "221 64 134", "217 41 119", "202 36 109", "121 21 65"], ink: "#361222", deep: "#BA2165", soft: "#F3E8ED", accentSoft: "#EDC0D4", tint: "#F0E6EA", line: "#E3D3DA", wash: "#F7F2F5" },
   { id: "purple", name: "বেগুনি", color: "#6D28D9", accent: "#A98AE8", page: "#F4F0FD", pal: ["244 240 250", "237 231 247", "224 210 247", "208 186 243", "190 159 238", "169 129 233", "147 95 227", "125 64 221", "109 40 217", "100 36 201", "60 21 120"], ink: "#201236", deep: "#5C21BA", soft: "#ECE8F3", accentSoft: "#CFC0ED", tint: "#E9E6F0", line: "#DAD3E3", wash: "#F4F2F7" },
   { id: "olive", name: "অলিভ", color: "#657834", accent: "#BFA94A", page: "#F4F6EA", pal: ["247 249 241", "240 244 230", "228 235 210", "212 224 183", "194 210 152", "174 196 119", "152 180 81", "123 147 64", "101 120 52", "93 110 48", "56 66 29"], ink: "#2A3216", deep: "#56662C", soft: "#F0F3E8", accentSoft: "#EAE2C3", tint: "#EDF0E6", line: "#DFE3D3", wash: "#F6F7F2" },
@@ -51,7 +51,8 @@ const THEME_PRESETS = [
 // "নর্ড" → "নর্ড ফ্রস্ট"। আগে সংরক্ষিত(localStorage/ব্যাকআপ) hex অপরিবর্তিত থাকে; এই ম্যাপ শুধু
 // পড়ার সময় অনুবাদ করে — সরানো থিম → ডিফল্ট সবুজ, পুরনো নর্ড → নর্ড ফ্রস্ট(storage নিজে মোছা/বদলানো হয় না)।
 const LEGACY_THEME_COLOR_MAP = {
-  "#3e6092": "#4F7099",
+  "#3e6092": "#4A78AD",
+  "#4f7099": "#4A78AD",
   "#3f8f7a": "#0E4B43",
   "#043d36": "#0E4B43",
   "#b85034": "#0E4B43",
