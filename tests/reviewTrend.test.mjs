@@ -180,3 +180,16 @@ test("overall: dailyScoreOf না থাকলে null", () => {
   const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [month("x", 30, 15), month("x", 31, 31), month("x", 31, 31)], h: h([fBool("x")]), groups });
   assert.equal(t.overall, null);
 });
+
+test("fardPrayers: আসল কাযা% দেখায়, কম = ভালো (↑)", () => {
+  const f = { key: "fardPrayers", label: "ফরজ কাযা", type: "count" };
+  const mk = q => { const m = {}; for (let d = 1; d <= 20; d++) m[pad2(d)] = { fardPrayers: q }; return m; };
+  const hh = h([f], { ratioOf: (ff, e) => (e ? (5 - e.fardPrayers) / 5 : null) });
+  const v = monthValue(mk(1), 20, f, hh); // ৫টার ১টা কাযা = ২০%
+  assert.equal(v.pct, 20); assert.equal(v.tier, "good");
+  const t = buildTrend({ year: 2026, month0: 10, now: NOW, entriesByMonth: [mk(3), mk(2), mk(0)], h: hh, groups });
+  const r = t.sections.flatMap(s => s.rows)[0];
+  assert.deepEqual(r.vals.map(x => x.pct), [60, 40, 0]);
+  assert.equal(r.dir, "up"); assert.equal(r.delta, 60);
+  assert.equal(r.vals[2].tier, "great");
+});

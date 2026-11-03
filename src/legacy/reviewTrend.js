@@ -8,6 +8,10 @@ const ATTENTION_BELOW = 40; // শেষ মাস এর নিচে হলে
 const MAX_ATTENTION = 3;
 const STEADY_GREAT = 85; // ক্যালেন্ডারের "চমৎকার" সীমার সাথে একই
 
+// যে ফিল্ডে কম মান = ভালো (কাযা): পিল-এ আসল % দেখায়, কিন্তু রং/তীর/মনোযোগ "ভালো-দিক" (g = ১০০ − %) ধরে।
+const INVERTED = new Set(["fardPrayers"]);
+const gOf = v => (v && v.g !== undefined ? v.g : v.pct);
+
 const pad2 = n => String(n).padStart(2, "0");
 const labelOf = f => ((f.shortLabel ? String(f.shortLabel).trim() : "") || f.label || f.key);
 
@@ -41,8 +45,10 @@ function monthValue(entries, upTo, f, h) {
     logged += 1; sum += r;
   }
   if (logged < MIN_DAYS) return null;
-  const raw = sum / logged;
-  return { pct: Math.round(raw * 100), tier: tierOf(raw), days: logged };
+  const raw = sum / logged; // ratioOf ইতিমধ্যে ভালো-দিকে (কাযা-মুক্ত স্কোর)
+  const g = Math.round(raw * 100);
+  if (INVERTED.has(f.key)) return { pct: 100 - g, g, tier: tierOf(raw), days: logged };
+  return { pct: g, tier: tierOf(raw), days: logged };
 }
 
 // vals: [ {pct}|null ×৩ ] ⇒ ধারা ও মন্তব্যের ধরন। কমপক্ষে ২ বৈধ মাস না থাকলে dir = null, kind = "few"।
@@ -50,14 +56,14 @@ function trendOf(vals) {
   const valid = vals.filter(Boolean);
   if (valid.length < 2) return { dir: null, delta: null, kind: "few", from: valid[0] || null, to: valid[0] || null };
   const first = valid[0], last = valid[valid.length - 1];
-  const delta = last.pct - first.pct;
+  const delta = gOf(last) - gOf(first);
   const dir = delta >= TREND_DELTA ? "up" : delta <= -TREND_DELTA ? "down" : "flat";
-  const strictUp = valid.length === 3 && valid[0].pct < valid[1].pct && valid[1].pct < valid[2].pct;
-  const strictDown = valid.length === 3 && valid[0].pct > valid[1].pct && valid[1].pct > valid[2].pct;
+  const strictUp = valid.length === 3 && gOf(valid[0]) < gOf(valid[1]) && gOf(valid[1]) < gOf(valid[2]);
+  const strictDown = valid.length === 3 && gOf(valid[0]) > gOf(valid[1]) && gOf(valid[1]) > gOf(valid[2]);
   let kind;
   if (dir === "up") kind = strictUp ? "rising" : "risingSome";
   else if (dir === "down") kind = strictDown ? "falling" : "fallingSome";
-  else kind = valid.every(v => v.pct >= STEADY_GREAT) ? "steadyGreat" : "steady";
+  else kind = valid.every(v => gOf(v) >= STEADY_GREAT) ? "steadyGreat" : "steady";
   return { dir, delta, kind, from: first, to: last };
 }
 
@@ -108,7 +114,7 @@ function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
   for (const r of rows) if (r.dir === "up" && (!best || r.delta > best.delta)) best = r;
 
   // মনোযোগ: ↓ ধারা অথবা শেষ (নির্বাচিত) মাস ৪০%-এর নিচে। শেষ মাসের মান কম আগে; সর্বোচ্চ ৩।
-  const cur = r => (r.vals[2] ? r.vals[2].pct : null);
+  const cur = r => (r.vals[2] ? gOf(r.vals[2]) : null);
   const attentionAll = rows
     .filter(r => r.dir === "down" || (cur(r) !== null && cur(r) < ATTENTION_BELOW))
     .sort((a, b) => (cur(a) === null ? 101 : cur(a)) - (cur(b) === null ? 101 : cur(b)));
