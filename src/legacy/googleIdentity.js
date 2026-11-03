@@ -286,21 +286,54 @@ function generateInviteToken() {
 }
 
 // Admin — নতুন/rotate(পুরনো থাকলেও overwrite, single-active-token মডেল)।
+// §Security-fix(৩ নভেম্বর ২০২৬): token আর families/{id} root doc-এ নেই
+// (root doc যেকোনো signed-in user পড়তে পারে → Family Code জানলেই token
+// পড়ে join সম্ভব ছিল)। এখন families/{id}/inviteLinks/active — শুধু admin
+// পড়তে/লিখতে পারে; join-যাচাই Rules নিজে ভেতরে করে।
+function inviteLinkRef(familyId) {
+  return doc(db, "families", familyId, "inviteLinks", "active");
+}
+
 async function rotateInviteLink(familyId) {
   const token = generateInviteToken();
-  await updateDoc(doc(db, "families", familyId), {
-    activeInviteToken: { token, createdAt: Date.now(), revoked: false },
-    updatedAt: Date.now()
-  });
+  await setDoc(inviteLinkRef(familyId), { token, createdAt: Date.now(), revoked: false });
   return token;
+}
+
+// Admin — বর্তমান token পড়া(non-admin পারবে না, Rules-এ বন্ধ)। ব্যর্থ হলে null।
+async function loadActiveInviteToken(familyId) {
+  try {
+    const snap = await getDoc(inviteLinkRef(familyId));
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;
+  }
+}
+
+// পুরনো root-field(activeInviteToken) একবার মুছে ফেলা — শুধু admin-এর ডিভাইস
+// থেকে, best-effort। পুরনো token ইচ্ছাকৃতভাবে বাতিল(ফাঁসের সম্ভাবনা ছিল);
+// admin নতুন লিংক শেয়ার করলে নতুন token তৈরি হবে।
+let _legacyInviteCleanupTried = false;
+async function removeLegacyInviteToken(familyId) {
+  if (_legacyInviteCleanupTried) return;
+  _legacyInviteCleanupTried = true;
+  try {
+    await updateDoc(doc(db, "families", familyId), {
+      activeInviteToken: deleteField(),
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    console.error("[Invite-Link] legacy token cleanup ব্যর্থ(non-fatal):", err && err.message);
+  }
 }
 
 // Admin — revoke। caller বর্তমান activeInviteToken object পাঠাবে(token/
 // createdAt অক্ষুণ্ণ রাখতে, শুধু revoked flip)।
 async function revokeInviteLink(familyId, activeInviteToken) {
-  await updateDoc(doc(db, "families", familyId), {
-    activeInviteToken: { ...activeInviteToken, revoked: true },
-    updatedAt: Date.now()
+  await setDoc(inviteLinkRef(familyId), {
+    token: activeInviteToken.token,
+    createdAt: activeInviteToken.createdAt,
+    revoked: true
   });
 }
 
@@ -324,11 +357,8 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   if (!familySnap.exists()) {
     return { aborted: true, reason: "family-not-found" };
   }
-  const fam = familySnap.data();
-  const active = fam.activeInviteToken;
-  if (!active || active.revoked || active.token !== token) {
-    return { aborted: true, reason: "invalid-token" };
-  }
+  // token-যাচাই এখন শুধু firestore.rules-এ(token আর client পড়তে পারে না);
+  // ভুল/revoked token হলে নিচের setDoc permission-denied পাবে → "invalid-token"।
 
   // §Bug-fix(owner-reported — "১ email = ১ member" invariant, 2_4 §১):
   // আগে এখানে কোনো users/{uid} mapping-check ছিল না বলে একই Google
@@ -449,6 +479,9 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     return { success: true, familyId, memberId, bound: false };
   } catch (err) {
     console.error("[Invite-Link] join ব্যর্থ:", err.message);
+    if (err && err.code === "permission-denied") {
+      return { aborted: true, reason: "invalid-token" };
+    }
     return { aborted: true, reason: "error", error: err.message };
   }
 }
@@ -563,6 +596,8 @@ export {
   generateInviteToken,
   rotateInviteLink,
   revokeInviteLink,
+  loadActiveInviteToken,
+  removeLegacyInviteToken,
   joinFamilyViaInviteLink,
   leaveFamily,
   editOwnProfile,

@@ -792,17 +792,14 @@ service cloud.firestore {
              || (resource.data.identityModel == 'transitioning' && request.resource.data.identityModel == 'google-only')
            );
 
-      // activeInviteToken: create/rotate(নতুন token generate) এবং
-      // revoke(শুধু revoked:true সেট) — শুধু admin। Token-এর নিজস্ব
-      // entropy/length client-side enforce হয়(2_4 §১০.১), Rules শুধু
-      // shape+admin-only guard করে।
+      // §Security-fix(৩ নভেম্বর ২০২৬): activeInviteToken আর এই root doc-এ
+      // লেখা যাবে না(root doc যেকোনো signed-in user "get" করতে পারে →
+      // token ফাঁস হতো)। নতুন জায়গা: নিচের inviteLinks/active(admin-only)।
+      // এখানে শুধু পুরনো field মুছে ফেলার অনুমতি(admin, field-delete only)।
       allow update: if request.auth != null
         && isAdminOfFamily(familyId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeInviteToken', 'updatedAt'])
-        && request.resource.data.activeInviteToken.keys().hasOnly(['token', 'createdAt', 'revoked'])
-        && request.resource.data.activeInviteToken.token is string
-        && request.resource.data.activeInviteToken.token.size() >= 22
-        && request.resource.data.activeInviteToken.revoked is bool;
+        && !('activeInviteToken' in request.resource.data);
 
       // status/orphanedAt(soft-delete, 2_4 §৫.৪): system নিজে(শেষ সদস্য
       // leave/remove একই transaction-এ) সেট করে — সেই transaction-এর
@@ -833,6 +830,25 @@ service cloud.firestore {
         && resource.data.status == 'orphaned'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'orphanedAt', 'updatedAt'])
         && !('status' in request.resource.data);
+
+      // §Security-fix(৩ নভেম্বর ২০২৬): Invite token — শুধু admin পড়ে/লেখে।
+      // Join-যাচাই members create-rule-এর ভেতরে get() দিয়ে হয়(সেটা এই
+      // read-rule দ্বারা আটকায় না), তাই joiner নিজে token পড়তে পারে না।
+      match /inviteLinks/{linkId} {
+        allow get: if request.auth != null
+          && linkId == 'active'
+          && isAdminOfFamily(familyId);
+        allow list: if false;
+        allow create, update: if request.auth != null
+          && linkId == 'active'
+          && isAdminOfFamily(familyId)
+          && request.resource.data.keys().hasOnly(['token', 'createdAt', 'revoked'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() >= 22
+          && request.resource.data.createdAt is number
+          && request.resource.data.revoked is bool;
+        allow delete: if false;
+      }
 
       // --- Phase C prep: members/entries/weekly subcollection rules ---
       // পুরোপুরি additive ও এই মুহূর্তে অব্যবহৃত — কোনো app code এখনো এই
@@ -873,12 +889,11 @@ service cloud.firestore {
         // client "member"-ছাড়া কিছু পাঠাতে পারবে না(privilege-escalation
         // guard — admin role এই path দিয়ে কখনো পাওয়া যাবে না)।
         allow create: if request.auth != null
-          && exists(/databases/$(database)/documents/families/$(familyId))
-          && 'activeInviteToken' in get(/databases/$(database)/documents/families/$(familyId)).data
-          && get(/databases/$(database)/documents/families/$(familyId)).data.activeInviteToken.revoked == false
+          && exists(/databases/$(database)/documents/families/$(familyId)/inviteLinks/active)
+          && get(/databases/$(database)/documents/families/$(familyId)/inviteLinks/active).data.revoked == false
           && 'inviteTokenAttempt' in request.resource.data
           && request.resource.data.inviteTokenAttempt
-               == get(/databases/$(database)/documents/families/$(familyId)).data.activeInviteToken.token
+               == get(/databases/$(database)/documents/families/$(familyId)/inviteLinks/active).data.token
           && request.resource.data.googleUid == request.auth.uid
           && request.resource.data.role == 'member'
           && request.resource.data.keys().hasOnly(['name', 'gender', 'googleUid', 'role', 'inviteTokenAttempt', 'createdAt', 'updatedAt']);

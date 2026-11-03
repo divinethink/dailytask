@@ -25,7 +25,7 @@ import {
 // দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
 // UI থেকে wire হচ্ছে।
 import {
-  editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink,
+  editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink, loadActiveInviteToken, removeLegacyInviteToken,
   deleteFamilyMemberEmail, normalizeEmail
 } from "./googleIdentity.js";
 import {
@@ -1046,6 +1046,13 @@ function App() {
   // field local state-এ mirror করা(existing family-doc fetch/listener থেকে,
   // নিচে দেখুন — কোনো নতুন read লাগেনি)। null = কখনো generate হয়নি।
   const [activeInviteToken, setActiveInviteToken] = useState(null);
+  // §Security-fix: invite token শুধু admin পড়তে পারে(families/{id}/inviteLinks/active)।
+  useEffect(() => {
+    if (isAdmin !== true || isGuestMode) return;
+    let cancelled = false;
+    loadActiveInviteToken(getFamilyId()).then(t => { if (!cancelled) setActiveInviteToken(t); });
+    return () => { cancelled = true; };
+  }, [isAdmin]);
   const originalEntryRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyList, setHistoryList] = useState([]);
@@ -1132,7 +1139,15 @@ function App() {
           setMigrationState(state);
           // §Public Invite-Link — একই live listener থেকে mirror(নতুন read
           // না), যাতে অন্য ডিভাইস থেকে rotate/revoke হলে সাথে সাথে sync হয়।
-          setActiveInviteToken(snap.exists() ? (snap.data().activeInviteToken || null) : null);
+          // §Security-fix: token আর root doc-এ নেই; পুরনো field থেকে গেলে
+          // শুধু admin-এর ডিভাইস থেকে একবার মুছে ফেলা হয়।
+          try {
+            const _d = snap.exists() ? snap.data() : null;
+            const _me = auth.currentUser ? auth.currentUser.uid : null;
+            if (_d && _d.activeInviteToken && _me && Array.isArray(_d.adminUids) && _d.adminUids.includes(_me)) {
+              removeLegacyInviteToken(migrationFamilyId);
+            }
+          } catch (e) { /* best-effort */ }
           // Family Code auto-propagate + notify: সার্ভারের families/{id}.familyCode
           // এই ডিভাইসের local কোড থেকে ভিন্ন হলে (Admin অন্য কোথাও কোড
           // পরিবর্তন করেছেন) — অটো নতুন কোড বসিয়ে, Google-linked হলে
@@ -1196,7 +1211,7 @@ function App() {
         setFirstAdminUid(migFamSnap.exists() ? (migFamSnap.data().firstAdminUid || null) : null);
         // §Public Invite-Link — একই boot fetch থেকে initial value(extra
         // read নেই)।
-        setActiveInviteToken(migFamSnap.exists() ? (migFamSnap.data().activeInviteToken || null) : null);
+        // (token এখন admin-only subdoc থেকে আলাদা effect-এ লোড হয়)
         // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
         // notification(read+unread)-এ live listener, যাতে "seen"(read:true)
         // করার পরও item panel থেকে হারিয়ে না যায়(শুধু explicit delete/Clear-all
