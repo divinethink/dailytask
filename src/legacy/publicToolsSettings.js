@@ -102,6 +102,15 @@ function getGeoPermissionState() {
   }
 }
 
+// GPS ব্যর্থতার বাংলা বার্তা(inline-error ব্যবহারকারী স্ক্রিনের জন্য) — ব্রাউজারের ইংরেজি message নয়
+function gpsErrorMessage(err) {
+  const code = err && err.code;
+  if (code === 1) return "লোকেশনের অনুমতি নেই — ব্রাউজার/অ্যাপ সেটিংসে লোকেশন \"অনুমতি দিন\", তারপর আবার চেষ্টা করুন।";
+  if (code === 2) return "ফোনের লোকেশন বন্ধ আছে — উপর থেকে নিচে টেনে লোকেশন চালু করে আবার চেষ্টা করুন।";
+  if (code === 3) return "অবস্থান পাওয়া যাচ্ছে না — লোকেশন চালু আছে কিনা দেখে আবার চেষ্টা করুন।";
+  return err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি";
+}
+
 export {
   getSavedLocation,
   saveLocation,
@@ -109,6 +118,7 @@ export {
   saveMadhab,
   detectGpsLocation,
   getGeoPermissionState,
+  gpsErrorMessage,
   DEFAULT_MADHAB,
   MANUAL_LOCATIONS,
 };

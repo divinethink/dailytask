@@ -346,6 +346,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [now, setNow] = useState(() => new Date());
+  // তারিখ বদলালে(মধ্যরাত পার হলে) সময়সূচি নতুন করে আনতে/হিসাব করতে
+  const todayKey = dayKey(now);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [madhabPanelOpen, setMadhabPanelOpen] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
@@ -403,7 +405,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         if (myReqId !== reqIdRef.current) return;
         setLoading(false);
       });
-  }, [location, madhab]);
+  }, [location, madhab, todayKey]);
 
   // §এলাকা-সার্চ(debounced, ৫০০ms) — Nominatim usage-policy-সৌজন্যে অকারণ
   // request এড়াতে ২ অক্ষরের কম হলে বা typing চলাকালীন call হয় না।
@@ -683,7 +685,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     // হিসেবে ব্যবহৃত(কয়েক মিনিটের farok থাকতে পারে, "আনুমানিক" স্পিরিট)।
     const nextFajr = addMinutes(fajr, 24 * 60);
     return { fajr, sunrise, dhuhr, asr, sunset, maghrib, isha, nextFajr };
-  }, [timings]);
+  }, [timings, todayKey]);
 
   // বর্তমান/পরবর্তী ওয়াক্ত(countdown banner) + list-highlight
   const waqtInfo = useMemo(() => {

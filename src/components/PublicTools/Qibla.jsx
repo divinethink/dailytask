@@ -17,6 +17,7 @@ import {
   getSavedLocation,
   saveLocation,
   detectGpsLocation,
+  gpsErrorMessage,
   MANUAL_LOCATIONS,
 } from "../../legacy/publicToolsSettings.js";
 import { calculateQiblaBearing } from "../../legacy/publicToolsQibla.js";
@@ -109,9 +110,9 @@ export function Qibla() {
   function handleUseGps() {
     setGpsBusy(true);
     setError(null);
-    detectGpsLocation()
+    detectGpsLocation({ fresh: true })
       .then((loc) => applyLocation(loc))
-      .catch((err) => setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি"))
+      .catch((err) => setError(gpsErrorMessage(err)))
       .finally(() => setGpsBusy(false));
   }
 

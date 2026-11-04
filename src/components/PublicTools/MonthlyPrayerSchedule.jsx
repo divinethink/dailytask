@@ -5,7 +5,7 @@
 // React global(window.React, globals.js)।
 
 import { toBn, BN_MONTHS } from "../../legacy/appHelpers.js";
-import { getSavedLocation, saveLocation, getSavedMadhab, detectGpsLocation, MANUAL_LOCATIONS } from "../../legacy/publicToolsSettings.js";
+import { getSavedLocation, saveLocation, getSavedMadhab, detectGpsLocation, gpsErrorMessage, MANUAL_LOCATIONS } from "../../legacy/publicToolsSettings.js";
 import { fetchMonthlyPrayerTimes } from "../../legacy/publicToolsPrayerApi.js";
 import { ChevronLeft, ChevronRight, Loader2 } from "../icons.jsx";
 
@@ -71,9 +71,9 @@ export function MonthlyPrayerSchedule() {
 
   function handleUseGps() {
     setGpsBusy(true);
-    detectGpsLocation()
+    detectGpsLocation({ fresh: true })
       .then((loc) => applyLocation(loc))
-      .catch((err) => setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি"))
+      .catch((err) => setError(gpsErrorMessage(err)))
       .finally(() => setGpsBusy(false));
   }
 
