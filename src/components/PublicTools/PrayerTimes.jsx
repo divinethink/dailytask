@@ -12,6 +12,7 @@ import {
   getSavedMadhab,
   saveMadhab,
   detectGpsLocation,
+  getGeoPermissionState,
   MANUAL_LOCATIONS,
 } from "../../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../../legacy/publicToolsPrayerApi.js";
@@ -35,7 +36,7 @@ function readGpsIssue() {
     if (!raw) return null;
     const v = JSON.parse(raw);
     const dismissedAt = Number(localStorage.getItem(GPS_DISMISS_KEY) || 0);
-    if (!v || !v.kind || !(v.at > dismissedAt)) return null;
+    if (!v || !v.kind || !GPS_TEXT[v.kind] || !(v.at > dismissedAt)) return null;
     return v;
   } catch {
     return null;
@@ -52,22 +53,37 @@ function dismissGpsIssue() {
     localStorage.setItem(GPS_DISMISS_KEY, String(Date.now()));
   } catch {}
 }
-// code 1=অনুমতি নেই, 2=লোকেশন বন্ধ/অনুপলব্ধ(ফোনের সেটিংস বন্ধ থাকলে সাধারণত এটাই)
-function gpsIssueKind(err) {
-  if (err && err.code === 1) return "denied";
-  if (err && err.code === 2) return "off";
-  return null;
-}
+// ওয়েব-পেজ ফোনের/ব্রাউজারের সেটিংস নিজে খুলতে পারে না(কোনো API নেই) — স্ট্যান্ডার্ড হলো:
+// কারণ ধরে পরিষ্কার ধাপ দেখানো + "আবার চেষ্টা করুন" বাটন + সেটিংস থেকে ফিরলে নিজে আবার চেষ্টা।
+// কারণ: denied=ব্লক করা, prompt=প্রশ্নটি এড়ানো/বাতিল, off=ফোনের লোকেশন বন্ধ, timeout=সময় শেষ
 const GPS_TEXT = {
   off: {
     title: "ফোনে লোকেশন বন্ধ আছে",
-    body: "নামাজের সঠিক সময়ের জন্য অনুগ্রহ করে ফোনের লোকেশন (জিপিএস) চালু করুন। এরপর আবার রিফ্রেশ করুন।",
-    short: "সঠিক সময়ের জন্য লোকেশন চালু করে রিফ্রেশ করুন।",
+    body: "নামাজের সঠিক সময়ের জন্য ফোনের লোকেশন (জিপিএস) চালু করুন।",
+    steps: ["ফোনের স্ক্রিন উপর থেকে নিচে টানুন", "\"লোকেশন\" আইকন চেপে চালু করুন", "এই অ্যাপে ফিরে \"আবার চেষ্টা করুন\" চাপুন"],
+    short: "লোকেশন চালু করে আবার চেষ্টা করুন।",
   },
   denied: {
+    title: "লোকেশনের অনুমতি বন্ধ করা আছে",
+    body: "ব্রাউজার আর নিজে থেকে প্রশ্ন করবে না। সেটিংসে গিয়ে একবার অনুমতি দিতে হবে।",
+    steps: [
+      "ব্রাউজারে: ঠিকানা-বারের পাশে 🔒 (বা ⋮) → সাইট সেটিংস → লোকেশন → অনুমতি দিন",
+      "হোম-স্ক্রিনের অ্যাপ হলে: অ্যাপ আইকন চেপে ধরুন → অ্যাপ তথ্য → অনুমতি → লোকেশন → অনুমতি",
+      "ফিরে এসে \"আবার চেষ্টা করুন\" চাপুন",
+    ],
+    short: "সেটিংসে লোকেশনের অনুমতি দিয়ে আবার চেষ্টা করুন।",
+  },
+  prompt: {
     title: "লোকেশনের অনুমতি দেওয়া হয়নি",
-    body: "নামাজের সঠিক সময়ের জন্য অনুগ্রহ করে ব্রাউজার বা অ্যাপের সেটিংসে লোকেশনের অনুমতি দিন। এরপর আবার রিফ্রেশ করুন।",
-    short: "সঠিক সময়ের জন্য অনুমতি দিয়ে রিফ্রেশ করুন।",
+    body: "সঠিক সময়ের জন্য অনুমতি লাগবে। \"আবার চেষ্টা করুন\" চেপে প্রশ্ন এলে \"Allow\" দিন।",
+    steps: [],
+    short: "আবার চেষ্টা করে অনুমতি দিন।",
+  },
+  timeout: {
+    title: "অবস্থান পাওয়া যাচ্ছে না",
+    body: "ফোনের লোকেশন চালু আছে কিনা দেখুন, দরকারে খোলা জায়গায় গিয়ে আবার চেষ্টা করুন।",
+    steps: [],
+    short: "লোকেশন চালু আছে কিনা দেখে আবার চেষ্টা করুন।",
   },
 };
 
@@ -473,24 +489,32 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     };
   }, []);
 
+  function showGpsIssue(kind) {
+    writeGpsIssue(kind);
+    setGpsIssue({ kind, at: Date.now() });
+    setGpsPopup(kind);
+  }
+
   function handleGpsFailure(err) {
-    const kind = gpsIssueKind(err);
-    if (kind) {
-      writeGpsIssue(kind);
-      setGpsIssue({ kind, at: Date.now() });
-      setGpsPopup(kind);
-    } else {
-      setError(
-        err && err.code === 3
-          ? "অবস্থান পেতে দেরি হচ্ছে। ফোনের লোকেশন চালু আছে কিনা দেখে আবার চেষ্টা করুন।"
-          : err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি"
-      );
+    const code = err && err.code;
+    if (code === 1) {
+      // অনুমতি নেই: ব্লক(denied) নাকি শুধু প্রশ্ন এড়ানো(prompt) — আলাদা নির্দেশ
+      return getGeoPermissionState().then((st) => showGpsIssue(st === "denied" ? "denied" : "prompt"));
     }
+    if (code === 2) {
+      showGpsIssue("off");
+      return;
+    }
+    if (code === 3) {
+      showGpsIssue("timeout");
+      return;
+    }
+    setError(err && err.message ? err.message : "GPS অবস্থান পাওয়া যায়নি");
   }
 
   function handleUseGps() {
     setGpsBusy(true);
-    detectGpsLocation()
+    detectGpsLocation({ fresh: true })
       .then((loc) =>
         resolveGpsName(loc).then((name) => {
           writeGpsIssue(null);
@@ -510,7 +534,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       return;
     }
     setGpsBusy(true);
-    detectGpsLocation()
+    detectGpsLocation({ fresh: true })
       .then((g) => {
         writeGpsIssue(null);
         setGpsIssue(null);
@@ -553,27 +577,62 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         )
       )
     : null;
-  const gpsPopupEl = gpsPopup
+  const gpsPopupEl = gpsPopup && GPS_TEXT[gpsPopup]
     ? /*#__PURE__*/React.createElement(
         "div",
         { className: "fixed inset-0 z-50 flex items-center justify-center px-6", style: { background: "rgba(0,0,0,0.45)" } },
         /*#__PURE__*/React.createElement(
           "div",
-          { className: "bg-white rounded-2xl p-5 w-full max-w-sm shadow-md" },
+          { className: "bg-white rounded-2xl p-5 w-full max-w-sm shadow-md max-h-[85vh] overflow-y-auto" },
           /*#__PURE__*/React.createElement("div", { className: "text-base font-bold text-emerald-950 mb-2" }, GPS_TEXT[gpsPopup].title),
-          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-600 leading-relaxed mb-4" }, GPS_TEXT[gpsPopup].body),
+          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-600 leading-relaxed mb-3" }, GPS_TEXT[gpsPopup].body),
+          GPS_TEXT[gpsPopup].steps.length > 0 &&
+            /*#__PURE__*/React.createElement(
+              "ol",
+              { className: "list-decimal pl-5 text-sm text-slate-700 leading-relaxed mb-4 flex flex-col gap-1" },
+              GPS_TEXT[gpsPopup].steps.map((t, i) => /*#__PURE__*/React.createElement("li", { key: i }, t))
+            ),
+          /*#__PURE__*/React.createElement(
+            "button",
+            {
+              type: "button",
+              disabled: gpsBusy,
+              onClick: () => {
+                setGpsPopup(null);
+                handleUseGps();
+              },
+              className: "w-full h-11 rounded-xl font-bold text-white text-sm bg-emerald-900 disabled:opacity-50",
+            },
+            "আবার চেষ্টা করুন"
+          ),
           /*#__PURE__*/React.createElement(
             "button",
             {
               type: "button",
               onClick: () => setGpsPopup(null),
-              className: "w-full h-11 rounded-xl font-bold text-white text-sm bg-emerald-900",
+              className: "w-full h-11 mt-2 rounded-xl font-semibold text-emerald-900 text-sm border border-slate-200",
             },
-            "ঠিক আছে"
+            "পরে"
           )
         )
       )
     : null;
+
+  // সেটিংস থেকে অ্যাপে ফিরলে: পপআপ খোলা ও অনুমতি এখন "granted" হলে নিজে আবার চেষ্টা(প্রশ্ন আসে না)
+  useEffect(() => {
+    if (!gpsPopup) return;
+    function onVisible() {
+      if (document.visibilityState !== "visible" || gpsBusy) return;
+      getGeoPermissionState().then((st) => {
+        if (st === "granted") {
+          setGpsPopup(null);
+          handleUseGps();
+        }
+      });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [gpsPopup, gpsBusy]);
 
   function handleMadhabChange(m) {
     setMadhabState(m);

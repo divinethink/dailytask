@@ -64,7 +64,10 @@ function saveMadhab(madhab) {
 
 // GPS দিয়ে বর্তমান lat/lon বের করে — কোনো reverse-geocode call না(উপরের নোট
 // দ্রষ্টব্য), তাই label সবসময় জেনেরিক "GPS অবস্থান"।
-function detectGpsLocation() {
+// {fresh:true}(ইউজার নিজে বাটন চাপলে): সর্বশেষ ১০ মিনিটের cached পজিশন নয়, নতুন পড়া;
+// timeout ১৫ সেকেন্ড। ডিফল্ট(অন্য কলার)অপরিবর্তিত।
+function detectGpsLocation(opts) {
+  const fresh = !!(opts && opts.fresh);
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("এই ব্রাউজারে GPS সাপোর্ট নেই"));
@@ -80,9 +83,23 @@ function detectGpsLocation() {
         });
       },
       (err) => reject(err),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+      { enableHighAccuracy: false, timeout: fresh ? 15000 : 10000, maximumAge: fresh ? 0 : 600000 }
     );
   });
+}
+
+// লোকেশন-অনুমতির বর্তমান অবস্থা(Permissions API): "granted" | "prompt" | "denied" | "unknown"।
+// "denied" হলে ব্রাউজার আর প্রশ্ন করে না — ইউজারকে সেটিংসে গিয়ে নিজে অনুমতি দিতে হয়।
+function getGeoPermissionState() {
+  try {
+    if (!navigator.permissions || !navigator.permissions.query) return Promise.resolve("unknown");
+    return navigator.permissions
+      .query({ name: "geolocation" })
+      .then((r) => r.state)
+      .catch(() => "unknown");
+  } catch {
+    return Promise.resolve("unknown");
+  }
 }
 
 export {
@@ -91,6 +108,7 @@ export {
   getSavedMadhab,
   saveMadhab,
   detectGpsLocation,
+  getGeoPermissionState,
   DEFAULT_MADHAB,
   MANUAL_LOCATIONS,
 };
