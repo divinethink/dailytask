@@ -27,12 +27,11 @@ export function FoldWrap({ fold, title, children }) {
 }
 
 import { sanitizeLayout, cardTitle } from "../legacy/homeLayout.js";
-import { isCreatorAuth } from "../legacy/familyIdentity.js";
 
-// হোম/ট্যাব কাস্টমাইজ এখন শুধু App Creator-এর(বয়স্ক সদস্যরা এলোমেলো করে ফেলা এড়াতে)। অন্য সবার জন্য
-// সেভ-করা লেআউট উপেক্ষিত → ডিফল্ট; ডেটা মোছা হয় না(creator-এর জন্য আগের মতোই কাজ করে)।
+// হোম/ট্যাব কাস্টমাইজ শুধু App Creator করেন; তাঁর সেভ-করা লেআউট(গ্লোবাল অ্যাপ ডিজাইন) সবার জন্য এক।
+// `member` হিসেবে এখানে app.js-এর designSrc আসে(.homeLayout); না থাকলে ডিফল্ট।
 function effectiveHomeLayout(member) {
-  return isCreatorAuth() ? member && member.homeLayout : undefined;
+  return member && member.homeLayout;
 }
 
 // দৈনিক-এন্ট্রি অংশ: তাযকিরাহ + ক্যাটেগরি-কার্ড + অন্যান্য, সেভ-করা ক্রম/দৃশ্যমানতা/fold অনুযায়ী।

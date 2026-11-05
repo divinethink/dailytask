@@ -527,6 +527,7 @@ export function DailyEntrySection({
   savedTick,
   saving,
   selectedMember,
+  designSrc,
   setCodeChangeNotice,
   setRecoveryMessage,
   onSaveTasks,
@@ -711,7 +712,7 @@ export function DailyEntrySection({
     size: 16
   })))), /*#__PURE__*/React.createElement("div", {
     className: "px-5 mt-4 space-y-3"
-  }, ...homeEntryCards(selectedMember, {
+  }, ...homeEntryCards(designSrc, {
     tazkirah: () => (() => {
     const insp = getDailyInspiration(viewDate);
     const tagLabel = insp.type === "ayat" ? "আয়াত" : insp.type === "hadith" ? "হাদীস" : "উক্তি";

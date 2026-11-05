@@ -584,6 +584,7 @@ import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
 import { useCursorEntries } from "./useCursorEntries.js";
+import { fetchDesign, saveDesignPart } from "./appDesign.js";
 const NO_DIRTY = { current: false };
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
@@ -918,6 +919,8 @@ function App() {
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [customFields, setCustomFields] = useState([]);
   const [fieldOverrides, setFieldOverrides] = useState({});
+  // গ্লোবাল অ্যাপ ডিজাইন(ক্রিয়েটরের সাজানো, সবার জন্য এক) — null = ডিফল্ট/ফলব্যাক
+  const [design, setDesign] = useState(null);
   const [showFieldManager, setShowFieldManager] = useState(false);
   const [showTazkirah, setShowTazkirah] = useState(false);
   const [showPopupMsgs, setShowPopupMsgs] = useState(false);
@@ -1320,8 +1323,11 @@ function App() {
       });
       const cf = await loadCustomFields();
       setCustomFields(cf);
-      setFieldOverrides(sanitizeOverrides(await loadFieldOverrides()));
-      setTazkirahData(sanitizeTazkirah(await loadTazkirahCustom()));
+      // গ্লোবাল ডিজাইন থাকলে সেটাই সবার জন্য; না থাকলে পরিবারের আগের সেভ-করা মান(ফলব্যাক, কিছু হারায় না)।
+      const dz = await fetchDesign();
+      setDesign(dz);
+      setFieldOverrides(sanitizeOverrides(dz && dz.fieldOverrides ? dz.fieldOverrides : await loadFieldOverrides()));
+      setTazkirahData(sanitizeTazkirah(dz && dz.tazkirah ? dz.tazkirah : await loadTazkirahCustom()));
       let last = null;
       try {
         // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
@@ -1440,7 +1446,8 @@ function App() {
       await saveCustomFields(nextCustomFields);
       setCustomFields(nextCustomFields);
     }
-    await saveFieldOverrides(nextOverrides);
+    await saveDesignPart("fieldOverrides", nextOverrides);
+    setDesign(d => ({ ...(d || {}), fieldOverrides: nextOverrides }));
     setFieldOverrides(nextOverrides);
   }
   async function handleSaveCustomTasks(next) {
@@ -1450,10 +1457,21 @@ function App() {
   }
   async function handleSaveTazkirah(next) {
     if (isLockedForSwitch) throw new Error("locked");
-    await saveTazkirahCustom(next);
+    await saveDesignPart("tazkirah", next);
+    setDesign(d => ({ ...(d || {}), tazkirah: next }));
     setTazkirahData(next);
   }
   const selectedMember = useMemo(() => (members || []).find(m => m.id === selectedId) || null, [members, selectedId]);
+  // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান(ফলব্যাক), অন্যদের ডিফল্ট।
+  const designSrc = (() => {
+    const legacy = (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember : null;
+    const d = design || {};
+    return {
+      homeLayout: d.homeLayout || (legacy ? legacy.homeLayout : undefined),
+      prayerLayout: d.prayerLayout || (legacy ? legacy.prayerLayout : undefined),
+      tabLayout: d.tabLayout || (legacy ? legacy.tabLayout : undefined)
+    };
+  })();
   // True when this member has been claimed ("দায়িত্ব নিন") by a different
   // Firebase Auth uid than the one this device is currently signed in as.
   // Unclaimed members (ownerUid null) are editable by anyone — that's the
@@ -2967,10 +2985,10 @@ function App() {
           setArchiveMonth0: setArchiveMonth0,
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
-          onOpenHomeLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowHomeLayout(true) : undefined,
-          onOpenPrayerLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowPrayerLayout(true) : undefined,
-          onOpenAmolLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowAmolLayout(true) : undefined,
-          onOpenToolsLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowToolsLayout(true) : undefined,
+          onOpenHomeLayout: isCreatorAuth() ? () => setShowHomeLayout(true) : undefined,
+          onOpenPrayerLayout: isCreatorAuth() ? () => setShowPrayerLayout(true) : undefined,
+          onOpenAmolLayout: isCreatorAuth() ? () => setShowAmolLayout(true) : undefined,
+          onOpenToolsLayout: isCreatorAuth() ? () => setShowToolsLayout(true) : undefined,
           onOpenFieldManager: isCreatorAuth() ? () => setShowFieldManager(true) : undefined,
           onOpenTazkirah: isCreatorAuth() ? () => setShowTazkirah(true) : undefined,
           // পপআপ বার্তা সম্পাদনা: শুধু App Creator(UI-gate; আসল নিরাপত্তা Rules-এর isAppCreator())
@@ -2996,21 +3014,26 @@ function App() {
         })),
         // নেভ-ট্যাব কাস্টমাইজ(২ নভেম্বর ২০২৬, owner-approved): সময়সূচি/আমল/সহায়িকা — একই স্ক্রিন, ভিন্ন tab।
         ...[["prayer", showPrayerLayout, setShowPrayerLayout], ["amol", showAmolLayout, setShowAmolLayout], ["tools", showToolsLayout, setShowToolsLayout]].map(([tab, shown, setShown]) =>
-          shown && selectedMember && React.createElement(React.Suspense, { key: "tablayout-" + tab, fallback: null }, React.createElement(TabLayoutScreen, {
+          shown && isCreatorAuth() && React.createElement(React.Suspense, { key: "tablayout-" + tab, fallback: null }, React.createElement(TabLayoutScreen, {
             tab: tab,
-            member: selectedMember,
+            member: designSrc,
             onSave: async ({ order, hidden }) => {
-              await saveTabLayout(migrationState, selectedId, tab, order, hidden);
-              setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, tabLayout: { ...(x.tabLayout || {}), [tab + "Order"]: order, [tab + "Hidden"]: hidden } } : x));
+              const nextTab = { ...(designSrc.tabLayout || {}), [tab + "Order"]: order.map(String), [tab + "Hidden"]: hidden.map(String) };
+              await saveDesignPart("tabLayout", nextTab);
+              setDesign(d => ({ ...(d || {}), tabLayout: nextTab }));
             },
             onClose: () => setShown(false)
           }))
         ),
-        showHomeLayout && selectedMember && React.createElement(React.Suspense, { fallback: null }, React.createElement(HomeLayoutScreen, {
-          member: selectedMember,
+        showHomeLayout && isCreatorAuth() && React.createElement(React.Suspense, { fallback: null }, React.createElement(HomeLayoutScreen, {
+          member: designSrc,
           onSave: async layout => {
-            await saveHomeLayout(migrationState, selectedId, layout);
-            setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, homeLayout: layout } : x));
+            const next = {
+              entry: layout.entry.map(c => ({ id: c.id, visible: c.visible, fold: c.fold })),
+              below: layout.below.map(c => ({ id: c.id, visible: c.visible, fold: c.fold }))
+            };
+            await saveDesignPart("homeLayout", next);
+            setDesign(d => ({ ...(d || {}), homeLayout: next }));
           },
           onClose: () => setShowHomeLayout(false)
         })),
@@ -3083,7 +3106,7 @@ function App() {
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
-          React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null, tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: designSrc.prayerLayout || null, tabLayout: designSrc.tabLayout || null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
@@ -3091,7 +3114,7 @@ function App() {
     if (activeTab === TAB_AMOL) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "আমল" }) },
-          React.createElement(AmolHub, { tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(AmolHub, { tabLayout: designSrc.tabLayout || null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
@@ -3099,7 +3122,7 @@ function App() {
     if (activeTab === TAB_TOOLS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
@@ -3236,6 +3259,7 @@ function App() {
   }), /*#__PURE__*/React.createElement("div", {
     className: "max-w-2xl mx-auto"
   }, React.createElement(DailyEntrySection, {
+    designSrc: designSrc,
     codeChangeNotice: codeChangeNotice,
     customFields: customFieldsView,
     onSaveTasks: handleSaveCustomTasks,
@@ -3287,7 +3311,7 @@ function App() {
     streak: streak,
     yesterdayMissing: yesterdayMissing,
     yesterdayEntry: yesterdayEntry
-  }), ...renderHomeBelow(selectedMember, {
+  }), ...renderHomeBelow(designSrc, {
     streak: () => /*#__PURE__*/React.createElement(StreakCard, {
     streak: streak,
     toBn: toBn,
