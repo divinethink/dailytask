@@ -583,6 +583,8 @@ import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
 import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
+import { useCursorEntries } from "./useCursorEntries.js";
+const NO_DIRTY = { current: false };
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
@@ -931,6 +933,11 @@ function App() {
       month0: d.getMonth()
     };
   });
+  // §আলাদা মাস-কার্সর(owner-approved): সাপ্তাহিক+মাসিক মুহাসাবা একসাথে(reviewCursor), ট্রেন্ড ও সভা প্রত্যেকে নিজের।
+  // ওভারভিউ ও দৈনিক এন্ট্রি/প্রিন্ট মূল monthCursor-এ। শুরুতে সবাই চলতি মাসে।
+  const [reviewCursor, setReviewCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month0: d.getMonth() }; });
+  const [trendCursor, setTrendCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month0: d.getMonth() }; });
+  const [meetingCursor, setMeetingCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month0: d.getMonth() }; });
   const [monthEntries, setMonthEntries] = useState({});
   const [monthRefreshKey, setMonthRefreshKey] = useState(0);
   const [printMode, setPrintMode] = useState(false);
@@ -961,8 +968,14 @@ function App() {
   // সোয়াইপ-পরবর্তী ছোট টোস্টে দেখানোর মাসের নাম(দৃশ্যমান ফিডব্যাক — ভাঁজ-বন্ধ কার্ডেও মাস বদল বোঝা যায়)
   const swipeMonthLabel = (c) => BN_MONTHS[c.month0] + " " + toBn(c.year);
   const swipeShiftMonth = (delta) => {
-    if ((weeklyDirtyRef.current || meetingDirtyRef.current) && !window.confirm("সাপ্তাহিক রিফ্লেকশন বা মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+    if (weeklyDirtyRef.current && !window.confirm("সাপ্তাহিক রিফ্লেকশনে সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
     setMonthCursor((c) => shiftMonthCursor(c, delta));
+  };
+  const reviewShiftMonth = (delta) => setReviewCursor((c) => shiftMonthCursor(c, delta));
+  const trendShiftMonth = (delta) => setTrendCursor((c) => shiftMonthCursor(c, delta));
+  const meetingShiftMonth = (delta) => {
+    if (meetingDirtyRef.current && !window.confirm("মাসিক সভায় সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
+    setMeetingCursor((c) => shiftMonthCursor(c, delta));
   };
   // Auto-update reload(fresh-load-only, dt-sw-updated event — dispatch হয়
   // top-level SW-registration কোড থেকে, দেখুন ফাইলের শুরুর দিকে)। Unsaved
@@ -1544,6 +1557,8 @@ function App() {
     }, () => {});
     return () => unsub();
   }, [selectedId, monthCursor, monthRefreshKey, migrationState]);
+  const reviewEntries = useCursorEntries({ cursor: reviewCursor, mainCursor: monthCursor, mainEntries: monthEntries, migrationState, memberId: selectedId });
+  const trendEntries = useCursorEntries({ cursor: trendCursor, mainCursor: monthCursor, mainEntries: monthEntries, migrationState, memberId: selectedId });
   const refreshWeekly = useCallback(() => {
     if (!selectedId || migrationState === undefined) return;
     loadWeekly(migrationState, selectedId, monthCursor.year, monthCursor.month0).then(data => {
@@ -1569,7 +1584,7 @@ function App() {
     if (isGuestMode) return;
     // New document (different month) — nothing local worth protecting yet.
     meetingDirtyRef.current = false;
-    const docKey = meetingKey(monthCursor.year, monthCursor.month0);
+    const docKey = meetingKey(meetingCursor.year, meetingCursor.month0);
     const docRef = doc(dbModular, getCollectionName(), docKey);
     const unsubscribe = onSnapshot(docRef, docSnap => {
       // H-1 fix: while the user has unsaved local edits, ignore incoming
@@ -1592,7 +1607,7 @@ function App() {
       }
     });
     return () => unsubscribe();
-  }, [monthCursor]);
+  }, [meetingCursor]);
   async function handleExportData() {
     if (isLockedForSwitch) {
       alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
@@ -2078,6 +2093,10 @@ function App() {
   function handleSendToMeeting(rows) {
     if (isGuestMode) { setShowGuestSignIn(true); return false; }
     if (!Array.isArray(rows) || !rows.length) return false;
+    if (reviewCursor.year !== meetingCursor.year || reviewCursor.month0 !== meetingCursor.month0) {
+      alert("সভা কার্ডে এখন অন্য মাস খোলা আছে। আগে সভা কার্ডে " + BN_MONTHS[reviewCursor.month0] + " " + toBn(reviewCursor.year) + " বেছে নিন, তারপর আবার পাঠান।");
+      return false;
+    }
     meetingDirtyRef.current = true;
     setMeetingState(prev => {
       const cur = Array.isArray(prev.rows) ? prev.rows : [];
@@ -2145,7 +2164,7 @@ function App() {
     }
     setSavingMeeting(true);
     try {
-      await saveMeetingData(monthCursor.year, monthCursor.month0, meetingState);
+      await saveMeetingData(meetingCursor.year, meetingCursor.month0, meetingState);
       meetingDirtyRef.current = false;
       setMeetingSavedTick(true);
       setTimeout(() => setMeetingSavedTick(false), 1600);
@@ -3323,7 +3342,7 @@ function App() {
     allFields: allFields,
     entryDirtyRef: entryDirtyRef,
     leadBlanks: leadBlanks,
-    meetingDirtyRef: meetingDirtyRef,
+    meetingDirtyRef: NO_DIRTY,
     monthCursor: monthCursor,
     monthEntries: monthEntries,
     monthStats: monthStats,
@@ -3360,15 +3379,15 @@ function App() {
       monthCursor: monthCursor
     })
   })),
-    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
+    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
     fold: fold,
-    onShiftMonth: swipeShiftMonth,
+    onShiftMonth: reviewShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
     locked: isLockedForThisDevice || isLockedForSwitch,
-    monthCursor: monthCursor,
-    monthEntries: monthEntries,
+    monthCursor: reviewCursor,
+    monthEntries: reviewEntries,
     allFields: allFields,
     fieldApplies: fieldApplies,
     isExcused: isExcused,
@@ -3379,15 +3398,15 @@ function App() {
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
   })),
-    trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
+    trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: trendShiftMonth, monthCursor: trendCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
     fold: fold,
-    onShiftMonth: swipeShiftMonth,
+    onShiftMonth: trendShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
     locked: isLockedForThisDevice || isLockedForSwitch,
-    monthCursor: monthCursor,
-    monthEntries: monthEntries,
+    monthCursor: trendCursor,
+    monthEntries: trendEntries,
     allFields: allFields,
     fieldApplies: fieldApplies,
     isExcused: isExcused,
@@ -3398,15 +3417,15 @@ function App() {
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
-    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
-    onShiftMonth: swipeShiftMonth,
+    onShiftMonth: reviewShiftMonth,
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
     locked: isLockedForThisDevice || isLockedForSwitch,
-    monthCursor: monthCursor,
-    monthEntries: monthEntries,
+    monthCursor: reviewCursor,
+    monthEntries: reviewEntries,
     allFields: allFields,
     fieldApplies: fieldApplies,
     isExcused: isExcused,
@@ -3415,23 +3434,23 @@ function App() {
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
-    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: meetingShiftMonth, monthCursor: meetingCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
     fold: fold,
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,
     isLockedForSwitch: isLockedForSwitch,
     meetingSavedTick: meetingSavedTick,
     meetingState: meetingState,
-    monthCursor: monthCursor,
+    monthCursor: meetingCursor,
     removeMeetingRow: removeMeetingRow,
     savingMeeting: savingMeeting,
     setShowMeetingInfoModal: setShowMeetingInfoModal,
     updateMeetingRow: updateMeetingRow,
     BN_MONTHS: BN_MONTHS,
     toBn: toBn,
-    setMonthCursor: setMonthCursor,
+    setMonthCursor: setMeetingCursor,
     setMonthRefreshKey: setMonthRefreshKey,
-    weeklyDirtyRef: weeklyDirtyRef,
+    weeklyDirtyRef: NO_DIRTY,
     meetingDirtyRef: meetingDirtyRef
   }))
   })), React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})), React.createElement(FamilyCodeChoiceModal, {
