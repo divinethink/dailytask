@@ -13,7 +13,7 @@ import { ChevronDown } from "./icons.jsx";
 
 const { useState, useEffect, useMemo } = React;
 
-const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300");
+const chip = on => "shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-sm border " + (on ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300");
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
@@ -129,14 +129,14 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     else body = (
       <div className="mt-3">
         {errCode && <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 p-2 mb-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.loadFailed}</p>}
-        <div className="flex flex-wrap gap-1.5 mb-2">
+        <div className="flex gap-1.5 mb-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
           {Array.from({ length: chunkCount(year, month0) }, (_, i) => i + 1).map(w => (
             <button key={w} type="button" onClick={() => setWeek(w)} className={chip(w === week)}>সপ্তাহ {toBn(w)}</button>
           ))}
         </div>
-        <p className="text-xs text-slate-500 mb-2">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} · 🔒 {T.privateTag}</p>
-        <div className="flex gap-1 mb-1">{T.steps.map((_, i) => <span key={i} className={"h-1.5 flex-1 rounded-full " + (i + 1 < step ? "bg-emerald-900" : i + 1 === step ? "bg-amber-500" : "bg-slate-200")} />)}</div>
-        <p className="text-xs text-slate-500 text-right mb-3">ধাপ {toBn(step)} / {toBn(5)} · {T.steps[step - 1]}</p>
+        <p className="text-xs text-slate-500 mb-1.5">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} · 🔒 {T.privateTag}</p>
+        <div className="flex gap-1 mb-0.5">{T.steps.map((_, i) => <span key={i} className={"h-1.5 flex-1 rounded-full " + (i + 1 < step ? "bg-emerald-900" : i + 1 === step ? "bg-amber-500" : "bg-slate-200")} />)}</div>
+        <p className="text-xs text-slate-500 text-right mb-2">ধাপ {toBn(step)} / {toBn(5)} · {T.steps[step - 1]}</p>
 
         {step === 1 && (
           <div>

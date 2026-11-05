@@ -15,9 +15,15 @@ import { EditIcon } from "./icons.jsx";
 
 const DEFAULT_SLEEP = "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।";
 
-export function tomorrowNotes(date, hijri) {
+// তথ্য-ফাইলের বার্তা "কাল"-দৃষ্টিকোণে লেখা; আজকের তারিখ দেখালে শুধু শব্দ "কাল/কালকের"→"আজ/আজকের"।
+// (সকাল/বিকাল-এর মতো শব্দ ছোঁয় না: আগে ফাঁকা/চিহ্ন থাকতে হবে, পরে ফাঁকা/চিহ্ন।)
+const KAL_RE = /(^|[\s—“(])কাল(কের)?(?=[\s—,।:?)”]|$)/g;
+const toToday = s => (typeof s === "string" ? s.replace(KAL_RE, (_, a, k) => a + (k ? "আজকের" : "আজ")) : s);
+
+export function tomorrowNotes(date, hijri, isTomorrow = true) {
   const hm = HIJRI_MONTHS_BN.indexOf(hijri.month) + 1;
   const r = calendarNotes(date.getDay(), hm, hijri.day);
+  if (!isTomorrow) r.notes = r.notes.map(n => ({ ...n, title: toToday(n.title), text: toToday(n.text) }));
   return { ...r, hm, history: historyFor(hm, hijri.day) };
 }
 
@@ -103,7 +109,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   const isTomorrow = !!todaySaved;
   const date = new Date(Date.now() + (isTomorrow ? 86400000 : 0));
   const hijri = getHijriDate(date);
-  const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri);
+  const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri, isTomorrow);
   if (fastingDay) {
     const fl = fastingLine(toBn);
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });

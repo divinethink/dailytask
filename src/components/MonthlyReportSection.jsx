@@ -17,7 +17,7 @@ const T = REVIEW_TEXT.monthly;
 const { useState, useEffect, useMemo } = React;
 
 const GOAL_ICON = { done: "✅", partial: "🟡", none: "❌" };
-const cardBox = "rounded-2xl bg-white p-3 mb-3";
+const cardBox = "rounded-2xl bg-white p-3 mb-2";
 const cardStyle = { border: "1px solid #EADFBE" };
 
 function SectionTitle({ children }) {
@@ -77,6 +77,7 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   const [off, setOff] = useState({}); // সিদ্ধান্ত-id → true হলে টিক নেই
   const [sent, setSent] = useState(false);
   const [pickErr, setPickErr] = useState(false);
+  const [decOpen, setDecOpen] = useState(false); // আগামী মাসের সিদ্ধান্ত: ডিফল্ট বন্ধ
 
   // আগের মাসের এন্ট্রি: কার্ড খুললে (বা সদস্য/মাস বদলালে) একবার। ব্যর্থ হলে তুলনা ছাড়াই রিপোর্ট চলে।
   useEffect(() => {
@@ -113,9 +114,9 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     [member, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore]);
   const report = useMemo(() => (open ? buildMonthlyReport({ year, month0, now: new Date(), curEntries: monthEntries, prevEntries: prev.entries, h }) : null),
     [open, year, month0, monthEntries, prev.entries, h]);
-  const sugg = useMemo(() => (report && report.ok ? suggestDecisions(report, { text: T.decisions, toBn, weekdayNames: BN_WEEKDAYS }) : []),
-    [report, toBn, BN_WEEKDAYS]);
   const goals = useMemo(() => goalSummary(reviews), [reviews]);
+  const sugg = useMemo(() => (report && report.ok ? suggestDecisions(report, { text: T.decisions, toBn, weekdayNames: BN_WEEKDAYS, goalNone: goals.counts.none, goalTotal: goals.counts.total }) : []),
+    [report, toBn, BN_WEEKDAYS, goals]);
 
   const textOf = s => (edits[s.id] !== undefined ? edits[s.id] : s.text);
   const doSend = () => {
@@ -150,19 +151,19 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       if (goals.counts.none) goalParts.push(fill(T.goalNone, { n: toBn(goals.counts.none) }));
       body = (
         <div className="mt-3">
-          <div className="rounded-xl p-4 mb-3 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)" }}>
+          <div className="rounded-xl p-3 mb-2 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)" }}>
             <div className="flex items-start justify-between gap-2 mb-2">
               <span className="text-sm opacity-90">{r.prev ? T.versus : T.avgNow}</span>
               <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
             </div>
             {r.prev && r.delta !== null ? (
               <>
-                <div className="text-3xl font-bold leading-none mb-1">{up ? "▲ " : down ? "▼ " : ""}{r.delta === 0 ? T.sameDelta : toBn(Math.abs(r.delta)) + "%"}</div>
+                <div className="text-2xl font-bold leading-none mb-1">{up ? "▲ " : down ? "▼ " : ""}{r.delta === 0 ? T.sameDelta : toBn(Math.abs(r.delta)) + "%"}</div>
                 <div className="text-sm opacity-90">{fill(T.prevToNow, { prev: BN_MONTHS[r.prev.month0], p: toBn(r.prev.avg), cur: BN_MONTHS[month0], c: toBn(r.avg) })}</div>
               </>
             ) : (
               <>
-                <div className="text-3xl font-bold leading-none mb-1">{toBn(r.avg)}%</div>
+                <div className="text-2xl font-bold leading-none mb-1">{toBn(r.avg)}%</div>
                 <div className="text-sm opacity-90">{prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
               </>
             )}
@@ -170,8 +171,19 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
           </div>
 
           <div className={cardBox} style={cardStyle}>
-            <SectionTitle>📈 {T.trendTitle}</SectionTitle>
-            <TrendChart weeks={r.weeks} toBn={toBn} />
+            {r.weeks.filter(w => w.avg !== null).length < 2 ? (
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-bold text-slate-800">📈 {T.trendTitle}</span>
+                {r.weeks.filter(w => w.avg !== null).map(w => (
+                  <span key={w.week} className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBEFC4", color: "#7A5A00" }}>{T.weekShort.replace("{n}", toBn(w.week))} · {toBn(w.avg)}%</span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <SectionTitle>📈 {T.trendTitle}</SectionTitle>
+                <TrendChart weeks={r.weeks} toBn={toBn} />
+              </>
+            )}
           </div>
 
           {r.weekdayValid >= 3 && (
@@ -233,17 +245,25 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
 
           {sugg.length > 0 && (
             <div className="rounded-2xl p-3" style={{ background: "#F6F8F5", border: "1px solid #D5E3D8" }}>
-              <h3 className="font-bold text-sm text-slate-800 mb-1">🧭 {T.decisionsTitle}</h3>
-              <p className="text-xs text-slate-500 mb-2">{T.decisionsHint}</p>
-              {sugg.map(s => (
-                <label key={s.id} className="flex items-start gap-2 py-2 border-b border-dashed border-slate-200">
-                  <input type="checkbox" checked={!off[s.id]} onChange={() => { setOff(o => ({ ...o, [s.id]: !o[s.id] })); setSent(false); setPickErr(false); }} className="mt-2" />
-                  <textarea rows={2} maxLength={300} value={textOf(s)} onChange={e => { const v = e.target.value; setEdits(m => ({ ...m, [s.id]: v })); setSent(false); }} className="flex-1 text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none" />
-                </label>
-              ))}
-              <button type="button" onClick={doSend} className="w-full mt-3 py-3 rounded-2xl bg-emerald-900 text-white font-bold">📨 {T.send}</button>
-              {pickErr && <p className="text-sm text-red-700 text-center mt-2">{T.sendPick}</p>}
-              {sent && <p className="text-sm text-emerald-800 text-center mt-2">{T.sent}</p>}
+              <button type="button" onClick={() => setDecOpen(o => !o)} aria-expanded={decOpen} className="w-full flex items-center gap-2 text-left">
+                <h3 className="flex-1 font-bold text-sm text-slate-800">🧭 {T.decisionsTitle}</h3>
+                <span className="text-[11px] text-slate-500">{toBn(sugg.filter(s => !off[s.id]).length)}টি</span>
+                <ChevronDown size={18} className={"shrink-0 text-slate-400 transition-transform" + (decOpen ? " rotate-180" : "")} />
+              </button>
+              {decOpen && (
+                <div className="mt-2">
+                  <p className="text-xs text-slate-500 mb-2">{T.decisionsHint}</p>
+                  {sugg.map(s => (
+                    <label key={s.id} className="flex items-start gap-2 py-2 border-b border-dashed border-slate-200">
+                      <input type="checkbox" checked={!off[s.id]} onChange={() => { setOff(o => ({ ...o, [s.id]: !o[s.id] })); setSent(false); setPickErr(false); }} className="mt-2" />
+                      <textarea rows={2} maxLength={300} value={textOf(s)} onChange={e => { const v = e.target.value; setEdits(m => ({ ...m, [s.id]: v })); setSent(false); }} className="flex-1 text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white resize-none" />
+                    </label>
+                  ))}
+                  <button type="button" onClick={doSend} className="w-full mt-3 py-3 rounded-2xl bg-emerald-900 text-white font-bold">📨 {T.send}</button>
+                  {pickErr && <p className="text-sm text-red-700 text-center mt-2">{T.sendPick}</p>}
+                  {sent && <p className="text-sm text-emerald-800 text-center mt-2">{T.sent}</p>}
+                </div>
+              )}
             </div>
           )}
 

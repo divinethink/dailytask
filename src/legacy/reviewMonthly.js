@@ -172,7 +172,15 @@ function suggestDecisions(report, o) {
     out.push({ id: "weekday", text: fill(T.weekday, { days: report.weakest.map(i => o.weekdayNames[i]).join(" ও ") }) });
   }
   if (m.improvement) out.push({ id: "keep", text: fill(T.keep, { label: m.improvement.label }) });
-  return out.slice(0, 3);
+  // বাড়তি প্রস্তাব (সবই নিজের ডেটা থেকে; ব্যক্তিগত মুহাসাবার লেখা নয়)
+  if (m.drop && report.topGap && report.topGap.key !== m.drop.key) out.push({ id: "gap", text: fill(T.gap, { label: report.topGap.label, n: o.toBn(report.topGap.missed) }) });
+  if (report.whenGood) out.push({ id: "phone", text: fill(T.phone, { label: report.whenGood.label }) });
+  if (Number.isFinite(report.avg)) {
+    if (report.prev && report.delta !== null && report.delta < 0) out.push({ id: "restore", text: fill(T.restore, { n: o.toBn(report.prev.avg) }) });
+    else if (report.avg < 95) out.push({ id: "target", text: fill(T.target, { n: o.toBn(Math.min(100, report.avg + 5)) }) });
+  }
+  if (o.goalNone > 0 || o.goalTotal === 0) out.push({ id: "goal", text: T.goal });
+  return out.slice(0, 5);
 }
 
 export { MIN_DAYS, SLEEP_KEY, prevMonthOf, elapsedDays, fill, buildMonthlyReport, goalSummary, suggestDecisions };
