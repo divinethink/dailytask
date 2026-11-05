@@ -78,12 +78,14 @@ function activityTierColor(pct) {
 const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
 // owner(২ নভেম্বর ২০২৬): প্রতি শতাংশ-স্তরে সর্বোচ্চ ৩টা আমলের নাম(বাকিগুলো দেখানো হয় না)।
 const MAX_LABELS_PER_TIER = 3;
+const FARD_RANK_LABEL = "ফরজ আদায় (কাযা-মুক্ত)";
 
 // একটা tier-row: "১ম সর্বোচ্চ: ১০০%" + ঐ শতাংশ-এ থাকা সবগুলো আমলের নাম(comma
 // দিয়ে একসাথে, owner-এর প্ল্যান অনুযায়ী) + একটা পাতলা প্রোগ্রেস-বার(দ্রুত visual
 // scan-এর জন্য)।
-function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
+function TierRow({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
   const color = activityTierColor(pct);
+  const shown = shownPct === undefined ? pct : shownPct;
   return /*#__PURE__*/React.createElement("div", {
     className: "mb-3 last:mb-0"
   }, /*#__PURE__*/React.createElement("div", {
@@ -96,11 +98,11 @@ function TierRow({ rank, rankPrefix, pct, labels, toBn }) {
   }, rankPrefix), /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-xs",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
-  }, toBn(pct), "%")), /*#__PURE__*/React.createElement("div", {
+  }, toBn(shown), "%")), /*#__PURE__*/React.createElement("div", {
     className: "h-2 rounded-full bg-slate-100 overflow-hidden mb-1 shadow-inner"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-full rounded-full transition-all duration-500",
-    style: { width: `${pct}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
+    style: { width: `${shown}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
   })), /*#__PURE__*/React.createElement("div", {
     className: "text-sm text-slate-700 leading-snug pl-6"
   }, labels.slice(0, MAX_LABELS_PER_TIER).join(", ")));
@@ -115,10 +117,11 @@ function TierColumn({ heading, headingColor, tiers, rankPrefix, toBn }) {
     className: "text-sm font-bold mb-2.5 text-center",
     style: { color: headingColor }
   }, heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
-    key: t.pct,
+    key: t.pct + "-" + (t.shownPct === undefined ? "" : t.shownPct),
     rank: i + 1,
     rankPrefix: `${ORDINAL_BN[i]} ${rankPrefix}`,
     pct: t.pct,
+    shownPct: t.shownPct,
     labels: t.labels,
     toBn: toBn
   })));
@@ -175,7 +178,7 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
     // এই মান দেখালে নিচের কাযা-বার্তা(complementary %)-র সাথে বৈপরীত্য মনে
     // হয়(owner পর্যবেক্ষণ, ৮ সেপ্টেম্বর ২০২৬)। তাই শুধু এই ranking-লেবেলে
     // স্পষ্ট নাম ব্যবহার করা হলো — সংখ্যা/hisab অপরিবর্তিত।
-    const label = f.key === "fardPrayers" ? "ফরজ আদায় (কাযা-মুক্ত)" : f.shortLabel || f.label;
+    const label = f.key === "fardPrayers" ? FARD_RANK_LABEL : f.shortLabel || f.label;
     if (pct !== null) results.push({ key: f.key, label, pct });
   }
   if (results.length === 0) return null;
@@ -191,7 +194,15 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
   const labelsForTop = pct => results.filter(r => r.pct === pct && topEligible(r)).map(r => r.label);
   const labelsForAny = pct => results.filter(r => r.pct === pct).map(r => r.label);
   const topTiers = topPercents.map(pct => ({ pct, labels: labelsForTop(pct) }));
-  const bottomTiers = bottomPercents.map(pct => ({ pct, labels: labelsForAny(pct) }));
+  // "আরও মনোযোগ" তালিকায় ফরজ আলাদা সারিতে "ফরজ (কাযা)" নামে আসল কাযা-হার(১০০−কাযা-মুক্ত%) দেখায়;
+  // র‍্যাঙ্কিং/রঙ আগের মতোই কাযা-মুক্ত স্কোর অনুযায়ী(owner, ৫ নভেম্বর ২০২৬)। অন্য আমলের সারি অপরিবর্তিত।
+  const bottomTiers = [];
+  for (const pct of bottomPercents) {
+    const normal = labelsForAny(pct).filter(l => l !== FARD_RANK_LABEL);
+    if (normal.length) bottomTiers.push({ pct, labels: normal });
+    if (results.some(r => r.pct === pct && r.key === "fardPrayers")) bottomTiers.push({ pct, shownPct: 100 - pct, labels: ["ফরজ (কাযা)"] });
+  }
+  bottomTiers.splice(3);
 
   const overallPct = Math.round(results.reduce((s, r) => s + r.pct, 0) / results.length);
   let badgeTier = ratingTier(overallPct);
