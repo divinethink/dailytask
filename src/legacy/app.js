@@ -2919,10 +2919,10 @@ function App() {
           setArchiveMonth0: setArchiveMonth0,
           monthCursor: monthCursor,
           setShowFeedbackModal: setShowFeedbackModal,
-          onOpenHomeLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowHomeLayout(true) : undefined,
-          onOpenPrayerLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowPrayerLayout(true) : undefined,
-          onOpenAmolLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowAmolLayout(true) : undefined,
-          onOpenToolsLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowToolsLayout(true) : undefined,
+          onOpenHomeLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowHomeLayout(true) : undefined,
+          onOpenPrayerLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowPrayerLayout(true) : undefined,
+          onOpenAmolLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowAmolLayout(true) : undefined,
+          onOpenToolsLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowToolsLayout(true) : undefined,
           onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
           onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
           // পপআপ বার্তা সম্পাদনা: শুধু App Creator(UI-gate; আসল নিরাপত্তা Rules-এর isAppCreator())
@@ -3035,7 +3035,7 @@ function App() {
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
-          React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null, tabLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.prayerLayout : null, tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
@@ -3043,7 +3043,7 @@ function App() {
     if (activeTab === TAB_AMOL) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "আমল" }) },
-          React.createElement(AmolHub, { tabLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(AmolHub, { tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
@@ -3051,7 +3051,7 @@ function App() {
     if (activeTab === TAB_TOOLS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
+          React.createElement(PublicToolsShell, { tabLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember.tabLayout : null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

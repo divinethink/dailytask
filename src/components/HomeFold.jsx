@@ -27,12 +27,19 @@ export function FoldWrap({ fold, title, children }) {
 }
 
 import { sanitizeLayout, cardTitle } from "../legacy/homeLayout.js";
+import { isCreatorAuth } from "../legacy/familyIdentity.js";
+
+// হোম/ট্যাব কাস্টমাইজ এখন শুধু App Creator-এর(বয়স্ক সদস্যরা এলোমেলো করে ফেলা এড়াতে)। অন্য সবার জন্য
+// সেভ-করা লেআউট উপেক্ষিত → ডিফল্ট; ডেটা মোছা হয় না(creator-এর জন্য আগের মতোই কাজ করে)।
+function effectiveHomeLayout(member) {
+  return isCreatorAuth() ? member && member.homeLayout : undefined;
+}
 
 // দৈনিক-এন্ট্রি অংশ: তাযকিরাহ + ক্যাটেগরি-কার্ড + অন্যান্য, সেভ-করা ক্রম/দৃশ্যমানতা/fold অনুযায়ী।
 // nodes[id](fold) → element। কীতে fold যুক্ত, তাই fold বদলালে কার্ড নতুন করে mount হয়(নতুন ডিফল্ট প্রযোজ্য)।
 export function homeEntryCards(member, nodes) {
   const out = [];
-  sanitizeLayout(member && member.homeLayout).entry.forEach(c => {
+  sanitizeLayout(effectiveHomeLayout(member)).entry.forEach(c => {
     if (!c.visible || !nodes[c.id]) return;
     const key = c.id + ":" + c.fold;
     out.push(
@@ -52,7 +59,7 @@ export function homeEntryCards(member, nodes) {
 const PX_WRAPPED = { streak: true, insight: true, focus: true, tomorrow: true };
 export function renderHomeBelow(member, nodes) {
   const out = [];
-  sanitizeLayout(member && member.homeLayout).below.forEach(c => {
+  sanitizeLayout(effectiveHomeLayout(member)).below.forEach(c => {
     if (!c.visible || !nodes[c.id]) return;
     const key = c.id + ":" + c.fold;
     const title = cardTitle("below", c.id);
