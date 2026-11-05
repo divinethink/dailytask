@@ -129,20 +129,22 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     else body = (
       <div className="mt-3">
         {errCode && <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 p-2 mb-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.loadFailed}</p>}
-        <div className="flex gap-1.5 mb-1 overflow-x-auto -mx-1 px-1 pb-3">
+        <div className="flex gap-1 mb-2">
           {Array.from({ length: chunkCount(year, month0) }, (_, i) => i + 1).map(w => (
-            <button key={w} type="button" onClick={() => setWeek(w)} className={chip(w === week)}>সপ্তাহ {toBn(w)}</button>
+            <button key={w} type="button" onClick={() => setWeek(w)} className={"flex-1 min-w-0 whitespace-nowrap text-center px-1 py-1 rounded-full text-[13px] font-semibold border " + (w === week ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300")}>সপ্তাহ {toBn(w)}</button>
           ))}
         </div>
-        <p className="text-xs text-slate-500 mb-1.5">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} · 🔒 {T.privateTag}</p>
-        <div className="flex gap-1 mb-0.5">{T.steps.map((_, i) => <span key={i} className={"h-1.5 flex-1 rounded-full " + (i + 1 < step ? "bg-emerald-900" : i + 1 === step ? "bg-amber-500" : "bg-slate-200")} />)}</div>
-        <p className="text-xs text-slate-500 text-right mb-2">ধাপ {toBn(step)} / {toBn(5)} · {T.steps[step - 1]}</p>
+        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-1">
+          <span className="shrink-0">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} <span title={T.privateTag}>🔒</span></span>
+          <span className="min-w-0 truncate font-semibold text-slate-600">ধাপ {toBn(step)}/{toBn(5)} · {T.steps[step - 1]}</span>
+        </div>
+        <div className="flex gap-1 mb-3">{T.steps.map((_, i) => <span key={i} className={"h-1 flex-1 rounded-full " + (i + 1 < step ? "bg-emerald-900" : i + 1 === step ? "bg-amber-500" : "bg-slate-200")} />)}</div>
 
         {step === 1 && (
           <div>
             {prevGoal ? <>
-              <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold mb-3">“{prevGoal}”</p>
-              <div className="grid grid-cols-3 gap-2 mb-3">
+              <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold mb-2">“{prevGoal}”</p>
+              <div className="grid grid-cols-3 gap-2 mb-2">
                 {["done", "partial", "none"].map(r => (
                   <button key={r} type="button" onClick={() => set("goalResult", r)} className={"rounded-xl border p-2 text-sm font-semibold " + (form.goalResult === r ? "border-amber-500 bg-amber-50" : "border-slate-200 bg-white")}>
                     {r === "done" ? "✅" : r === "partial" ? "🟡" : "❌"}<br />{T.goal[r]}
@@ -162,7 +164,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
 
         {step === 2 && (
           <div>
-            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 mb-2 text-sm">
               <div className="rounded-xl border border-slate-200 p-2"><div className="text-xs text-slate-500">{T.summary.logged}</div><b>{toBn(loggedDays)}/{toBn(days.length)}</b> {T.summary.day}</div>
               {jamTotal && jamTotal.days > 0 && <div className="rounded-xl border border-slate-200 p-2"><div className="text-xs text-slate-500">{T.summary.jamaat}</div><b>{toBn(jamTotal.sum)}/{toBn(jamTotal.possible)}</b> {T.summary.unit}</div>}
             </div>
@@ -172,9 +174,9 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
               <option value="">—</option>
               {applicable.map(f => <option key={f.key} value={f.key}>{f.shortLabel || f.label}</option>)}
             </select>
-            {gapField && gapRow && <p className="text-xs text-slate-500 mb-3">{gapLabel}: {toBn(gapRow.logged)} দিনের {toBn(gapRow.missed)} দিন সম্পূর্ণ হয়নি</p>}
+            {gapField && gapRow && <p className="text-xs text-slate-500 mb-2">{gapLabel}: {toBn(gapRow.logged)} দিনের {toBn(gapRow.missed)} দিন সম্পূর্ণ হয়নি</p>}
             <p className="font-bold text-sm mt-3 mb-2">{T.gap.reasonTitle}</p>
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-2">
               {T.gap.reasons.map(r => <button key={r.id} type="button" onClick={() => set("gapReasons", toggle(form.gapReasons || [], r.id))} className={chip((form.gapReasons || []).includes(r.id))}>{r.t}</button>)}
             </div>
             <p className="font-bold text-sm mb-1">{T.gap.momentTitle}</p>
@@ -191,7 +193,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
                 return <button key={p.id} type="button" onClick={() => cycleHaqq(p.id)} className={"px-3 py-1.5 rounded-full text-sm border font-semibold " + (st === "good" ? "bg-emerald-900 text-white border-emerald-900" : st === "care" ? "bg-orange-50 text-orange-800 border-orange-300" : "bg-white text-slate-700 border-slate-300")}>{p.t}{st === "good" ? " ✓" : st === "care" ? " ⚠" : ""}</button>;
               })}
             </div>
-            <p className="text-[11px] text-slate-400 mb-3">{T.haqq.tapHint}</p>
+            <p className="text-[11px] text-slate-400 mb-2">{T.haqq.tapHint}</p>
             {firstCare && <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm">📌 {T.haqq.pinPrefix}<b>{firstCare.task}</b></p>}
           </div>
         )}
@@ -199,7 +201,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
         {step === 4 && (isProxy ? <p className="text-sm text-slate-600">{T.closedRoomProxy}</p> : (
           <div>
             <div className="flex items-center justify-between mb-2"><b>🔐 {T.closedRoom.title}</b><span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">{T.closedRoom.badge}</span></div>
-            <p className="rounded-xl border border-slate-200 p-3 text-sm mb-3">{T.closedRoom.privacy}</p>
+            <p className="rounded-xl border border-slate-200 p-3 text-sm mb-2">{T.closedRoom.privacy}</p>
             <p className="font-bold text-sm mb-2">{T.closedRoom.prompt}</p>
             {T.closedRoom.items.map(it => (
               <label key={it.id} className="flex items-start gap-2 py-2 border-b border-dashed border-slate-200 text-sm">
@@ -222,15 +224,15 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
         {step === 5 && (
           <div>
             <p className="font-bold text-sm mb-1">{T.next.goalTitle}</p>
-            <input maxLength={200} value={form.nextGoal || ""} onChange={e => set("nextGoal", e.target.value)} className={box + " mb-3 bg-amber-50"} />
+            <input maxLength={200} value={form.nextGoal || ""} onChange={e => set("nextGoal", e.target.value)} className={box + " mb-2 bg-amber-50"} />
             <p className="font-bold text-sm mb-1">{T.next.ifThenTitle}</p>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <textarea rows={3} maxLength={200} value={form.ifText || ""} onChange={e => set("ifText", e.target.value)} placeholder="যদি…" className={box + " resize-none"} />
-              <textarea rows={3} maxLength={200} value={form.thenText || ""} onChange={e => set("thenText", e.target.value)} placeholder="তাহলে…" className={box + " resize-none"} />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <textarea rows={2} maxLength={200} value={form.ifText || ""} onChange={e => set("ifText", e.target.value)} placeholder="যদি…" className={box + " resize-none"} />
+              <textarea rows={2} maxLength={200} value={form.thenText || ""} onChange={e => set("thenText", e.target.value)} placeholder="তাহলে…" className={box + " resize-none"} />
             </div>
             <p className="font-bold text-sm mb-1">{T.next.gratitudeTitle}</p>
-            <input maxLength={300} value={form.gratitude || ""} onChange={e => set("gratitude", e.target.value)} className={box + " mb-3"} />
-            <button type="button" disabled={saveState === "saving"} onClick={onSave} className="w-full py-3 rounded-2xl bg-emerald-900 text-white font-bold disabled:opacity-60">✔ {T.next.save}</button>
+            <input maxLength={300} value={form.gratitude || ""} onChange={e => set("gratitude", e.target.value)} className={box + " mb-2"} />
+            <button type="button" disabled={saveState === "saving"} onClick={onSave} className="w-full py-2.5 rounded-2xl bg-emerald-900 text-white font-bold disabled:opacity-60">✔ {T.next.save}</button>
             {saveState === "saved" && <p className="text-sm text-emerald-800 text-center mt-2">{T.saved}</p>}
             {saveState === "error" && <p className="text-sm text-red-700 text-center mt-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.saveFailed}</p>}
             <p className="text-[11px] text-slate-500 text-center mt-2">🔒 {T.next.privacy}</p>
@@ -238,7 +240,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           </div>
         )}
 
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2 mt-3">
           {step > 1 && <button type="button" onClick={() => goStep(step - 1)} className="px-4 py-2.5 rounded-2xl border border-slate-300 text-sm font-bold">‹ আগের ধাপ</button>}
           {step < 5 && <button type="button" onClick={() => goStep(step + 1)} className="flex-1 py-2.5 rounded-2xl bg-emerald-900 text-white font-bold">পরের ধাপ ›</button>}
         </div>
