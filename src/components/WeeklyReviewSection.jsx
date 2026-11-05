@@ -94,9 +94,9 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const firstCare = T.haqq.people.find(p => haqqState(p.id) === "care");
 
   const goStep = n => {
-    if (n === 5 && !form.nextGoal && !form.ifText && !form.thenText) {
+    if (n === 5 && !form.nextGoal) {
       const sg = T.next.suggest[(form.gapReasons || [])[0]];
-      if (sg) setForm(f => ({ ...f, nextGoal: sg.goal, ifText: sg.ifText, thenText: sg.thenText }));
+      if (sg) setForm(f => ({ ...f, nextGoal: sg.goal }));
     }
     setStep(n);
   };
@@ -225,11 +225,6 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           <div>
             <p className="font-bold text-sm mb-1">{T.next.goalTitle}</p>
             <input maxLength={200} value={form.nextGoal || ""} onChange={e => set("nextGoal", e.target.value)} className={box + " mb-3 bg-amber-50"} />
-            <p className="font-bold text-sm mb-1">{T.next.ifThenTitle}</p>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <textarea rows={3} maxLength={200} value={form.ifText || ""} onChange={e => set("ifText", e.target.value)} placeholder="যদি…" className={box + " resize-none"} />
-              <textarea rows={3} maxLength={200} value={form.thenText || ""} onChange={e => set("thenText", e.target.value)} placeholder="তাহলে…" className={box + " resize-none"} />
-            </div>
             <p className="font-bold text-sm mb-1">{T.next.gratitudeTitle}</p>
             <input maxLength={300} value={form.gratitude || ""} onChange={e => set("gratitude", e.target.value)} className={box + " mb-3"} />
             <button type="button" disabled={saveState === "saving"} onClick={onSave} className="w-full py-3 rounded-2xl bg-emerald-900 text-white font-bold disabled:opacity-60">✔ {T.next.save}</button>
