@@ -16,6 +16,7 @@ import { DuaSection } from "./DuaSection.jsx";
 import { DuaAcceptanceCard } from "./DuaAcceptanceCard.jsx";
 import { DeathReminderCard } from "./DeathReminderCard.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
+import { useBackLayer } from "../../legacy/backNav.js";
 
 const { useState } = React;
 
@@ -30,6 +31,7 @@ const HUB_ITEMS = [
 
 export function AmolHub({ tabLayout } = {}) {
   const [activeItem, setActiveItem] = useState(null);
+  useBackLayer(!!activeItem, () => setActiveItem(null));
 
   if (activeItem) {
     const item = HUB_ITEMS.find((i) => i.key === activeItem);

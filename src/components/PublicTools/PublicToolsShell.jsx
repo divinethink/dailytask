@@ -9,6 +9,7 @@
 
 import { ChevronLeft } from "../icons.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
+import { useBackLayer } from "../../legacy/backNav.js";
 import { ToolGridSection, PageHeader, VerseCard, DetailHeader } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
@@ -144,6 +145,9 @@ export function PublicToolsShell({ tabLayout } = {}) {
   // "front" | { tool: {key,label} } | { single: {id,label} } |
   // { category: catObj } | { category: catObj, item: {key,label} }
   const [view, setView] = useState("front");
+  // ব্যাক বাটন: স্তর-১(ক্যাটাগরি/টুল/সিঙ্গেল)→সহায়িকা; স্তর-২(ক্যাটাগরির আইটেম)→ক্যাটাগরি।
+  useBackLayer(view !== "front", () => setView("front"));
+  useBackLayer(view !== "front" && !!view.item, () => setView((v) => (v !== "front" && v.category ? { category: v.category } : "front")));
 
   if (view !== "front" && view.single) {
     const SingleComponent = SINGLE_ENTRY_COMPONENTS[view.single.id];

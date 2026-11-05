@@ -617,6 +617,7 @@ const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen
 const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
+import { useBackLayer } from "./backNav.js";
 // §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো(3_2 §১-এর নীতি
 // অনুযায়ী শুধু import বদল, routing-switch touch হয়নি)। lazy-load(3_2 §২.১ standing
@@ -798,6 +799,27 @@ function App() {
   useEffect(() => {
     try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
   }, [activeTab]);
+  // ব্যাক বাটন: হোম ছাড়া যেকোনো ট্যাব থেকে ব্যাক = হোমে ফেরা(হোমে ব্যাক = আগের মতো এক্সিট)।
+  useBackLayer(activeTab !== TAB_FAMILY, () => setActiveTab(TAB_FAMILY));
+  // নেভ-লোডিং: অন্য ট্যাবের ফাইল অবসর সময়ে আগেভাগে নামানো(Data Saver চালু থাকলে নয়)।
+  // একই import() path হওয়ায় React.lazy একই chunk পায়; ব্যর্থ হলে চুপচাপ বাদ।
+  useEffect(() => {
+    try { if (navigator.connection && navigator.connection.saveData) return undefined; } catch {}
+    const run = () => {
+      [
+        () => import("../components/PublicTools/PrayerTimes.jsx"),
+        () => import("../components/PublicTools/AmolHub.jsx"),
+        () => import("../components/PublicTools/PublicToolsShell.jsx"),
+        () => import("../components/MenuPage.jsx")
+      ].forEach(load => { try { load().catch(() => {}); } catch {} });
+    };
+    if (window.requestIdleCallback) {
+      const id = window.requestIdleCallback(run, { timeout: 5000 });
+      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
+    }
+    const t = setTimeout(run, 3000);
+    return () => clearTimeout(t);
+  }, []);
   const [themeColor, setThemeColor] = useThemeColor();
   const [displayMode, setDisplayMode] = useDisplayMode();
   // §B৭ Onboarding coach-mark(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
