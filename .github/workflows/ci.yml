@@ -8,6 +8,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,3 +27,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm test
+
+  # Firestore Rules: cross-family isolation (emulator)। আলাদা job — ব্যর্থ হলে build/test ফল ঢাকা পড়ে না।
+  rules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      # package-lock বদলাতে না হয় — তাই শুধু CI-তে, lock ছাড়া ইনস্টল।
+      - run: npm install --no-save @firebase/rules-unit-testing@3.0.4
+      - run: npm run test:rules
