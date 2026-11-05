@@ -1321,11 +1321,11 @@ function App() {
         family_code: getFamilyCode(),
         member_count: m.length
       });
-      const cf = await loadCustomFields();
-      setCustomFields(cf);
       // গ্লোবাল ডিজাইন থাকলে সেটাই সবার জন্য; না থাকলে পরিবারের আগের সেভ-করা মান(ফলব্যাক, কিছু হারায় না)।
       const dz = await fetchDesign();
       setDesign(dz);
+      const cf = dz && Array.isArray(dz.customFields) ? dz.customFields : await loadCustomFields();
+      setCustomFields(cf);
       setFieldOverrides(sanitizeOverrides(dz && dz.fieldOverrides ? dz.fieldOverrides : await loadFieldOverrides()));
       setTazkirahData(sanitizeTazkirah(dz && dz.tazkirah ? dz.tazkirah : await loadTazkirahCustom()));
       let last = null;
@@ -1443,7 +1443,8 @@ function App() {
   async function handleSaveFieldManager(nextOverrides, nextCustomFields) {
     if (isLockedForSwitch) throw new Error("locked");
     if (JSON.stringify(nextCustomFields) !== JSON.stringify(customFields)) {
-      await saveCustomFields(nextCustomFields);
+      await saveDesignPart("customFields", nextCustomFields);
+      setDesign(d => ({ ...(d || {}), customFields: nextCustomFields }));
       setCustomFields(nextCustomFields);
     }
     await saveDesignPart("fieldOverrides", nextOverrides);

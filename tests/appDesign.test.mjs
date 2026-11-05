@@ -15,8 +15,14 @@ test("বৈধ অংশ থাকে, অবৈধ অংশ বাদ", () =>
 test("homeLayout-এ entry/below তালিকা না থাকলে বাদ", () => {
   assert.equal(sanitizeDesign({ homeLayout: { entry: [] } }), null);
 });
+test("customFields: অবৈধ আইটেম বাদ, খালি তালিকা বৈধ", () => {
+  const r = sanitizeDesign({ customFields: [{ key: "custom_1", label: "ক" }, { key: "x" }, null, "s", { label: "y" }] });
+  assert.deepEqual(r.customFields, [{ key: "custom_1", label: "ক" }]);
+  assert.deepEqual(sanitizeDesign({ customFields: [] }), { customFields: [] });
+  assert.equal(sanitizeDesign({ customFields: "bad" }), null);
+});
 test("isDesignKey শুধু সংজ্ঞায়িত অংশ", () => {
   for (const k of DESIGN_KEYS) assert.ok(isDesignKey(k));
-  assert.equal(isDesignKey("customFields"), false);
+  assert.equal(isDesignKey("customTasks"), false);
   assert.equal(isDesignKey("__proto__"), false);
 });
