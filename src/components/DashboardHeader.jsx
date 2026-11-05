@@ -29,6 +29,7 @@ export function DashboardHeader({
   onGuestSignInTap,
   handleAddMember,
   handleChangeGmail,
+  handleChangeGoogleAccount,
   handleCopyCode,
   handleFullLogout,
   handleEditOwnProfile,
@@ -142,6 +143,7 @@ export function DashboardHeader({
   onDemoteSelf: handleSelfDemote,
   onEditProfile: handleEditOwnProfile,
   onLeaveFamily: handleLeaveFamily,
+  onChangeGoogleAccount: handleChangeGoogleAccount,
   onLogout: handleFullLogout
 })), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"

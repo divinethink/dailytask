@@ -13,7 +13,7 @@
 // handleSelfDemote/handleFullLogout) caller(App()) থেকে callback-prop
 // হিসেবে আসে, শুধু presentational + local UI-state(profile-edit ফর্ম
 // টগল)।
-import { CalIcon, EditIcon, LogOutIcon } from "./icons.jsx";
+import { CalIcon, EditIcon, LogOutIcon, GoogleGIcon } from "./icons.jsx";
 import { useState } from "react";
 
 export function ProfileDropdownGoogle({
@@ -29,6 +29,7 @@ export function ProfileDropdownGoogle({
   onDemoteSelf,       // () => Promise — এডমিন হতে অব্যাহতি(এই সংস্করণে UI থেকে সরানো, prop রাখা হলো future-use-এর জন্য)
   onEditProfile,      // (name, gender) => Promise<{success}>
   onLeaveFamily,       // () => Promise<{success, aborted, reason}>
+  onChangeGoogleAccount, // () => Promise<{ok, message}> — জিমেইল অ্যাকাউন্ট (জিমেইল) বদলান
   onLogout            // () => void
 }) {
   const [editing, setEditing] = useState(false);
@@ -37,6 +38,9 @@ export function ProfileDropdownGoogle({
   const [saving, setSaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaveError, setLeaveError] = useState(null);
+  const [confirmChange, setConfirmChange] = useState(false);
+  const [changeBusy, setChangeBusy] = useState(false);
+  const [changeError, setChangeError] = useState(null);
 
   if (!show) return null;
 
@@ -50,6 +54,8 @@ export function ProfileDropdownGoogle({
     setEditing(false);
     setConfirmLeave(false);
     setLeaveError(null);
+    setConfirmChange(false);
+    setChangeError(null);
     onClose();
   }
 
@@ -61,6 +67,15 @@ export function ProfileDropdownGoogle({
     if (res && res.success) {
       setEditing(false);
     }
+  }
+
+  async function handleConfirmChange() {
+    setChangeError(null);
+    setChangeBusy(true);
+    const res = await onChangeGoogleAccount();
+    setChangeBusy(false);
+    if (res && res.ok) closeAndReset(); // এরপর পূর্ণ-পর্দা রিকভারি-গেট (GoogleRelinkGate) নিজে থেকে আসে
+    else setChangeError((res && res.message) || "ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
   }
 
   async function handleConfirmLeave() {
@@ -188,6 +203,51 @@ export function ProfileDropdownGoogle({
             className: "flex-1 bg-slate-100 text-slate-600 rounded-lg py-1 text-xs"
           }, "বাতিল")
         )
+      ),
+      // --- জিমেইল (জিমেইল অ্যাকাউন্ট) বদলান ---
+      onChangeGoogleAccount && /*#__PURE__*/React.createElement("div", {
+        className: "px-4 py-2 border-t border-slate-100"
+      },
+        !confirmChange
+          ? /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => setConfirmChange(true),
+              className: "w-full text-left text-slate-700 text-xs font-semibold hover:text-emerald-800 flex items-center gap-1.5"
+            }, /*#__PURE__*/React.createElement(GoogleGIcon, { size: 14 }), "জিমেইল বদলান")
+          : /*#__PURE__*/React.createElement("div", {
+              className: "space-y-1.5"
+            },
+              /*#__PURE__*/React.createElement("div", {
+                className: "text-slate-700 text-[10px] font-semibold"
+              }, "নিশ্চিত? আপনার এন্ট্রি ও ভূমিকা অক্ষুণ্ণ থাকবে। তবে জেনে রাখুন:"),
+              /*#__PURE__*/React.createElement("ul", {
+                className: "list-disc pl-4 text-slate-600 text-[10px] space-y-0.5"
+              },
+                /*#__PURE__*/React.createElement("li", null, "ড্রাইভ ব্যাকআপ এরপর নতুন জিমেইলের ড্রাইভে যাবে; আগের ব্যাকআপ আগের জিমেইলেই থাকবে।"),
+                /*#__PURE__*/React.createElement("li", null, "ব্লগ-লেখক তালিকায় আগের জিমেইল থাকলে নতুন জিমেইল সেখানে যোগ করাতে হবে।"),
+                /*#__PURE__*/React.createElement("li", null, "নতুন জিমেইল আগে এই অ্যাপে ব্যবহৃত হয়ে থাকলে যুক্ত করা যাবে না।"),
+                /*#__PURE__*/React.createElement("li", null, "পরের পর্দায় নতুন অ্যাকাউন্ট বেছে না নেওয়া পর্যন্ত লগআউট করবেন না।")
+              ),
+              changeError && /*#__PURE__*/React.createElement("div", {
+                className: "text-red-500 text-[10px]"
+              }, changeError),
+              /*#__PURE__*/React.createElement("div", {
+                className: "flex gap-1.5"
+              },
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  disabled: changeBusy,
+                  onClick: handleConfirmChange,
+                  className: "flex-1 bg-emerald-700 text-white rounded-lg py-1 text-xs font-semibold disabled:opacity-50"
+                }, changeBusy ? "অপেক্ষা করুন…" : "হ্যাঁ, বদলাব"),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  disabled: changeBusy,
+                  onClick: () => { setConfirmChange(false); setChangeError(null); },
+                  className: "flex-1 bg-slate-100 text-slate-600 rounded-lg py-1 text-xs"
+                }, "বাতিল")
+              )
+            )
       ),
       // --- লগআউট ---
       /*#__PURE__*/React.createElement("div", {

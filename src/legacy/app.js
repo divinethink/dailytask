@@ -26,7 +26,7 @@ import {
 // UI থেকে wire হচ্ছে।
 import {
   editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink, loadActiveInviteToken, removeLegacyInviteToken,
-  deleteFamilyMemberEmail, normalizeEmail
+  deleteFamilyMemberEmail, normalizeEmail, startGoogleAccountChange
 } from "./googleIdentity.js";
 import {
   dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
@@ -578,6 +578,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
+import { GoogleRelinkGate } from "../components/GoogleRelinkGate.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
 import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
@@ -2467,6 +2468,12 @@ function App() {
     }
     return res;
   }
+  // §Google অ্যাকাউন্ট (মেইল) বদলান — UID অপরিবর্তিত; ধাপ ১: পুরনো Google ছাড়ানো। ধাপ ২ (নতুন অ্যাকাউন্ট যুক্ত)
+  // পূর্ণ-পর্দা GoogleRelinkGate-এ (mountApp-এ বসানো) — আলাদা ট্যাপে, যাতে popup আটকে না যায়।
+  async function handleChangeGoogleAccount() {
+    if (isLockedForSwitch) return { ok: false, message: "সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।" };
+    return startGoogleAccountChange();
+  }
   // Single Logout — Family code session + Google session, দুটোই একসাথে
   // পরিষ্কার। কোনো Firestore/member ownership data পরিবর্তন হয় না — শুধু
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
@@ -3151,6 +3158,7 @@ function App() {
     onGuestSignInTap: () => setShowGuestSignIn(true),
     handleAddMember: handleAddMember,
     handleChangeGmail: handleChangeGmail,
+    handleChangeGoogleAccount: handleChangeGoogleAccount,
     handleCopyCode: handleCopyCode,
     handleFullLogout: handleFullLogout,
     handleEditOwnProfile: handleEditOwnProfile,
@@ -3577,7 +3585,8 @@ function mountApp() {
   // এখানে branching সরিয়ে সবসময় সরাসরি App() render করা হচ্ছে।
   const container = document.getElementById("root");
   const root = ReactDOM.createRoot(container);
-  root.render(/*#__PURE__*/React.createElement(App, null));
+  // GoogleRelinkGate App()-এর বাইরে: মেইল-বদলের মাঝপথের রিকভারি-পর্দা App-এর কোনো early-return-এ ঢাকা পড়ে না।
+  root.render(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(App, null), /*#__PURE__*/React.createElement(GoogleRelinkGate, null)));
 }
 
 // --- Anonymous Authentication (background, no login UI) ---

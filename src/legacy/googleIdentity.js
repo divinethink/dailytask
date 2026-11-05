@@ -8,7 +8,8 @@
 // Normalization)।
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, deleteField } from "firebase/firestore";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider, linkWithPopup, unlink } from "firebase/auth";
+import { RELINK_FLAG, relinkErrorMessage, staleMappingKey, oldEmailFromFlag } from "./googleAccountChange.js";
 import { generateSecureCode } from "./appHelpers.js";
 
 // §১০.২ — চূড়ান্ত সংজ্ঞা: শুধু trim+lowercase, dot/plus-stripping না
@@ -572,6 +573,72 @@ async function editOwnProfile(familyId, memberId, name, gender) {
   }
 }
 
+// ---- Google অ্যাকাউন্ট (মেইল) বদলান ----
+// UID অপরিবর্তিত থাকে (unlink → link), তাই এডমিন-ভূমিকা/এন্ট্রি/মুহাসাবা যেমন ছিল তেমনই থাকে; rules/schema বদল নেই।
+// ধাপ ১ (startGoogleAccountChange): পুরনো Google ছাড়ানো + ফ্ল্যাগ রাখা। ধাপ ২ (linkGoogleAccountNow): আলাদা ট্যাপে
+// নতুন (বা পুরনো) অ্যাকাউন্ট যুক্ত — popup সবসময় সরাসরি ব্যবহারকারীর ট্যাপ থেকে, যাতে ব্রাউজার আটকে না দেয়।
+function relinkNotify() {
+  try { window.dispatchEvent(new Event("dt-relink-changed")); } catch {}
+}
+function getRelinkFlag() {
+  try { return localStorage.getItem(RELINK_FLAG); } catch { return null; }
+}
+function googleProviderEmail(user) {
+  const p = user && user.providerData ? user.providerData.find(x => x.providerId === "google.com") : null;
+  return (p && p.email) || (user && user.email) || null;
+}
+function hasGoogleProvider(user) {
+  return !!(user && user.providerData && user.providerData.some(x => x.providerId === "google.com"));
+}
+async function startGoogleAccountChange() {
+  const user = auth.currentUser;
+  if (!user) return { ok: false, message: relinkErrorMessage("auth/requires-recent-login") };
+  if (!hasGoogleProvider(user)) return { ok: false, message: relinkErrorMessage("") };
+  const oldEmail = normalizeEmail(googleProviderEmail(user));
+  // ফ্ল্যাগ আগে বসাই — unlink সফল হয়ে অ্যাপ বন্ধ হয়ে গেলেও পরের বার রিকভারি-গেট আসবে।
+  try { localStorage.setItem(RELINK_FLAG, oldEmail || "1"); } catch { return { ok: false, message: relinkErrorMessage("") }; }
+  try {
+    await unlink(user, "google.com");
+  } catch (err) {
+    // unlink ব্যর্থ ⇒ কিছুই বদলায়নি; ফ্ল্যাগ সরিয়ে স্বাভাবিক অবস্থায় ফেরা।
+    try { localStorage.removeItem(RELINK_FLAG); } catch {}
+    return { ok: false, message: relinkErrorMessage(err && err.code) };
+  }
+  relinkNotify();
+  return { ok: true };
+}
+// বিঃদ্রঃ এই ফাংশনের প্রথম async-পূর্ব statement-ই linkWithPopup — কোনো await আগে নেই।
+function linkGoogleAccountNow(familyId, memberId) {
+  const user = auth.currentUser;
+  if (!user) return Promise.resolve({ ok: false, message: relinkErrorMessage("auth/requires-recent-login") });
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" }); // একই অ্যাকাউন্ট নিজে থেকে বাছা এড়াতে
+  return linkWithPopup(user, provider).then(async result => {
+    const newEmail = googleProviderEmail(result.user) || result.user.email;
+    const stale = staleMappingKey(oldEmailFromFlag(getRelinkFlag()), newEmail);
+    if (stale && familyId && memberId) {
+      // পুরনো মেইলের নিবন্ধন-রেকর্ড মোছা (best-effort; ব্যর্থ হলে কিছু ভাঙে না)।
+      try {
+        const ref = familyMemberEmailRef(stale);
+        const snap = await getDoc(ref);
+        if (snap.exists() && snap.data().familyId === familyId && snap.data().memberId === memberId) await deleteDoc(ref);
+      } catch (e) {
+        console.error("[Google মেইল বদল] পুরনো mapping মোছা ব্যর্থ(non-fatal):", e && e.code);
+      }
+    }
+    try { localStorage.removeItem(RELINK_FLAG); } catch {}
+    relinkNotify();
+    return { ok: true };
+  }).catch(err => {
+    if (err && err.code === "auth/provider-already-linked") {
+      try { localStorage.removeItem(RELINK_FLAG); } catch {}
+      relinkNotify();
+      return { ok: true };
+    }
+    return { ok: false, message: relinkErrorMessage(err && err.code) };
+  });
+}
+
 // §১০.৩ Single-Popup Pattern — shared helper। এই ফাংশন UI button-এর
 // onClick-এর সবচেয়ে প্রথম synchronous statement হিসেবে সরাসরি কল হবে
 // (কোনো await/.then()-এর ভিতর থেকে না) — existing GoogleAccountModal.jsx-
@@ -601,6 +668,10 @@ export {
   joinFamilyViaInviteLink,
   leaveFamily,
   editOwnProfile,
+  startGoogleAccountChange,
+  linkGoogleAccountNow,
+  getRelinkFlag,
+  hasGoogleProvider,
   triggerGoogleSignInPopup
 };
 
