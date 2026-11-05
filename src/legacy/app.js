@@ -2971,8 +2971,8 @@ function App() {
           onOpenPrayerLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowPrayerLayout(true) : undefined,
           onOpenAmolLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowAmolLayout(true) : undefined,
           onOpenToolsLayout: (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowToolsLayout(true) : undefined,
-          onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
-          onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
+          onOpenFieldManager: isCreatorAuth() ? () => setShowFieldManager(true) : undefined,
+          onOpenTazkirah: isCreatorAuth() ? () => setShowTazkirah(true) : undefined,
           // পপআপ বার্তা সম্পাদনা: শুধু App Creator(UI-gate; আসল নিরাপত্তা Rules-এর isAppCreator())
           onOpenPopupMessages: isCreatorAuth() ? () => setShowPopupMsgs(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
@@ -2980,13 +2980,13 @@ function App() {
         showPopupMsgs && isCreatorAuth() && React.createElement(React.Suspense, { fallback: null }, React.createElement(PopupMessagesScreen, {
           onClose: () => setShowPopupMsgs(false)
         })),
-        showTazkirah && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(TazkirahManagerScreen, {
+        showTazkirah && isCreatorAuth() && React.createElement(React.Suspense, { fallback: null }, React.createElement(TazkirahManagerScreen, {
           builtins: DAILY_INSPIRATIONS,
           data: tazkirahData,
           onSave: handleSaveTazkirah,
           onClose: () => setShowTazkirah(false)
         })),
-        showFieldManager && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(FieldManagerScreen, {
+        showFieldManager && isCreatorAuth() && React.createElement(React.Suspense, { fallback: null }, React.createElement(FieldManagerScreen, {
           deenFields: DEFAULT_DEEN_FIELDS,
           duniyaFields: DEFAULT_DUNIYA_FIELDS,
           customFields: customFields,
