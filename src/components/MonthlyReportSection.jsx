@@ -192,7 +192,10 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
                 )}
               </>
             )}
-            <div className="border-t border-slate-100 mt-3 pt-3">
+          </div>
+
+          <div className={cardBox} style={cardStyle}>
+            <div>
               <SectionTitle>📈 {T.trendTitle}</SectionTitle>
               {r.weeks.filter(w => w.avg !== null).length < 2 ? (
                 <div className="flex items-center gap-2 flex-wrap">
