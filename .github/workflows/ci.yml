@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npm test
+      - run: node --test tests/*.test.mjs
 
   # Firestore Rules: cross-family isolation (emulator)। আলাদা job — ব্যর্থ হলে build/test ফল ঢাকা পড়ে না।
   rules:
@@ -46,4 +46,4 @@ jobs:
       - run: npm ci
       # package-lock বদলাতে না হয় — তাই শুধু CI-তে, lock ছাড়া ইনস্টল।
       - run: npm install --no-save @firebase/rules-unit-testing@3.0.4
-      - run: npm run test:rules
+      - run: npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-dailytask "node --test rules-tests/*.test.mjs"
