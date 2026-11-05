@@ -52,10 +52,10 @@ function TrendChart({ weeks, toBn }) {
 
 function WeekdayBars({ avgs, weakest, names, toBn }) {
   return (
-    <div className="flex items-end gap-1.5" style={{ height: 104 }}>
+    <div className="flex items-end gap-1.5" style={{ height: 76 }}>
       {avgs.map(a => {
         const weak = weakest.includes(a.weekday);
-        const hgt = a.avg === null ? 4 : Math.max(8, Math.round(a.avg * 0.7));
+        const hgt = a.avg === null ? 4 : Math.max(6, Math.round(a.avg * 0.5));
         return (
           <div key={a.weekday} className="flex-1 flex flex-col items-center justify-end">
             <span className="text-[10px] text-slate-500 mb-0.5">{a.avg === null ? "" : toBn(a.avg)}</span>
@@ -77,6 +77,7 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   const [off, setOff] = useState({}); // সিদ্ধান্ত-id → true হলে টিক নেই
   const [sent, setSent] = useState(false);
   const [pickErr, setPickErr] = useState(false);
+  const [tab, setTab] = useState("week"); // সপ্তাহ | বার
   const [decOpen, setDecOpen] = useState(false); // আগামী মাসের সিদ্ধান্ত: ডিফল্ট বন্ধ
 
   // আগের মাসের এন্ট্রি: কার্ড খুললে (বা সদস্য/মাস বদলালে) একবার। ব্যর্থ হলে তুলনা ছাড়াই রিপোর্ট চলে।
@@ -151,52 +152,68 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       if (goals.counts.none) goalParts.push(fill(T.goalNone, { n: toBn(goals.counts.none) }));
       body = (
         <div className="mt-3">
-          <div className="rounded-xl p-3 mb-2 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)" }}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <span className="text-sm opacity-90">{r.prev ? T.versus : T.avgNow}</span>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
-            </div>
+          <div className="rounded-xl p-3 mb-2 text-white flex items-center gap-3" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)" }}>
             {r.prev && r.delta !== null ? (
               <>
-                <div className="text-2xl font-bold leading-none mb-1">{up ? "▲ " : down ? "▼ " : ""}{r.delta === 0 ? T.sameDelta : toBn(Math.abs(r.delta)) + "%"}</div>
-                <div className="text-sm opacity-90">{fill(T.prevToNow, { prev: BN_MONTHS[r.prev.month0], p: toBn(r.prev.avg), cur: BN_MONTHS[month0], c: toBn(r.avg) })}</div>
+                <div className="shrink-0">
+                  <div className="text-xs opacity-90 mb-1">{T.versus}</div>
+                  <div className="text-2xl font-bold leading-none">{up ? "▲ " : down ? "▼ " : ""}{r.delta === 0 ? T.sameDelta : toBn(Math.abs(r.delta)) + "%"}</div>
+                </div>
+                <div className="ml-auto text-right min-w-0">
+                  <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
+                  <div className="text-xs opacity-90">{fill(T.prevToNow, { prev: BN_MONTHS[r.prev.month0], p: toBn(r.prev.avg), cur: BN_MONTHS[month0], c: toBn(r.avg) })}</div>
+                  {r.partial && <div className="text-[11px] opacity-80 mt-1">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
+                </div>
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold leading-none mb-1">{toBn(r.avg)}%</div>
-                <div className="text-sm opacity-90">{prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
+                <div className="shrink-0">
+                  <div className="text-xs opacity-90 mb-1">{T.avgNow}</div>
+                  <div className="text-2xl font-bold leading-none">{toBn(r.avg)}%</div>
+                </div>
+                <div className="ml-auto text-right min-w-0">
+                  <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
+                  <div className="text-xs opacity-90">{prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
+                </div>
               </>
             )}
-            {r.partial && r.prev && <div className="text-xs opacity-80 mt-2">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
           </div>
 
           <div className={cardBox} style={cardStyle}>
+            {r.weekdayValid >= 3 && (
+              <div className="flex bg-slate-100 rounded-full p-0.5 mb-2" role="tablist">
+                {[["week", "📈 সপ্তাহ অনুযায়ী"], ["day", "🗓️ বার অনুযায়ী"]].map(([k, l]) => (
+                  <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={"flex-1 text-[13px] font-bold py-1.5 rounded-full " + (tab === k ? "bg-emerald-900 text-white" : "text-slate-500")}>{l}</button>
+                ))}
+              </div>
+            )}
+            {(tab === "week" || r.weekdayValid < 3) ? (
+              <div>
             {r.weeks.filter(w => w.avg !== null).length < 2 ? (
               <div className="flex items-center gap-2 flex-wrap text-sm">
-                <span className="font-bold text-slate-800">📈 {T.trendTitle}</span>
+                {r.weekdayValid < 3 && <span className="font-bold text-slate-800">📈 {T.trendTitle}</span>}
                 {r.weeks.filter(w => w.avg !== null).map(w => (
                   <span key={w.week} className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBEFC4", color: "#7A5A00" }}>{T.weekShort.replace("{n}", toBn(w.week))} · {toBn(w.avg)}%</span>
                 ))}
               </div>
             ) : (
               <>
-                <SectionTitle>📈 {T.trendTitle}</SectionTitle>
+                {r.weekdayValid < 3 && <SectionTitle>📈 {T.trendTitle}</SectionTitle>}
                 <TrendChart weeks={r.weeks} toBn={toBn} />
               </>
             )}
+              </div>
+            ) : (
+              <div>
+                <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
+                {r.weakest.length > 0 && (
+                  <p className="text-sm rounded-xl p-2 mt-2" style={{ background: "#FDEFE3", color: "#9A3412" }}>
+                    {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-
-          {r.weekdayValid >= 3 && (
-            <div className={cardBox} style={cardStyle}>
-              <SectionTitle>🗓️ {T.weekdayTitle}</SectionTitle>
-              <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
-              {r.weakest.length > 0 && (
-                <p className="text-sm rounded-xl p-3 mt-3" style={{ background: "#FDEFE3", color: "#9A3412" }}>
-                  {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
-                </p>
-              )}
-            </div>
-          )}
 
           {(moveCount > 0 || r.whenGood) && (
             <div className={cardBox} style={cardStyle}>
@@ -204,14 +221,14 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
                 <>
                   <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${moveCount}, minmax(0, 1fr))` }}>
                     {r.moves.improvement && (
-                      <div className="rounded-xl p-3" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
+                      <div className="rounded-xl p-2" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
                         <div className="text-xs text-slate-600 mb-1">🚀 {T.bestTitle}</div>
                         <div className="font-bold text-sm text-emerald-950">{r.moves.improvement.label}</div>
                         <div className="text-xs text-slate-600 mt-1">{fill(T.daysTo, { prev: toBn(r.moves.improvement.prev), cur: toBn(r.moves.improvement.cur) })}</div>
                       </div>
                     )}
                     {r.moves.drop && (
-                      <div className="rounded-xl p-3" style={{ background: "#FDEFE3", border: "1px solid #F6D5B8" }}>
+                      <div className="rounded-xl p-2" style={{ background: "#FDEFE3", border: "1px solid #F6D5B8" }}>
                         <div className="text-xs text-slate-600 mb-1">⚠️ {T.dropTitle}</div>
                         <div className="font-bold text-sm text-emerald-950">{r.moves.drop.label}</div>
                         <div className="text-xs text-slate-600 mt-1">{fill(T.daysTo, { prev: toBn(r.moves.drop.prev), cur: toBn(r.moves.drop.cur) })}</div>
