@@ -213,12 +213,24 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
             <div className={cardBox} style={cardStyle}>
               {moveCount > 0 && (
                 <>
-                  <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${moveCount}, minmax(0, 1fr))` }}>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                    {!r.moves.improvement && (
+                      <div className="rounded-xl p-2" style={{ background: "#F3F6F4", border: "1px solid #E1E8E3" }}>
+                        <div className="text-xs text-slate-600 mb-1">🚀 {T.bestTitle}</div>
+                        <div className="text-xs text-slate-500 leading-relaxed">{T.noImprove}</div>
+                      </div>
+                    )}
                     {r.moves.improvement && (
                       <div className="rounded-xl p-2" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
                         <div className="text-xs text-slate-600 mb-1">🚀 {T.bestTitle}</div>
                         <div className="font-bold text-sm text-emerald-950">{r.moves.improvement.label}</div>
                         <div className="text-xs text-slate-600 mt-1">{fill(T.daysTo, { prev: toBn(r.moves.improvement.prev), cur: toBn(r.moves.improvement.cur) })}</div>
+                      </div>
+                    )}
+                    {!r.moves.drop && (
+                      <div className="rounded-xl p-2" style={{ background: "#F3F6F4", border: "1px solid #E1E8E3" }}>
+                        <div className="text-xs text-slate-600 mb-1">⚠️ {T.dropTitle}</div>
+                        <div className="text-xs text-slate-500 leading-relaxed">{T.noDrop}</div>
                       </div>
                     )}
                     {r.moves.drop && (
