@@ -143,7 +143,6 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       const r = report;
       const monthName = BN_MONTHS[month0] + " " + toBn(year);
       const up = r.delta !== null && r.delta > 0, down = r.delta !== null && r.delta < 0;
-      const moveCount = (r.moves.improvement ? 1 : 0) + (r.moves.drop ? 1 : 0);
       const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
       const goalParts = [];
       if (goals.counts.done) goalParts.push(fill(T.goalDone, { n: toBn(goals.counts.done) }));
@@ -209,43 +208,10 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
             </div>
           </div>
 
-          {(moveCount > 0 || r.whenGood) && (
+          {r.whenGood && (
             <div className={cardBox} style={cardStyle}>
-              {moveCount > 0 && (
-                <>
-                  <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-                    {!r.moves.improvement && (
-                      <div className="rounded-xl p-2" style={{ background: "#F3F6F4", border: "1px solid #E1E8E3" }}>
-                        <div className="text-xs text-slate-600 mb-1">🚀 {T.bestTitle}</div>
-                        <div className="text-xs text-slate-500 leading-relaxed">{T.noImprove}</div>
-                      </div>
-                    )}
-                    {r.moves.improvement && (
-                      <div className="rounded-xl p-2" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
-                        <div className="text-xs text-slate-600 mb-1">🚀 {T.bestTitle}</div>
-                        <div className="font-bold text-sm text-emerald-950">{r.moves.improvement.label}</div>
-                        <div className="text-xs text-slate-600 mt-1">{fill(T.daysTo, { prev: toBn(r.moves.improvement.prev), cur: toBn(r.moves.improvement.cur) })}</div>
-                      </div>
-                    )}
-                    {!r.moves.drop && (
-                      <div className="rounded-xl p-2" style={{ background: "#F3F6F4", border: "1px solid #E1E8E3" }}>
-                        <div className="text-xs text-slate-600 mb-1">⚠️ {T.dropTitle}</div>
-                        <div className="text-xs text-slate-500 leading-relaxed">{T.noDrop}</div>
-                      </div>
-                    )}
-                    {r.moves.drop && (
-                      <div className="rounded-xl p-2" style={{ background: "#FDEFE3", border: "1px solid #F6D5B8" }}>
-                        <div className="text-xs text-slate-600 mb-1">⚠️ {T.dropTitle}</div>
-                        <div className="font-bold text-sm text-emerald-950">{r.moves.drop.label}</div>
-                        <div className="text-xs text-slate-600 mt-1">{fill(T.daysTo, { prev: toBn(r.moves.drop.prev), cur: toBn(r.moves.drop.cur) })}</div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">{T.movesHint}</p>
-                </>
-              )}
               {r.whenGood && (
-                <div className={moveCount > 0 ? "mt-3" : ""}>
+                <div>
                   <SectionTitle>🔎 {T.whenGoodTitle}</SectionTitle>
                   <p className="text-sm text-slate-700">{fill(T.whenGood, { label: r.whenGood.label, n: toBn(r.whenGood.diff) })} <span className="text-slate-400">{T.whenGoodNote}</span></p>
                 </div>

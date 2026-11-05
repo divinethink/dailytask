@@ -273,5 +273,5 @@ test("weekGlance: সব দিন সমান হলে সেরা দিন
 test("REVIEW_TEXT.glance: প্রয়োজনীয় লেখা আছে", () => {
   const G = REVIEW_TEXT.glance;
   assert.equal(G.weekdays.length, 7);
-  for (const k of ["title", "avg", "logged", "best", "deltaUp", "deltaDown", "deltaSame", "needMore"]) assert.ok(G[k]);
+  for (const k of ["title", "vsPrev", "best", "deltaUp", "deltaDown", "deltaSame", "needMore"]) assert.ok(G[k]);
 });

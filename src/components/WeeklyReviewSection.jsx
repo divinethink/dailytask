@@ -185,14 +185,11 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
               {glance.logged > 0 && (
                 <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
                   <div className="text-xs font-bold opacity-90 mb-2">{G.title}</div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <GlanceCell label={G.avg} value={glance.avg !== null ? toBn(glance.avg) + "%" : "—"} sub={glance.delta ? (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%" : ""} />
-                    <GlanceCell label={G.logged} value={toBn(glance.logged) + "/" + toBn(glance.total)} sub={G.day} />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <GlanceCell label={G.vsPrev} value={glance.delta === null ? "—" : glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"} sub="" />
                     <GlanceCell label={G.best} value={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : "—"} sub={glance.best ? toBn(glance.best.pct) + "%" : ""} />
                   </div>
-                  {glance.delta !== null
-                    ? <p className="text-[11px] opacity-90 mt-2">{glance.delta === 0 ? G.deltaSame : (glance.delta > 0 ? G.deltaUp : G.deltaDown).replace("{n}", toBn(Math.abs(glance.delta)))}</p>
-                    : !glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
+                  {glance.delta === null && !glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
                 </div>
               )}
               <p className="text-sm text-slate-600">{T.goal.noPrev}</p>
