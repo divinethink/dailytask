@@ -7,7 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { authModular as auth } from "../legacy/firebaseConfig.js";
 import { getRelinkFlag, hasGoogleProvider, linkGoogleAccountNow, loadUserMapping } from "../legacy/googleIdentity.js";
 import { GoogleGIcon } from "./icons.jsx";
-import { oldEmailFromFlag } from "../legacy/googleAccountChange.js";
+import { oldEmailFromFlag, RELINK_FLAG } from "../legacy/googleAccountChange.js";
 
 const TEXT = {
   title: "নতুন জিমেইল অ্যাকাউন্ট যুক্ত করুন",
@@ -30,6 +30,8 @@ export function GoogleRelinkGate() {
     function refresh() {
       const flag = getRelinkFlag();
       const u = auth.currentUser;
+      // বাসি ফ্ল্যাগ (সাইন-আউট হয়ে গেছে, বা জিমেইল আবার যুক্ত) পরিষ্কার — যাতে ভবিষ্যতে ভুল করে গেট না আসে।
+      if (flag && (!u || hasGoogleProvider(u))) { try { localStorage.removeItem(RELINK_FLAG); } catch {} }
       const on = !!(flag && u && !hasGoogleProvider(u));
       setPending(on);
       setOldEmail(on ? oldEmailFromFlag(flag) : null);
