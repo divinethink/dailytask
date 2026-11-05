@@ -3,7 +3,7 @@
 // প্রতিটা বদল সাথে সাথে সেভ(পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
 // React global(window.React, globals.js)।
 import { saveHomeCardExtras } from "../legacy/editableContent.js";
-import { EXTRAS_SECTION_ID, MAX_ITEMS, LIMITS, validateItem, normalizeItem, makeItemId } from "./tomorrowExtras.js";
+import { EXTRAS_SECTION_ID, MAX_ITEMS, LIMITS, validateItem, normalizeItem, makeItemId, makeOverride } from "./tomorrowExtras.js";
 import { WEEKDAYS_BN } from "./tomorrowCalendarData.js";
 
 const { useState } = React;
@@ -20,7 +20,8 @@ function Field({ label, children }) {
   return React.createElement("label", { className: "block mb-2" }, React.createElement("span", { className: "block text-xs font-semibold text-slate-600 mb-1" }, label), children);
 }
 
-export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, onSaved, onClose }) {
+export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, builtins = [], onSaved, onClose }) {
+  const overrides = extras.overrides || {};
   const [form, setForm] = useState(null); // null = তালিকা, নইলে যোগ/সম্পাদনার ফর্ম
   const [sleep, setSleep] = useState(extras.sleepText || "");
   const [busy, setBusy] = useState(false);
@@ -41,18 +42,31 @@ export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, on
     }
   }
 
+  // অন্তর্নির্মিত বার্তা: বদলানো লেখা/লুকানো overrides-এ জমা হয়; মূল কোড অক্ষত, "মূল লেখায় ফেরান"-এ মুছে যায়
+  async function setOverride(id, o) {
+    const next = { ...overrides };
+    if (o) next[id] = o; else delete next[id];
+    return persist({ ...extras, overrides: next });
+  }
+
   async function saveForm() {
     const msg = validateItem(form);
     if (msg) return setError(msg);
+    if (form.bid) {
+      const o = makeOverride(form);
+      if (!o) return setError("বাক্য লিখুন।");
+      if (await setOverride(form.bid, o)) setForm(null);
+      return;
+    }
     const clean = normalizeItem({ ...form, id: form.id || makeItemId() });
     if (!form.id && extras.items.length >= MAX_ITEMS) return setError("সর্বোচ্চ " + MAX_ITEMS + "টি বাক্য রাখা যায়।");
     const items = form.id ? extras.items.map((it) => (it.id === form.id ? clean : it)) : [...extras.items, clean];
-    if (await persist({ items, sleepText: extras.sleepText })) setForm(null);
+    if (await persist({ ...extras, items })) setForm(null);
   }
 
   async function remove(it) {
     if (!window.confirm("এই বাক্যটি মুছবেন?")) return;
-    await persist({ items: extras.items.filter((x) => x.id !== it.id), sleepText: extras.sleepText });
+    await persist({ ...extras, items: extras.items.filter((x) => x.id !== it.id) });
   }
 
   const set = (k) => (e) => setForm({ ...form, [k]: k === "w" ? Number(e.target.value) : e.target.value });
@@ -63,8 +77,8 @@ export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, on
     body = React.createElement(
       "div",
       null,
-      React.createElement("p", { className: "text-sm font-bold text-emerald-950 mb-2" }, form.id ? "বাক্য সম্পাদনা" : "নতুন বাক্য"),
-      React.createElement(
+      React.createElement("p", { className: "text-sm font-bold text-emerald-950 mb-2" }, form.bid ? "অন্তর্নির্মিত বার্তা সম্পাদনা" : form.id ? "বাক্য সম্পাদনা" : "নতুন বাক্য"),
+      !form.bid && React.createElement(
         Field,
         { label: "কোন বারের কার্ডে আসবে? (কালকের বার)" },
         React.createElement(
@@ -89,6 +103,34 @@ export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, on
     body = React.createElement(
       "div",
       null,
+      builtins.length > 0 && React.createElement(
+        "div",
+        { className: "mb-3" },
+        React.createElement("p", { className: "text-xs font-bold text-emerald-900 mb-1.5" }, "এই দিনের অ্যাপ-বার্তা"),
+        React.createElement(
+          "ul",
+          { className: "space-y-2" },
+          builtins.map((b) => {
+            const o = overrides[b.id];
+            const hidden = !!(o && o.hidden);
+            const cur = o && !o.hidden ? o : b;
+            return React.createElement(
+              "li",
+              { key: b.id, className: "rounded-xl border border-slate-200 bg-white px-3 py-2" + (hidden ? " opacity-60" : "") },
+              React.createElement("p", { className: "text-xs font-semibold text-slate-500" }, hidden ? "লুকানো" : o ? "সম্পাদিত" : "মূল লেখা"),
+              React.createElement("p", { className: "text-sm text-slate-800 mt-0.5" }, (cur.icon || "") + " " + (cur.title ? cur.title + " — " : "") + cur.text),
+              React.createElement(
+                "div",
+                { className: "flex flex-wrap gap-2 justify-end mt-1.5" },
+                !hidden && React.createElement("button", { type: "button", className: btn + " border border-slate-200 text-slate-700", disabled: busy, onClick: () => { setError(""); setForm({ ...EMPTY, bid: b.id, icon: cur.icon || "🌿", title: cur.title || "", text: cur.text || "", src: cur.src || "" }); } }, "সম্পাদনা"),
+                React.createElement("button", { type: "button", className: btn + " border border-slate-200 text-slate-700", disabled: busy, onClick: () => setOverride(b.id, hidden ? null : { hidden: true }) }, hidden ? "আবার দেখান" : "লুকান"),
+                o && !hidden && React.createElement("button", { type: "button", className: btn + " border border-amber-300 text-amber-700", disabled: busy, onClick: () => setOverride(b.id, null) }, "মূল লেখায় ফেরান")
+              )
+            );
+          })
+        )
+      ),
+      React.createElement("p", { className: "text-xs font-bold text-emerald-900 mb-1.5" }, "আপনার যোগ-করা বাক্য"),
       extras.items.length === 0 && React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "এখনো কোনো বাড়তি বাক্য নেই।"),
       React.createElement(
         "ul",
@@ -120,7 +162,7 @@ export function TomorrowExtrasEditor({ extras, defaultSleep, tomorrowWeekday, on
         React.createElement(
           "div",
           { className: "flex justify-end" },
-          React.createElement("button", { type: "button", className: btn + " border border-slate-300 text-slate-700 disabled:opacity-60", disabled: busy || sleep.trim() === (extras.sleepText || ""), onClick: () => persist({ items: extras.items, sleepText: sleep }) }, busy ? "সেভ হচ্ছে..." : "এই লেখা সেভ করুন")
+          React.createElement("button", { type: "button", className: btn + " border border-slate-300 text-slate-700 disabled:opacity-60", disabled: busy || sleep.trim() === (extras.sleepText || ""), onClick: () => persist({ ...extras, sleepText: sleep }) }, busy ? "সেভ হচ্ছে..." : "এই লেখা সেভ করুন")
         )
       )
     );

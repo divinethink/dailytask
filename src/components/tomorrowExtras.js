@@ -31,11 +31,55 @@ function hash(s) {
   return h;
 }
 
-// raw = Firestore doc data(বা null)। ফেরত: { items, sleepText }
+// অন্তর্নির্মিত(কোডে লেখা) বার্তার স্থির আইডি: মূল শিরোনাম থেকে। শিরোনাম না বদলালে আইডি একই থাকে।
+export function builtinId(title) {
+  return "b_" + Math.abs(hash(String(title || "")));
+}
+
+const BUILTIN_ID_RE = /^b_\d+$/;
+const MAX_OVERRIDES = 80;
+
+// অন্তর্নির্মিত বার্তার বদল: { hidden:true } = লুকানো; নয়তো নতুন লেখা। ভুল গঠনে null(= মূল লেখাই থাকে)
+function normalizeOverride(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.hidden === true) return { hidden: true };
+  const text = str(raw.text, LIMITS.text);
+  if (!text) return null;
+  return { hidden: false, icon: str(raw.icon, LIMITS.icon) || "🌿", title: str(raw.title, LIMITS.title), text, src: str(raw.src, LIMITS.src) };
+}
+
+// raw = Firestore doc data(বা null)। ফেরত: { items, sleepText, overrides }
 export function normalizeExtras(raw) {
   const src = raw && typeof raw === "object" && raw.homeCardExtras && typeof raw.homeCardExtras === "object" ? raw.homeCardExtras : {};
   const items = (Array.isArray(src.items) ? src.items : []).map(normalizeItem).filter(Boolean).slice(0, MAX_ITEMS);
-  return { items, sleepText: str(src.sleepText, LIMITS.sleep) };
+  const overrides = {};
+  const ro = src.overrides && typeof src.overrides === "object" && !Array.isArray(src.overrides) ? src.overrides : {};
+  Object.keys(ro).slice(0, MAX_OVERRIDES).forEach((id) => {
+    if (!BUILTIN_ID_RE.test(id)) return;
+    const o = normalizeOverride(ro[id]);
+    if (o) overrides[id] = o;
+  });
+  return { items, sleepText: str(src.sleepText, LIMITS.sleep), overrides };
+}
+
+// ফর্ম থেকে অন্তর্নির্মিত বার্তার বদল তৈরি(যাচাইসহ)
+export function makeOverride(form) {
+  return normalizeOverride({ hidden: false, icon: form && form.icon, title: form && form.title, text: form && form.text, src: form && form.src });
+}
+
+// কার্ডের note-তালিকায় বদল প্রয়োগ: লুকানো বাদ, বদলানো লেখা বসে। id-হীন note(রোজার সময় ইত্যাদি) অপরিবর্তিত।
+// textFn: আজ-মোডে "কাল"→"আজ" রূপান্তরের জন্য(ঐচ্ছিক)
+export function applyOverrides(notes, overrides, textFn) {
+  const ov = overrides || {};
+  const f = typeof textFn === "function" ? textFn : (x) => x;
+  const out = [];
+  (notes || []).forEach((n) => {
+    const o = n && n.id ? ov[n.id] : null;
+    if (!o) return out.push(n);
+    if (o.hidden) return;
+    out.push({ ...n, icon: o.icon, title: f(o.title), text: f(o.text), src: o.src });
+  });
+  return out;
 }
 
 // ফর্ম থেকে আসা item যাচাই; ভুল থাকলে বাংলা বার্তা, ঠিক থাকলে null

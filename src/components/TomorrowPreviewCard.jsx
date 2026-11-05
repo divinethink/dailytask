@@ -9,7 +9,7 @@ import { peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { WEEKDAYS_BN, MILESTONES, calendarNotes, historyFor } from "./tomorrowCalendarData.js";
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
-import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor } from "./tomorrowExtras.js";
+import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor, builtinId, applyOverrides } from "./tomorrowExtras.js";
 import { TomorrowExtrasEditor } from "./TomorrowExtrasEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
@@ -23,6 +23,7 @@ const toToday = s => (typeof s === "string" ? s.replace(KAL_RE, (_, a, k) => a +
 export function tomorrowNotes(date, hijri, isTomorrow = true) {
   const hm = HIJRI_MONTHS_BN.indexOf(hijri.month) + 1;
   const r = calendarNotes(date.getDay(), hm, hijri.day);
+  r.notes = r.notes.map(n => ({ ...n, id: builtinId(n.title) })); // মূল শিরোনাম থেকে স্থির আইডি(সম্পাদনা/লুকানোর জন্য)
   if (!isTomorrow) r.notes = r.notes.map(n => ({ ...n, title: toToday(n.title), text: toToday(n.text) }));
   return { ...r, hm, history: historyFor(hm, hijri.day) };
 }
@@ -98,7 +99,7 @@ function Row({ n, muted }) {
 // todaySaved=false হলে কার্ড "আজ"-এর বার্তা দেখায়; আজকের ডেটা সেভ হলে "আগামীকাল"।
 export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
-  const [extras, setExtras] = React.useState({ items: [], sleepText: "" });
+  const [extras, setExtras] = React.useState({ items: [], sleepText: "", overrides: {} });
   const [editing, setEditing] = React.useState(false);
   React.useEffect(() => {
     let alive = true;
@@ -109,7 +110,8 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   const isTomorrow = !!todaySaved;
   const date = new Date(Date.now() + (isTomorrow ? 86400000 : 0));
   const hijri = getHijriDate(date);
-  const { notes, special, fastingDay, history } = tomorrowNotes(date, hijri, isTomorrow);
+  const { notes: builtinNotes, special, fastingDay, history } = tomorrowNotes(date, hijri, isTomorrow);
+  const notes = applyOverrides(builtinNotes, extras.overrides, isTomorrow ? null : toToday);
   if (fastingDay) {
     const fl = fastingLine(toBn);
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });
@@ -139,7 +141,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
         isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-7 h-7 flex items-center justify-center rounded-lg text-emerald-800 hover:bg-black/5" }, React.createElement(EditIcon, { size: 16 }))
       )
     ),
-    isCreator && editing && React.createElement(TomorrowExtrasEditor, { extras, defaultSleep: DEFAULT_SLEEP, tomorrowWeekday: date.getDay(), onSaved: setExtras, onClose: () => setEditing(false) }),
+    isCreator && editing && React.createElement(TomorrowExtrasEditor, { extras, defaultSleep: DEFAULT_SLEEP, tomorrowWeekday: date.getDay(), builtins: builtinNotes, onSaved: setExtras, onClose: () => setEditing(false) }),
     React.createElement(
       "ul",
       { className: "space-y-2" },
