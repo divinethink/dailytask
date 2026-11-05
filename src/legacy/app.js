@@ -610,6 +610,7 @@ import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, একই pattern): TAB_SETTINGS-এ ট্যাপ না
 // করলে এই chunk লোড হবে না।
 import { renderHomeBelow } from "../components/HomeFold.jsx";
+import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
 import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
 const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
@@ -3631,7 +3632,7 @@ function mountApp() {
   const container = document.getElementById("root");
   const root = ReactDOM.createRoot(container);
   // GoogleRelinkGate App()-এর বাইরে: মেইল-বদলের মাঝপথের রিকভারি-পর্দা App-এর কোনো early-return-এ ঢাকা পড়ে না।
-  root.render(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(App, null), /*#__PURE__*/React.createElement(GoogleRelinkGate, null)));
+  root.render(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)), /*#__PURE__*/React.createElement(GoogleRelinkGate, null)));
 }
 
 // --- Anonymous Authentication (background, no login UI) ---
