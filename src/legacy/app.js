@@ -614,6 +614,7 @@ import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
 import { taskFields } from "./customTasks.js";
 const TabLayoutScreen = React.lazy(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
+const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 // §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
@@ -894,6 +895,7 @@ function App() {
   const [fieldOverrides, setFieldOverrides] = useState({});
   const [showFieldManager, setShowFieldManager] = useState(false);
   const [showTazkirah, setShowTazkirah] = useState(false);
+  const [showPopupMsgs, setShowPopupMsgs] = useState(false);
   const [tazkirahData, setTazkirahData] = useState(() => sanitizeTazkirah(null));
   const [viewDate, setViewDate] = useState(new Date());
   const [entry, setEntry] = useState({});
@@ -2923,7 +2925,12 @@ function App() {
           onOpenToolsLayout: (selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? () => setShowToolsLayout(true) : undefined,
           onOpenFieldManager: isAdmin ? () => setShowFieldManager(true) : undefined,
           onOpenTazkirah: isAdmin ? () => setShowTazkirah(true) : undefined,
+          // পপআপ বার্তা সম্পাদনা: শুধু App Creator(UI-gate; আসল নিরাপত্তা Rules-এর isAppCreator())
+          onOpenPopupMessages: isCreatorAuth() ? () => setShowPopupMsgs(true) : undefined,
           themeColorPickerEl: themeColorPickerEl
+        })),
+        showPopupMsgs && isCreatorAuth() && React.createElement(React.Suspense, { fallback: null }, React.createElement(PopupMessagesScreen, {
+          onClose: () => setShowPopupMsgs(false)
         })),
         showTazkirah && isAdmin && React.createElement(React.Suspense, { fallback: null }, React.createElement(TazkirahManagerScreen, {
           builtins: DAILY_INSPIRATIONS,

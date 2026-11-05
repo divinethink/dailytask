@@ -86,6 +86,7 @@ export function MenuPage({
   onOpenToolsLayout,
   onOpenFieldManager,
   onOpenTazkirah,
+  onOpenPopupMessages,
   themeColorPickerEl
 }) {  return h(
     "div",
@@ -231,8 +232,8 @@ export function MenuPage({
             })
           ),
           // ৪) কাস্টমাইজ(প্রতিটা সারি আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
-          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah) && h(SectionLabel, null, "কাস্টমাইজ"),
-          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah) && h(
+          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(SectionLabel, null, "কাস্টমাইজ"),
+          (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(
             "div",
             { className: CARD, style: CARD_STYLE },
             onOpenHomeLayout && h(MenuRow, {
@@ -276,6 +277,13 @@ export function MenuPage({
               hint: "নিজের বাণী যোগ/লুকান",
               showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager),
               onClick: () => { onOpenTazkirah(); }
+            }),
+            onOpenPopupMessages && h(MenuRow, {
+              icon: h(EditIcon, { size: 15 }),
+              title: "পপআপ বার্তা সম্পাদনা",
+              hint: "শুধু অ্যাপ ক্রিয়েটর",
+              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah),
+              onClick: () => { onOpenPopupMessages(); }
             })
           ),
           // ৫) ফিডব্যাক

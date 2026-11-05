@@ -2,6 +2,7 @@
 // legacy App(). Structural-only: original show*/setShow* state names become {show, onClose}
 // props (state ownership stays in App(), per Roadmap A4 Owner Rule). JSX body unchanged.
 import { InfoIcon, X, ChevronRight } from "./icons.jsx";
+import { usePopupMessages } from "../legacy/popupMessages.js";
 const { useState } = React;
 
 // §B৭ Onboarding Coach-mark(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
@@ -23,14 +24,44 @@ const COACH_MARK_STEPS = [{
   title: "ধারাবাহিকতা 🔥",
   body: "প্রতিদিন পূরণ করলে স্ট্রিক বাড়বে, এবং মাসিক ওভারভিউ-তে নিজের অগ্রগতি দেখতে পারবেন।"
 }];
+
+// App Creator-সম্পাদিত লেখা দেখানোর সাধারণ পপআপ(মূল পপআপের মতোই চেহারা)। শুধু custom লেখা থাকলে ব্যবহৃত;
+// না থাকলে নিচের মূল(অপরিবর্তিত) পপআপই দেখায়। লেখা plain text(React escape করে), নতুন লাইন বজায় থাকে।
+function CustomMessagePopup({ title, body, onClose }) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100 max-h-[85vh] overflow-y-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-sm text-slate-800 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(InfoIcon, {
+    size: 16,
+    color: "var(--theme-primary)"
+  }), " " + title), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onClose()
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 18,
+    className: "text-slate-400"
+  }))), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-600 leading-relaxed mb-4 whitespace-pre-line"
+  }, body), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onClose(),
+    className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+  }, "বুঝেছি")));
+}
+
 export function CoachMarkModal({
   show,
   onClose
 }) {
   const [step, setStep] = useState(0);
+  const msgs = usePopupMessages(show, ["coach_0", "coach_1", "coach_2", "coach_3"]);
   if (!show) return false;
-  const isLast = step === COACH_MARK_STEPS.length - 1;
-  const s = COACH_MARK_STEPS[step];
+  const steps = COACH_MARK_STEPS.map((d, i) => ({ title: msgs[i].title || d.title, body: msgs[i].body || d.body }));
+  const isLast = step === steps.length - 1;
+  const s = steps[step];
   function finish() {
     setStep(0);
     onClose();
@@ -43,7 +74,7 @@ export function CoachMarkModal({
     className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1"
-  }, COACH_MARK_STEPS.map((_, i) => /*#__PURE__*/React.createElement("span", {
+  }, steps.map((_, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     className: "w-1.5 h-1.5 rounded-full",
     style: {
@@ -77,6 +108,8 @@ export function CoachMarkModal({
 }
 
 export function MemberInfoModal({ show, onClose }) {
+  const m = usePopupMessages(show, ["member"])[0];
+  if (show && m.custom) return /*#__PURE__*/React.createElement(CustomMessagePopup, { title: m.title, body: m.body, onClose: onClose });
   return show && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
@@ -102,6 +135,8 @@ export function MemberInfoModal({ show, onClose }) {
 }
 
 export function ExcuseInfoModal({ show, onClose }) {
+  const m = usePopupMessages(show, ["excuse"])[0];
+  if (show && m.custom) return /*#__PURE__*/React.createElement(CustomMessagePopup, { title: m.title, body: m.body, onClose: onClose });
   return show && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
@@ -139,6 +174,8 @@ export function ExcuseInfoModal({ show, onClose }) {
 }
 
 export function WeeklyInfoModal({ show, onClose }) {
+  const m = usePopupMessages(show, ["weekly"])[0];
+  if (show && m.custom) return /*#__PURE__*/React.createElement(CustomMessagePopup, { title: m.title, body: m.body, onClose: onClose });
   return show && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
@@ -164,6 +201,8 @@ export function WeeklyInfoModal({ show, onClose }) {
 }
 
 export function MeetingInfoModal({ show, onClose }) {
+  const m = usePopupMessages(show, ["meeting"])[0];
+  if (show && m.custom) return /*#__PURE__*/React.createElement(CustomMessagePopup, { title: m.title, body: m.body, onClose: onClose });
   return show && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {
@@ -189,6 +228,8 @@ export function MeetingInfoModal({ show, onClose }) {
 }
 
 export function MonthlyOverviewInfoModal({ show, onClose }) {
+  const m = usePopupMessages(show, ["monthly"])[0];
+  if (show && m.custom) return /*#__PURE__*/React.createElement(CustomMessagePopup, { title: m.title, body: m.body, onClose: onClose });
   return show && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
   }, /*#__PURE__*/React.createElement("div", {

@@ -97,6 +97,22 @@ async function saveHomeCardExtras(sectionId, data) {
   );
 }
 
+// পপআপ-বার্তা ওভাররাইড(App Creator-only, Rules-এ enforced)। mergeFields: popupMessages map সম্পূর্ণ
+// প্রতিস্থাপিত হয়(সাধারণ merge:true-তে মুছে ফেলা আইটেম পুরনো মান নিয়ে থেকে যেত)।
+async function savePopupMessages(sectionId, data) {
+  const user = requireCreator();
+  await setDoc(
+    sectionRef(sectionId),
+    {
+      format: "popupMessages",
+      popupMessages: data && typeof data === "object" ? data : {},
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    },
+    { mergeFields: ["format", "popupMessages", "updatedAt", "updatedBy"] }
+  );
+}
+
 // §৪.২ — App Creator-এর UI-তে auto-generate(client-side), ম্যানুয়ালি টাইপ না।
 function makeAccordionItemId() {
   return "item_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -108,5 +124,6 @@ export {
   saveAccordion,
   saveTable,
   saveHomeCardExtras,
+  savePopupMessages,
   makeAccordionItemId,
 };
