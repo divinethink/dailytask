@@ -3403,6 +3403,7 @@ function App() {
     fieldApplies: fieldApplies,
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),

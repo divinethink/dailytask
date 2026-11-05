@@ -5,7 +5,7 @@
 import { MonthPillNav } from "./MonthPillNav.jsx";
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk } from "../legacy/reviewSchema.js";
-import { weeklyGap, countFieldTotal } from "../legacy/reviewCalc.js";
+import { weeklyGap, countFieldTotal, weekGlance } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
@@ -15,9 +15,20 @@ const { useState, useEffect, useMemo } = React;
 
 const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300");
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
+const G = T.glance;
+const GLANCE_BG = "linear-gradient(135deg,#1F4D44,#2D6A5C)";
+function GlanceCell({ label, value, sub }) {
+  return (
+    <div className="rounded-lg px-1.5 py-2 text-center min-w-0" style={{ background: "rgba(255,255,255,0.12)" }}>
+      <div className="text-[11px] opacity-90 leading-tight">{label}</div>
+      <div className="text-[17px] font-bold leading-tight mt-1 break-words">{value}</div>
+      <div className="text-[11px] opacity-90 leading-tight mt-0.5 min-h-[14px]">{sub}</div>
+    </div>
+  );
+}
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
-export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS }) {
+export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {
   const { year, month0 } = monthCursor;
   const now = new Date();
   const isCurMonth = now.getFullYear() === year && now.getMonth() === month0;
@@ -75,6 +86,18 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     applies: f => fieldApplies(f, member),
     excused: (f, e) => isFieldExcusable(f, member) && isExcused(e, f.key)
   }), [days, allFields, member]);
+  // এক নজর: ভবিষ্যতের দিন গণনার বাইরে; আগের সপ্তাহ একই মাসে থাকলেই তুলনা (আগের মাসের ডেটা এখানে লোড হয় না)।
+  const upTo = isCurMonth ? Math.min(range.end, now.getDate()) : (year * 12 + month0 > now.getFullYear() * 12 + now.getMonth() ? 0 : range.end);
+  const glance = useMemo(() => {
+    const cur = days.filter(d => d.day <= upTo);
+    let prevDays = null;
+    if (week > 1) {
+      const pr = chunkRange(year, month0, week - 1);
+      prevDays = [];
+      for (let d = pr.start; d <= pr.end; d++) prevDays.push({ day: d, entry: (monthEntries && monthEntries[pad2(d)]) || null });
+    }
+    return weekGlance({ days: cur, prevDays, scoreOf: e => dailyScore(e, member, allFields) });
+  }, [days, upTo, week, year, month0, monthEntries, member, allFields, dailyScore]);
   const loggedDays = days.filter(d => d.entry).length;
   const jam = allFields.find(f => f.key === "jamaat" && fieldApplies(f, member));
   const jamTotal = jam ? countFieldTotal(days, "jamaat", jam.max || 5) : null;
@@ -158,7 +181,22 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
                 </div>
                 {form.goalResult === "partial" && <p className="text-xs rounded-lg bg-emerald-50 p-2 text-emerald-900">💚 {T.goal.partialNote}</p>}
               </>}
-            </> : <p className="text-sm text-slate-600">{T.goal.noPrev}</p>}
+            </> : <>
+              {glance.logged > 0 && (
+                <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
+                  <div className="text-xs font-bold opacity-90 mb-2">{G.title}</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <GlanceCell label={G.avg} value={glance.avg !== null ? toBn(glance.avg) + "%" : "—"} sub={glance.delta ? (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%" : ""} />
+                    <GlanceCell label={G.logged} value={toBn(glance.logged) + "/" + toBn(glance.total)} sub={G.day} />
+                    <GlanceCell label={G.best} value={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : "—"} sub={glance.best ? toBn(glance.best.pct) + "%" : ""} />
+                  </div>
+                  {glance.delta !== null
+                    ? <p className="text-[11px] opacity-90 mt-2">{glance.delta === 0 ? G.deltaSame : (glance.delta > 0 ? G.deltaUp : G.deltaDown).replace("{n}", toBn(Math.abs(glance.delta)))}</p>
+                    : !glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
+                </div>
+              )}
+              <p className="text-sm text-slate-600">{T.goal.noPrev}</p>
+            </>}
           </div>
         )}
 

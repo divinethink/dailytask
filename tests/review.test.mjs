@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
-import { weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
+import { weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 
@@ -242,4 +242,36 @@ test("suggestDecisions: সর্বোচ্চ ৩, ব্যক্তিগ�
   const gap = suggestDecisions({ ok: true, partial: false, weakest: [], moves: {}, topGap: { label: "যিকির", missed: 9 } }, { text: D, toBn: bn, weekdayNames: names });
   assert.deepEqual(gap.map(x => x.id), ["gap"]);
   assert.deepEqual(suggestDecisions({ ok: false }, { text: D, toBn: bn, weekdayNames: names }), []);
+});
+
+// সপ্তাহের এক নজর (ধাপ ১)
+const gDays = scores => scores.map((s, i) => ({ day: i + 1, entry: s === undefined ? null : { s } }));
+const gScore = e => e.s;
+test("weekGlance: গড়, সেরা দিন ও এন্ট্রি-সংখ্যা", () => {
+  const g = weekGlance({ days: gDays([0.5, 0.8, undefined, 0.8, 0.2]), scoreOf: gScore });
+  assert.equal(g.total, 5); assert.equal(g.logged, 4); assert.equal(g.enough, true);
+  assert.equal(g.avg, 58);                       // (50+80+80+20)/4 = 57.5 ⇒ 58
+  assert.deepEqual(g.best, { day: 2, pct: 80 }); // সমান হলে আগের দিন
+  assert.equal(g.delta, null);                   // আগের সপ্তাহ নেই
+});
+test("weekGlance: কম ডেটায় গড়/সেরা দিন/delta নেই", () => {
+  const g = weekGlance({ days: gDays([0.5, 0.9]), prevDays: gDays([0.4, 0.4, 0.4]), scoreOf: gScore });
+  assert.equal(g.logged, 2); assert.equal(g.enough, false);
+  assert.equal(g.avg, null); assert.equal(g.best, null); assert.equal(g.delta, null);
+});
+test("weekGlance: আগের সপ্তাহের সাথে delta", () => {
+  const g = weekGlance({ days: gDays([0.6, 0.6, 0.9]), prevDays: gDays([0.5, 0.5, 0.5]), scoreOf: gScore });
+  assert.equal(g.avg, 70); assert.equal(g.delta, 20);
+  assert.equal(weekGlance({ days: gDays([0.6, 0.6, 0.9]), prevDays: gDays([0.5, undefined, 0.5]), scoreOf: gScore }).delta, null); // আগের সপ্তাহে ৩ দিন নেই
+});
+test("weekGlance: সব দিন সমান হলে সেরা দিন নেই; এন্ট্রিহীন সপ্তাহ নিরাপদ", () => {
+  assert.equal(weekGlance({ days: gDays([0.7, 0.7, 0.7]), scoreOf: gScore }).best, null);
+  const e = weekGlance({ days: gDays([undefined, undefined]), scoreOf: gScore });
+  assert.equal(e.logged, 0); assert.equal(e.avg, null);
+  assert.equal(weekGlance({ days: [], scoreOf: gScore }).total, 0);
+});
+test("REVIEW_TEXT.glance: প্রয়োজনীয় লেখা আছে", () => {
+  const G = REVIEW_TEXT.glance;
+  assert.equal(G.weekdays.length, 7);
+  for (const k of ["title", "avg", "logged", "best", "deltaUp", "deltaDown", "deltaSame", "needMore"]) assert.ok(G[k]);
 });

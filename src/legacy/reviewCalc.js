@@ -89,4 +89,37 @@ function countFieldTotal(days, key, max) {
   return { sum, possible: max * n, days: n };
 }
 
-export { weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
+// সপ্তাহের এক নজর (ধাপ ১)। days/prevDays: [{ day, entry|null }] ; scoreOf(entry) ⇒ 0..1 বা null।
+// গড় ও সেরা দিন দেখানো হয় অন্তত GLANCE_MIN দিনের স্কোর থাকলে; আগের সপ্তাহ (prevDays) না থাকলে বা কম ডেটা হলে delta = null।
+// সেরা দিন: সর্বোচ্চ স্কোর (সমান হলে আগের দিন); সব দিনের স্কোর সমান হলে null (বেছে দেখানোর মতো পার্থক্য নেই)।
+const GLANCE_MIN = 3;
+function glanceRows(days, scoreOf) {
+  const rows = [];
+  for (const d of days || []) {
+    if (!d || !d.entry) continue;
+    const s = scoreOf(d.entry);
+    if (s === null || s === undefined || !Number.isFinite(s)) continue;
+    rows.push({ day: d.day, pct: Math.round(s * 100) });
+  }
+  return rows;
+}
+function weekGlance({ days, prevDays, scoreOf }) {
+  const rows = glanceRows(days, scoreOf);
+  const logged = (days || []).filter(d => d && d.entry).length;
+  const enough = rows.length >= GLANCE_MIN;
+  const avg = enough ? Math.round(rows.reduce((t, r) => t + r.pct, 0) / rows.length) : null;
+  let best = null;
+  if (enough) {
+    const top = rows.reduce((b, r) => (r.pct > b.pct ? r : b), rows[0]);
+    const low = Math.min(...rows.map(r => r.pct));
+    if (top.pct > low) best = { day: top.day, pct: top.pct };
+  }
+  let delta = null;
+  if (avg !== null && prevDays) {
+    const pr = glanceRows(prevDays, scoreOf);
+    if (pr.length >= GLANCE_MIN) delta = monthDelta(Math.round(pr.reduce((t, r) => t + r.pct, 0) / pr.length), avg);
+  }
+  return { total: (days || []).length, logged, enough, avg, best, delta };
+}
+
+export { weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
