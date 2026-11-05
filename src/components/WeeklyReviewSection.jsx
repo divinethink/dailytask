@@ -129,7 +129,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     else body = (
       <div className="mt-3">
         {errCode && <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 p-2 mb-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.loadFailed}</p>}
-        <div className="flex gap-1.5 mb-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
+        <div className="flex gap-1.5 mb-1 overflow-x-auto -mx-1 px-1 pb-3">
           {Array.from({ length: chunkCount(year, month0) }, (_, i) => i + 1).map(w => (
             <button key={w} type="button" onClick={() => setWeek(w)} className={chip(w === week)}>সপ্তাহ {toBn(w)}</button>
           ))}

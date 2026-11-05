@@ -255,48 +255,6 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div className="rounded-xl p-3" style={{ background: "#EAF6EE", border: "1px solid #CFE8D8" }}>
-            <div className="text-xs font-bold text-emerald-900 mb-1">🌱 {T.bestTitle}</div>
-            {trend.best ? (
-              <div className="text-emerald-950 leading-relaxed">
-                <div className="text-sm font-bold">{trend.best.label}</div>
-                <div className="text-xs whitespace-nowrap">{toBn(trend.best.from.pct)}% → {toBn(trend.best.to.pct)}%</div>
-              </div>
-            ) : (
-              <div className="text-xs text-emerald-950 leading-relaxed">{T.noBest}</div>
-            )}
-          </div>
-          <div className="rounded-xl p-3" style={{ background: "#FBF3E1", border: "1px solid #EFDDB0" }}>
-            <div className="text-xs font-bold mb-1" style={{ color: "#7A5A00" }}>💛 {T.attTitle}</div>
-            {!lowest ? (
-              <div className="text-xs leading-relaxed" style={{ color: "#5C4300" }}>{T.attNone}</div>
-            ) : (
-              <div style={{ color: "#5C4300" }}>
-                <div className="text-sm font-bold leading-snug">{lowest.label}</div>
-                {lowest.vals[2] && <div className="text-xs">{toBn(lowest.vals[2].pct)}%</div>}
-                {canFocus && (
-                  currentFocusKey === lowest.key ? (
-                    <div className="mt-2 text-xs font-bold text-emerald-800">{T.focusDone}</div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={!!focusBusy}
-                      onClick={() => putFocus(lowest.key)}
-                      className="mt-2 w-full rounded-xl px-2 py-2 text-xs font-bold text-white leading-tight disabled:opacity-60"
-                      style={{ background: "#0E4B43", minHeight: 40 }}
-                    >
-                      {focusBusy === lowest.key ? T.focusSaving : T.focusBtn}
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        {canFocus && lowest && <p className="text-xs mb-2 leading-relaxed" style={{ color: "#7A5A00" }}>{T.focusHint}</p>}
-        {focusErr && <p className="text-xs text-orange-700 mb-2">{T.focusErr}</p>}
-
         {trend.curEmpty && (
           <p className="text-xs text-slate-500 mb-2 leading-relaxed">{fill(T.curEmpty, { month: BN_MONTHS[month0] })}</p>
         )}
