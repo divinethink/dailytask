@@ -23,6 +23,7 @@ import { WaqtAmalCard } from "../WaqtAmalCard.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { JamaatCard } from "./JamaatCard.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
+import { GPS_MESSAGES, usePopupMessages } from "../../legacy/popupMessages.js";
 
 const { useState, useEffect, useMemo, useRef } = React;
 
@@ -56,36 +57,8 @@ function dismissGpsIssue() {
 // ওয়েব-পেজ ফোনের/ব্রাউজারের সেটিংস নিজে খুলতে পারে না(কোনো API নেই) — স্ট্যান্ডার্ড হলো:
 // কারণ ধরে পরিষ্কার ধাপ দেখানো + "আবার চেষ্টা করুন" বাটন + সেটিংস থেকে ফিরলে নিজে আবার চেষ্টা।
 // কারণ: denied=ব্লক করা, prompt=প্রশ্নটি এড়ানো/বাতিল, off=ফোনের লোকেশন বন্ধ, timeout=সময় শেষ
-const GPS_TEXT = {
-  off: {
-    title: "ফোনে লোকেশন বন্ধ আছে",
-    body: "নামাজের সঠিক সময়ের জন্য ফোনের লোকেশন (জিপিএস) চালু করুন।",
-    steps: ["ফোনের স্ক্রিন উপর থেকে নিচে টানুন", "\"লোকেশন\" আইকন চেপে চালু করুন", "এই অ্যাপে ফিরে \"আবার চেষ্টা করুন\" চাপুন"],
-    short: "লোকেশন চালু করে আবার চেষ্টা করুন।",
-  },
-  denied: {
-    title: "লোকেশনের অনুমতি বন্ধ করা আছে",
-    body: "ব্রাউজার আর নিজে থেকে প্রশ্ন করবে না। সেটিংসে গিয়ে একবার অনুমতি দিতে হবে।",
-    steps: [
-      "ব্রাউজারে: ঠিকানা-বারের পাশে 🔒 (বা ⋮) → সাইট সেটিংস → লোকেশন → অনুমতি দিন",
-      "হোম-স্ক্রিনের অ্যাপ হলে: অ্যাপ আইকন চেপে ধরুন → অ্যাপ তথ্য → অনুমতি → লোকেশন → অনুমতি",
-      "ফিরে এসে \"আবার চেষ্টা করুন\" চাপুন",
-    ],
-    short: "সেটিংসে লোকেশনের অনুমতি দিয়ে আবার চেষ্টা করুন।",
-  },
-  prompt: {
-    title: "লোকেশনের অনুমতি দেওয়া হয়নি",
-    body: "সঠিক সময়ের জন্য অনুমতি লাগবে। \"আবার চেষ্টা করুন\" চেপে প্রশ্ন এলে \"Allow\" দিন।",
-    steps: [],
-    short: "আবার চেষ্টা করে অনুমতি দিন।",
-  },
-  timeout: {
-    title: "অবস্থান পাওয়া যাচ্ছে না",
-    body: "ফোনের লোকেশন চালু আছে কিনা দেখুন, দরকারে খোলা জায়গায় গিয়ে আবার চেষ্টা করুন।",
-    steps: [],
-    short: "লোকেশন চালু আছে কিনা দেখে আবার চেষ্টা করুন।",
-  },
-};
+const GPS_TEXT = GPS_MESSAGES;
+const GPS_KINDS = ["off", "denied", "prompt", "timeout"];
 
 function parseTimeOnDate(baseDate, hhmm) {
   if (!hhmm || typeof hhmm !== "string") return null;
@@ -554,6 +527,9 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   }
 
   // ব্যানার(দুই লাইন, ✕ সহ) ও পপআপ — বন্ধ/অনুমতি-নেই অবস্থায়
+  // লেখা App Creator সম্পাদনা করতে পারেন(মেনু → পপআপ বার্তা সম্পাদনা); না থাকলে কোড-ডিফল্ট
+  const gpsMsgs = usePopupMessages(!!(gpsPopup || gpsIssue), GPS_KINDS.map((k) => "gps_" + k));
+  const gpsMsg = (k) => gpsMsgs[GPS_KINDS.indexOf(k)];
   const gpsBanner = gpsIssue
     ? /*#__PURE__*/React.createElement(
         "div",
@@ -561,8 +537,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         /*#__PURE__*/React.createElement(
           "div",
           { className: "flex-1" },
-          /*#__PURE__*/React.createElement("div", { className: "font-bold" }, GPS_TEXT[gpsIssue.kind].title),
-          /*#__PURE__*/React.createElement("div", null, GPS_TEXT[gpsIssue.kind].short)
+          /*#__PURE__*/React.createElement("div", { className: "font-bold" }, gpsMsg(gpsIssue.kind).custom ? gpsMsg(gpsIssue.kind).title : GPS_TEXT[gpsIssue.kind].title),
+          /*#__PURE__*/React.createElement("div", null, gpsMsg(gpsIssue.kind).custom ? gpsMsg(gpsIssue.kind).body.split("\n")[0] : GPS_TEXT[gpsIssue.kind].short)
         ),
         /*#__PURE__*/React.createElement(
           "button",
@@ -586,9 +562,9 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         /*#__PURE__*/React.createElement(
           "div",
           { className: "bg-white rounded-2xl p-5 w-full max-w-sm shadow-md max-h-[85vh] overflow-y-auto" },
-          /*#__PURE__*/React.createElement("div", { className: "text-base font-bold text-emerald-950 mb-2" }, GPS_TEXT[gpsPopup].title),
-          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-600 leading-relaxed mb-3" }, GPS_TEXT[gpsPopup].body),
-          GPS_TEXT[gpsPopup].steps.length > 0 &&
+          /*#__PURE__*/React.createElement("div", { className: "text-base font-bold text-emerald-950 mb-2" }, gpsMsg(gpsPopup).custom ? gpsMsg(gpsPopup).title : GPS_TEXT[gpsPopup].title),
+          /*#__PURE__*/React.createElement("p", { className: "text-sm text-slate-600 leading-relaxed mb-3 whitespace-pre-line" }, gpsMsg(gpsPopup).custom ? gpsMsg(gpsPopup).body : GPS_TEXT[gpsPopup].body),
+          !gpsMsg(gpsPopup).custom && GPS_TEXT[gpsPopup].steps.length > 0 &&
             /*#__PURE__*/React.createElement(
               "ol",
               { className: "list-decimal pl-5 text-sm text-slate-700 leading-relaxed mb-4 flex flex-col gap-1" },
