@@ -10,6 +10,8 @@
 // বাটন — বাকি সব content(family username/সদস্য/ডেটা ম্যানেজমেন্ট ইত্যাদি) hidden।
 import { BookIcon, CalIcon, ChevronRight, ClockIcon, CopyIcon, DownloadIcon, EditIcon, HomeIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon, GoogleGIcon } from "./icons.jsx";
 import { MemberListSection } from "./MemberListSection.jsx";
+import { isCreatorAuth } from "../legacy/familyIdentity.js";
+import { fetchSection, saveRichtext } from "../legacy/editableContent.js";
 
 // §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested "আরো সুন্দর ও গোছানো"): শুধু
 // দৃশ্য/লেআউট বদল — প্রতিটা বাটনের onClick/শর্ত(isAdmin/onOpen* গেট) আগের মতোই,
@@ -21,13 +23,122 @@ const CARD_STYLE = { borderColor: "var(--theme-line, #E2E8F0)" };
 function SectionLabel({ children }) {
   return h("div", { className: "px-2 pt-1 text-[11px] font-bold tracking-wider text-slate-500" }, children);
 }
-function MenuRow({ icon, title, hint, onClick, accent, showDivider = true }) {
+// ছোট টাইল(আইকন-চিপ উপরে, নাম নিচে) — গ্রিডে বসে, লিস্টের চেয়ে অনেক কম উচ্চতা নেয়।
+// label = পূর্ণ নাম(screen-reader/tooltip), title = টাইলে দৃশ্যমান ছোট নাম।
+function MenuTile({ icon, title, label, onClick }) {
   return h(
     "button",
     {
       type: "button",
       onClick,
-      className: "w-full text-left px-4 min-h-[52px] py-2 flex items-center gap-3 active:bg-slate-50 hover:bg-slate-50/70 transition-colors " + (showDivider ? "border-t" : ""),
+      title: label || title,
+      "aria-label": label || title,
+      className: "bg-white rounded-2xl border shadow-sm flex flex-col items-center justify-center gap-1 px-1 py-2 min-h-[68px] active:scale-95 transition-transform",
+      style: CARD_STYLE
+    },
+    h(
+      "span",
+      {
+        className: "w-8 h-8 rounded-xl flex items-center justify-center",
+        style: { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary)" },
+        "aria-hidden": "true"
+      },
+      icon
+    ),
+    h("span", { className: "text-[11px] font-semibold leading-tight text-slate-700 text-center" }, title)
+  );
+}
+
+// "আমাদের জানান" সারি — শিরোনাম+হিন্ট App Creator সম্পাদনা করতে পারেন(ডানে-উপরে ✏️)।
+// সংরক্ষণ: publicToolsContent/menuFeedbackButton(richtext: ১ম লাইন=শিরোনাম, ২য়=হিন্ট;
+// বিদ্যমান saveRichtext/Rules reuse, নতুন schema/rule নেই)। doc না থাকলে/ফাঁকা হলে ডিফল্ট।
+const FEEDBACK_ID = "menuFeedbackButton";
+const FEEDBACK_DEFAULT = { title: "আমাদের জানান", hint: "পরামর্শ বা সমস্যা" };
+function parseFeedbackDoc(doc) {
+  const body = doc && doc.richtext && typeof doc.richtext.body === "string" ? doc.richtext.body : "";
+  const lines = body.split("\n");
+  const title = (lines[0] || "").trim();
+  if (!title) return FEEDBACK_DEFAULT;
+  return { title, hint: lines.slice(1).join(" ").trim() };
+}
+function FeedbackRow({ onOpen }) {
+  const isCreator = isCreatorAuth();
+  const [text, setText] = React.useState(FEEDBACK_DEFAULT);
+  const [editing, setEditing] = React.useState(false);
+  const [draftT, setDraftT] = React.useState("");
+  const [draftH, setDraftH] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  React.useEffect(() => {
+    let alive = true;
+    fetchSection(FEEDBACK_ID).then(d => { if (alive) setText(parseFeedbackDoc(d)); });
+    return () => { alive = false; };
+  }, []);
+  async function save() {
+    const title = draftT.trim();
+    const hint = draftH.trim();
+    if (!title) { setErr("শিরোনাম ফাঁকা রাখা যাবে না।"); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      await saveRichtext(FEEDBACK_ID, title + "\n" + hint);
+      setText({ title, hint });
+      setEditing(false);
+    } catch {
+      setErr("সেভ করা যায়নি। আবার চেষ্টা করুন।");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const input = "w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none";
+  if (editing) {
+    return h(
+      "div",
+      { className: CARD + " p-3 space-y-2", style: CARD_STYLE },
+      h("input", { value: draftT, maxLength: 40, onChange: e => setDraftT(e.target.value), placeholder: "শিরোনাম", className: input }),
+      h("input", { value: draftH, maxLength: 60, onChange: e => setDraftH(e.target.value), placeholder: "ছোট বিবরণ(ঐচ্ছিক)", className: input }),
+      err && h("p", { className: "text-xs text-red-500" }, err),
+      h(
+        "div",
+        { className: "flex gap-2 justify-end" },
+        h("button", { type: "button", disabled: busy, onClick: () => setEditing(false), className: "px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200" }, "বাতিল"),
+        h("button", { type: "button", disabled: busy, onClick: save, className: "px-3 py-1.5 rounded-xl text-xs font-semibold text-white disabled:opacity-60", style: { background: "var(--theme-primary)" } }, busy ? "সেভ হচ্ছে..." : "সেভ করুন")
+      )
+    );
+  }
+  return h(
+    "div",
+    { className: "relative " + CARD, style: CARD_STYLE },
+    h(MenuRow, {
+      icon: h(MessageSquare, { size: 15 }),
+      title: text.title,
+      hint: text.hint || undefined,
+      accent: true,
+      showDivider: false,
+      hideChevron: isCreator,
+      onClick: onOpen
+    }),
+    isCreator && h(
+      "button",
+      {
+        type: "button",
+        onClick: () => { setDraftT(text.title); setDraftH(text.hint); setErr(""); setEditing(true); },
+        className: "absolute top-1 right-1 w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95",
+        title: "লেখা সম্পাদনা করুন",
+        "aria-label": "লেখা সম্পাদনা করুন"
+      },
+      h(EditIcon, { size: 14 })
+    )
+  );
+}
+
+function MenuRow({ icon, title, hint, onClick, accent, showDivider = true, hideChevron = false }) {
+  return h(
+    "button",
+    {
+      type: "button",
+      onClick,
+      className: "w-full text-left px-4 min-h-[44px] py-1.5 flex items-center gap-3 active:bg-slate-50 hover:bg-slate-50/70 transition-colors " + (showDivider ? "border-t" : ""),
       style: showDivider ? { borderColor: "var(--theme-line, #E2E8F0)" } : undefined
     },
     h(
@@ -45,7 +156,7 @@ function MenuRow({ icon, title, hint, onClick, accent, showDivider = true }) {
       h("span", { className: "block text-sm font-semibold leading-snug " + (accent ? "" : "text-slate-800"), style: accent ? { color: "var(--theme-primary)" } : undefined }, title),
       hint && h("span", { className: "block text-[11px] text-slate-500 leading-snug mt-0.5" }, hint)
     ),
-    h(ChevronRight, { size: 16, color: "#94A3B8" })
+    !hideChevron && h(ChevronRight, { size: 16, color: "#94A3B8" })
   );
 }
 
@@ -95,7 +206,7 @@ export function MenuPage({
       "div",
       {
         style: { background: "var(--theme-primary)" },
-        className: "px-5 pt-6 pb-5 shadow-md flex items-center gap-2"
+        className: "px-5 pt-4 pb-3 shadow-md flex items-center gap-2"
       },
       h(MenuIcon, { size: 18, color: "#F4F7F1" }),
       h(
@@ -129,11 +240,11 @@ export function MenuPage({
         )
       : h(
           "div",
-          { className: "px-3 pt-3 space-y-3 text-sm text-slate-800" },
+          { className: "px-3 pt-2.5 space-y-2 text-sm text-slate-800" },
           // ১) ফ্যামিলি ইউজারনেম
           h(
             "div",
-            { className: CARD + " px-4 py-3 flex items-center justify-between gap-3", style: CARD_STYLE },
+            { className: CARD + " px-4 py-2 flex items-center justify-between gap-3", style: CARD_STYLE },
             h(
               "div",
               { className: "min-w-0" },
@@ -149,7 +260,7 @@ export function MenuPage({
                 {
                   type: "button",
                   onClick: e => { e.stopPropagation(); handleCopyCode(); },
-                  className: "w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-transform",
+                  className: "w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform",
                   style: { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary)" },
                   title: "কপি করুন",
                   "aria-label": "কপি করুন"
@@ -161,7 +272,7 @@ export function MenuPage({
                 {
                   type: "button",
                   onClick: () => { setShowFamilyCodeChoiceModal(true); },
-                  className: "w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-transform",
+                  className: "w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform",
                   style: { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary)" },
                   title: "ফ্যামিলি ইউজারনেম পরিবর্তন করুন",
                   "aria-label": "ফ্যামিলি ইউজারনেম পরিবর্তন করুন"
@@ -201,29 +312,30 @@ export function MenuPage({
               onClick: async () => { try { await handleShareInviteLink(); } catch {} }
             })
           ),
-          // ৩) ডেটা ম্যানেজমেন্ট
+          // ৩) ডেটা ম্যানেজমেন্ট(৩-কলাম টাইল-গ্রিড)
           h(SectionLabel, null, "ডেটা ম্যানেজমেন্ট"),
           h(
             "div",
-            { className: CARD, style: CARD_STYLE },
-            h(MenuRow, {
-              icon: h(DownloadIcon, { size: 15 }),
-              title: "ডেটা ব্যাকআপ রাখুন",
-              showDivider: false,
+            { className: "grid grid-cols-3 gap-2" },
+            h(MenuTile, {
+              icon: h(DownloadIcon, { size: 17 }),
+              title: "ডেটা ব্যাকআপ",
+              label: "ডেটা ব্যাকআপ রাখুন",
               onClick: () => {
                 setDriveBackupStatus(null);
                 setShowBackupOptionsModal(true);
               }
             }),
-            h(MenuRow, {
-              icon: h(UploadIcon, { size: 15 }),
-              title: "ইম্পোর্ট ব্যাকআপ ফাইল",
+            h(MenuTile, {
+              icon: h(UploadIcon, { size: 17 }),
+              title: "ইম্পোর্ট ব্যাকআপ",
+              label: "ইম্পোর্ট ব্যাকআপ ফাইল",
               onClick: () => { setShowImportOptionsModal(true); }
             }),
-            h(MenuRow, {
-              icon: h(CalIcon, { size: 15 }),
-              title: "আর্কাইভ দেখুন",
-              hint: "মাস/সাল",
+            h(MenuTile, {
+              icon: h(CalIcon, { size: 17 }),
+              title: "আর্কাইভ",
+              label: "আর্কাইভ দেখুন (মাস/সাল)",
               onClick: () => {
                 setArchiveYear(monthCursor.year);
                 setArchiveMonth0(monthCursor.month0);
@@ -231,74 +343,21 @@ export function MenuPage({
               }
             })
           ),
-          // ৪) কাস্টমাইজ(প্রতিটা সারি আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
+          // ৪) কাস্টমাইজ(৪-কলাম টাইল-গ্রিড; প্রতিটা টাইল আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
           (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(SectionLabel, null, "কাস্টমাইজ"),
           (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(
             "div",
-            { className: CARD, style: CARD_STYLE },
-            onOpenHomeLayout && h(MenuRow, {
-              icon: h(HomeIcon, { size: 15 }),
-              title: "হোম কাস্টমাইজ",
-              hint: "কার্ড সাজান/ভাঁজ",
-              showDivider: false,
-              onClick: () => { onOpenHomeLayout(); }
-            }),
-            onOpenPrayerLayout && h(MenuRow, {
-              icon: h(ClockIcon, { size: 15 }),
-              title: "সময়সূচি কাস্টমাইজ",
-              hint: "কার্ড সাজান/লুকান",
-              showDivider: !!onOpenHomeLayout,
-              onClick: () => { onOpenPrayerLayout(); }
-            }),
-            onOpenAmolLayout && h(MenuRow, {
-              icon: h(BookIcon, { size: 15 }),
-              title: "আমল কাস্টমাইজ",
-              hint: "কার্ড সাজান/লুকান",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout),
-              onClick: () => { onOpenAmolLayout(); }
-            }),
-            onOpenToolsLayout && h(MenuRow, {
-              icon: h(EditIcon, { size: 15 }),
-              title: "সহায়িকা কাস্টমাইজ",
-              hint: "কার্ড সাজান/লুকান",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout),
-              onClick: () => { onOpenToolsLayout(); }
-            }),
-            onOpenFieldManager && h(MenuRow, {
-              icon: h(EditIcon, { size: 15 }),
-              title: "লেবেল ম্যানেজ",
-              hint: "নাম বদল/লুকান/নতুন",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout),
-              onClick: () => { onOpenFieldManager(); }
-            }),
-            onOpenTazkirah && h(MenuRow, {
-              icon: h(BookIcon, { size: 15 }),
-              title: "তাযকিরাহ ম্যানেজ",
-              hint: "নিজের বাণী যোগ/লুকান",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager),
-              onClick: () => { onOpenTazkirah(); }
-            }),
-            onOpenPopupMessages && h(MenuRow, {
-              icon: h(EditIcon, { size: 15 }),
-              title: "পপআপ বার্তা সম্পাদনা",
-              hint: "শুধু অ্যাপ ক্রিয়েটর",
-              showDivider: !!(onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah),
-              onClick: () => { onOpenPopupMessages(); }
-            })
+            { className: "grid grid-cols-4 gap-2" },
+            onOpenHomeLayout && h(MenuTile, { icon: h(HomeIcon, { size: 17 }), title: "হোম", label: "হোম কাস্টমাইজ", onClick: () => { onOpenHomeLayout(); } }),
+            onOpenPrayerLayout && h(MenuTile, { icon: h(ClockIcon, { size: 17 }), title: "সময়সূচি", label: "সময়সূচি কাস্টমাইজ", onClick: () => { onOpenPrayerLayout(); } }),
+            onOpenAmolLayout && h(MenuTile, { icon: h(BookIcon, { size: 17 }), title: "আমল", label: "আমল কাস্টমাইজ", onClick: () => { onOpenAmolLayout(); } }),
+            onOpenToolsLayout && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "সহায়িকা", label: "সহায়িকা কাস্টমাইজ", onClick: () => { onOpenToolsLayout(); } }),
+            onOpenFieldManager && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "লেবেল", label: "লেবেল ম্যানেজ (নাম বদল/লুকান/নতুন)", onClick: () => { onOpenFieldManager(); } }),
+            onOpenTazkirah && h(MenuTile, { icon: h(BookIcon, { size: 17 }), title: "তাযকিরাহ", label: "তাযকিরাহ ম্যানেজ (নিজের বাণী)", onClick: () => { onOpenTazkirah(); } }),
+            onOpenPopupMessages && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "পপআপ বার্তা", label: "পপআপ বার্তা সম্পাদনা (শুধু অ্যাপ ক্রিয়েটর)", onClick: () => { onOpenPopupMessages(); } })
           ),
-          // ৫) ফিডব্যাক
-          h(
-            "div",
-            { className: CARD, style: CARD_STYLE },
-            h(MenuRow, {
-              icon: h(MessageSquare, { size: 15 }),
-              title: "আমাদের জানান",
-              hint: "পরামর্শ বা সমস্যা",
-              accent: true,
-              showDivider: false,
-              onClick: () => { setShowFeedbackModal(true); }
-            })
-          ),
+          // ৫) ফিডব্যাক(লেখা ক্রিয়েটর-সম্পাদনযোগ্য)
+          h(FeedbackRow, { onOpen: () => { setShowFeedbackModal(true); } }),
           // ৬) চেহারা: ডিসপ্লে মোড + থিম কালার(app.js-এর themeColorPickerEl)
           themeColorPickerEl
         )
