@@ -180,32 +180,32 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
           </div>
 
           <div className={cardBox} style={cardStyle}>
-            {r.weekdayValid >= 3 && (
+            {(
               <div className="flex bg-slate-100 rounded-full p-0.5 mb-2" role="tablist">
                 {[["week", "📈 সপ্তাহ অনুযায়ী"], ["day", "🗓️ বার অনুযায়ী"]].map(([k, l]) => (
                   <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={"flex-1 text-[13px] font-bold py-1.5 rounded-full " + (tab === k ? "bg-emerald-900 text-white" : "text-slate-500")}>{l}</button>
                 ))}
               </div>
             )}
-            {(tab === "week" || r.weekdayValid < 3) ? (
+            {tab === "week" ? (
               <div>
             {r.weeks.filter(w => w.avg !== null).length < 2 ? (
               <div className="flex items-center gap-2 flex-wrap text-sm">
-                {r.weekdayValid < 3 && <span className="font-bold text-slate-800">📈 {T.trendTitle}</span>}
+                
                 {r.weeks.filter(w => w.avg !== null).map(w => (
                   <span key={w.week} className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBEFC4", color: "#7A5A00" }}>{T.weekShort.replace("{n}", toBn(w.week))} · {toBn(w.avg)}%</span>
                 ))}
               </div>
             ) : (
               <>
-                {r.weekdayValid < 3 && <SectionTitle>📈 {T.trendTitle}</SectionTitle>}
-                <TrendChart weeks={r.weeks} toBn={toBn} />
+                                <TrendChart weeks={r.weeks} toBn={toBn} />
               </>
             )}
               </div>
             ) : (
               <div>
-                <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
+                {r.weekdayValid < 3 && <p className="text-sm text-slate-500 py-2">{T.weekdayNeedMore}</p>}
+                {r.weekdayValid >= 3 && <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />}
                 {r.weakest.length > 0 && (
                   <p className="text-sm rounded-xl p-2 mt-2" style={{ background: "#FDEFE3", color: "#9A3412" }}>
                     {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
