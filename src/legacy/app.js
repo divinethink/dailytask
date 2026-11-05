@@ -1463,16 +1463,6 @@ function App() {
     setTazkirahData(next);
   }
   const selectedMember = useMemo(() => (members || []).find(m => m.id === selectedId) || null, [members, selectedId]);
-  // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান(ফলব্যাক), অন্যদের ডিফল্ট।
-  const designSrc = (() => {
-    const legacy = (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember : null;
-    const d = design || {};
-    return {
-      homeLayout: d.homeLayout || (legacy ? legacy.homeLayout : undefined),
-      prayerLayout: d.prayerLayout || (legacy ? legacy.prayerLayout : undefined),
-      tabLayout: d.tabLayout || (legacy ? legacy.tabLayout : undefined)
-    };
-  })();
   // True when this member has been claimed ("দায়িত্ব নিন") by a different
   // Firebase Auth uid than the one this device is currently signed in as.
   // Unclaimed members (ownerUid null) are editable by anyone — that's the
@@ -1484,6 +1474,17 @@ function App() {
   // নাহলে পুরনো ownerUids array — কোনো ডেটা/schema পরিবর্তন হয়নি, শুধু
   // client-side compatibility shim(২_৪_১ §৬-এর dual-check নীতি অনুযায়ী)।
   const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : ((m && m.ownerUids) || []);
+  // (memberOwnerUids-এর নিচে রাখা জরুরি — const, আগে ডাকলে ReferenceError)
+  // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান(ফলব্যাক), অন্যদের ডিফল্ট।
+  const designSrc = (() => {
+    const legacy = (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember : null;
+    const d = design || {};
+    return {
+      homeLayout: d.homeLayout || (legacy ? legacy.homeLayout : undefined),
+      prayerLayout: d.prayerLayout || (legacy ? legacy.prayerLayout : undefined),
+      tabLayout: d.tabLayout || (legacy ? legacy.tabLayout : undefined)
+    };
+  })();
   const isLockedForThisDevice = !!(selectedMember && memberOwnerUids(selectedMember).length && (!auth.currentUser || !memberOwnerUids(selectedMember).includes(auth.currentUser.uid)));
   // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
   // (approved design) is the real safety boundary; this is purely UX so the
