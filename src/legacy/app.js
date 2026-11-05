@@ -3538,8 +3538,10 @@ function linkGoogleAccount() {
 function unlinkGoogleAccount() {
   return unlink(authModular.currentUser, "google.com");
 }
+// Anonymous sign-in এখন Firebase Console-এ বন্ধ — তাই sign-out-এর পর নতুন
+// anonymous uid তৈরি করা হয় না; পরের বুটে ব্যবহারকারী guest mode-এ যায়।
 function signOutToFreshAnonymous() {
-  return signOut(authModular).then(() => signInAnonymously(authModular));
+  return signOut(authModular);
 }
 
 // =====================================================================
