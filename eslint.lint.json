@@ -25,7 +25,8 @@
         "args": "none",
         "caughtErrors": "none",
         "varsIgnorePattern": "^_",
-        "destructuredArrayIgnorePattern": "^_"
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true
       }
     ],
     "jsx-no-undef-local": "error"
