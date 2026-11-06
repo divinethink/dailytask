@@ -3,7 +3,7 @@
 // ভিতরে প্রথম prominent item হিসেবে সরাসরি inline render হয়(3_3 §৬ mockup অনুযায়ী)।
 // বাকি ৬টা item — সব কয়টাই এখন নিজস্ব component-এ wire করা(✏️-ট্যাগড item-গুলো
 // EditableSection.jsx/RotatingCard.jsx reuse করে)। "দৈনিক আমল-চ্যালেঞ্জ" টাইল গ্রিড থেকে সরানো
-// হয়েছে(১৯ সেপ্টেম্বর ২০২৬, owner-decision, ৩+৩ ব্যালেন্সের জন্য) — DailyAmolChallenge.jsx ফাইল অক্ষুণ্ণ। কোনো checklist/completion-state
+// হয়েছে(১৯ সেপ্টেম্বর ২০২৬, owner-decision, ৩+৩ ব্যালেন্সের জন্য)। কোনো checklist/completion-state
 // এই ফাইলে নেই(3_1-এর Core Decision)।
 // React global(window.React, globals.js)।
 

@@ -6,7 +6,7 @@ import { REVIEW_TEXT } from "../legacy/reviewText.js";
 import { buildTrend } from "../legacy/reviewTrend.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
-import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS, dateKey } from "../legacy/appHelpers.js";
+import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
 import { ChevronDown } from "./icons.jsx";
 import { MonthPillNav } from "./MonthPillNav.jsx";
@@ -75,15 +75,12 @@ function monthTag(months, BN_MONTHS, toBn) {
   return nm(a) + "–" + nm(c);
 }
 
-export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, tomorrowKey, onSetFocus, toBn, BN_MONTHS }) {
+export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {
   const { year, month0 } = monthCursor;
   const [open, setOpen] = useState(fold === "open" || fold === "fixed");
   const [data, setData] = useState({ key: null, status: "idle", entries: [null, null] }); // idle | loading | ready | error
   const loadedKey = useRef(null);
   const [showAll, setShowAll] = useState(false); // সারির বিস্তারিত তালিকা, ডিফল্টে বন্ধ
-  const [focusBusy, setFocusBusy] = useState(null); // যে আমলের ফোকাস সেভ চলছে
-  const [focusSet, setFocusSet] = useState(null); // এই সেশনে যেটা ফোকাসে রাখা হয়েছে
-  const [focusErr, setFocusErr] = useState(false);
   const key = memberId + "|" + year + "|" + month0;
 
   // আগের দুই মাস: কার্ড খুললে, এবং সদস্য/মাস বদলালে। একই key-তে বন্ধ-খোলায় আবার পড়ে না।
@@ -111,26 +108,6 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
     member, allFields, fieldApplies, isExcused, isFieldExcusable, ratioOf: fieldRatioToday,
     dailyScoreOf: dailyScore ? (e => dailyScore(e, member, allFields)) : undefined
   }), [member, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore]);
-
-  // ফোকাস মানে "কাল"-এর জন্য; তাই শুধু চলতি মাস দেখার সময় বোতাম। আগের মাস দেখলে শুধু পড়া।
-  const nowD = new Date();
-  const tomorrowKeyNow = dateKey(new Date(nowD.getTime() + 86400000)); // প্রতি রেন্ডারে নতুন, রাত ১২টার পরও ঠিক
-  const canFocus = !!onSetFocus && nowD.getFullYear() === year && nowD.getMonth() === month0;
-  const stored = member && member.tomorrowFocus;
-  const currentFocusKey = focusSet || (stored && stored.targetDateKey === tomorrowKeyNow ? stored.fieldKey : null);
-  async function putFocus(fieldKey) {
-    if (focusBusy) return; // দুইবার চাপলে একবারই
-    setFocusBusy(fieldKey);
-    setFocusErr(false);
-    try {
-      await onSetFocus({ fieldKey, targetDateKey: tomorrowKeyNow, source: "manual" });
-      setFocusSet(fieldKey);
-    } catch (err) {
-      setFocusErr(true);
-    } finally {
-      setFocusBusy(null);
-    }
-  }
 
   const fresh = data.key === key && (data.status === "ready" || data.status === "error");
   const trend = useMemo(() => {
@@ -171,7 +148,6 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
     otherSections.unshift({ ...qs, rows: rowsFirst });
   }
   const otherCount = otherSections.reduce((n, sec) => n + sec.rows.length, 0);
-  const lowest = trend && trend.ok ? trend.attention[0] || null : null;
 
   let body = null;
   if (open) {

@@ -1,5 +1,5 @@
 import { dbModular, authModular, authModular as auth, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
-import { GoogleAuthProvider, signOut, signInAnonymously, signInWithPopup, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
+import { GoogleAuthProvider, signOut, signInWithPopup, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
 import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, writeBatch, increment, arrayUnion, arrayRemove, collection, orderBy, limit } from "firebase/firestore";
 import {
   FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
@@ -43,7 +43,7 @@ import {
   migrateMembersIfNeeded,
   loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadTazkirahCustom, saveTazkirahCustom, loadEntry, saveEntry, entryDocId, pushEntryHistory,
   fetchEntryHistory,
-  updateBestScoreIfNeeded, saveTomorrowFocus, saveHomeLayout, savePrayerLayout, saveTabLayout, saveCustomTasks
+  updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks
 } from "./memberData.js";
 import {
   isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
@@ -2519,28 +2519,12 @@ function App() {
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
   // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
   async function handleFullLogout() {
-    const wasGoogleLinked = isGoogleLinked();
     const ok = window.confirm("লগ আউট করবেন নিশ্চিত?");
     if (!ok) return;
     try {
-      if (wasGoogleLinked) {
-        // Google-linked অবস্থায় fresh anonymous uid তৈরি করলে পুরনো
-        // uid-এর সাথে ownership/admin-role সম্পর্ক ছিন্ন হয়ে যায়(lockout
-        // risk)। তাই এখানে শুধু sign-out করা হচ্ছে, নতুন anonymous uid
-        // তৈরি করা হচ্ছে না — একটি flag রেখে দেওয়া হচ্ছে যাতে পরের বুটে
-        // Google re-auth gate দেখানো হয়(signInWithPopup একই পুরনো uid
-        // ফিরিয়ে দেবে, continuity বজায় থাকবে)।
-        try {
-          localStorage.setItem("dt_pending_google_reauth", "1");
-        } catch {}
-        await signOut(authModular);
-      } else {
-        await signOutToFreshAnonymous();
-      }
+      // Anonymous sign-in বন্ধ — নতুন পরিচয় তৈরি হয় না; reload-এর পর guest mode।
+      await signOut(authModular);
     } catch (err) {
-      try {
-        localStorage.removeItem("dt_pending_google_reauth");
-      } catch {}
       alert("লগআউট করতে সমস্যা হয়েছে: " + err.message);
       return;
     }
@@ -2578,7 +2562,7 @@ function App() {
   }
   async function handleDeleteGoogleAccount() {
     try {
-      // একই কারণে এখানেও অতিরিক্ত signOutToFreshAnonymous() কল বাদ দেওয়া
+      // এখানে অতিরিক্ত নতুন পরিচয় তৈরি করা হয় না
       // হয়েছে — unlinkGoogleAccount() একাই যথেষ্ট এবং একই ডিভাইস uid
       // বজায় রাখে, তাই সদস্যদের এডিট-অধিকার অক্ষুণ্ণ থাকে।
       await unlinkGoogleAccount();
@@ -3439,8 +3423,6 @@ function App() {
     isExcused: isExcused,
     isFieldExcusable: isFieldExcusable,
     dailyScore: dailyScore,
-    tomorrowKey: tomorrowKey,
-    onSetFocus: (focus) => saveTomorrowFocus(migrationState, selectedId, focus),
     toBn: toBn,
     BN_MONTHS: BN_MONTHS
   })),
@@ -3593,11 +3575,6 @@ function linkGoogleAccount() {
 function unlinkGoogleAccount() {
   return unlink(authModular.currentUser, "google.com");
 }
-// Anonymous sign-in এখন Firebase Console-এ বন্ধ — তাই sign-out-এর পর নতুন
-// anonymous uid তৈরি করা হয় না; পরের বুটে ব্যবহারকারী guest mode-এ যায়।
-function signOutToFreshAnonymous() {
-  return signOut(authModular);
-}
 
 // =====================================================================
 // --- Onboarding (নতুন/Incognito device — Analyze→Plan approved, ---
@@ -3647,76 +3624,6 @@ function bootOnce() {
   appMounted = true;
   mountApp();
 }
-// Wait for Firebase to report the REAL restored session (anonymous,
-// Google-linked, or none) before deciding whether a fresh anonymous
-// sign-in is needed. The old code called signInAnonymously()
-// unconditionally, in parallel with this restore — if it ran before the
-// persisted (possibly Google-linked) user had finished loading, it could
-// create a brand-new anonymous identity and silently throw away the link,
-// which is exactly the "picked my Google account, it came back looking
-// like before" symptom. Now we only sign in anonymously if, after
-// Firebase reports its true state, there is genuinely no user yet.
-// Google-linked Full Logout একটি "pending re-auth" flag রেখে যায়(uid
-// continuity রক্ষার জন্য fresh anonymous sign-in ইচ্ছাকৃতভাবে skip করা
-// হয়েছে ওই flow-এ)। সেই flag থাকলে auto-anonymous sign-in না করে একটি
-// ছোট gate দেখানো হয় — কারণ signInWithPopup() ব্যবহারকারীর click ছাড়া
-// (page-load-এ automatic) ব্রাউজার popup-blocker আটকে দেয়। Gate-এ ব্যর্থ/
-// বাতিল হলে "Family Code দিয়ে চালিয়ে যান" বাটন স্বাভাবিক anonymous flow-এ
-// পড়ে — কোনো loop নেই, non-Google flow সম্পূর্ণ অপরিবর্তিত।
-function renderPendingGoogleReauthGate() {
-  const container = document.getElementById("root");
-  const root = ReactDOM.createRoot(container);
-  function GoogleReauthGate() {
-    const [busy, setBusy] = useState(false);
-    const [err, setErr] = useState(null);
-    function proceedAnonymous() {
-      setBusy(true);
-      signInAnonymously(authModular).catch(e => {
-        console.error("Anonymous sign-in failed:", e);
-      }).finally(() => {
-        // mountApp() নিজে আবার এই একই #root container-এ createRoot()
-        // করবে — তার আগে এই gate-এর root unmount করা জরুরি, নাহলে React
-        // "already has a root" warning দেয়(duplicate root)।
-        root.unmount();
-        bootOnce();
-      });
-    }
-    function handleGoogleClick() {
-      setBusy(true);
-      setErr(null);
-      signInWithPopup(authModular, googleProvider).then(() => {
-        root.unmount();
-        bootOnce();
-      }).catch(e => {
-        setBusy(false);
-        if (!(e && e.code === "auth/popup-closed-by-user")) {
-          setErr("Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন, অথবা Family Username দিয়ে চালিয়ে যান।");
-        }
-      });
-    }
-    function handleFallbackClick() {
-      proceedAnonymous();
-    }
-    return /*#__PURE__*/React.createElement("div", {
-      className: "min-h-screen flex flex-col items-center justify-center bg-[#F4F7F1] px-6 text-center gap-4"
-    }, /*#__PURE__*/React.createElement("p", {
-      className: "text-base font-medium text-slate-700 max-w-xs leading-relaxed"
-    }, "আপনি লগ আউট হয়েছেন"), err && /*#__PURE__*/React.createElement("p", {
-      className: "text-sm font-medium text-red-600 max-w-xs"
-    }, err), /*#__PURE__*/React.createElement("button", {
-      onClick: handleGoogleClick,
-      disabled: busy,
-      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60",
-      style: { borderColor: "#1D7A68", color: "#1D7A68" }
-    }, busy ? /*#__PURE__*/React.createElement(Loader2, { className: "animate-spin", size: 14 }) : null, "Google দিয়ে সাইন-ইন করুন"), /*#__PURE__*/React.createElement("button", {
-      onClick: handleFallbackClick,
-      disabled: busy,
-      className: "w-full max-w-xs h-12 px-4 rounded-2xl border-2 text-sm font-bold flex items-center justify-center disabled:opacity-60",
-      style: { background: "#FBF3E1", borderColor: "#C89B3C", color: "#8A6D2F" }
-    }, "প্রথম পেজে ফিরে আসুন"));
-  }
-  root.render(/*#__PURE__*/React.createElement(GoogleReauthGate, null));
-}
 // §Guest-mode consolidation(১২ সেপ্টেম্বর ২০২৬, owner-approved) — আগে এখানে
 // কোনো user না থাকলে renderGoogleLandingGate()(আলাদা root, আলাদা
 // component) দেখানো হতো। এখন App() নিজেই isGuestMode দিয়ে guest অবস্থা
@@ -3726,10 +3633,5 @@ function renderPendingGoogleReauthGate() {
 // unused, সেটাও সরানো হয়েছে)।
 const unsubscribeAuth = onAuthStateChanged(authModular, user => {
   unsubscribeAuth();
-  if (!user) {
-    try {
-      localStorage.removeItem("dt_pending_google_reauth");
-    } catch {}
-  }
   bootOnce();
 });
