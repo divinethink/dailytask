@@ -5,7 +5,15 @@ import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
 import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
 import { getFamilyCode, getFamilyId, getCollectionName, resolvePathContext } from "./familyIdentity.js";
 import { loadMembersV2 } from "./memberData.js";
-import { extractOwnerUidsFromMemberData } from "./legacyMigrationTools.js";
+
+// member-ডক থেকে মালিকের UID-তালিকা (backup/restore-এর ownership-detection)।
+// legacy `ownerUids` থাকলে তা; না থাকলে/খালি হলে `googleUid` fallback।
+// (আগে legacyMigrationTools.js-এ ছিল; ফাইলটি সরানোয় এখানে আনা হয়েছে — আচরণ অপরিবর্তিত।)
+function extractOwnerUidsFromMemberData(data) {
+  const arr = Array.isArray(data.ownerUids) ? data.ownerUids : [];
+  if (arr.length === 0 && data.googleUid) return [data.googleUid];
+  return arr.filter(u => typeof u === "string" && u);
+}
 
 const GOOGLE_DRIVE_CLIENT_ID = "10031644603-a8i21oh9sookntt70k3qvr29t2ns3s9h.apps.googleusercontent.com";
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
