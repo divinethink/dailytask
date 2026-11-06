@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debug</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:12px;font-size:14px}
+button{font-size:16px;padding:10px 14px;margin:4px 4px 8px 0}
+pre{white-space:pre-wrap;word-break:break-word;background:#f3f3f3;padding:10px;border-radius:8px}
+</style></head><body>
+<h3>CSP / Service Worker ডিবাগ (শুধু পড়ে, কিছু বদলায় না)</h3>
+<button id="run">১) পরীক্ষা চালান</button>
+<button id="copy">২) ফল কপি করুন</button>
+<pre id="out">"পরীক্ষা চালান" চাপুন…</pre>
+<hr>
+<p>নিচের বোতাম শুধু এই ডিভাইসের পুরনো Service Worker ও cache মোছে (ডেটা/লগইন মোছে না):</p>
+<button id="fix">৩) এই ডিভাইসের SW ও cache রিসেট</button>
+<script>
+var out=document.getElementById("out");
+function log(s){out.textContent+="\n"+s;}
+async function head(label,url){
+  try{
+    var r=await fetch(url+"?dbg="+Date.now(),{cache:"no-store"});
+    var csp=r.headers.get("content-security-policy-report-only")||"";
+    log(label+" status="+r.status);
+    log("  CSP-RO আছে: "+(csp?"হ্যাঁ":"না"));
+    log("  script-src-এ googletagmanager: "+/script-src[^;]*googletagmanager/.test(csp));
+    log("  connect-src-এ googletagmanager: "+/connect-src[^;]*googletagmanager/.test(csp));
+    log("  connect-src-এ google-analytics: "+/connect-src[^;]*google-analytics\.com/.test(csp));
+    log("  cf-cache-status: "+(r.headers.get("cf-cache-status")||"-")+" | age: "+(r.headers.get("age")||"-"));
+  }catch(e){log(label+" ব্যর্থ: "+e);}
+}
+document.getElementById("run").onclick=async function(){
+  out.textContent="ফল:";
+  log("সময়: "+new Date().toISOString());
+  log("ব্রাউজার: "+navigator.userAgent);
+  await head("PAGE /","/");
+  await head("SW /sw.js","/sw.js");
+  try{
+    var regs=await navigator.serviceWorker.getRegistrations();
+    log("SW সংখ্যা: "+regs.length);
+    regs.forEach(function(r){
+      log("  active: "+(r.active?r.active.scriptURL+" ["+r.active.state+"]":"নেই")+" | waiting: "+!!r.waiting+" | installing: "+!!r.installing);
+    });
+    log("controller আছে: "+!!navigator.serviceWorker.controller);
+    log("cache তালিকা: "+JSON.stringify(await caches.keys()));
+  }catch(e){log("SW তথ্য ব্যর্থ: "+e);}
+  log("— শেষ —");
+};
+document.getElementById("copy").onclick=function(){
+  navigator.clipboard.writeText(out.textContent).then(function(){alert("কপি হয়েছে");},function(){alert("কপি হয়নি — লেখা সিলেক্ট করে কপি করুন");});
+};
+document.getElementById("fix").onclick=async function(){
+  if(!confirm("এই ডিভাইসের Service Worker ও cache মুছবেন?"))return;
+  var regs=await navigator.serviceWorker.getRegistrations();
+  for(var i=0;i<regs.length;i++){await regs[i].unregister();}
+  var ks=await caches.keys();
+  for(var j=0;j<ks.length;j++){await caches.delete(ks[j]);}
+  alert("হয়েছে। এখন অ্যাপ পেজ খুলে দুবার রিফ্রেশ করুন।");
+};
+</script></body></html>
