@@ -78,3 +78,12 @@ test("ধাপ২: admin সদস্যের entry লিখতে পার�
 test("ধাপ২: ownerUids-only সদস্যের review ownerUids দিয়ে পড়া যায় না", async () => {
   await assertFails(getDoc(doc(as("uidOld"), "families/famA/reviews/m3_2026-11-01")));
 });
+
+// ধাপ ৩: member-ডক না থাকলে entry/weekly আর সবার জন্য খোলা নয়
+test("ধাপ৩: না-থাকা member-এর entry non-admin লিখতে পারে না", async () => {
+  await assertFails(setDoc(doc(as("uidC"), "families/famA/entries/ghost_2026-11-01"), { memberId: "ghost", x: 1 }));
+  await assertFails(setDoc(doc(as("uidC"), "families/famA/weekly/ghost_2026-11"), { memberId: "ghost", x: 1 }));
+});
+test("ধাপ৩: না-থাকা member-এর entry admin লিখতে পারে", async () => {
+  await assertSucceeds(setDoc(doc(as("uidA"), "families/famA/entries/ghost_2026-11-01"), { memberId: "ghost", x: 1 }));
+});

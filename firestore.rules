@@ -150,16 +150,15 @@ service cloud.firestore {
     // app code এই path পড়ে/লেখে না — শুধু future migration-এর জন্য rules
     // আগে থেকে প্রস্তুত রাখা হচ্ছে।
     //
-    // Phase-5 ধাপ ২: member-এর একমাত্র owner = তার googleUid। পুরনো ownerUids/
-    // ownerUid আর পড়া হয় না। member না থাকলে null(আগের আচরণ), googleUid
-    // না থাকলে/null হলে কখনো-না-মেলা sentinel — তাই শুধু admin(isAdminOfFamily
-    // OR-clause) লিখতে পারে; ফাঁকা array কখনো রিটার্ন হয় না(open-write হোল নয়)।
+    // Phase-5 ধাপ ২-৩: member-এর একমাত্র owner = তার googleUid। ownerUids/ownerUid
+    // আর পড়া হয় না। member ডক না থাকলে, googleUid না থাকলে বা null হলে কখনো-না-মেলা
+    // sentinel রিটার্ন হয় — তাই শুধু admin(isAdminOfFamily OR-clause) লিখতে পারে;
+    // null/ফাঁকা array কখনো রিটার্ন হয় না(open-write হোল নয়)।
     function currentMemberOwnerV2(familyId, docId) {
       let memberId = docId.split('_')[0];
       let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
       let m = exists(memberPath) ? get(memberPath).data : null;
-      return (m == null) ? null
-        : (('googleUid' in m) && m.googleUid != null) ? [m.googleUid]
+      return (m != null && ('googleUid' in m) && m.googleUid != null) ? [m.googleUid]
         : ['__unclaimed_no_owner__'];
     }
 
