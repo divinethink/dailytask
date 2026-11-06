@@ -48,11 +48,7 @@ function stampLastActive(batch, memberRef, familyId, uid) {
   }
   if (familyId) batch.set(doc(db, "families", familyId), { lastActiveAt: ts }, { merge: true });
 }
-// --- Device-Claim member storage (v2) — one real Firestore document per
-// member (doc id: "member:<id>") with plain top-level fields, so Firestore
-// security rules can read `ownerUid` directly (rules cannot see inside a
-// JSON-stringified "value" field, which is why v1's single array-doc
-// couldn't support per-member ownership).
+// member:<id> — প্রতিটা সদস্য একটা আলাদা Firestore ডক (সরল top-level ফিল্ড)।
 function memberDocId(id) {
   return `member:${id}`;
 }

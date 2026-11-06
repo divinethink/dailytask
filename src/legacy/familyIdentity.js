@@ -589,8 +589,7 @@ async function claimFirstAdminIfEligible(preloaded) {
         firstAdminUid: auth.currentUser.uid,
         updatedAt: Date.now()
       });
-      return true; // এই ডিভাইস/কলই সদ্য প্রথম Admin হলো — caller Recovery
-      // Key setup modal দেখাতে পারে।
+      return true; // এই ডিভাইস/কলই সদ্য প্রথম Admin হলো।
     }
   } catch {
     // Best-effort — Admin claim ব্যর্থ হলেও মূল ফিচার (Family Code set /

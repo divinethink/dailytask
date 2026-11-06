@@ -28,13 +28,6 @@ service cloud.firestore {
         : ['__unclaimed_no_owner__'];
     }
 
-    // memberId জানা থাকলে সরাসরি owner-তালিকা: শুধু googleUid(claimed হলে), নইলে []।
-    function memberOwnerUids(familyId, memberId) {
-      let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
-      let m = exists(memberPath) ? get(memberPath).data : null;
-      return (m != null && ('googleUid' in m) && m.googleUid != null) ? [m.googleUid] : [];
-    }
-
     // --- Phase C: Admin-bypass (শুধু bulk migration-এর জন্য) ---
     // request.auth.uid যদি families/<familyId>-এর adminUids array-তে থাকে,
     // তাহলে সেই ব্যক্তি migration/Copy ধাপে ownerUid-নির্বিশেষে members/
@@ -410,23 +403,6 @@ service cloud.firestore {
             || request.resource.data.adminUids.hasAny([resource.data.firstAdminUid])
             || request.auth.uid == resource.data.firstAdminUid);
 
-      // §Recovery Key — key জানা যেকোনো authenticated user নিজেকে
-      // adminUids-এ যোগ করতে পারবে, শুধু যদি সঠিক hash পাঠায়(client নিজেই
-      // entered key hash করে পাঠায় — plaintext কখনো Firestore-এ যায় না)।
-      // hidden private/recovery doc-এর সাথে get() দিয়ে compare। Rules
-      // all-or-nothing গেট — hash না মিললে পুরো write-ই reject হয়(কিছুই
-      // persist হয় না), তাই ভুল guess-এর কোনো ছাপ document-এ থাকে না।
-      // adminUids শুধু পুরনো array + ঠিক নিজের uid যোগ হতে পারবে(অন্য
-      // কিছু বদলানো/সরানো যাবে না)।
-      allow update: if request.auth != null
-        && exists(/databases/$(database)/documents/families/$(familyId)/private/recovery)
-        && request.resource.data.recoveryHashAttempt
-             == get(/databases/$(database)/documents/families/$(familyId)/private/recovery).data.hash
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminUids', 'recoveryHashAttempt', 'updatedAt'])
-        && request.resource.data.adminUids.hasAll(resource.data.adminUids)
-        && request.resource.data.adminUids.size() == resource.data.adminUids.size() + 1
-        && request.resource.data.adminUids.hasAny([request.auth.uid]);
-
       // §Phase E prep — lastActiveAt stamp (scope-সীমিত, revised):
       // Data Lifecycle Policy-এর জন্য family-level activity stamp। এই write
       // stampLastActive() থেকে member/entry write-এর *একই atomic batch*-এ
@@ -562,20 +538,20 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
 
         // Activity-stamp: saveEntry()/saveWeekly()-এর একই atomic batch-এ member-doc-এ
-        // {lastActiveAt, ownerActivity, updatedAt} merge-write হয় (memberData.js stampLastActive)।
+        // {lastActiveAt, updatedAt} merge-write হয় (memberData.js stampLastActive)।
         // এই clause না থাকলে batch-এর মূল entry/weekly write-ও ব্যর্থ হতো।
-        // শুধু claimed সদস্য (googleUid == request.auth.uid), শুধু এই ৩টা ফিল্ড।
+        // শুধু claimed সদস্য (googleUid == request.auth.uid), শুধু এই ২টা ফিল্ড।
         allow update: if request.auth != null
           && isClaimedByGoogle(familyId, memberId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'ownerActivity', 'updatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt']);
 
         // Admin-proxy activity-stamp: Admin যখন unclaimed proxy (googleUid অনুপস্থিত/null)-এর
         // হয়ে entry সেভ করেন, একই batch-এর member-doc stamp-ও অনুমোদিত হতে হবে —
-        // নইলে পুরো batch ব্যর্থ হয়। শুধু unclaimed member, একই ৩টা ফিল্ড।
+        // নইলে পুরো batch ব্যর্থ হয়। শুধু unclaimed member, একই ২টা ফিল্ড।
         allow update: if request.auth != null
           && isAdminOfFamily(familyId)
           && (!('googleUid' in resource.data) || resource.data.googleUid == null)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'ownerActivity', 'updatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt']);
 
         // --- §Motivational Layer(নতুন, চ্যাট-approved plan, দুইটা clause) ---
         // দুটোই সম্পূর্ণ additive, saveEntry()/stampLastActive()-এর কোনো
@@ -845,22 +821,6 @@ service cloud.firestore {
         allow delete: if request.auth != null && request.auth.uid == resource.data.targetUid;
       }
 
-      // --- §Recovery Key(First Admin) — hidden hash storage ---
-      // Plaintext key কখনো Firestore-এ যায় না(client-side generate+hash)।
-      // এই doc client থেকে কখনো read করা যায় না(শুধু Rules-এর ভেতরে get()
-      // দিয়ে hash compare করার জন্য ব্যবহৃত) — তাই hash কখনো leak হয় না।
-      // একবার সেট হলে immutable(update/delete সম্পূর্ণ বন্ধ) — rotation
-      // future scope, এখন প্রয়োজন নেই।
-      match /private/{docId} {
-        allow read: if false;
-        allow create: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && docId == 'recovery'
-          && request.resource.data.keys().hasOnly(['hash', 'createdAt'])
-          && request.resource.data.hash is string
-          && request.resource.data.hash.size() == 64;
-        allow update, delete: if false;
-      }
     }
 
     // --- legacy data_<code> কালেকশন (appStorage shared ডক) ---
