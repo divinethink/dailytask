@@ -59,9 +59,9 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
   // shadow-সহ) দেখা যেত। Fix: card-wrapper এখন এই component-এর ভিতরেই, তাই
   // একই null-check card-সহ পুরোটাই covers করে — কোনো blank-card সম্ভব না।
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-4"
+    className: "bg-white rounded-2xl px-4 py-3 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-3"
   },
-    /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-2 text-center" }, isToday ? "🎯 আজকের ফোকাস" : "🎯 আগামীকালের ফোকাস"),
+    editing && /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-1.5 text-center" }, isToday ? "🎯 আজকের ফোকাস" : "🎯 আগামীকালের ফোকাস"),
     editing
       ? /*#__PURE__*/React.createElement("div", { className: "flex gap-2 items-center" },
           /*#__PURE__*/React.createElement("select", {
@@ -77,11 +77,12 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
         )
       : /*#__PURE__*/React.createElement("div", { className: "flex justify-between items-center" },
           /*#__PURE__*/React.createElement("span", { className: "text-sm text-emerald-950 font-bold" },
+            /*#__PURE__*/React.createElement("span", { className: "text-slate-600 font-semibold" }, isToday ? "🎯 আজকের ফোকাস: " : "🎯 আগামীকালের ফোকাস: "),
             activeField.shortLabel || activeField.label,
             activeSource === "auto" ? " (পরামর্শ)" : ""
           ),
           /*#__PURE__*/React.createElement("button", {
-            className: "text-xs text-[#0E4B43] underline",
+            className: "text-xs text-[#0E4B43] underline py-3 -my-3 pl-3 shrink-0",
             onClick: () => { setChoice(activeFieldKey); setEditing(true); }
           }, "পরিবর্তন করুন")
         )
