@@ -27,6 +27,7 @@
         "varsIgnorePattern": "^_",
         "destructuredArrayIgnorePattern": "^_"
       }
-    ]
+    ],
+    "jsx-no-undef-local": "error"
   }
 }
