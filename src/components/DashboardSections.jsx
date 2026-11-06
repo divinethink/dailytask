@@ -84,25 +84,28 @@ const FARD_RANK_LABEL = "ফরজ আদায় (কাযা-মুক্ত
 function TierRow({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
   const color = activityTierColor(pct);
   const shown = shownPct === undefined ? pct : shownPct;
+  // সারির উচ্চতা সমান(নামের জন্য ২ লাইনের জায়গা) — যাতে পাশাপাশি দুই প্যানেলে ১ম-১ম, ২য়-২য় সারি মিলে থাকে।
   return /*#__PURE__*/React.createElement("div", {
-    className: "mb-2 last:mb-0",
+    className: "mb-2.5 last:mb-0",
     title: rankPrefix
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2"
+    className: "flex items-start gap-1.5 min-h-[2.4rem]"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0",
+    className: "w-5 h-5 mt-0.5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0",
     style: { background: color }
   }, toBn(rank)), /*#__PURE__*/React.createElement("span", {
-    className: "flex-1 min-w-0 text-sm font-bold text-slate-800 leading-snug"
-  }, labels.slice(0, MAX_LABELS_PER_TIER).join(", ")), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold text-base flex-shrink-0",
-    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
-  }, toBn(shown), "%")), /*#__PURE__*/React.createElement("div", {
-    className: "h-1.5 rounded-full bg-white/80 overflow-hidden mt-1 ml-7"
+    className: "flex-1 min-w-0 text-[13px] font-bold text-slate-800 leading-tight"
+  }, labels.slice(0, MAX_LABELS_PER_TIER).join(", "))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 h-1.5 rounded-full bg-white/80 overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-full rounded-full transition-all duration-500",
     style: { width: `${shown}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
-  })));
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-sm flex-shrink-0 w-10 text-right",
+    style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
+  }, toBn(shown), "%")));
 }
 
 // একটা প্যানেল(সর্বোচ্চ অথবা সর্বনিম্ন) — সর্বোচ্চ ৩টা distinct শতাংশ-tier(কম থাকলে ততটাই),
@@ -110,10 +113,10 @@ function TierRow({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
 function TierColumn({ heading, icon, headingColor, bg, border, tiers, rankPrefix, toBn }) {
   if (tiers.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", {
-    className: "rounded-xl px-3 py-2.5",
+    className: "rounded-xl px-2.5 py-2.5",
     style: { background: bg, border: `1px solid ${border}` }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-bold mb-2 flex items-center gap-1.5",
+    className: "text-[13px] font-bold mb-2.5 flex items-center gap-1",
     style: { color: headingColor }
   }, /*#__PURE__*/React.createElement("span", null, icon), heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
     key: t.pct + "-" + (t.shownPct === undefined ? "" : t.shownPct),
@@ -239,11 +242,11 @@ export function TopBottomActivityRanking({
   const { topTiers, bottomTiers, qazaJamaatBlock } = stats;
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-4 shadow-[0_3px_12px_-3px_rgba(30,41,59,0.12)] border border-slate-200/70 mt-4"
+    className: "mt-4"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, "📊 চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col gap-2 mb-3"
+    className: "grid grid-cols-2 gap-2 mb-3 items-start"
   }, /*#__PURE__*/React.createElement(TierColumn, {
     heading: "সর্বোচ্চ ৩ এক্টিভিটি",
     icon: "🏆",
