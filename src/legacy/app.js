@@ -47,18 +47,14 @@ if ("serviceWorker" in navigator) {
 // --- PWA Install Tracking ---
 // beforeinstallprompt fires when the browser is willing to show its own
 // "Add to Home Screen" prompt — we don't build a custom install button here,
-// just record that the prompt became available and keep a reference in case
-// a future UI wants to trigger it manually.
-let deferredInstallPrompt = null;
-window.addEventListener("beforeinstallprompt", e => {
-  deferredInstallPrompt = e;
+// just record that the prompt became available (analytics only).
+window.addEventListener("beforeinstallprompt", () => {
   logAnalyticsEvent("pwa_install_prompt_shown");
 });
 // appinstalled fires once the user actually completes installation
 // (regardless of whether it was via the browser's own prompt or an OS-level
 // "Add to Home Screen" flow) — this is the actual install-count signal.
 window.addEventListener("appinstalled", () => {
-  deferredInstallPrompt = null;
   logAnalyticsEvent("pwa_installed");
   setDoc(doc(dbModular, "app_stats", "pwa_installs"), {
     count: increment(1),

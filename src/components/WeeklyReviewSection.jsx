@@ -2,14 +2,12 @@
 // ডেটা: families/<id>/reviews (শুধু মালিক, firestore.rules)। বদ্ধ ঘর শুধু এই কম্পোনেন্টের state-এ থাকে,
 // কোথাও সেভ/লগ হয় না; সপ্তাহ বদলালে বা পাতা ছাড়লে মুছে যায়।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
-import { MonthPillNav } from "./MonthPillNav.jsx";
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk } from "../legacy/reviewSchema.js";
 import { weeklyGap, countFieldTotal, weekGlance } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
-import { ChevronDown } from "./icons.jsx";
 
 const { useState, useEffect, useMemo } = React;
 
@@ -17,15 +15,6 @@ const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emeral
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
 const G = T.glance;
 const GLANCE_BG = "linear-gradient(135deg,#1F4D44,#2D6A5C)";
-function GlanceCell({ label, value, sub }) {
-  return (
-    <div className="rounded-lg px-1.5 py-2 text-center min-w-0" style={{ background: "rgba(255,255,255,0.12)" }}>
-      <div className="text-[11px] opacity-90 leading-tight">{label}</div>
-      <div className="text-[17px] font-bold leading-tight mt-1 break-words">{value}</div>
-      <div className="text-[11px] opacity-90 leading-tight mt-0.5 min-h-[14px]">{sub}</div>
-    </div>
-  );
-}
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
 export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {

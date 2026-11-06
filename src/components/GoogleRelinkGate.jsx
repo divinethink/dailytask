@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { authModular as auth } from "../legacy/firebaseConfig.js";
 import { getRelinkFlag, hasGoogleProvider, linkGoogleAccountNow, loadUserMapping } from "../legacy/googleIdentity.js";
-import { GoogleGIcon } from "./icons.jsx";
 import { oldEmailFromFlag, RELINK_FLAG } from "../legacy/googleAccountChange.js";
 
 const TEXT = {

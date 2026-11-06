@@ -8,8 +8,6 @@ import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
-import { ChevronDown } from "./icons.jsx";
-import { MonthPillNav } from "./MonthPillNav.jsx";
 
 const T = REVIEW_TEXT.trend;
 const { useState, useEffect, useMemo, useRef } = React;
@@ -34,40 +32,8 @@ const ARROW = {
   flat: { ch: "→", color: "#8A9A8F", label: T.flat }
 };
 
-function Pill({ v, monthName, toBn }) {
-  const tier = v ? v.tier : "none";
-  const text = v ? toBn(v.pct) + "%" : T.noValue;
-  return (
-    <span
-      className="w-11 shrink-0 text-center text-xs font-bold rounded-full py-1"
-      style={TIER_STYLE[tier]}
-      aria-label={monthName + " " + (v ? toBn(v.pct) + "%" : T.legend.none)}
-    >
-      {text}
-    </span>
-  );
-}
-
 // প্রথমে দেখানো মূল ৮টি আমল (এই ক্রমে); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
 const KEY_ORDER = ["fardPrayers", "jamaat", "exercise", "healthyFood", "noLyingBackbitingPride", "dawah", "earlyMorning"];
-
-function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
-  const ar = r.dir ? ARROW[r.dir] : null;
-  return (
-    <div className="flex items-center gap-1 py-2.5 border-b border-dashed border-slate-200">
-      <div className="flex-1 min-w-0 pr-1">
-        <div className="font-bold text-sm text-slate-800 leading-snug">{r.label}</div>
-        {comment && <div className="text-xs text-slate-500 leading-snug">{comment}</div>}
-      </div>
-      {r.vals.map((v, i) => (
-        <Pill key={i} v={v} monthName={BN_MONTHS[months[i].month0]} toBn={toBn} />
-      ))}
-      <span className="w-4 shrink-0 text-center font-bold" style={{ color: ar ? ar.color : "transparent" }} aria-label={ar ? ar.label : undefined}>
-        {ar ? ar.ch : ""}
-      </span>
-    </div>
-  );
-}
 
 function monthTag(months, BN_MONTHS, toBn) {
   const a = months[0], c = months[2];

@@ -3,7 +3,6 @@
 // একবার one-shot পড়া; সাপ্তাহিক লক্ষ্যের ফল = নিজের reviews (শুধু মালিক, id ধরে ≤৫টা get)।
 // "সভায় পাঠান": শুধু আমলের হিসাব থেকে তৈরি সিদ্ধান্ত, সম্পাদনাযোগ্য; ব্যক্তিগত মুহাসাবার লেখা কখনো যায় না।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
-import { MonthPillNav } from "./MonthPillNav.jsx";
 import { REVIEW_TEXT } from "../legacy/reviewText.js";
 import { chunkCount, chunkRange, chunkWeekKey } from "../legacy/reviewSchema.js";
 import { buildMonthlyReport, goalSummary, suggestDecisions, elapsedDays, prevMonthOf, fill } from "../legacy/reviewMonthly.js";
@@ -11,7 +10,6 @@ import { loadReviewsForWeeks } from "../legacy/reviewData.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
-import { ChevronDown } from "./icons.jsx";
 
 const T = REVIEW_TEXT.monthly;
 const { useState, useEffect, useMemo } = React;
@@ -19,54 +17,6 @@ const { useState, useEffect, useMemo } = React;
 const GOAL_ICON = { done: "✅", partial: "🟡", none: "❌" };
 const cardBox = "rounded-2xl bg-white p-3 mb-2";
 const cardStyle = { border: "1px solid #EADFBE" };
-
-function SectionTitle({ children }) {
-  return <h3 className="font-bold text-sm text-slate-800 mb-2">{children}</h3>;
-}
-
-// সপ্তাহ-ভিত্তিক গড়ের রেখা। কমপক্ষে একটা সপ্তাহে ডেটা থাকলে আঁকা হয়; ১টা হলে শুধু বিন্দু।
-function TrendChart({ weeks, toBn }) {
-  const W = 300, H = 118, padX = 30, top = 28, bottom = 86;
-  const n = weeks.length;
-  const x = i => (n === 1 ? W / 2 : padX + (i * (W - 2 * padX)) / (n - 1));
-  const y = v => bottom - (v / 100) * (bottom - top);
-  const pts = weeks.map((w, i) => (w.avg === null ? null : [x(i), y(w.avg)]));
-  const real = pts.filter(Boolean);
-  const label = weeks.filter(w => w.avg !== null).map(w => T.weekShort.replace("{n}", toBn(w.week)) + " " + toBn(w.avg) + "%").join(", ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={label}>
-      <line x1={padX - 14} y1={bottom + 6} x2={W - padX + 14} y2={bottom + 6} stroke="#E2E8F0" strokeWidth="1" />
-      {real.length > 1 && <polyline points={real.map(p => p.join(",")).join(" ")} fill="none" stroke="#1F4D44" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
-      {weeks.map((w, i) => pts[i] && (
-        <g key={w.week}>
-          <circle cx={pts[i][0]} cy={pts[i][1]} r="5" fill="#fff" stroke="#C89B3C" strokeWidth="3" />
-          <text x={pts[i][0]} y={pts[i][1] - 11} textAnchor="middle" fontSize="12" fontWeight="700" fill="#334155">{toBn(w.avg)}%</text>
-        </g>
-      ))}
-      {weeks.map((w, i) => (
-        <text key={"l" + w.week} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#64748B">{T.weekShort.replace("{n}", toBn(w.week))}</text>
-      ))}
-    </svg>
-  );
-}
-
-function WeekdayBars({ avgs, weakest, names, toBn }) {
-  return (
-    <div className="flex items-end gap-1.5" style={{ height: 76 }}>
-      {avgs.map(a => {
-        const weak = weakest.includes(a.weekday);
-        const hgt = a.avg === null ? 4 : Math.max(6, Math.round(a.avg * 0.5));
-        return (
-          <div key={a.weekday} className="flex-1 flex flex-col items-center justify-end">
-            <span className="text-[10px] text-slate-500 mb-0.5">{a.avg === null ? "" : toBn(a.avg)}</span>
-            <div className="w-full rounded-t-lg" style={{ height: hgt, background: a.avg === null ? "#E2E8F0" : weak ? "#E39A5B" : "#7FB89C" }} />
-            <span className={"text-xs mt-1 " + (weak ? "font-bold text-orange-700" : "text-slate-600")}>{names[a.weekday]}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function MonthlyReportSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS, BN_WEEKDAYS, onSendToMeeting }) {
   const { year, month0 } = monthCursor;
