@@ -7,7 +7,6 @@ export const JAMAAT_KEY = "dt_pt_jamaat";
 export const JAMAAT_KEYS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 export const JAMAAT_LABEL = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা", jumuah: "জুমা" };
 export const BASES = { start: "ওয়াক্ত শুরু", sunrise: "সূর্যোদয়", sunset: "সূর্যাস্ত" };
-export const ROUND_STEPS = [0, 5];
 const STALE_DAYS = 35; // মসজিদ সাধারণত ঋতুতে/মাসে সময় বদলায় — এর বেশি পুরনো হলে মিলিয়ে নিতে বলা হয়
 
 // Edit-ফর্মের শুরুর পরামর্শ(বাইতুল আমান জামে মসজিদ বোর্ড, ২ নভেম্বর ২০২৬ থেকে)। সংরক্ষণের আগে কিছুই সেভ হয় না।

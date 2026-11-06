@@ -184,31 +184,6 @@ function formatHijriDate(date) {
   return `${toBn(h.day)} ${h.month} ${toBn(h.year)}`;
 }
 
-// প্রিমিয়াম countdown-banner-এর পেছনে সাজসজ্জামূলক মসজিদ-সিলুয়েট(pure inline
-// SVG vector — কোনো image asset না, app-এর "হালকা/দ্রুত" নীতি অক্ষুণ্ণ রাখতে)।
-function MosqueSilhouette() {
-  return /*#__PURE__*/React.createElement(
-    "svg",
-    {
-      viewBox: "0 0 400 160",
-      preserveAspectRatio: "xMaxYMax slice",
-      className: "absolute inset-0 w-full h-full pointer-events-none",
-      style: { opacity: 0.16 },
-      "aria-hidden": "true",
-    },
-    /*#__PURE__*/React.createElement("circle", { cx: 356, cy: 26, r: 2.5, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("circle", { cx: 312, cy: 14, r: 1.8, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("circle", { cx: 268, cy: 34, r: 1.8, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("rect", { x: 226, y: 64, width: 7, height: 96, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("circle", { cx: 229.5, cy: 60, r: 5.5, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("rect", { x: 372, y: 74, width: 7, height: 86, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("circle", { cx: 375.5, cy: 70, r: 5.5, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("path", { d: "M258,160 L258,112 Q258,72 300,72 Q342,72 342,112 L342,160 Z", fill: "#fff" }),
-    /*#__PURE__*/React.createElement("circle", { cx: 300, cy: 64, r: 4, fill: "#fff" }),
-    /*#__PURE__*/React.createElement("rect", { x: 292, y: 54, width: 3, height: 12, fill: "#fff" })
-  );
-}
-
 // §লোকেশন-রো vs GPS-পিল — আলাদা icon(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬): আগে
 // দুই জায়গাতেই একই 📍 emoji ছিল, বিভ্রান্তিকর। এখন GPS-পিলে crosshair/target(GpsIcon)
 // ও এলাকা-রো-তে classic map-pin/teardrop(PinIcon) — দুটো visually স্পষ্ট আলাদা।
@@ -281,7 +256,6 @@ const WAQT_CHIP = {
 };
 
 // ("পরবর্তী ওয়াক্ত + আমল" কার্ড হোম-ট্যাবে সরানো হয়েছে — components/WaqtAmalCard.jsx)
-const WAQT_TIME_COLOR = { fajr: "#185FA5", dhuhr: "#0E4B43", asr: "#B3610E", maghrib: "#B23A25", isha: "#4B4FA8" };
 const OTHER_ITEMS = [
   { k: "tahajjud", label: "তাহাজ্জুদ", color: "#4B4FA8" },
   { k: "ishraq", label: "ইশরাক", color: "#B3610E" },

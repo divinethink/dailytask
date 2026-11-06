@@ -3,8 +3,8 @@
 // mapping, isGoogleLinked() (moved here from app.js boot-section — needed
 // by both this file ও memberData.js, single source of truth).
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, query, where, documentId, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { FAMILY_CODE_CHARS, generateSecureCode } from "./appHelpers.js";
+import { collection, doc, getDoc, getDocs, query, where, documentId, setDoc, updateDoc, deleteDoc, runTransaction } from "firebase/firestore";
+import { generateSecureCode } from "./appHelpers.js";
 // §২.৪ Identity Simplification — Sign Up(§২.১) নতুন Google-only family
 // creation path-এর জন্য(নিচে createNewFamilyGoogleOnly)। শুধু এই একটা
 // helper import করা হচ্ছে, পুরনো createNewFamily()/কোনো existing flow

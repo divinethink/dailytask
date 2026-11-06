@@ -1,5 +1,5 @@
-// A4 G3+G5 — Family Code Lifecycle (Choice/Create/Join/Rename) modals + Access
-// Requests modal, extracted verbatim from legacy App(). Structural-only (Owner
+// A4 G3+G5 — Family Code Lifecycle (Choice/Create/Join/Rename) modals,
+// extracted verbatim from legacy App(). Structural-only (Owner
 // Rule 2): original show*/setShow* state becomes {show, onClose} props (state
 // ownership stays in App()); all other state/handlers/constants passed through
 // as props exactly as referenced before. JSX body unchanged.
@@ -253,51 +253,4 @@ export function RenameFamilyCodeModal({
     disabled: renameFamCodeBusy,
     className: "w-full py-2 rounded-xl text-sm font-bold bg-[#C89B3C] text-[#16302B]"
   }, "বন্ধ করুন")));
-}
-
-export function AccessRequestsModal({
-  show,
-  onClose,
-  loadingAccessRequests,
-  pendingAccessRequests,
-  decideAccessRequest
-}) {
-  return show && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold text-sm text-slate-800"
-  }, "প্রবেশাধিকার অনুরোধ"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => onClose()
-  }, /*#__PURE__*/React.createElement(X, {
-    size: 18,
-    className: "text-slate-400"
-  }))), loadingAccessRequests ? /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-center py-6"
-  }, /*#__PURE__*/React.createElement(Loader2, {
-    className: "animate-spin",
-    size: 20,
-    color: "var(--theme-primary)"
-  })) : pendingAccessRequests.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 py-3 text-center"
-  }, "কোনো পেন্ডিং অনুরোধ নেই।") : /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2 max-h-72 overflow-y-auto"
-  }, pendingAccessRequests.map(r => /*#__PURE__*/React.createElement("div", {
-    key: r.id,
-    className: "flex items-center justify-between gap-2 border border-slate-100 rounded-xl px-3 py-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-slate-600 truncate",
-    title: r.id
-  }, r.id.slice(0, 10) + "…"), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-1.5 shrink-0"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => decideAccessRequest(r.id, "approved"),
-    className: "px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-700 text-white"
-  }, "অনুমোদন"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => decideAccessRequest(r.id, "denied"),
-    className: "px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200 text-slate-600"
-  }, "প্রত্যাখ্যান")))))));
 }

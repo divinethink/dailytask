@@ -124,32 +124,3 @@ export const PRAYER_CARD_DEFS = [
   { id: "waqt", title: "চলমান সালাত" },
   { id: "jamaat", title: "মসজিদের জামায়াত" }
 ];
-export function defaultPrayerOrder() {
-  return PRAYER_CARD_DEFS.map(x => x.id);
-}
-export function sanitizePrayerOrder(raw) {
-  const known = new Set(defaultPrayerOrder());
-  const seen = new Set();
-  const out = [];
-  if (Array.isArray(raw)) {
-    for (const id of raw.slice(0, 20)) {
-      if (typeof id !== "string" || !known.has(id) || seen.has(id)) continue;
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  for (const id of defaultPrayerOrder()) if (!seen.has(id)) out.push(id);
-  return out;
-}
-export function prayerCardTitle(id) {
-  const f = PRAYER_CARD_DEFS.find(x => x.id === id);
-  return f ? f.title : id;
-}
-export function movePrayerId(list, id, dir) {
-  const i = list.indexOf(id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= list.length) return [...list];
-  const next = [...list];
-  [next[i], next[j]] = [next[j], next[i]];
-  return next;
-}

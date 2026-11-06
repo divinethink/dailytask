@@ -7,26 +7,6 @@ import { getHijriDate } from "../legacy/appHelpers.js";
 
 const DISMISS_PREFIX = "yb_dismissed_";
 
-function fieldFilled(f, entry) {
-  const v = entry ? entry[f.key] : undefined;
-  if (f.type === "bool") return !!v;
-  if (f.key === "fardPrayers") return false;
-  if (f.type === "count" || f.type === "number") return (Number(v) || 0) > 0;
-  return false;
-}
-
-export function countFilledCards(cats, entry, member, fieldApplies) {
-  let total = 0;
-  let filled = 0;
-  cats.forEach(c => {
-    const applicable = c.fields.filter(f => fieldApplies(f, member));
-    if (applicable.length === 0) return;
-    total += 1;
-    if (applicable.some(f => fieldFilled(f, entry))) filled += 1;
-  });
-  return { total, filled };
-}
-
 export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty, yesterdayMissing, todayKey, onGoYesterday, canCopy, onCopyYesterday, toBn, isToday }) {
   const [hideYb, setHideYb] = React.useState(() => {
     try { return !!localStorage.getItem(DISMISS_PREFIX + todayKey); } catch { return false; }

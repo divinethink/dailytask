@@ -1,9 +1,9 @@
 // memberData.js — Member/Entry/Weekly/Key Firestore data-layer (CRUD,
 // claim/FIFO, stampLastActive, member-key system, entry history).
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, Timestamp, deleteField, query, where, documentId, orderBy, limit } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, Timestamp, deleteField, query, where, documentId, orderBy, limit } from "firebase/firestore";
 import { sha256Hex, monthPrefix } from "./appHelpers.js";
-import { getFamilyCode, resolveFamilyIdFromCode, getFamilyId, saveUserFamilyCode, getCollectionName, appStorage, resolvePathContext, isGoogleLinked } from "./familyIdentity.js";
+import { getFamilyCode, resolveFamilyIdFromCode, getFamilyId, saveUserFamilyCode, appStorage, resolvePathContext, isGoogleLinked } from "./familyIdentity.js";
 
 function meetingKey(year, month0) {
   return `meeting_rows_v2:${monthPrefix(year, month0)}`;

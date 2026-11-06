@@ -1,25 +1,8 @@
 import { dbModular, authModular, authModular as auth, logAnalyticsEvent, logAuthDiagnostics } from "./firebaseConfig.js";
-import { GoogleAuthProvider, signOut, signInWithPopup, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
-import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, writeBatch, increment, arrayUnion, arrayRemove, collection, orderBy, limit } from "firebase/firestore";
-import {
-  FAMILY_CODE_CHARS, generateSecureCode, sha256Hex, useFonts, THEME_PRESETS,
-  applyThemeColor, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS,
-  DEEN_CATEGORY_GROUPS,
-  fieldApplies, isExcused, isFieldExcusable, BN_DIGITS, toBn, BN_MONTHS, BN_WEEKDAYS,
-  DAILY_INSPIRATIONS, AYAT_LIST, HADITH_LIST, QUOTE_LIST, INSPIRATION_TYPE_CYCLE,
-  getDailyInspiration, pad2, dateKey, formatBnDateTime, isFutureDate, monthPrefix,
-  daysInMonth, isLastDayOfMonth, HIJRI_MONTHS_BN, gregorianToJD, islamicToJD, getHijriDate,
-  dailyScore, scoreColor, fieldPercent, calculateStreak, getWeekRanges
-} from "./appHelpers.js";
-import {
-  isCreatorAuth, enterFamilyAsCreator, exitCreatorOverride, getFamilyCode,
-  isFamilyCodeCharsetValid, normalizeFamilyKey, setFamilyCode, changeFamilyCodeForExistingFamily,
-  createNewFamily, joinExistingFamily, checkFamilyCodeExists, getFamilyId,
-  ensureFamilyCodeMapping, familyDocRef, ensureFamilyMeta, ensureDataCollectionName,
-  ensureLegacyCollectionMap, claimFirstAdminIfEligible, loadUserFamilyCode, saveUserFamilyCode,
-  syncFamilyCodeWithAccount, getCollectionName, appStorage,
-  resolvePathContext, FAMILY_CODE_MIN_LENGTH, FAMILY_CODE_MAX_LENGTH, isGoogleLinked
-} from "./familyIdentity.js";
+import { GoogleAuthProvider, signOut, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
+import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, addDoc, writeBatch, increment, arrayUnion, arrayRemove, collection, orderBy, limit } from "firebase/firestore";
+import { useFonts, THEME_PRESETS, useThemeColor, DISPLAY_MODES, useDisplayMode, DEFAULT_DEEN_FIELDS, DEFAULT_DUNIYA_FIELDS, DEEN_CATEGORY_GROUPS, fieldApplies, isExcused, isFieldExcusable, toBn, BN_MONTHS, BN_WEEKDAYS, DAILY_INSPIRATIONS, pad2, dateKey, formatBnDateTime, isFutureDate, daysInMonth, isLastDayOfMonth, getHijriDate, dailyScore, scoreColor, fieldPercent, calculateStreak, getWeekRanges } from "./appHelpers.js";
+import { isCreatorAuth, getFamilyCode, isFamilyCodeCharsetValid, changeFamilyCodeForExistingFamily, createNewFamily, joinExistingFamily, getFamilyId, ensureFamilyCodeMapping, familyDocRef, ensureFamilyMeta, ensureDataCollectionName, ensureLegacyCollectionMap, claimFirstAdminIfEligible, saveUserFamilyCode, syncFamilyCodeWithAccount, getCollectionName, appStorage, resolvePathContext, FAMILY_CODE_MIN_LENGTH, FAMILY_CODE_MAX_LENGTH, isGoogleLinked } from "./familyIdentity.js";
 // §ProfileDropdownGoogle wiring(১১ সেপ্টেম্বর ২০২৬): নতুন Google-only
 // Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
 // দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
@@ -28,31 +11,8 @@ import {
   editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink, loadActiveInviteToken, removeLegacyInviteToken,
   deleteFamilyMemberEmail, normalizeEmail, startGoogleAccountChange
 } from "./googleIdentity.js";
-import {
-  dryRunPhaseCReadinessCheck, copyPhaseCData, verifyPhaseCData, reverseSyncPhaseCData,
-  healthCheckFamily, auditAllFamiliesHealthCheck, extractOwnerUidsFromMemberData,
-  auditGrandfatherCandidates, migrateOwnerUidsToArray, migrateApprovedGrandfatherAccess,
-  auditOrphanFamilies, cleanupOrphanFamilies, backfillLastActiveAt, backfillFirstAdminUid,
-  backfillMemberRoles
-} from "./legacyMigrationTools.js";
-import {
-  meetingKey, saveMeetingData, loadWeekly, saveWeekly, loadLegacyMembers, stampLastActive,
-  tsToMillis, memberDocId, loadMembersV2, deleteMemberDoc,
-  releaseMemberDoc,
-  createMemberWithKey,
-  migrateMembersIfNeeded,
-  loadCustomFields, saveCustomFields, loadFieldOverrides, saveFieldOverrides, loadTazkirahCustom, saveTazkirahCustom, loadEntry, saveEntry, entryDocId, pushEntryHistory,
-  fetchEntryHistory,
-  updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks
-} from "./memberData.js";
-import {
-  isGoogleDriveConfigured, ensureDriveTokenClient, requestDriveAccessToken, getDriveAccessToken,
-  driveFetch, findDriveBackupFile, findOrCreateDriveBackupFolder, readAllFamilyDataForBackup,
-  writeParsedBackupToFamily, buildDriveBackupPayload, uploadDriveBackup, downloadDriveBackupContent,
-  backupToGoogleDrive, mergeBackupData, restoreFromGoogleDrive, isFileSystemAccessSupported,
-  openFsaIdb, saveFsaDirHandle, loadFsaDirHandle, clearStoredFsaDirHandle, ensureFsaPermission,
-  getOrRequestFsaBaseDir, writeFsaBackupFile, DRIVE_BACKUP_SCHEMA_VERSION
-} from "./backup.js";
+import { meetingKey, saveMeetingData, loadWeekly, deleteMemberDoc, releaseMemberDoc, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
+import { isGoogleDriveConfigured, getDriveAccessToken, findDriveBackupFile, readAllFamilyDataForBackup, backupToGoogleDrive, mergeBackupData, restoreFromGoogleDrive, clearStoredFsaDirHandle, getOrRequestFsaBaseDir, writeFsaBackupFile, DRIVE_BACKUP_SCHEMA_VERSION } from "./backup.js";
 
 // Feedback submission — powered by Web3Forms (no server/coding needed).
 // 1. Go to https://web3forms.com and enter your email to get a free
@@ -515,37 +475,7 @@ const {
   useMemo,
   useRef
 } = React;
-import {
-  Icon,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Printer,
-  Check,
-  X,
-  User,
-  CalIcon,
-  DownloadIcon,
-  UploadIcon,
-  Trash,
-  LogOutIcon,
-  KeyIcon,
-  EyeIcon,
-  EyeOffIcon,
-  MenuIcon,
-  CopyIcon,
-  ShareIcon,
-  MessageSquare,
-  UsersIcon,
-  ChevronDown,
-  EditIcon,
-  InfoIcon,
-  GoogleIcon,
-  RefreshIcon,
-  Loader2,
-  ClockIcon,
-  AppLogo
-} from "../components/icons.jsx";
+import { Loader2, AppLogo } from "../components/icons.jsx";
 import {
   MemberInfoModal,
   ExcuseInfoModal,
@@ -555,7 +485,6 @@ import {
   CoachMarkModal
 } from "../components/InfoModals.jsx";
 import { HistoryModal } from "../components/HistoryModal.jsx";
-import { NotificationPanel } from "../components/NotificationPanel.jsx";
 import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, বিদ্যমান PrintReport/Public-Tools lazy
 // pattern reuse): এই ৪টা মোডাল সবসময় mount থাকে(শুধু `show` prop visibility
@@ -567,7 +496,6 @@ const ArchiveModal = React.lazy(() => import("../components/BackupRestore.jsx").
 const BackupOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.BackupOptionsModal })));
 const DriveRestoreModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.DriveRestoreModal })));
 const ImportOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ImportOptionsModal })));
-import { MemberListSection } from "../components/MemberListSection.jsx";
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // §Part B §B৫(Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
 // শুধু `printMode` true হলেই render হয়(নিচে), কিন্তু আগে static import ছিল
@@ -615,7 +543,6 @@ import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
 import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
 const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
 const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
-import { sanitizeLayout as sanitizeHomeLayout } from "./homeLayout.js";
 import { taskFields } from "./customTasks.js";
 const TabLayoutScreen = React.lazy(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
@@ -947,8 +874,6 @@ function App() {
   const [printMode, setPrintMode] = useState(false);
   const [weekly, setWeekly] = useState({});
   const [weeklyRowCount, setWeeklyRowCount] = useState(1);
-  const [savingWeekly, setSavingWeekly] = useState(false);
-  const [weeklySavedTick, setWeeklySavedTick] = useState(false);
   const [meetingState, setMeetingState] = useState({
     rows: [{
       id: "1",
@@ -2080,22 +2005,6 @@ function App() {
       setFeedbackSending(false);
     }
   }
-  function updateWeekly(weekIdx, field, value) {
-    if (isGuestMode) { setShowGuestSignIn(true); return; }
-    weeklyDirtyRef.current = true;
-    setWeekly(prev => ({
-      ...prev,
-      [weekIdx]: {
-        ...(prev[weekIdx] || {}),
-        [field]: value
-      }
-    }));
-  }
-  function addWeeklyRow() {
-    if (isGuestMode) { setShowGuestSignIn(true); return; }
-    const maxPossible = getWeekRanges(daysInMonth(monthCursor.year, monthCursor.month0)).length;
-    setWeeklyRowCount(c => Math.min(c + 1, maxPossible));
-  }
   function addMeetingRow() {
     if (isGuestMode) { setShowGuestSignIn(true); return; }
     meetingDirtyRef.current = true;
@@ -2155,28 +2064,6 @@ function App() {
         rows: nextRows
       };
     });
-  }
-  async function handleSaveWeekly() {
-    if (!selectedId) return;
-    if (isLockedForThisDevice) {
-      alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে এডিট করা যাবে না।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    setSavingWeekly(true);
-    try {
-      await saveWeekly(migrationState, selectedId, monthCursor.year, monthCursor.month0, weekly, selectedMember?.ownerUid ?? null);
-      weeklyDirtyRef.current = false;
-      setWeeklySavedTick(true);
-      setTimeout(() => setWeeklySavedTick(false), 1600);
-    } catch (err) {
-      alert("সাপ্তাহিক রিফ্লেকশন সেভ করতে সমস্যা হয়েছে: " + err.message);
-    } finally {
-      setSavingWeekly(false);
-    }
   }
   async function handleSaveMeeting() {
     if (isLockedForSwitch) {

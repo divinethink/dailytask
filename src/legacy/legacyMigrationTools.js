@@ -3,9 +3,9 @@
 // কোনো active code-path এখান থেকে trigger হয় না — শুধু owner manual browser-
 // console tool হিসেবে ব্যবহৃত হয়)। Active member/family code থেকে ইচ্ছাকৃতভাবে
 // আলাদা রাখা হয়েছে যাতে active-flow maintenance-এ এই ~১,০০০ লাইন বাধা না দেয়।
-import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
+import { dbModular as db } from "./firebaseConfig.js";
 import { collection, doc, getDoc, getDocs, query, where, documentId, limit, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp } from "firebase/firestore";
-import { getFamilyCode, getFamilyId, ensureFamilyCodeMapping, getCollectionName } from "./familyIdentity.js";
+import { getFamilyCode, getFamilyId, getCollectionName } from "./familyIdentity.js";
 
 async function dryRunPhaseCReadinessCheck() {
   console.log("[Phase C dry-run] শুরু হচ্ছে — শুধু read, কোনো write হবে না। Family:", getFamilyCode());

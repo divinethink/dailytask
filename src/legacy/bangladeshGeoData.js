@@ -6,17 +6,6 @@
 // হয়(কোনো extra geocode-call লাগে না)। উপজেলা বাছাই করলে publicToolsGeocode.js
 // (Nominatim)-এ "{উপজেলা}, {জেলা}, Bangladesh" পাঠিয়ে সঠিক lat/lon আনা হয়।
 
-export const BD_DIVISIONS = [
-  { id: "1", name: "চট্টগ্রাম" },
-  { id: "2", name: "রাজশাহী" },
-  { id: "3", name: "খুলনা" },
-  { id: "4", name: "বরিশাল" },
-  { id: "5", name: "সিলেট" },
-  { id: "6", name: "ঢাকা" },
-  { id: "7", name: "রংপুর" },
-  { id: "8", name: "ময়মনসিংহ" },
-];
-
 export const BD_DISTRICTS = [
   { id: "1", divisionId: "1", name: "কুমিল্লা", lat: 23.468275, lon: 91.178814 },
   { id: "2", divisionId: "1", name: "ফেনী", lat: 23.023231, lon: 91.384084 },

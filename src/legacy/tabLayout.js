@@ -91,8 +91,3 @@ export function moveId(list, id, dir) {
   [next[i], next[j]] = [next[j], next[i]];
   return next;
 }
-
-// সেভের জন্য: কেবল বৈধ id, মোট ≤ MAX_IDS।
-export function packTab(tab, order, hidden) {
-  return { order: sanitizeOrder(tab, order), hidden: sanitizeHidden(tab, hidden) };
-}
