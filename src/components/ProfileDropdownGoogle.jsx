@@ -84,7 +84,7 @@ export function ProfileDropdownGoogle({
     if (res && res.success) {
       closeAndReset();
     } else if (res && res.reason === "first-admin-must-transfer") {
-      setLeaveError("প্রথম এডমিন হিসেবে ত্যাগ করার আগে অন্য কাউকে এডমিন বানাতে হবে।");
+      setLeaveError("প্রথম এডমিন পরিবার ত্যাগ করতে পারবেন না।");
     } else {
       setLeaveError("ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
     }
