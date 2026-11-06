@@ -83,7 +83,7 @@ function monthOverall(entries, upTo, h) {
   }
   if (logged < MIN_DAYS) return null;
   const raw = sum / logged;
-  return { pct: Math.round(raw * 100), tier: tierOf(raw), days: logged };
+  return { pct: Math.round(raw * 100), tier: tierOf(raw), days: logged, sum };
 }
 
 // h = { member, allFields, fieldApplies, isExcused, isFieldExcusable, ratioOf, dailyScoreOf? }
@@ -117,7 +117,11 @@ function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
 
   // মনোযোগ: ↓ ধারা অথবা শেষ (নির্বাচিত) মাস ৪০%-এর নিচে। শেষ মাসের মান কম আগে; সর্বোচ্চ ৩।
   const cur = r => (r.vals[2] ? gOf(r.vals[2]) : null);
+  // যে আমলের বৈধ মাসগুলোতে সবই ০% — "এখনো শুরু হয়নি"; মনোযোগের গণনা ফোলায় না, আলাদা দেখানো হয়।
+  const isNotStarted = r => r.vals.filter(Boolean).length >= 2 && r.vals.every(v => !v || gOf(v) === 0);
+  const notStarted = rows.filter(isNotStarted);
   const attentionAll = rows
+    .filter(r => !isNotStarted(r))
     .filter(r => r.dir === "down" || (cur(r) !== null && cur(r) < ATTENTION_BELOW))
     .sort((a, b) => (cur(a) === null ? 101 : cur(a)) - (cur(b) === null ? 101 : cur(b)));
   const attention = attentionAll.slice(0, MAX_ATTENTION);
@@ -128,9 +132,16 @@ function buildTrend({ year, month0, now, entriesByMonth, h, groups }) {
 
   // সব আমল মিলিয়ে তিন মাসের গড় ও ধারা (দুই মাসের বৈধ তথ্য না থাকলে overall = null)
   const oVals = months.map((m, i) => monthOverall(entriesByMonth ? entriesByMonth[i] : null, upTo[i], h));
-  const overall = oVals.filter(Boolean).length >= 2 ? { vals: oVals, ...trendOf(oVals) } : null;
+  let overall = null;
+  if (oVals.filter(Boolean).length >= 2) {
+    // তিন মাসের একত্র গড়: এন্ট্রি করা সব দিনের গড় (মাসের দিন-সংখ্যা অনুযায়ী ন্যায্য ওজন)
+    const valid = oVals.filter(Boolean);
+    const dayN = valid.reduce((t, v) => t + v.days, 0);
+    const rawAll = valid.reduce((t, v) => t + v.sum, 0) / dayN;
+    overall = { vals: oVals, ...trendOf(oVals), all: { pct: Math.round(rawAll * 100), tier: tierOf(rawAll), days: dayN } };
+  }
 
-  return { ok: rows.length > 0, overall, months, sections, best, attention, attentionCount: attentionAll.length, upCount, curEmpty, rowCount: rows.length };
+  return { ok: rows.length > 0, overall, months, sections, best, attention, notStarted, attentionCount: attentionAll.length, upCount, curEmpty, rowCount: rows.length };
 }
 
 export { TREND_DELTA, ATTENTION_BELOW, MAX_ATTENTION, tierOf, threeMonths, monthValue, trendOf, buildTrend };

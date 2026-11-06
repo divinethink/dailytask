@@ -90,7 +90,7 @@ function TrendRow({ r, months, BN_MONTHS, toBn, comment, selected, onToggle, onS
               disabled={sent}
               className="w-full mt-2 py-2 rounded-xl text-sm font-bold bg-emerald-900 text-white disabled:opacity-60"
             >
-              📨 {sent ? T.sent : T.send}
+              {sent ? T.sent : "📨 " + T.send}
             </button>
           )}
         </div>
@@ -213,16 +213,25 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
         {data.status === "error" && <p className="text-xs text-orange-700 mb-2">{T.error}</p>}
 
         {trend.overall && (
-          <div className="rounded-xl p-3 mb-3" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
+          <div className="rounded-2xl p-3.5 mb-3" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
+            <div className="flex items-center gap-3 mb-2.5">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-sm text-slate-800">{T.overallTitle}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{T.allSub}</div>
+              </div>
+              <span className="text-2xl font-bold rounded-xl px-3.5 py-1.5" style={{ background: (TIER_STYLE[trend.overall.all.tier] || TIER_STYLE.none).background, color: (TIER_STYLE[trend.overall.all.tier] || TIER_STYLE.none).color }}>
+                {toBn(trend.overall.all.pct)}%
+              </span>
+            </div>
             <div className="flex items-end gap-1 text-slate-500" style={{ fontSize: 10.5 }}>
-              <span className="flex-1 min-w-0" />
+              <span className="flex-1 min-w-0">{T.perMonth}</span>
               {trend.months.map(m => (
                 <span key={m.year + "-" + m.month0} className="w-11 shrink-0 text-center whitespace-nowrap">{T.monthShort[m.month0]}</span>
               ))}
               <span className="w-4 shrink-0" />
             </div>
             <div className="flex items-center gap-1 mt-1">
-              <div className="flex-1 min-w-0 pr-1 font-bold text-sm text-slate-800 leading-snug">{T.overallTitle}</div>
+              <div className="flex-1 min-w-0 pr-1 text-xs text-slate-600 leading-snug">{trend.overall.dir ? ARROW[trend.overall.dir].label : ""}</div>
               {trend.overall.vals.map((v, i) => (
                 <Pill key={i} v={v} monthName={BN_MONTHS[trend.months[i].month0]} toBn={toBn} />
               ))}
@@ -236,22 +245,23 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </div>
         )}
 
-        {trend.attention.length > 0 && (
-          <div className="mb-3">
-            <div className="text-xs font-bold mb-1.5" style={{ color: "#9A3412" }}>🎯 {T.attTitle}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {trend.attention.map(r => {
-                const last = r.vals[2] || r.vals[1] || r.vals[0];
-                return (
-                  <button key={r.key} type="button" onClick={() => pickRow(r.key, true)} className="text-xs font-bold rounded-full px-3 py-1.5" style={{ background: "#FDEFE3", color: "#9A3412", border: "1px solid #F3D3B5" }}>
-                    {r.label}{last ? " " + toBn(last.pct) + "%" : ""}{r.dir === "down" ? " ↓" : ""}
-                  </button>
-                );
-              })}
-            </div>
+        {(trend.attention.length > 0 || (trend.notStarted && trend.notStarted.length > 0)) && (
+          <div className="rounded-2xl p-3 mb-3" style={{ background: "#FFF6EC", border: "1px solid #F3D3B5" }}>
+            <div className="text-sm font-bold mb-1.5" style={{ color: "#9A3412" }}>🎯 {T.attTitle}</div>
+            {trend.attention.map(r => (
+              <button key={r.key} type="button" onClick={() => pickRow(r.key, true)} className="w-full flex items-center gap-2 py-2 text-left border-t first:border-t-0" style={{ borderColor: "#F3D3B5" }}>
+                <span className="flex-1 min-w-0 text-sm font-bold text-slate-800 leading-snug">{r.label}</span>
+                <span className="shrink-0 text-xs font-bold" style={{ color: "#9A3412" }}>{r.vals.map(v => (v ? toBn(v.pct) + "%" : "—")).join(" → ")}</span>
+                <span className="w-3 shrink-0 text-center font-bold" style={{ color: r.dir === "down" ? ARROW.down.color : "transparent" }}>{r.dir === "down" ? "↓" : ""}</span>
+              </button>
+            ))}
             {trend.attentionCount > trend.attention.length && (
-              <p className="text-[11px] text-slate-500 mt-1">{fill(T.attMore, { n: toBn(trend.attentionCount - trend.attention.length) })}</p>
+              <p className="text-[11px] text-slate-500 mt-1.5">{fill(T.attMore, { n: toBn(trend.attentionCount - trend.attention.length) })}</p>
             )}
+            {trend.notStarted && trend.notStarted.length > 0 && (
+              <p className="text-[11px] text-slate-500 mt-1.5">{fill(T.notStarted, { names: trend.notStarted.map(r => r.label).join("، ") })}</p>
+            )}
+            <p className="text-[11px] text-slate-500 mt-1.5">{T.tapHint}</p>
           </div>
         )}
 
@@ -299,9 +309,11 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           ))}
         </div>
 
-        <p className="text-[11px] text-slate-500 mb-1">{T.tapHint}</p>
         {trend.curEmpty && (
           <p className="text-xs text-slate-500 mb-2 leading-relaxed">{fill(T.curEmpty, { month: BN_MONTHS[month0] })}</p>
+        )}
+        {Object.keys(sentKeys).length > 0 && (
+          <p className="text-sm text-emerald-800 text-center rounded-xl p-2.5 mt-2" style={{ background: "#E8F3EC" }} role="status">{T.sentNote}</p>
         )}
         <p className="text-slate-400 text-center mt-2" style={{ fontSize: 11 }}>{T.footnote}</p>
       </div>

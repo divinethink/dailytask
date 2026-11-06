@@ -176,6 +176,22 @@ test("overall: dailyScoreOf থাকলে তিন মাসের গড়;
   assert.equal(t.overall.dir, "up");
 });
 
+test("overall.all: তিন মাসের একত্র গড় = এন্ট্রি করা সব দিনের গড় (দিন-ওজনসহ)", () => {
+  const hh = h([fBool("x")], { dailyScoreOf: e => (e.x ? 1 : 0) });
+  const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [month("x", 30, 15), month("x", 31, 31), month("x", 2, 2)], h: hh, groups });
+  // ১৫/৩০ + ৩০/৩০ (সেপ্টেম্বরে ৩০ দিন) ⇒ ৪৫/৬০ = ৭৫%; তিন নম্বর মাস (২ দিন) বৈধ নয়
+  assert.equal(t.overall.all.pct, 75);
+  assert.equal(t.overall.all.days, 60);
+});
+
+test("notStarted: সব বৈধ মাসে ০% আমল মনোযোগ-গণনার বাইরে, আলাদা তালিকায়", () => {
+  const fs = [fBool("z"), fBool("w")];
+  const mk = (zDone, n) => { const o = {}; for (let d = 1; d <= n; d++) o[pad2(d)] = { z: d <= zDone, w: true }; return o; };
+  const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [mk(0, 10), mk(0, 10), mk(0, 10)], h: h(fs), groups });
+  assert.deepEqual(t.notStarted.map(r => r.key), ["z"]);
+  assert.ok(!t.attention.some(r => r.key === "z"));
+});
+
 test("overall: dailyScoreOf না থাকলে null", () => {
   const t = buildTrend({ year: 2026, month0: 9, now: NOW, entriesByMonth: [month("x", 30, 15), month("x", 31, 31), month("x", 31, 31)], h: h([fBool("x")]), groups });
   assert.equal(t.overall, null);
