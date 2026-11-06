@@ -253,11 +253,10 @@ service cloud.firestore {
     }
 
     function isApprovedMember(familyId) {
-      let reqPath = /databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid);
+      // Phase-5: accessRequests-ভিত্তিক approval সরানো হয়েছে।
       return isAdminOfFamily(familyId)
         || isAppCreator()
-        || isClaimedFamilyMember(familyId)
-        || (exists(reqPath) && get(reqPath).data.status == 'approved');
+        || isClaimedFamilyMember(familyId);
     }
 
     // --- Legacy read-rule gate (নতুন) ---
@@ -564,8 +563,6 @@ service cloud.firestore {
         && (
              resource.data.adminUids.hasAny([request.auth.uid])
              || isAppCreator()
-             || (exists(/databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid))
-                 && get(/databases/$(database)/documents/families/$(familyId)/accessRequests/$(request.auth.uid)).data.status == 'approved')
            );
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly(
@@ -1454,16 +1451,6 @@ service cloud.firestore {
                || (request.resource.data.type == 'device_joined'
                    && isApprovedMember(familyId)
                    && get(/databases/$(database)/documents/families/$(familyId)).data.adminUids.hasAny([request.resource.data.targetUid]))
-               || (request.resource.data.type == 'member_request'
-                   // Fix(১৯ আগস্ট ২০২৬, item 33): requester তখনও approved
-                   // member না(এটাই approval পাওয়ার প্রথম ধাপ), তাই
-                   // isApprovedMember() সবসময় false হতো — notification
-                   // silently deny হয়ে যেত। বদলে requester-এর নিজের নামে
-                   // pending memberRequests doc থাকা যাচাই(forge-প্রুফ,
-                   // request.auth.uid == doc-id)।
-                   && exists(/databases/$(database)/documents/families/$(familyId)/memberRequests/$(request.auth.uid))
-                   && get(/databases/$(database)/documents/families/$(familyId)/memberRequests/$(request.auth.uid)).data.status == 'pending'
-                   && get(/databases/$(database)/documents/families/$(familyId)).data.adminUids.hasAny([request.resource.data.targetUid]))
              );
         allow update: if request.auth != null
           && request.auth.uid == resource.data.targetUid
@@ -1486,84 +1473,6 @@ service cloud.firestore {
           && request.resource.data.hash is string
           && request.resource.data.hash.size() == 64;
         allow update, delete: if false;
-      }
-
-      // --- Access Approval Gate — Step 2 bootstrap: accessRequests write ---
-      // শুধু grandfather migration script (migrateApprovedGrandfatherAccess())
-      // চালানোর জন্য ন্যূনতম rule। শুধু বর্তমান family-র server-verified
-      // admin (adminUids) create করতে পারবে, শুধু status:"approved" সহ
-      // নির্দিষ্ট তিনটি field-এ সীমাবদ্ধ। update/delete client থেকে বন্ধ —
-      // ভুল হলে শুধু owner Console থেকে ম্যানুয়ালি ঠিক করবেন (legacyCollectionMap-এর
-      // মতো একই pattern)। ভবিষ্যতের isApprovedMember() শুধু এই collection
-      // read করবে অন্য rule-এ ব্যবহারের জন্য — এই write-rule-এর সাথে
-      // কোনো সংঘর্ষ নেই।
-      match /accessRequests/{uid} {
-        // Audit-fix(High #2, ১৫ আগস্ট ২০২৬): আগে শুধু auth!=null চেক হতো —
-        // ফলে যেকোনো authenticated user অন্য family-র pending/approved/
-        // denied request status ও UID পড়তে পারত। এখন শুধু নিজের request
-        // (self-uid) অথবা সেই family-র Admin (approve UI-এর জন্য দরকার)।
-        allow read: if request.auth != null
-          && (request.auth.uid == uid || isAdminOfFamily(familyId));
-
-        // Bootstrap/grandfather admin-write (অপরিবর্তিত)
-        allow create: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && request.resource.data.keys().hasOnly(['status', 'source', 'approvedAt'])
-          && request.resource.data.status == 'approved';
-
-        // --- Access Approval Gate — Step 4: self-request ---
-        // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved, reversible):
-        // Non-admin নিজের uid-তে status:"pending" অথবা "approved" দুটোই
-        // create করতে পারবে (আগে শুধু pending, admin-approve লাগত) —
-        // অন্য কারো uid-তে বা denied স্ট্যাটাসে এখনো না। isApprovedMember()
-        // ও অন্য কোনো read/write rule অপরিবর্তিত — শুধু এই একটি self-create
-        // condition শিথিল করা হয়েছে। মডারেশন ফিরিয়ে আনতে শুধু নিচের লাইন
-        // আবার status == 'pending'-এ ফেরত দিতে হবে।
-        allow create: if request.auth != null
-          && request.auth.uid == uid
-          && request.resource.data.keys().hasOnly(['status', 'requestedAt'])
-          && request.resource.data.status in ['pending', 'approved'];
-
-        // --- Access Approval Gate — Step 4: admin decide (নতুন) ---
-        // শুধু admin, শুধু বিদ্যমান pending থেকে approved/denied-এ,
-        // শুধু status+decidedAt field affected — অন্য কোনো mutation না।
-        allow update: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && resource.data.status == 'pending'
-          && request.resource.data.status in ['approved', 'denied']
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt']);
-
-        allow delete: if false;
-      }
-
-      // --- §সদস্য হোন(Member Request, নতুন, Member Key সেশন) ---
-      // Family Code দিয়ে approved(accessRequests) হওয়া মানেই এখন আর
-      // সরাসরি member(person) তৈরি করা যায় না — নাম(+জেন্ডার) দিয়ে
-      // অনুরোধ করবে, Admin অনুমোদন করলে তবেই members/{id}+private/key
-      // তৈরি হবে(app.js, admin-side, একই batch-এ)। accessRequests-এর
-      // সাথে একই pattern — শুধু self-uid read/create, admin-only decide।
-      match /memberRequests/{uid} {
-        allow read: if request.auth != null
-          && (request.auth.uid == uid || isAdminOfFamily(familyId));
-        allow create: if request.auth != null
-          && request.auth.uid == uid
-          && request.resource.data.keys().hasOnly(['name', 'gender', 'status', 'requestedAt', 'presetKey'])
-          && request.resource.data.status == 'pending'
-          && request.resource.data.name is string
-          && request.resource.data.name.size() > 0
-          && request.resource.data.presetKey is string
-          && request.resource.data.presetKey.size() >= 6 && request.resource.data.presetKey.size() <= 64
-          // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): উপরের
-          // private/key create/update rule-এর memberKey regex-এর সাথে
-          // সামঞ্জস্যপূর্ণ(approval-এ ঠিক এই presetKey-ই memberKey হিসেবে
-          // বসে, তাই দুই জায়গায় একই charset প্রয়োজন)।
-          && request.resource.data.presetKey.matches('^[A-Za-z0-9!@#$%&*+_-]+$');
-        allow update: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && resource.data.status == 'pending'
-          && request.resource.data.status in ['approved', 'denied']
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt']);
-        allow delete: if false;
       }
     }
 

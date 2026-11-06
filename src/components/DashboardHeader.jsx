@@ -34,7 +34,6 @@ export function DashboardHeader({
   handleEditOwnProfile,
   handleLeaveFamily,
   handleMakeAdmin,
-  handleReleaseMember,
   handleRemoveAdmin,
   handleRemoveMember,
   handleRevokeInviteLink,

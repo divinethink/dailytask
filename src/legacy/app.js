@@ -11,7 +11,7 @@ import {
   editOwnProfile, leaveFamily, addProxyMemberByAdmin, rotateInviteLink, revokeInviteLink, loadActiveInviteToken, removeLegacyInviteToken,
   deleteFamilyMemberEmail, normalizeEmail, startGoogleAccountChange
 } from "./googleIdentity.js";
-import { meetingKey, saveMeetingData, loadWeekly, deleteMemberDoc, releaseMemberDoc, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
+import { meetingKey, saveMeetingData, loadWeekly, deleteMemberDoc, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
 import { isGoogleDriveConfigured, getDriveAccessToken, findDriveBackupFile, readAllFamilyDataForBackup, backupToGoogleDrive, mergeBackupData, restoreFromGoogleDrive, clearStoredFsaDirHandle, getOrRequestFsaBaseDir, writeFsaBackupFile, DRIVE_BACKUP_SCHEMA_VERSION } from "./backup.js";
 
 // Feedback submission — powered by Web3Forms (no server/coding needed).
@@ -676,35 +676,7 @@ function App() {
         m = await migrateMembersIfNeeded(bootMigrationState);
       } catch (err) {
         if (err && err.accessDenied) {
-          // Access Approval Gate — Step 4: নিজের accessRequest দেখা, না
-          // থাকলে "pending" তৈরি করা (Rules-এ self-create শুধু pending-এ
-          // সীমাবদ্ধ)। এরপর UI "অনুমোদনের অপেক্ষায়" স্ক্রিন দেখাবে —
-          // members/customFields ইত্যাদি লোড করার চেষ্টা করা হবে না।
-          try {
-            const myUid = auth.currentUser ? auth.currentUser.uid : null;
-            if (myUid) {
-              const reqRef = doc(dbModular, "families", migrationFamilyId, "accessRequests", myUid);
-              const reqSnap = await getDoc(reqRef);
-              if (!reqSnap.exists()) {
-                // সাময়িক moderation-off (১৫ আগস্ট ২০২৬, owner-approved):
-                // নতুন access-request এখন সরাসরি "approved"-এ create হয়
-                // (আগে "pending" থাকত, admin approve করা লাগত)। Rules-এ
-                // self-create-এ approved status-ও allow করা হয়েছে।
-                // isApprovedMember() ও অন্য কোনো security boundary বদলায়নি।
-                await setDoc(reqRef, { status: "approved", requestedAt: Date.now() });
-                // যেহেতু মডারেশন অটো-অন, "অনুমোদনের অপেক্ষায়" স্ক্রিন
-                // দেখানোর দরকার নেই — সাথে সাথেই approved, তাই একবার
-                // reload করলে migrateMembersIfNeeded() স্বাভাবিকভাবে সফল
-                // হবে(নতুন accessRequest doc এখন approved অবস্থায় আছে)।
-                window.location.reload();
-                return;
-              }
-              // reqSnap আগে থেকেই exists(status যাই হোক — approved/pending/
-              // denied legacy leftover) হলে এখানে কিছু করা হচ্ছে না, নিচের
-              // pending-screen fallback-এ যাবে(rare inconsistency-তে
-              // infinite-reload এড়াতে)।
-            }
-          } catch {}
+          // accessRequests flow সরানো হয়েছে (Phase-5): অনুমোদিত না হলে সরাসরি "অপেক্ষা" স্ক্রিন।
           setAccessPending(true);
           setMembers([]);
           return;
@@ -871,7 +843,7 @@ function App() {
   // করার জন্য dual-check helper। googleUid থাকলে সেটাই একমাত্র owner-uid,
   // নাহলে পুরনো ownerUids array — কোনো ডেটা/schema পরিবর্তন হয়নি, শুধু
   // client-side compatibility shim(২_৪_১ §৬-এর dual-check নীতি অনুযায়ী)।
-  const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : ((m && m.ownerUids) || []);
+  const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : [];
   // (memberOwnerUids-এর নিচে রাখা জরুরি — const, আগে ডাকলে ReferenceError)
   // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান(ফলব্যাক), অন্যদের ডিফল্ট।
   const designSrc = (() => {
@@ -1664,34 +1636,6 @@ function App() {
   // করুন"/"দায়িত্ব নিন" বাটন MemberListSection.jsx থেকেও একই সেশনে সরানো
   // হয়েছে। handleReleaseMember(self-only device-release, Member Key-নির্ভর
   // না) অপরিবর্তিত।
-  async function handleReleaseMember(m) {
-    // Firestore rules-এ isUnownedOrMine() চেক করে — অন্য ডিভাইসের claim
-    // করা সদস্যকে release করার চেষ্টা করলে সার্ভার সবসময় reject করবে
-    // (UI আগে "সংরক্ষিত" বাটনে এই একই ফাংশন কল করত, ফলে ব্যর্থ Firestore
-    // রিকোয়েস্টের পর একটা অস্পষ্ট এরর দেখাত)। এখন আগে থেকেই চেক করে
-    // স্পষ্ট বার্তা দেখানো হচ্ছে, যাতে ব্যবহারকারী বুঝতে পারে এটা কেন
-    // সম্ভব নয় এবং কী করতে হবে।
-    const myUid = auth.currentUser ? auth.currentUser.uid : null;
-    if (memberOwnerUids(m).length && !memberOwnerUids(m).includes(myUid)) {
-      alert(`"${m.name}"-এর দায়িত্ব বর্তমানে অন্য একটি ডিভাইসে আছে — এই সদস্যের দায়িত্ব শুধুমাত্র সেই ডিভাইস থেকেই ছাড়া যাবে, এখান থেকে সম্ভব নয়।`);
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
-    const ok = window.confirm(`"${m.name}"-এর দায়িত্ব ছেড়ে দিতে চান? এরপর যেকোনো সাইন-ইন করা ডিভাইস এই সদস্যের দায়িত্ব নিতে পারবে।`);
-    if (!ok) return;
-    try {
-      await releaseMemberDoc(migrationState, m.id);
-      setMembers(prev => prev.map(x => x.id === m.id ? {
-        ...x,
-        ownerUids: []
-      } : x));
-    } catch (err) {
-      alert("দায়িত্ব ছাড়তে সমস্যা হয়েছে: " + err.message);
-    }
-  }
   // Admin Visibility UI — একজন claimed সদস্যকে Admin করা। Rules-এ scoped
   // update clause (adminUids-এ ঠিক ১টা নতুন uid যোগ, বাকি সব অপরিবর্তিত)
   // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
@@ -2242,7 +2186,6 @@ function App() {
           entryDirtyRef: entryDirtyRef,
           weeklyDirtyRef: weeklyDirtyRef,
           auth: authModular,
-          handleReleaseMember: handleReleaseMember,
           isLockedForSwitch: isLockedForSwitch,
           isAdmin: isAdmin,
           adminUidsList: adminUidsList,
@@ -2483,7 +2426,6 @@ function App() {
     handleEditOwnProfile: handleEditOwnProfile,
     handleLeaveFamily: handleLeaveFamily,
     handleMakeAdmin: handleMakeAdmin,
-    handleReleaseMember: handleReleaseMember,
     handleRemoveAdmin: handleRemoveAdmin,
     handleRemoveMember: handleRemoveMember,
     handleRevokeInviteLink: handleRevokeInviteLink,

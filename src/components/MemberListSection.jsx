@@ -27,7 +27,6 @@ export function MemberListSection({
   entryDirtyRef,
   weeklyDirtyRef,
   auth,
-  handleReleaseMember,
   isLockedForSwitch,
   isAdmin,
   adminUidsList,
@@ -36,7 +35,7 @@ export function MemberListSection({
   handleRemoveMember,
   setAddingMember
 }) {  const h = React.createElement;
-  const uidsOf = m => m.googleUid ? [m.googleUid] : (m.ownerUids || []);
+  const uidsOf = m => m.googleUid ? [m.googleUid] : [];
   const myUid = auth.currentUser && auth.currentUser.uid;
   return h("div", null,
     h("div", {
@@ -84,16 +83,9 @@ export function MemberListSection({
           className: "flex-1 min-w-0 truncate text-sm " + (selected ? "font-bold" : "font-medium text-slate-700"),
           style: selected ? { color: "var(--theme-ink, #16302B)" } : undefined
         }, m.name),
-        isMine ? h("button", {
-          type: "button",
-          onClick: e => {
-            e.stopPropagation();
-            handleReleaseMember(m);
-          },
-          disabled: isLockedForSwitch,
+        isMine ? h("span", {
           className: pill + " border",
-          style: { background: "#FFFFFF", color: "var(--theme-primary)", borderColor: "var(--theme-primary)" },
-          title: "আপনার দায়িত্বে আছে — ছেড়ে দিতে ট্যাপ করুন"
+          style: { background: "#FFFFFF", color: "var(--theme-primary)", borderColor: "var(--theme-primary)" }
         }, "আপনি") : hasOwner && h("span", {
           onClick: e => { e.stopPropagation(); },
           className: "w-6 h-6 rounded-full bg-slate-100 text-slate-500 shrink-0 flex items-center justify-center cursor-default",

@@ -6,13 +6,17 @@ import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
 import { getFamilyCode, getFamilyId, getCollectionName, resolvePathContext } from "./familyIdentity.js";
 import { loadMembersV2 } from "./memberData.js";
 
-// member-ডক থেকে মালিকের UID-তালিকা (backup/restore-এর ownership-detection)।
-// legacy `ownerUids` থাকলে তা; না থাকলে/খালি হলে `googleUid` fallback।
-// (আগে legacyMigrationTools.js-এ ছিল; ফাইলটি সরানোয় এখানে আনা হয়েছে — আচরণ অপরিবর্তিত।)
+// মালিকের UID-তালিকা: এখন শুধু googleUid (পুরনো ownerUids আর পড়া হয় না)।
 function extractOwnerUidsFromMemberData(data) {
-  const arr = Array.isArray(data.ownerUids) ? data.ownerUids : [];
-  if (arr.length === 0 && data.googleUid) return [data.googleUid];
-  return arr.filter(u => typeof u === "string" && u);
+  return data && data.googleUid ? [data.googleUid] : [];
+}
+
+// Phase-5: পুরনো ownerUids/ownerActivity ফিল্ড restore-এ আর ঢোকে না।
+// ব্যাকআপে (পুরনো ফাইলে) থাকলেও এখানে ছেঁটে ফেলা হয় — নতুন ডেটা বা বিদ্যমান সদস্যের
+// googleUid/role ইত্যাদি আচরণ অপরিবর্তিত।
+function stripLegacyOwnerFields(data) {
+  const { ownerUids, ownerActivity, ...rest } = data || {};
+  return rest;
 }
 
 const GOOGLE_DRIVE_CLIENT_ID = "10031644603-a8i21oh9sookntt70k3qvr29t2ns3s9h.apps.googleusercontent.com";
@@ -462,26 +466,25 @@ async function mergeBackupData(migrationState, parsed, options) {
         // release স্বাধীনভাবে ঘটে থাকে — একটি পুরনো ব্যাকআপ সেই লাইভ
         // দায়িত্ব-অবস্থাকে "টাইম-ট্রাভেল" করে বদলে দিতে পারবে না।
         const liveOwnerData = isV2
-          ? { ownerUids: extractOwnerUidsFromMemberData(existingDocsByKey[key]) }
+          ? {}
           : { ownerUid: existingDocsByKey[key].ownerUid ?? null };
         memberKeys.push({
           key,
-          data: { ...parsed[key], ...liveOwnerData }
+          data: { ...(isV2 ? stripLegacyOwnerFields(parsed[key]) : parsed[key]), ...liveOwnerData }
         });
         return;
       }
       // একেবারে নতুন সদস্য — brand-new create
       let newOwnerData;
       if (isV2) {
-        const backupOwners = extractOwnerUidsFromMemberData(parsed[key]);
-        newOwnerData = { ownerUids: (myUid && backupOwners.includes(myUid)) ? [myUid] : [] };
+        newOwnerData = {};
       } else {
         const backupOwner = parsed[key].ownerUid ?? null;
         newOwnerData = { ownerUid: backupOwner === myUid ? myUid : null };
       }
       memberKeys.push({
         key,
-        data: { ...parsed[key], ...newOwnerData }
+        data: { ...(isV2 ? stripLegacyOwnerFields(parsed[key]) : parsed[key]), ...newOwnerData }
       });
       return;
     }
