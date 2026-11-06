@@ -89,18 +89,6 @@ service cloud.firestore {
         && get(memberPath).data.googleUid == request.auth.uid;
     }
 
-    // --- §Google-Login Identity Migration(2_4_1 §৫ Phase-4, cutover) ---
-    // family google-only অবস্থায় পৌঁছালে পুরনো Member-Password/ownerUids
-    // device-claim path Rules-level বন্ধ করার জন্য centralized helper।
-    // শুধু সেই নির্দিষ্ট old-model-specific clause-গুলোতেই ব্যবহার হয়
-    // (নিচে চিহ্নিত) — adminUids/firstAdminUid role-management(Make/Remove
-    // Admin ইত্যাদি) ও admin-triggered proxy member create/delete googleUid-
-    // model-এও reused বলে ইচ্ছাকৃতভাবে অপরিবর্তিত রাখা হয়েছে।
-    function isGoogleOnly(familyId) {
-      let familyPath = /databases/$(database)/documents/families/$(familyId);
-      return exists(familyPath) && get(familyPath).data.identityModel == 'google-only';
-    }
-
     // --- App creator-only delete permission (স্থায়ী) ---
     // এই ক্ষমতা কোনো family-র adminUids-এর সাথে কখনো coupled না — এটা
     // family-membership থেকে সম্পূর্ণ স্বাধীন, app-wide, single-uid-ভিত্তিক
@@ -305,21 +293,7 @@ service cloud.firestore {
       // extra read লাগে না) ব্যবহার করা হলো। Security logic অভিন্ন — শুধু
       // redundant read বাদ। accessRequests lookup (non-admin approval)-এর
       // জন্য এক get() লাগবেই, সেটা অপরিবর্তিত।
-      // §Member Key Direct-Identify bug-fix(২০ আগস্ট ২০২৬): আগে এখানে
-      // একটিমাত্র "allow read"(get+list একসাথে) ছিল, isApprovedMember-এর
-      // মতোই গেটেড — ফলে admin member নতুন/আগে-কখনো-approve-না-হওয়া
-      // device থেকে claimMemberWithKey()-এর transaction-ভিতরে
-      // tx.get(famRef)(adminUids sync-এর জন্য, isAdminRole হলে) করার সময়
-      // permission-denied পেত(পুরো transaction fail, generic "Missing or
-      // insufficient permissions")। Fix: members/{memberId}-এর "get"-এর
-      // মতোই একই pattern — single-doc "get" pre-approval-open(শুধু
-      // authenticated), "list"(collection-wide, যেমন
-      // auditGrandfatherCandidates()/auditOrphanFamilies()) আগের শর্তেই
-      // গেটেড থাকে। isAppCreator() শুধু auth.uid-নির্ভর(document-data
-      // independent) বলে App Creator-এর জন্য list আগের মতোই কাজ করবে।
-      // family-root doc-এ কোনো secret নেই(memberKey hash আলাদা
-      // private/ subcollection-এ) — real authorization update rules-এর
-      // hash-check-এই হয়, এই "get" শুধু pre-approval routing।
+      // single-doc get: শুধু authenticated; list নিচের শর্তে গেটেড। family-root doc-এ কোনো secret নেই।
       allow get: if request.auth != null;
       allow list: if request.auth != null
         && (
@@ -549,27 +523,11 @@ service cloud.firestore {
       // জন্য মানানসই করে — যাতে Phase C-এর আসল migration script চালানোর
       // সময় rules নিয়ে আলাদা করে অপেক্ষা করতে না হয়।
       match /members/{memberId} {
-        // §Member Key Direct-Identify bug-fix(২০ আগস্ট ২০২৬): আগে
-        // "read"(get+list একসাথে) isApprovedMember()-এ গেটেড ছিল — ফলে
-        // নতুন/আগে-কখনো-approve-না-হওয়া user directIdentifyLogin()-এ
-        // সঠিক Family Code+Member Password দিলেও claimMemberWithKey()-এর
-        // transaction-ভিতরের tx.get(memberRef) permission-denied পেত(নিচের
-        // claim-branch update rule pre-approval-friendly হলেও, তার আগের
-        // read-ই ব্লক করে দিত)। Fix: keyIndex-এর মতোই "get" আলাদা করে
-        // pre-approval-open(শুধু authenticated) — actual authorization এখনো
-        // নিচের update rule-এর memberKeyHash cross-check-এই হয়, এই get শুধু
-        // routing/pre-check। "list"(member-select dropdown ইত্যাদি, পুরো
-        // roster) আগের মতোই isApprovedMember()-গেটেড থাকে, কোনো enumeration
-        // exposure বাড়েনি।
+        // single-doc get: শুধু authenticated; list (পুরো roster) isApprovedMember-গেটেড।
         allow get: if request.auth != null;
         allow list: if request.auth != null && isApprovedMember(familyId);
 
-        // §Member Key(১৫ আগস্ট ২০২৬-পরবর্তী সেশন, Admin Recovery Key
-        // প্রতিস্থাপন): member তৈরি এখন শুধু Admin করবেন(সরাসরি সংযোজন,
-        // অথবা memberRequests অনুমোদনের মাধ্যমে) — আগের self-serve
-        // isUnownedOrMine() create-bypass সরানো হলো, যাতে কোনো member
-        // Member Key ছাড়া তৈরি না হয় (app.js একই batch-এ member doc +
-        // private/key subdoc দুটোই লেখে)।
+        // Admin সরাসরি member (proxy) তৈরি করতে পারেন।
         allow create: if request.auth != null && isAdminOfFamily(familyId);
 
         // §Google-Login — Invite-link self-join(2_4 §৫.২, additive):
@@ -603,40 +561,17 @@ service cloud.firestore {
           && isAdminOfFamily(familyId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
 
-        // §Google-Login cutover-safe activity-stamp(নতুন, ১৩ সেপ্টেম্বর
-        // ২০২৬, 2_4_1 §৫.১ root-cause fix): memberData.js: stampLastActive()
-        // saveEntry()/saveWeekly()-এর *একই atomic batch*-এ member-doc-এ
-        // {lastActiveAt, ownerActivity:{[uid]:ts}} merge-write করে —
-        // legacy ownerUids-block উপরে !isGoogleOnly(familyId) দিয়ে
-        // guarded থাকায় "google-only" অবস্থায় এই write reject হতো, এবং
-        // batch atomicity-র কারণে entry/weekly-এর মূল write-ও fail করত
-        // (১১ সেপ্টেম্বর ২০২৬ lock-out ইনসিডেন্ট, বিস্তারিত 2_4_1 §৫.১)।
-        // এই নতুন clause শুধু ততক্ষণই relevant যখন caller ইতিমধ্যে
-        // isClaimedByGoogle(familyId, memberId) — অর্থাৎ member-এর
-        // googleUid == request.auth.uid — legacy(pure ownerUids, কোনো
-        // googleUid field নেই) member-এ এই clause কখনো match করবে না,
-        // তাই legacy path-এ কোনো behavior-change নেই। Field-scope-এ
-        // সীমাবদ্ধ(শুধু এই ৩টা), isGoogleOnly()-নির্বিশেষে সচল(legacy ও
-        // google-only উভয় state-এ কাজ করবে, কারণ transitioning/legacy-তে
-        // এই একই write আগে থেকেই উপরের legacy-clause দিয়ে অনুমোদিত ছিল —
-        // এখানে duplicate permission harmless)।
+        // Activity-stamp: saveEntry()/saveWeekly()-এর একই atomic batch-এ member-doc-এ
+        // {lastActiveAt, ownerActivity, updatedAt} merge-write হয় (memberData.js stampLastActive)।
+        // এই clause না থাকলে batch-এর মূল entry/weekly write-ও ব্যর্থ হতো।
+        // শুধু claimed সদস্য (googleUid == request.auth.uid), শুধু এই ৩টা ফিল্ড।
         allow update: if request.auth != null
           && isClaimedByGoogle(familyId, memberId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'ownerActivity', 'updatedAt']);
 
-        // §Admin-proxy activity-stamp fix(নতুন, ১৩ সেপ্টেম্বর ২০২৬,
-        // owner-reported): উপরের clause শুধু claimed(googleUid==caller)
-        // সদস্যের নিজের stampLastActive() কভার করে। কিন্তু Admin যখন এখনো
-        // unclaimed proxy member(googleUid: null, 2_4 §৫.১)-এর হয়ে entry
-        // সেভ করেন(caller নিজে সেই member না, admin), stampLastActive()-এর
-        // bundled member-doc write-এ caller(admin)-এর uid isClaimedByGoogle
-        // মেলে না(member.googleUid এখনো null) — legacy-clause-ও
-        // !isGoogleOnly()-guard-এ ব্লকড, ফলে কোনো clause-ই match করত না ও
-        // পুরো entry-save batch(atomicity-র কারণে) "Missing or insufficient
-        // permissions" দিয়ে ব্যর্থ হতো। Fix: admin, শুধু unclaimed
-        // (googleUid field অনুপস্থিত অথবা null) member-এ, একই field-scope-এ
-        // সীমাবদ্ধ লেখার অনুমতি। Claimed member-এ এই clause কখনো match
-        // করবে না(googleUid != null হলে শর্ত false)।
+        // Admin-proxy activity-stamp: Admin যখন unclaimed proxy (googleUid অনুপস্থিত/null)-এর
+        // হয়ে entry সেভ করেন, একই batch-এর member-doc stamp-ও অনুমোদিত হতে হবে —
+        // নইলে পুরো batch ব্যর্থ হয়। শুধু unclaimed member, একই ৩টা ফিল্ড।
         allow update: if request.auth != null
           && isAdminOfFamily(familyId)
           && (!('googleUid' in resource.data) || resource.data.googleUid == null)
@@ -801,19 +736,6 @@ service cloud.firestore {
                !('firstAdminUid' in get(/databases/$(database)/documents/families/$(familyId)).data)
                || request.auth.uid != get(/databases/$(database)/documents/families/$(familyId)).data.firstAdminUid
              );
-
-        // §Member Key — private ownership/recovery credential। plaintext
-        // (memberKey, owner/admin display+copy) ও hash(memberKeyHash,
-        // উপরের claim-verify) একই doc-এ — read শুধু owner/admin, অন্য কোনো
-        // approved member পড়তে পারবে না(document-level rule বলে আলাদা
-        // subcollection-এ রাখা হলো)।
-        match /private/key {
-          allow read: if request.auth != null && (
-            isAdminOfFamily(familyId)
-            || memberOwnerUids(familyId, memberId).hasAny([request.auth.uid])
-          );
-          allow delete: if false;
-        }
       }
 
       match /entries/{entryId} {
@@ -889,61 +811,6 @@ service cloud.firestore {
         allow list: if false;
         allow create, update: if canAccessReview(familyId, reviewId) && validReview(reviewId);
         allow delete: if canAccessReview(familyId, reviewId);
-      }
-
-      // --- §keyIndex(Direct-identify, pre-approval routing-only) ---
-      // Content শুধু {memberId: string} — কোনো authorization field নেই।
-      // Get শুধু "কোন memberId" বলে, actual claim/authorization member
-      // doc-এর existing Rules-এ(memberKeyHash cross-check) হয়, অপরিবর্তিত।
-      match /keyIndex/{hash} {
-        // Pre-approval flow বজায় রাখতে isApprovedMember() গেট নেই —
-        // শুধু authenticated(anonymous সহ) হলেই get করা যাবে।
-        allow get: if request.auth != null;
-        allow list: if false;
-
-        // Create: শুধু owner/admin নিজের memberId-এর জন্যই নতুন keyIndex
-        // বানাতে পারবেন — request.resource.data.memberId অবশ্যই string
-        // হতে হবে এবং requester সেই member-এর owner/admin হতে হবে
-        // (cross-member injection আটকায়)। Doc ইতিমধ্যে exist করলে এটা আর
-        // "create" হিসেবে গণ্য হয় না(Firestore নিজেই "update" ধরবে) —
-        // নিচে কোনো update rule নেই, তাই duplicate-hash create
-        // স্বয়ংক্রিয়ভাবে deny হয়ে যায়(explicit exists-check লাগে না)।
-        //
-        // ২০ আগস্ট ২০২৬ — BLOCKER fix: createMemberWithKey() নতুন member
-        // doc + keyIndex একই batch-এ create করে। batch/transaction-এর
-        // ভেতরে exists()/get() sibling pending write দেখতে পায় না, তাই
-        // brand-new memberId-এর জন্য exists(member) সবসময় false আসত এবং
-        // পুরো batch deny হয়ে যেত(existing "নতুন member তৈরি" ও
-        // "memberRequest approve" flow ভাঙত)। সমাধান: exists(member)
-        // অনুযায়ী branch —
-        //   Case A(member আগে থেকেই বিদ্যমান, যেমন changeMemberKey
-        //   rotation): exists() নির্ভরযোগ্য, আগের মতোই
-        //   owner/admin cross-check বজায়(defense-in-depth অক্ষুণ্ণ)।
-        //   Case B(member একই batch-এ নতুন তৈরি হচ্ছে, তাই exists()
-        //   false): সব caller(createMemberWithKey) admin-initiated —
-        //   তাই এই branch-এ শুধু isAdminOfFamily(familyId) দিয়ে গেট,
-        //   যা বাস্তব app flow-এর সাথে সামঞ্জস্যপূর্ণ এবং memberId
-        //   app-generated(user input না) বলে নতুন attack-surface তৈরি
-        //   করে না।
-        allow create: if request.auth != null
-          && request.resource.data.keys().hasOnly(['memberId'])
-          && request.resource.data.memberId is string
-          && (
-            (exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.memberId))
-              && (isAdminOfFamily(familyId)
-                  || memberOwnerUids(familyId, request.resource.data.memberId).hasAny([request.auth.uid])))
-            || (!exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.resource.data.memberId))
-              && isAdminOfFamily(familyId))
-          );
-
-        // Update path নেই(memberId পরে বদলানোর দরকার নেই, tamper-surface
-        // কমাতে ইচ্ছাকৃতভাবে বাদ) — default deny প্রযোজ্য।
-
-        // Delete: শুধু ওই keyIndex-এ লেখা memberId-এর owner/admin — অন্য
-        // member-এর keyIndex accidental/malicious delete আটকায়।
-        allow delete: if request.auth != null
-          && (isAdminOfFamily(familyId)
-              || memberOwnerUids(familyId, resource.data.memberId).hasAny([request.auth.uid]));
       }
 
       // --- §Notification System(নতুন) ---

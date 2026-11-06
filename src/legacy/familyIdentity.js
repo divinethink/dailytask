@@ -616,9 +616,7 @@ async function saveUserFamilyCode(uid, code, memberId) {
       familyCode: code.trim(),
       updatedAt: Date.now()
     };
-    // §Member Key Direct-Identify(১৯ আগস্ট ২০২৬, touch-point 3) — optional
-    // memberId, existing call site-গুলো(৩টি) এই param পাস করে না বলে
-    // অপরিবর্তিত থাকে।
+    // memberId ঐচ্ছিক — না পাঠালে payload-এ যায় না।
     if (memberId) payload.memberId = memberId;
     await setDoc(doc(db, "users", uid), payload, {
       merge: true

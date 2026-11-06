@@ -92,12 +92,7 @@ async function fetchMemberData(familyId, memberId) {
   return snap.exists() ? snap.data() : null;
 }
 
-// §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap): পুরনো createMemberWithKey()
-// (Member Password-ভিত্তিক, memberData.js) google-only family-তে
-// firestore.rules-এর `private/key` create rule(`!isGoogleOnly(familyId)`
-// guard)-এ blocked হয়ে যাওয়ায় Dashboard-এর "Add Member" বাটন ভাঙা ছিল —
-// দুটো real family-ই ইতিমধ্যে identityModel:"google-only"। এই ফাংশন 2_4
-// §৫.১("Admin-added Proxy Member") pattern অনুসরণ করে: email দিয়ে unclaimed
+// Admin-added Proxy Member (2_4 §৫.১): Dashboard-এর "Add Member" এই পথে চলে — email দিয়ে unclaimed
 // member তৈরি(googleUid:null), সদস্য পরে নিজে Google Sign-in করলে
 // signInExistingMemberByGoogle()-এর email-match branch দিয়ে auto-claim হবে
 // (একই ফাইলের নিচে, existing flow — নতুন কিছু লাগেনি)।
