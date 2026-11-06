@@ -108,18 +108,41 @@ function weekGlance({ days, prevDays, scoreOf }) {
   const logged = (days || []).filter(d => d && d.entry).length;
   const enough = rows.length >= GLANCE_MIN;
   const avg = enough ? Math.round(rows.reduce((t, r) => t + r.pct, 0) / rows.length) : null;
-  let best = null;
+  let best = null, worst = null;
   if (enough) {
     const top = rows.reduce((b, r) => (r.pct > b.pct ? r : b), rows[0]);
-    const low = Math.min(...rows.map(r => r.pct));
-    if (top.pct > low) best = { day: top.day, pct: top.pct };
+    const bot = rows.reduce((b, r) => (r.pct < b.pct ? r : b), rows[0]);
+    if (top.pct > bot.pct) { best = { day: top.day, pct: top.pct }; worst = { day: bot.day, pct: bot.pct }; }
   }
   let delta = null;
   if (avg !== null && prevDays) {
     const pr = glanceRows(prevDays, scoreOf);
     if (pr.length >= GLANCE_MIN) delta = monthDelta(Math.round(pr.reduce((t, r) => t + r.pct, 0) / pr.length), avg);
   }
-  return { total: (days || []).length, logged, enough, avg, best, delta };
+  return { total: (days || []).length, logged, enough, avg, best, worst, delta };
 }
 
-export { weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
+// সপ্তাহের সেরা ও সবচেয়ে অবহেলিত আমল (ফিল্ড)। weeklyGap-এর মতোই প্যারামিটার; ওজরের দিন বাদ।
+// প্রতিটি ফিল্ডে অন্তত ২ দিনের ডেটা লাগে। সবার গড় সমান হলে null (বেছে দেখানোর মতো পার্থক্য নেই)।
+// গড় সমান হলে ফিল্ড-তালিকার ক্রমে আগেরটি।
+function weekFieldExtremes({ days, fields, ratioOf, applies, excused }) {
+  const rows = [];
+  for (const f of fields || []) {
+    if (!applies(f)) continue;
+    let logged = 0, sum = 0;
+    for (const d of days || []) {
+      if (!d || !d.entry || excused(f, d.entry)) continue;
+      const r = ratioOf(f, d.entry);
+      if (r === null || r === undefined || !Number.isFinite(r)) continue;
+      logged += 1; sum += r;
+    }
+    if (logged >= 2) rows.push({ key: f.key, avgPct: Math.round((sum / logged) * 100) });
+  }
+  if (rows.length < 2) return { best: null, worst: null };
+  const best = rows.reduce((b, r) => (r.avgPct > b.avgPct ? r : b), rows[0]);
+  const worst = rows.reduce((b, r) => (r.avgPct < b.avgPct ? r : b), rows[0]);
+  if (best.avgPct === worst.avgPct) return { best: null, worst: null };
+  return { best, worst };
+}
+
+export { weekFieldExtremes, weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };

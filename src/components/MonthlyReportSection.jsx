@@ -203,16 +203,12 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
             </div>
           </div>
 
-          {r.whenGood && (
-            <div className={cardBox} style={cardStyle}>
-              {r.whenGood && (
-                <div>
-                  <SectionTitle>🔎 {T.whenGoodTitle}</SectionTitle>
-                  <p className="text-sm text-slate-700">{fill(T.whenGood, { label: r.whenGood.label, n: toBn(r.whenGood.diff) })} <span className="text-slate-400">{T.whenGoodNote}</span></p>
-                </div>
-              )}
-            </div>
-          )}
+          <div className={cardBox} style={cardStyle}>
+            <SectionTitle>🔎 {T.whenGoodTitle}</SectionTitle>
+            {r.whenGood
+              ? <p className="text-sm text-slate-700 leading-relaxed">{fill(T.whenGood, { label: r.whenGood.label, n: toBn(r.whenGood.diff) })} <span className="text-slate-400">{T.whenGoodNote}</span></p>
+              : <p className="text-sm text-slate-500 leading-relaxed">{T.whenGoodNone}</p>}
+          </div>
 
           {goals.counts.total > 0 && (
             <div className={cardBox} style={cardStyle}>

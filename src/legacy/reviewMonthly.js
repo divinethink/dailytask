@@ -113,23 +113,37 @@ function buildMonthlyReport({ year, month0, now, curEntries, prevEntries, h }) {
     moves = { improvement: withLabel(r.improvement), drop: withLabel(r.drop) };
   }
 
-  // "কখন ভালো থাকেন": ঘুমের আগে ফোন-বন্ধের দিন বনাম অন্য দিন, ওই ফিল্ড বাদ দিয়ে বাকি আমলের স্কোর।
-  // সম্পর্ক মাত্র, কারণ নয়। দুই দলেই ≥৩ দিন ও ≥৫ পয়েন্ট পার্থক্য না হলে দেখানো হয় না।
-  let whenGood = null;
-  const sf = applicable.find(f => f.key === SLEEP_KEY);
-  if (sf) {
-    const rest = h.allFields.filter(f => f.key !== SLEEP_KEY);
+  // "কখন ভালো থাকেন": কোন আমল পূর্ণ করা দিনগুলোতে বাকি আমলের স্কোর সবচেয়ে বেশি থাকে।
+  // আগে শুধু "ঘুমের আগে ফোন বন্ধ" দেখা হতো; এখন সেটা অগ্রাধিকার পায়, শর্ত না মিললে বাকি আমল থেকে সবচেয়ে বড় পার্থক্যেরটা।
+  // সম্পর্ক মাত্র, কারণ নয়। দুই দলেই ≥৩ দিন ও ≥৫ পয়েন্ট পার্থক্য না হলে null।
+  const whenGoodFor = (f, isYes) => {
+    const rest = h.allFields.filter(x => x.key !== f.key);
     const yes = [], no = [];
     for (let d = 1; d <= elapsed; d++) {
       const e = curEntries ? curEntries[pad2(d)] : null;
       if (!e) continue;
+      if (f.key !== SLEEP_KEY && h.isFieldExcusable(f, h.member) && h.isExcused(e, f.key)) continue;
       const s = h.dailyScore(e, h.member, rest);
       if (s === null || s === undefined || !Number.isFinite(s)) continue;
-      (e[SLEEP_KEY] ? yes : no).push({ score: s });
+      const flag = isYes(e);
+      if (flag === null) continue;
+      (flag ? yes : no).push({ score: s });
     }
-    if (yes.length >= MIN_DAYS && no.length >= MIN_DAYS) {
-      const diff = avgPct(yes) - avgPct(no);
-      if (diff >= 5) whenGood = { key: sf.key, label: labelOf(sf), diff, yesN: yes.length, noN: no.length };
+    if (yes.length < MIN_DAYS || no.length < MIN_DAYS) return null;
+    const diff = avgPct(yes) - avgPct(no);
+    return diff >= 5 ? { key: f.key, label: labelOf(f), diff, yesN: yes.length, noN: no.length } : null;
+  };
+  let whenGood = null;
+  const sf = applicable.find(f => f.key === SLEEP_KEY);
+  if (sf) whenGood = whenGoodFor(sf, e => !!e[SLEEP_KEY]);
+  if (!whenGood) {
+    for (const f of applicable) {
+      if (f.key === SLEEP_KEY) continue;
+      const c = whenGoodFor(f, e => {
+        const r = h.ratioOf(f, e);
+        return r === null || r === undefined || !Number.isFinite(r) ? null : r >= 1;
+      });
+      if (c && (!whenGood || c.diff > whenGood.diff)) whenGood = c;
     }
   }
 

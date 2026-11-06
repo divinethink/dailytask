@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
-import { weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
+import { weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 
@@ -274,4 +274,27 @@ test("REVIEW_TEXT.glance: প্রয়োজনীয় লেখা আছ�
   const G = REVIEW_TEXT.glance;
   assert.equal(G.weekdays.length, 7);
   for (const k of ["title", "vsPrev", "best", "deltaUp", "deltaDown", "deltaSame", "needMore"]) assert.ok(G[k]);
+});
+
+test("weekGlance: পিছিয়ে পড়া দিন", () => {
+  const g = weekGlance({ days: gDays([0.5, 0.8, undefined, 0.8, 0.2]), scoreOf: gScore });
+  assert.equal(g.worst.pct, 20);
+  assert.equal(weekGlance({ days: gDays([0.7, 0.7, 0.7]), scoreOf: gScore }).worst, null);
+});
+
+test("weekFieldExtremes: সেরা ও অবহেলিত আমল; সমান হলে null; ২ দিনের কম বাদ", () => {
+  const days = [1, 2, 3].map(d => ({ day: d, entry: { a: 1, b: d === 1 ? 1 : 0 } }));
+  const o = { days, fields: [{ key: "a" }, { key: "b" }], ratioOf: (f, e) => e[f.key], applies: () => true, excused: () => false };
+  const r = weekFieldExtremes(o);
+  assert.equal(r.best.key, "a"); assert.equal(r.worst.key, "b"); assert.equal(r.worst.avgPct, 33);
+  assert.deepEqual(weekFieldExtremes({ ...o, fields: [{ key: "a" }] }), { best: null, worst: null });
+  assert.deepEqual(weekFieldExtremes({ ...o, ratioOf: () => 1 }), { best: null, worst: null });
+});
+
+test("report: কখন ভালো থাকেন — ফোন-বন্ধ না মিললে অন্য আমল থেকে", () => {
+  const cur = {};
+  for (let d = 1; d <= 4; d++) cur[d] = { a: 1, b: 1 };  // a পূর্ণ: বাকি স্কোর বেশি
+  for (let d = 5; d <= 8; d++) cur[d] = { a: 0, b: 0 };
+  const r = buildMonthlyReport({ year: 2026, month0: 10, now: NOW_LATE, curEntries: mk(cur), prevEntries: null, h: H });
+  assert.ok(r.whenGood && r.whenGood.diff >= 5);
 });

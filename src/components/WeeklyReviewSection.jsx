@@ -4,7 +4,7 @@
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk } from "../legacy/reviewSchema.js";
-import { weeklyGap, countFieldTotal, weekGlance } from "../legacy/reviewCalc.js";
+import { weeklyGap, countFieldTotal, weekGlance, weekFieldExtremes } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
@@ -19,12 +19,15 @@ const G = T.glance;
 const STEP_ICONS = ["🎯", "📉", "🤝", "🔐", "🌱"];
 const GLANCE_BG = "linear-gradient(135deg,#1F4D44,#2D6A5C)";
 
-function GlanceCell({ label, value, sub }) {
+function GlanceDay({ tone, label, dayName, pctText, fieldLabel, fieldName }) {
+  const bg = tone === "good" ? "rgba(255,255,255,0.14)" : "rgba(232,163,23,0.24)";
   return (
-    <div className="rounded-lg p-2" style={{ background: "rgba(255,255,255,0.14)" }}>
+    <div className="rounded-lg p-2.5" style={{ background: bg }}>
       <div className="text-[11px] opacity-90">{label}</div>
-      <div className="text-base font-bold leading-tight">{value}</div>
-      {sub ? <div className="text-[11px] opacity-90">{sub}</div> : null}
+      <div className="text-base font-bold leading-tight">{dayName || "—"}</div>
+      <div className="text-[11px] opacity-90">{pctText}</div>
+      <div className="mt-2 pt-2 text-[11px] opacity-90" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>{fieldLabel}</div>
+      <div className="text-sm font-bold leading-snug">{fieldName || "—"}</div>
     </div>
   );
 }
@@ -100,6 +103,13 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     }
     return weekGlance({ days: cur, prevDays, scoreOf: e => dailyScore(e, member, allFields) });
   }, [days, upTo, week, year, month0, monthEntries, member, allFields, dailyScore]);
+  const extremes = useMemo(() => weekFieldExtremes({
+    days: days.filter(d => d.day <= upTo), fields: allFields,
+    ratioOf: (f, e) => fieldRatioToday(f, e),
+    applies: f => !!f.key && fieldApplies(f, member),
+    excused: (f, e) => isFieldExcusable(f, member) && isExcused(e, f.key)
+  }), [days, upTo, allFields, member]);
+  const fieldName = k => { const f = allFields.find(x => x.key === k); return f ? (f.shortLabel || f.label) : ""; };
   const loggedDays = days.filter(d => d.entry).length;
   const jam = allFields.find(f => f.key === "jamaat" && fieldApplies(f, member));
   const jamTotal = jam ? countFieldTotal(days, "jamaat", jam.max || 5) : null;
@@ -200,12 +210,15 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
             </> : <>
               {glance.logged > 0 && (
                 <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
-                  <div className="text-xs font-bold opacity-90 mb-2">{G.title}</div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <GlanceCell label={G.vsPrev} value={glance.delta === null ? "—" : glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"} sub="" />
-                    <GlanceCell label={G.best} value={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : "—"} sub={glance.best ? toBn(glance.best.pct) + "%" : ""} />
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="text-sm font-bold">{G.title}</div>
+                    {glance.delta !== null && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{G.vsPrev} {glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"}</span>}
                   </div>
-                  {glance.delta === null && !glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <GlanceDay tone="good" label={"🌟 " + G.best} dayName={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : ""} pctText={glance.best ? toBn(glance.best.pct) + "%" : ""} fieldLabel={G.bestField} fieldName={extremes.best ? fieldName(extremes.best.key) : ""} />
+                    <GlanceDay tone="warn" label={"🌧 " + G.worst} dayName={glance.worst ? G.weekdays[new Date(year, month0, glance.worst.day).getDay()] : ""} pctText={glance.worst ? toBn(glance.worst.pct) + "%" : ""} fieldLabel={G.worstField} fieldName={extremes.worst ? fieldName(extremes.worst.key) : ""} />
+                  </div>
+                  {!glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
                 </div>
               )}
               <p className="text-sm text-slate-600">{T.goal.noPrev}</p>
