@@ -486,7 +486,6 @@ export function MeetingMinutesSection({
   fold,
   addMeetingRow,
   handleSaveMeeting,
-  isLockedForSwitch,
   meetingSavedTick,
   meetingState,
   monthCursor,
@@ -599,7 +598,6 @@ export function MeetingMinutesSection({
     }))));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveMeeting,
-    disabled: isLockedForSwitch,
     className: "w-full h-11 rounded-2xl font-bold text-white text-sm bg-emerald-900 flex items-center justify-center gap-2 shadow-sm"
   }, savingMeeting ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",

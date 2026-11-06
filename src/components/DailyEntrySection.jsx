@@ -519,7 +519,6 @@ export function DailyEntrySection({
   handleDateTouchEnd,
   handleDateTouchStart,
   handleSave,
-  isLockedForSwitch,
   isLockedForThisDevice,
   monthlyReminderBanner,
   openHistoryModal,
@@ -742,7 +741,7 @@ export function DailyEntrySection({
       yesterdayMissing: !!yesterdayMissing && !recoveryMessage,
       todayKey: dateKey(new Date()),
       onGoYesterday: goYesterday,
-      canCopy: !isLockedForThisDevice && !isLockedForSwitch && dateKey(viewDate) === dateKey(new Date()) && copyKeys.length > 0,
+      canCopy: !isLockedForThisDevice && dateKey(viewDate) === dateKey(new Date()) && copyKeys.length > 0,
       onCopyYesterday: copyYesterday,
       toBn: toBn,
       isToday: dateKey(viewDate) === dateKey(new Date())
@@ -818,7 +817,7 @@ export function DailyEntrySection({
       tasks: selectedMember && selectedMember.customTasks,
       entry: entry,
       toggleDisabled: isFutureDate(viewDate) || isLockedForThisDevice,
-      manageDisabled: isLockedForThisDevice || isLockedForSwitch,
+      manageDisabled: isLockedForThisDevice,
       onToggle: updateField,
       onSaveTasks: onSaveTasks
     }));
@@ -855,7 +854,7 @@ export function DailyEntrySection({
     className: "text-xs text-center text-slate-600 bg-slate-100 border border-slate-200 rounded-xl py-2 px-3"
   }, "এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে শুধু দেখা যাবে, এডিট করা যাবে না।"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSave,
-    disabled: isFutureDate(viewDate) || isLockedForThisDevice || isLockedForSwitch,
+    disabled: isFutureDate(viewDate) || isLockedForThisDevice,
     className: "w-full h-12 rounded-2xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100",
     style: {
       background: savedTick ? "#4C8C74" : "var(--theme-primary)"

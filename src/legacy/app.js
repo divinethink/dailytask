@@ -811,7 +811,6 @@ function App() {
     return [...deenFieldsView, ...duniyaFieldsView, ...customFieldsView, ...memberTaskFields];
   }, [deenFieldsView, duniyaFieldsView, customFieldsView, memberTaskFields]);
   async function handleSaveFieldManager(nextOverrides, nextCustomFields) {
-    if (isLockedForSwitch) throw new Error("locked");
     if (JSON.stringify(nextCustomFields) !== JSON.stringify(customFields)) {
       await saveDesignPart("customFields", nextCustomFields);
       setDesign(d => ({ ...(d || {}), customFields: nextCustomFields }));
@@ -822,12 +821,10 @@ function App() {
     setFieldOverrides(nextOverrides);
   }
   async function handleSaveCustomTasks(next) {
-    if (isLockedForSwitch) throw new Error("locked");
     await saveCustomTasks(migrationState, selectedId, next);
     setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, customTasks: next } : x));
   }
   async function handleSaveTazkirah(next) {
-    if (isLockedForSwitch) throw new Error("locked");
     await saveDesignPart("tazkirah", next);
     setDesign(d => ({ ...(d || {}), tazkirah: next }));
     setTazkirahData(next);
@@ -856,11 +853,6 @@ function App() {
     };
   })();
   const isLockedForThisDevice = !!(selectedMember && memberOwnerUids(selectedMember).length && (!auth.currentUser || !memberOwnerUids(selectedMember).includes(auth.currentUser.uid)));
-  // Step 5 (Switch prep): UI-level (app) guard — server-side Rules enforcement
-  // (approved design) is the real safety boundary; this is purely UX so the
-  // person sees a clear message instead of a raw Firestore permission error
-  // during the brief "locked" window of a family's Switch.
-  const isLockedForSwitch = migrationState === "locked";
   // §Old-code cleanup Phase 4(১৫ সেপ্টেম্বর ২০২৬, owner-approved): memberRequest
   // status-fetch effect ও "Approved-member Google welcome" popup effect+
   // dismiss-function সম্পূর্ণ সরানো হলো — google-only architecture-এ
@@ -1002,10 +994,6 @@ function App() {
     return () => unsubscribe();
   }, [meetingCursor]);
   async function handleExportData() {
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     try {
       // File System Access (থাকলে) সবচেয়ে আগে চেষ্টা করা হয় —
       // showDirectoryPicker() অবশ্যই user gesture-এর মধ্যেই কল করতে হয়,
@@ -1101,10 +1089,6 @@ function App() {
   }
   // --- Google Drive Backup/Restore UI handlers ---
   async function handleDriveBackupClick() {
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     if (!isGoogleLinked()) {
       setShowBackupOptionsModal(false);
       setShowGoogleAccountModal(true);
@@ -1126,10 +1110,6 @@ function App() {
     }
   }
   async function handleBothBackupClick() {
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     await handleExportData();
     await handleDriveBackupClick();
   }
@@ -1182,10 +1162,6 @@ function App() {
   // পাওয়া গেলে/ব্যর্থ হলে স্পষ্ট বার্তা দেখানো হয়।
   async function handleManualDriveRestoreClick() {
     setShowImportOptionsModal(false);
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     if (!isGoogleLinked()) {
       setShowGoogleAccountModal(true);
       return;
@@ -1194,10 +1170,6 @@ function App() {
   }
   async function handleConfirmDriveRestore() {
     if (!driveRestoreCandidate) return;
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     setDriveRestoreBusy(true);
     try {
       await restoreFromGoogleDrive(driveRestoreCandidate.id, migrationState);
@@ -1211,10 +1183,6 @@ function App() {
     }
   }
   async function handleImportData(e) {
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     const fileReader = new FileReader();
     if (e.target.files && e.target.files[0]) {
       fileReader.readAsText(e.target.files[0], "UTF-8");
@@ -1513,10 +1481,6 @@ function App() {
     });
   }
   async function handleSaveMeeting() {
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     setSavingMeeting(true);
     try {
       await saveMeetingData(meetingCursor.year, meetingCursor.month0, meetingState);
@@ -1541,10 +1505,6 @@ function App() {
     }
     const name = newName.trim();
     if (!name) return;
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap fix): আগে এখানে
     // createMemberWithKey()(Member Password-ভিত্তিক) কল হতো, যা google-only
     // family-তে Rules-level(`private/key` create, `!isGoogleOnly` guard)
@@ -1592,10 +1552,6 @@ function App() {
     // বলে এই ফাংশন কল হওয়া মানেই caller admin — আলাদা client-check
     // redundant, তাই সরিয়ে ফেলা হলো। Server-side Rules অপরিবর্তিত(একমাত্র
     // real authorization boundary)।
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
-      return;
-    }
     const ok = window.confirm(`আপনি কি নিশ্চিত "${m.name}" কে সদস্য তালিকা থেকে বাদ দিতে চান? এই সদস্যের নাম আর দেখা যাবে না, তবে পূর্বের সেভ করা ডেটা মুছে যাবে না।`);
     if (!ok) return;
     const next = (members || []).filter(x => x.id !== m.id);
@@ -1644,10 +1600,6 @@ function App() {
     const mUids = memberOwnerUids(m);
     if (!mUids.length) {
       alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
     }
     const ok = window.confirm(`"${m.name}"-কে এডমিন করতে চান? এডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
@@ -1704,10 +1656,6 @@ function App() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     if (firstAdminUid && mUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
       alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
     }
     const ok = window.confirm(`"${m.name}"-কে এডমিন পদ থেকে বাদ দিতে চান?`);
@@ -1817,7 +1765,6 @@ function App() {
   // §Google অ্যাকাউন্ট (মেইল) বদলান — UID অপরিবর্তিত; ধাপ ১: পুরনো Google ছাড়ানো। ধাপ ২ (নতুন অ্যাকাউন্ট যুক্ত)
   // পূর্ণ-পর্দা GoogleRelinkGate-এ (mountApp-এ বসানো) — আলাদা ট্যাপে, যাতে popup আটকে না যায়।
   async function handleChangeGoogleAccount() {
-    if (isLockedForSwitch) return { ok: false, message: "সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।" };
     return startGoogleAccountChange();
   }
   // Single Logout — Family code session + Google session, দুটোই একসাথে
@@ -1907,10 +1854,6 @@ function App() {
     if (!selectedId || isFutureDate(viewDate)) return;
     if (isLockedForThisDevice) {
       alert("এই সদস্যের দায়িত্ব অন্য ডিভাইসে আছে — এখান থেকে এডিট করা যাবে না।");
-      return;
-    }
-    if (isLockedForSwitch) {
-      alert("সিস্টেম আপডেট চলছে — একটু পর আবার চেষ্টা করুন।");
       return;
     }
     setSaving(true);
@@ -2186,7 +2129,6 @@ function App() {
           entryDirtyRef: entryDirtyRef,
           weeklyDirtyRef: weeklyDirtyRef,
           auth: authModular,
-          isLockedForSwitch: isLockedForSwitch,
           isAdmin: isAdmin,
           adminUidsList: adminUidsList,
           handleMakeAdmin: handleMakeAdmin,
@@ -2387,7 +2329,7 @@ function App() {
     monthEntries: monthEntries,
     monthStats: monthStats,
     migrationState: migrationState,
-    locked: isLockedForThisDevice || isLockedForSwitch,
+    locked: isLockedForThisDevice,
     printMode: printMode,
     selectedMember: selectedMember,
     setPrintMode: setPrintMode,
@@ -2432,7 +2374,6 @@ function App() {
     handleSelfDemote: handleSelfDemote,
     handleShareInviteLink: handleShareInviteLink,
     isAdmin: isAdmin,
-    isLockedForSwitch: isLockedForSwitch,
     isMenuOpen: isMenuOpen,
     members: members,
     monthCursor: monthCursor,
@@ -2489,7 +2430,6 @@ function App() {
     handleDateTouchEnd: handleDateTouchEnd,
     handleDateTouchStart: handleDateTouchStart,
     handleSave: handleSave,
-    isLockedForSwitch: isLockedForSwitch,
     isLockedForThisDevice: isLockedForThisDevice,
     monthlyReminderBanner: monthlyReminderBanner,
     openHistoryModal: openHistoryModal,
@@ -2628,7 +2568,7 @@ function App() {
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
-    locked: isLockedForThisDevice || isLockedForSwitch,
+    locked: isLockedForThisDevice,
     monthCursor: reviewCursor,
     monthEntries: reviewEntries,
     allFields: allFields,
@@ -2647,7 +2587,7 @@ function App() {
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
-    locked: isLockedForThisDevice || isLockedForSwitch,
+    locked: isLockedForThisDevice,
     monthCursor: trendCursor,
     monthEntries: trendEntries,
     allFields: allFields,
@@ -2664,7 +2604,7 @@ function App() {
     migrationState: migrationState,
     memberId: selectedId,
     member: selectedMember,
-    locked: isLockedForThisDevice || isLockedForSwitch,
+    locked: isLockedForThisDevice,
     monthCursor: reviewCursor,
     monthEntries: reviewEntries,
     allFields: allFields,
@@ -2679,7 +2619,6 @@ function App() {
     fold: fold,
     addMeetingRow: addMeetingRow,
     handleSaveMeeting: handleSaveMeeting,
-    isLockedForSwitch: isLockedForSwitch,
     meetingSavedTick: meetingSavedTick,
     meetingState: meetingState,
     monthCursor: meetingCursor,

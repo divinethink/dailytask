@@ -17,7 +17,7 @@
 import { InfoIcon, Plus, Trash, User, UsersIcon } from "./icons.jsx";
 
 // §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested): শুধু লেআউট/স্টাইল — সব onClick/শর্ত/
-// guard(dirty-confirm, isAdmin, isLockedForSwitch, uid-যাচাই) আগের মতোই অপরিবর্তিত।
+// guard(dirty-confirm, isAdmin, uid-যাচাই) আগের মতোই অপরিবর্তিত।
 // সারি এখন এক-লাইন(অবতার+নাম+ব্যাজ/বাটন+ডিলিট) — কার্ডের উচ্চতা ন্যূনতম; নাম দীর্ঘ হলে truncate।
 export function MemberListSection({
   members,
@@ -27,7 +27,6 @@ export function MemberListSection({
   entryDirtyRef,
   weeklyDirtyRef,
   auth,
-  isLockedForSwitch,
   isAdmin,
   adminUidsList,
   handleMakeAdmin,
@@ -98,7 +97,6 @@ export function MemberListSection({
             e.stopPropagation();
             handleMakeAdmin(m);
           },
-          disabled: isLockedForSwitch,
           className: pill + " bg-white text-slate-600 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
           title: "এডমিন করুন"
         }, "Make Admin"),
@@ -108,7 +106,6 @@ export function MemberListSection({
             e.stopPropagation();
             handleRemoveAdmin(m);
           },
-          disabled: isLockedForSwitch,
           className: pill + " bg-white text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
           title: "এডমিন পদ থেকে বাদ দিন"
         }, "Remove Admin"),
@@ -118,7 +115,6 @@ export function MemberListSection({
             e.stopPropagation();
             handleRemoveMember(m);
           },
-          disabled: isLockedForSwitch,
           className: "w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0 disabled:opacity-40",
           title: "সদস্য বাদ দিন",
           "aria-label": "সদস্য বাদ দিন"

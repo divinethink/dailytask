@@ -40,7 +40,6 @@ export function DashboardHeader({
   handleSelfDemote,
   handleShareInviteLink,
   isAdmin,
-  isLockedForSwitch,
   isMenuOpen,
   members,
   monthCursor,
@@ -215,7 +214,6 @@ export function DashboardHeader({
     className: "flex-1 px-3 py-1.5 rounded-xl text-xs text-slate-900 outline-none font-medium"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: handleAddMember,
-    disabled: isLockedForSwitch,
     className: "px-3 py-1.5 rounded-xl text-xs font-bold bg-[#C89B3C] text-[#16302B]"
   }, "যোগ"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAddingMember(false),
