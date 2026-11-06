@@ -3,7 +3,7 @@
 import test, { before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
 
 let env;
 before(async () => {
@@ -60,4 +60,21 @@ test("regression: Google-claimed সদস্য নিজের নাম ব�
 });
 test("regression: Admin অন্য সদস্যকে Make Admin করতে পারে (role)", async () => {
   await assertSucceeds(updateDoc(doc(as("uidA"), "families/famA/members/m2"), { role: "admin", updatedAt: 2 }));
+});
+
+// ধাপ ২: entries/weekly/reviews-এর owner = শুধু googleUid
+test("ধাপ২: ownerUids-only সদস্যের entry ownerUids দিয়ে লেখা যায় না", async () => {
+  await assertFails(setDoc(doc(as("uidOld"), "families/famA/entries/m3_2026-11-01"), { memberId: "m3", x: 1 }));
+});
+test("ধাপ২: googleUid-মালিক নিজের entry লিখতে পারে", async () => {
+  await assertSucceeds(setDoc(doc(as("uidC"), "families/famA/entries/m2_2026-11-01"), { memberId: "m2", x: 1 }));
+});
+test("ধাপ২: অন্য সদস্য মালিকের entry লিখতে পারে না", async () => {
+  await assertFails(setDoc(doc(as("uidC"), "families/famA/entries/m1_2026-11-01"), { memberId: "m1", x: 1 }));
+});
+test("ধাপ২: admin সদস্যের entry লিখতে পারে", async () => {
+  await assertSucceeds(setDoc(doc(as("uidA"), "families/famA/entries/m2_2026-11-02"), { memberId: "m2", x: 1 }));
+});
+test("ধাপ২: ownerUids-only সদস্যের review ownerUids দিয়ে পড়া যায় না", async () => {
+  await assertFails(getDoc(doc(as("uidOld"), "families/famA/reviews/m3_2026-11-01")));
 });

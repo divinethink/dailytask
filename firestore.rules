@@ -150,71 +150,24 @@ service cloud.firestore {
     // app code এই path পড়ে/লেখে না — শুধু future migration-এর জন্য rules
     // আগে থেকে প্রস্তুত রাখা হচ্ছে।
     //
-    // §Google-Login fix(Critical #1, security-audit ৯ সেপ্টেম্বর ২০২৬):
-    // 'googleUid' field থাকা member(নতুন Google-login identity model,
-    // 2_4 §৩/§৫)-এ এটাই authoritative owner — এই field একেবারেই না
-    // থাকলে(পুরনো ownerUids-based legacy family) আগের fallback অপরিবর্তিত।
-    //
-    // Root-cause(fix-এর আগে): নতুন Google-login member doc-এ শুধু
-    // googleUid থাকে, ownerUids/ownerUid কোনোটাই না — আগের এই function
-    // তখন empty array([]) রিটার্ন করত, এবং isUnownedOrMineArray([])
-    // definition অনুযায়ী(uids.size()==0 → true) সবসময় true হতো — ফলে
-    // যেকোনো authenticated user(family-র সদস্যও না) সেই member-এর
-    // entries/weekly write/delete করতে পারত(open-write hole)।
-    //
-    // এখন branch-লজিক:
-    //   - googleUid non-null(claimed member) → [googleUid]-ই একমাত্র owner,
-    //     আগের ownerUids-pattern-এর মতোই isUnownedOrMineArray() দিয়ে
-    //     সঠিকভাবে গেটেড হবে।
-    //   - googleUid field আছে কিন্তু null(unclaimed proxy member, admin
-    //     কর্তৃক তৈরি, 2_4 §৫.১) → কোনো real uid এখনো owner না, তাই empty
-    //     array/null না দিয়ে(যেগুলো isUnownedOrMineArray()-এ true হয়ে
-    //     open-write তৈরি করত) একটা কখনো-না-মেলা sentinel uid রিটার্ন করা
-    //     হচ্ছে — এতে isUnownedOrMineArray() নিশ্চিতভাবে false হয়, শুধু
-    //     entries/weekly rule-এর পাশের isAdminOfFamily() OR-clause দিয়েই
-    //     admin লিখতে পারবেন(§৬-এর নীতি: unclaimed = admin read+write,
-    //     non-admin কেউ না)।
-    // §Google-Login fix(Critical #4, security-audit ৯ সেপ্টেম্বর ২০২৬,
-    // 2_4_1 §৬ dual-path cross-check): আগের সংস্করণ(শুধু Critical #1-এর
-    // fix) googleUid field থাকা member-এ পুরনো ownerUids সম্পূর্ণ ignore
-    // করত — কিন্তু 2_4_1(Old→New Identity Migration Protocol)-এর
-    // "transitioning" state-এ পুরনো ownerUids-based path ও নতুন googleUid
-    // path দুটোই একসাথে(OR-logic) সচল থাকার কথা(safety-net, কোনো সদস্য
-    // মাঝপথে lock-out হবেন না)। Phase-2-এ admin কোনো সদস্যের email/
-    // googleUid:null field বসানোর সাথে সাথেই আগের fix তার পুরনো
-    // ownerUids ignore করে ফেলত — protocol-এর কেন্দ্রীয় নিরাপত্তা-নীতি
-    // ভাঙত। এখন legacy ownerUids ও claimed googleUid উভয়ই combine করা
-    // হচ্ছে — googleUid field একেবারেই না-থাকা(pure legacy) member-এর
-    // জন্য behavior অপরিবর্তিত(byte-identical পুরনো logic)।
+    // Phase-5 ধাপ ২: member-এর একমাত্র owner = তার googleUid। পুরনো ownerUids/
+    // ownerUid আর পড়া হয় না। member না থাকলে null(আগের আচরণ), googleUid
+    // না থাকলে/null হলে কখনো-না-মেলা sentinel — তাই শুধু admin(isAdminOfFamily
+    // OR-clause) লিখতে পারে; ফাঁকা array কখনো রিটার্ন হয় না(open-write হোল নয়)।
     function currentMemberOwnerV2(familyId, docId) {
       let memberId = docId.split('_')[0];
       let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
       let m = exists(memberPath) ? get(memberPath).data : null;
-      let legacyOwners = (m == null) ? [] : (('ownerUids' in m) ? m.ownerUids : (('ownerUid' in m && m.ownerUid != null) ? [m.ownerUid] : []));
-      let hasGoogleField = (m != null) && ('googleUid' in m);
-      let googleOwner = (hasGoogleField && m.googleUid != null) ? [m.googleUid] : [];
-      let combined = legacyOwners.concat(googleOwner);
       return (m == null) ? null
-        : (!hasGoogleField) ? legacyOwners
-        : (combined.size() > 0 ? combined : ['__unclaimed_no_owner__']);
+        : (('googleUid' in m) && m.googleUid != null) ? [m.googleUid]
+        : ['__unclaimed_no_owner__'];
     }
 
-    // --- §Multi-device — সরাসরি memberId দিয়ে ownerUids array বের করা
-    // (currentMemberOwnerV2 docId-থেকে-split করে, কিন্তু এখানে memberId
-    // আগে থেকেই জানা থাকে — যেমন private/key subcollection rule-এ)।
-    // একই migration-window fallback(ownerUids না থাকলে ownerUid থেকে) ---
-    // নোট: এই function ইচ্ছাকৃতভাবে googleUid-priority fix থেকে আলাদা
-    // রাখা হয়েছে — এটা শুধু legacy ownerUids-based member-subcollection
-    // rules(Member Key, ownerUids-swap ইত্যাদি, সব যা এখনো ownerUids-model
-    // ব্যবহার করে)-এ ব্যবহৃত হয়, googleUid-model member-এ এই path-গুলো
-    // আদৌ প্রযোজ্য হবে না(googleUid-model member-এর নিজস্ব আলাদা clause
-    // আছে, নিচে দেখুন)। তাই এখানে change করলে unrelated legacy path
-    // ভাঙার ঝুঁকি ছিল — scope শুধু entries/weekly(Critical #1-এর
-    // প্রকৃত bug-site)-এ সীমাবদ্ধ রাখা হয়েছে।
+    // memberId জানা থাকলে সরাসরি owner-তালিকা: শুধু googleUid(claimed হলে), নইলে []।
     function memberOwnerUids(familyId, memberId) {
       let memberPath = /databases/$(database)/documents/families/$(familyId)/members/$(memberId);
       let m = exists(memberPath) ? get(memberPath).data : null;
-      return (m == null) ? [] : (('ownerUids' in m) ? m.ownerUids : (('ownerUid' in m && m.ownerUid != null) ? [m.ownerUid] : []));
+      return (m != null && ('googleUid' in m) && m.googleUid != null) ? [m.googleUid] : [];
     }
 
     // --- Phase C: Admin-bypass (শুধু bulk migration-এর জন্য) ---
@@ -977,23 +930,6 @@ service cloud.firestore {
           && isAdminOfFamily(familyId)
           && (!('googleUid' in resource.data) || resource.data.googleUid == null)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'updatedAt']);
-
-        // §Google-Login Migration(Medium #5 fix, 2_4_1 §৫ Phase-2, Category
-        // A — "ইতিমধ্যে Google-linked" সদস্য): V1-এর existing Google-linking
-        // linkWithCredential()(account-linking, same Firebase UID-তে Google
-        // provider যোগ হয়) ব্যবহার করত বলে Category-A সদস্যের "verified
-        // Google UID" আসলে তার নিজের বিদ্যমান ownerUids-এই ইতিমধ্যে থাকা
-        // UID। তাই admin সরাসরি googleUid set করতে পারবেন, কিন্তু শুধু
-        // তখনই যখন নতুন মান ইতিমধ্যে সেই member-এর ownerUids array-তে
-        // বিদ্যমান(forge-প্রুফ — কোনো arbitrary/নতুন UID injection সম্ভব
-        // না, শুধু already-platform-verified UID promote করা যায়)। শুধু
-        // unclaimed(googleUid অনুপস্থিত বা null) member-এ প্রযোজ্য —
-        // claimed member-এ কখনো প্রভাব ফেলে না।
-        allow update: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
-          && memberOwnerUids(familyId, memberId).hasAny([request.resource.data.googleUid])
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleUid', 'updatedAt']);
 
         // Admin — unclaimed proxy-র নাম/জেন্ডার edit(functional-gap fix)।
         // নতুন-schema proxy member-এ ownerUids field-ই থাকে না বলে
