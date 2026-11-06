@@ -27,9 +27,9 @@ test("সব কার্ড লুকানো হলে লুকানো ত
 
 test("সময়সূচি: পুরনো prayerLayout fallback, নতুন tabLayout অগ্রাধিকার; নতুন waqt কার্ড শেষে", () => {
   const legacy = ["meal", "schedule", "forbidden", "other"];
-  assert.deepEqual(resolveTab("prayer", undefined, legacy).order, ["meal", "schedule", "forbidden", "other", "jamaat", "waqt"]);
+  assert.deepEqual(resolveTab("prayer", undefined, legacy).order, ["meal", "schedule", "forbidden", "other", "waqt", "jamaat"]);
   assert.deepEqual(resolveTab("prayer", { prayerOrder: ["waqt"] }, legacy).order.slice(0, 1), ["waqt"]);
-  assert.deepEqual(visibleIds("prayer", { prayerHidden: ["forbidden"] }), ["schedule", "jamaat", "other", "meal", "waqt"]);
+  assert.deepEqual(visibleIds("prayer", { prayerHidden: ["forbidden"] }), ["schedule", "other", "meal", "waqt", "jamaat"]);
 });
 
 test("moveId সীমার বাইরে গেলে অপরিবর্তিত", () => {

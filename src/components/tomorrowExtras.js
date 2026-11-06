@@ -99,3 +99,18 @@ export function extrasFor(extras, weekday) {
 export function makeItemId() {
   return "item_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 }
+
+// বার্তার লেখাকে বুলেটে ভাগ: "।"-তে শেষ হওয়া বাক্য ধরে। ২টির কম হলে খালি তালিকা(= বুলেট নয়, সাধারণ অনুচ্ছেদ)।
+export function splitBullets(text) {
+  if (typeof text !== "string") return [];
+  const parts = (text.match(/[^।]+।?/g) || []).map((x) => x.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts : [];
+}
+
+// প্রতিদিনের আমল(সব দিনে দেখায়, "ঘুমের আগে"-র ওপরে) ও ঘুমের আগের বাড়তি আমল।
+export const DAILY_AMOL = [
+  "প্রতি ওয়াক্ত ফরজ সালাতের পর আয়াতুল কুরসি ও তাসবীহ পাঠ করা।",
+  "ইস্তেগফার ও মাসনূন যিকিরে মত্ত থাকা।",
+  "মানুষের সাথে সদ্ব্যবহার ও সহযোগিতা করা।",
+];
+export const SLEEP_EXTRA = "ঘুমের আগে সবাইকে ক্ষমা করে দেওয়া।";

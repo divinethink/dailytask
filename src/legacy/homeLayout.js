@@ -33,9 +33,9 @@ export const CARD_DEFS = {
     d("focus", "আগামীকালের ফোকাস", "fixed"),
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
     d("tomorrow", "আগামীকাল", "fixed"),
-    d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "closed"),
-    d("weekly", "সাপ্তাহিক মুহাসাবা", "closed"),
-    d("trend", "তিন মাসের চিত্র", "closed"),
+    d("weekly", "সাপ্তাহিক মুহাসাবা", "open"),
+    d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "open"),
+    d("trend", "তিন মাসের চিত্র", "open"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")
   ]
 };
@@ -118,11 +118,11 @@ export function sameLayout(a, b) {
 // না থাকলে/অবৈধ হলে ডিফল্ট ক্রম = আগের আচরণ হুবহু। অচেনা/ডুপ্লিকেট id বাদ, বাদ-পড়া কার্ড ডিফল্ট ক্রমে শেষে।
 export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },
-  { id: "jamaat", title: "মসজিদের জামায়াত" },
   { id: "forbidden", title: "নিষিদ্ধ সময়" },
   { id: "other", title: "অন্যান্য সালাত" },
   { id: "meal", title: "সেহরি ও ইফতার" },
-  { id: "waqt", title: "চলমান সালাত" }
+  { id: "waqt", title: "চলমান সালাত" },
+  { id: "jamaat", title: "মসজিদের জামায়াত" }
 ];
 export function defaultPrayerOrder() {
   return PRAYER_CARD_DEFS.map(x => x.id);

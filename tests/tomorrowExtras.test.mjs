@@ -1,7 +1,7 @@
 // চালান: node --test tests/
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeExtras, extrasFor, validateItem, normalizeItem, builtinId, applyOverrides, makeOverride } from "../src/components/tomorrowExtras.js";
+import { normalizeExtras, extrasFor, validateItem, normalizeItem, builtinId, applyOverrides, makeOverride, splitBullets } from "../src/components/tomorrowExtras.js";
 
 test("normalizeExtras: doc না থাকলে/ভুল গঠনে খালি", () => {
   assert.deepEqual(normalizeExtras(null), { items: [], sleepText: "", overrides: {} });
@@ -67,4 +67,11 @@ test("applyOverrides: লুকানো বাদ, বদলানো লেখ
 
 test("makeOverride: খালি লেখায় null", () => {
   assert.equal(makeOverride({ text: "  " }), null);
+});
+
+test("splitBullets: বাক্য ধরে ভাগ; একটিমাত্র হলে খালি", () => {
+  assert.deepEqual(splitBullets("সূরা কাহফ পড়ুন; নূর ছড়াবে। দরুদ পড়ুন। দোয়া করুন।"), ["সূরা কাহফ পড়ুন; নূর ছড়াবে।", "দরুদ পড়ুন।", "দোয়া করুন।"]);
+  assert.deepEqual(splitBullets("প্রথম। নিয়ত করবেন কি?"), ["প্রথম।", "নিয়ত করবেন কি?"]);
+  assert.deepEqual(splitBullets("একটাই বাক্য।"), []);
+  assert.deepEqual(splitBullets(null), []);
 });

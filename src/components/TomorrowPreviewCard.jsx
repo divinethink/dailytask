@@ -9,7 +9,7 @@ import { peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { WEEKDAYS_BN, MILESTONES, calendarNotes, historyFor } from "./tomorrowCalendarData.js";
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
-import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor, builtinId, applyOverrides } from "./tomorrowExtras.js";
+import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor, builtinId, applyOverrides, splitBullets, DAILY_AMOL, SLEEP_EXTRA } from "./tomorrowExtras.js";
 import { TomorrowExtrasEditor } from "./TomorrowExtrasEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
@@ -76,6 +76,7 @@ const TONES = {
 
 function Row({ n, muted }) {
   const t = TONES[n.tone] || TONES.ibadat;
+  const bullets = Array.isArray(n.bullets) ? n.bullets : splitBullets(n.text);
   return React.createElement(
     "li",
     { className: "flex items-start gap-2.5 rounded-xl border px-3 py-2.5 " + t.box + (muted ? " opacity-80" : "") },
@@ -84,7 +85,9 @@ function Row({ n, muted }) {
       "div",
       { className: "min-w-0 flex-1" },
       n.title && React.createElement("p", { className: "text-sm font-bold text-emerald-950 leading-snug" }, n.title),
-      React.createElement("p", { className: "text-sm leading-relaxed " + (muted ? "text-slate-500" : "text-slate-700") + (n.title ? " mt-0.5" : "") }, n.text),
+      bullets.length > 1
+        ? React.createElement("ul", { className: "list-disc pl-4 space-y-1 text-sm leading-relaxed marker:text-emerald-700 " + (muted ? "text-slate-500" : "text-slate-700") + (n.title ? " mt-1" : "") }, bullets.map((b, i) => React.createElement("li", { key: i }, b)))
+        : React.createElement("p", { className: "text-sm leading-relaxed " + (muted ? "text-slate-500" : "text-slate-700") + (n.title ? " mt-0.5" : "") }, bullets.length === 1 ? bullets[0] : n.text),
       n.dua && React.createElement(
         "div",
         { className: "mt-2 rounded-lg bg-white/90 border border-emerald-100 px-3 py-2" },
@@ -117,10 +120,12 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });
   }
   extrasFor(extras, date.getDay()).forEach((n) => notes.push(n));
+  notes.push({ tone: "ibadat", icon: "🌿", title: "প্রতিদিনের আমল", bullets: DAILY_AMOL });
   history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: isTomorrow ? "ইতিহাসের পাতায় কাল" : "ইতিহাসের পাতায় আজ", text: t }));
   const ms = nextMilestone(date);
   const hasMore = notes.length > 0;
-  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", text: extras.sleepText || DEFAULT_SLEEP };
+  const sleepBase = splitBullets(extras.sleepText || DEFAULT_SLEEP);
+  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", bullets: [...(sleepBase.length ? sleepBase : [extras.sleepText || DEFAULT_SLEEP]), SLEEP_EXTRA] };
 
   return React.createElement(
     "div",
