@@ -402,18 +402,14 @@ async function backupToGoogleDrive(migrationState) {
 
 async function mergeBackupData(migrationState, parsed, options) {
   const compareUpdatedAt = !!(options && options.compareUpdatedAt);
-  const isV2 = migrationState === "v2";
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
   const currentMembers = await loadMembersV2(migrationState);
   const ownerByMemberId = {};
   currentMembers.forEach(m => {
-    ownerByMemberId[m.id] = isV2 ? extractOwnerUidsFromMemberData(m) : (m.ownerUid ?? null);
+    ownerByMemberId[m.id] = extractOwnerUidsFromMemberData(m);
   });
   function isMineOrUnclaimed(owner) {
-    if (isV2) {
-      return !owner || !owner.length || owner.includes(myUid);
-    }
-    return !owner || owner === myUid;
+    return !owner || !owner.length || owner.includes(myUid);
   }
   let existingDocsByKey = {};
   if (compareUpdatedAt) {
@@ -453,26 +449,16 @@ async function mergeBackupData(migrationState, parsed, options) {
         // (লাইভ) দায়িত্ব/ownerUid(s) কখনো ব্যাকআপ দিয়ে ওভাররাইট হয় না। claim/
         // release স্বাধীনভাবে ঘটে থাকে — একটি পুরনো ব্যাকআপ সেই লাইভ
         // দায়িত্ব-অবস্থাকে "টাইম-ট্রাভেল" করে বদলে দিতে পারবে না।
-        const liveOwnerData = isV2
-          ? {}
-          : { ownerUid: existingDocsByKey[key].ownerUid ?? null };
         memberKeys.push({
           key,
-          data: { ...(isV2 ? stripLegacyOwnerFields(parsed[key]) : parsed[key]), ...liveOwnerData }
+          data: stripLegacyOwnerFields(parsed[key])
         });
         return;
       }
       // একেবারে নতুন সদস্য — brand-new create
-      let newOwnerData;
-      if (isV2) {
-        newOwnerData = {};
-      } else {
-        const backupOwner = parsed[key].ownerUid ?? null;
-        newOwnerData = { ownerUid: backupOwner === myUid ? myUid : null };
-      }
       memberKeys.push({
         key,
-        data: { ...(isV2 ? stripLegacyOwnerFields(parsed[key]) : parsed[key]), ...newOwnerData }
+        data: stripLegacyOwnerFields(parsed[key])
       });
       return;
     }
