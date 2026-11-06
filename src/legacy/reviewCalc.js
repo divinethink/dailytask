@@ -145,4 +145,31 @@ function weekFieldExtremes({ days, fields, ratioOf, applies, excused }) {
   return { best, worst };
 }
 
-export { weekFieldExtremes, weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
+// গত সপ্তাহের তুলনায় আমল-ভিত্তিক বদল: সবচেয়ে বেশি উন্নতি ও সবচেয়ে বেশি পতন (পয়েন্টে, পূর্ণসংখ্যা)।
+// দুই সপ্তাহেই ফিল্ডে অন্তত ২ দিনের ডেটা লাগে; ওজরের দিন বাদ। সমান delta-য় ফিল্ড-তালিকার ক্রমে আগেরটি।
+// prevDays না থাকলে বা কোনো বদল না থাকলে সংশ্লিষ্ট মান null।
+function weekFieldMoves({ days, prevDays, fields, ratioOf, applies, excused }) {
+  if (!prevDays) return { improvement: null, drop: null };
+  const avgOf = (list, f) => {
+    let logged = 0, sum = 0;
+    for (const d of list || []) {
+      if (!d || !d.entry || excused(f, d.entry)) continue;
+      const r = ratioOf(f, d.entry);
+      if (r === null || r === undefined || !Number.isFinite(r)) continue;
+      logged += 1; sum += r;
+    }
+    return logged >= 2 ? Math.round((sum / logged) * 100) : null;
+  };
+  const rows = [];
+  for (const f of fields || []) {
+    if (!applies(f)) continue;
+    const cur = avgOf(days, f), prev = avgOf(prevDays, f);
+    if (cur === null || prev === null) continue;
+    rows.push({ key: f.key, cur, prev, delta: cur - prev });
+  }
+  const up = rows.filter(r => r.delta > 0).reduce((b, r) => (!b || r.delta > b.delta ? r : b), null);
+  const down = rows.filter(r => r.delta < 0).reduce((b, r) => (!b || r.delta < b.delta ? r : b), null);
+  return { improvement: up, drop: down };
+}
+
+export { weekFieldMoves, weekFieldExtremes, weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };

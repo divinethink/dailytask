@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
-import { weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
+import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 
@@ -297,4 +297,15 @@ test("report: কখন ভালো থাকেন — ফোন-বন্ধ 
   for (let d = 5; d <= 8; d++) cur[d] = { a: 0, b: 0 };
   const r = buildMonthlyReport({ year: 2026, month0: 10, now: NOW_LATE, curEntries: mk(cur), prevEntries: null, h: H });
   assert.ok(r.whenGood && r.whenGood.diff >= 5);
+});
+
+test("weekFieldMoves: উন্নতি/পতন; আগের সপ্তাহ না থাকলে বা ডেটা কম হলে null", () => {
+  const mkd = vals => vals.map((v, i) => ({ day: i + 1, entry: v }));
+  const cur = mkd([{ a: 1, b: 0 }, { a: 1, b: 0 }]);
+  const prev = mkd([{ a: 0.5, b: 1 }, { a: 0.5, b: 1 }]);
+  const o = { days: cur, prevDays: prev, fields: [{ key: "a" }, { key: "b" }], ratioOf: (f, e) => e[f.key], applies: () => true, excused: () => false };
+  const r = weekFieldMoves(o);
+  assert.deepEqual([r.improvement.key, r.improvement.delta, r.drop.key, r.drop.delta], ["a", 50, "b", -100]);
+  assert.deepEqual(weekFieldMoves({ ...o, prevDays: null }), { improvement: null, drop: null });
+  assert.deepEqual(weekFieldMoves({ ...o, prevDays: mkd([{ a: 0, b: 1 }]) }), { improvement: null, drop: null }); // আগের সপ্তাহে ১ দিন
 });
