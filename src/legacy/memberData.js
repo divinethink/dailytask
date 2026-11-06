@@ -40,17 +40,6 @@ async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid
   stampLastActive(batch, doc(ctx.membersRef, ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
   await batch.commit();
 }
-// --- Legacy (v1) member storage — single "members" doc holding a JSON array.
-// Kept ONLY as a one-time migration source; do not write to it anymore.
-async function loadLegacyMembers() {
-  try {
-    const res = await appStorage.get("members", true);
-    return res ? JSON.parse(res.value) : [];
-  } catch {
-    return [];
-  }
-}
-
 function stampLastActive(batch, memberRef, familyId, uid) {
   const ts = Timestamp.now();
   if (memberRef) {
@@ -117,25 +106,9 @@ async function deleteMemberDoc(migrationState, id) {
 }
 
 
+// Phase-5: v1 (legacy array-doc) ফলব্যাক সরানো হয়েছে; এখন শুধু v2 সদস্য-ডক পড়ে।
 async function migrateMembersIfNeeded(migrationState) {
-  const v2 = await loadMembersV2(migrationState);
-  if (v2.length) return v2;
-  const legacy = await loadLegacyMembers();
-  if (!legacy.length) return [];
-  const migrated = legacy.map(m => ({
-    ...m,
-    ownerUid: m.ownerUid ?? null,
-    createdAt: m.createdAt || Date.now()
-  }));
-  try {
-    // Switch prep fix: আগে এখানে hardcoded "legacy" পাস করা হতো —
-    // migrationState param যোগ হওয়ার পর এখন caller-এর প্রকৃত (server-verified)
-    // migrationState পাস করা হচ্ছে, যাতে কোনো family ইতিমধ্যে v2-তে থাকা
-    // অবস্থায় (edge case: v1 legacy array-doc আছে কিন্তু কোনো v2 member: doc
-    // এখনো নেই) এই one-time migration ভুল (legacy) path-এ লিখে না ফেলে।
-    await Promise.all(migrated.map(m => saveMemberDoc(migrationState, m)));
-  } catch {}
-  return migrated;
+  return loadMembersV2(migrationState);
 }
 async function loadCustomFields() {
   try {
@@ -307,7 +280,6 @@ export {
   saveMeetingData,
   loadWeekly,
   saveWeekly,
-  loadLegacyMembers,
   stampLastActive,
   memberDocId,
   loadMembersV2,
