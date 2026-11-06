@@ -749,35 +749,19 @@ const appStorage = {
 };
 
 function resolvePathContext(migrationState, familyCode, familyId) {
-  if (migrationState === "v2") {
-    const familyRoot = doc(db, "families", familyId);
-    return {
-      mode: "v2",
-      membersRef: collection(familyRoot, "members"),
-      entriesRef: collection(familyRoot, "entries"),
-      weeklyRef: collection(familyRoot, "weekly"),
-      memberDocId: (id) => id,
-      entryDocId: (memberId, dateKey) => `${memberId}_${dateKey}`,
-      weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
-    };
-  }
-  // legacy ("legacy" বা "locked" বা fallback)
-  // §৫ fix: আগে এখানে সরাসরি `data_${familyCode}` (লাইভ familyCode থেকে)
-  // ব্যবহার হতো — familyCode বদলালে saveEntry/loadEntry/saveMemberDoc
-  // ইত্যাদি সব ভুল কালেকশনে চলে যেত। এখন getCollectionName()
-  // (dataCollectionName-ব্যাকড, familyCode-independent) ব্যবহার হচ্ছে —
-  // familyCode যতবারই বদলাক, আসল ডাটা কালেকশন একই থাকে। বিদ্যমান সব
-  // caller familyCode param পাঠাতে থাকবে (API অপরিবর্তিত, harmless —
-  // legacy branch-এ শুধু আর ব্যবহৃত হচ্ছে না)।
-  const legacyRef = collection(db, getCollectionName());
+  // Phase-5 ধাপ খ: legacy (data_<code>) member/entry/weekly path সরানো হয়েছে —
+  // শুধু v2 subcollection। v2 ছাড়া অন্য অবস্থা হলে নীরবে ভুল জায়গায় না গিয়ে
+  // error (fail-closed); app.js এই অবস্থায় আগেই "সাপোর্টেড নয়" স্ক্রিন দেখায়।
+  if (migrationState !== "v2") throw new Error("unsupported_migration_state");
+  const familyRoot = doc(db, "families", familyId);
   return {
-    mode: "legacy",
-    membersRef: legacyRef,
-    entriesRef: legacyRef,
-    weeklyRef: legacyRef,
-    memberDocId: (id) => `member:${id}`,
-    entryDocId: (memberId, dateKey) => `entry:${memberId}:${dateKey}`,
-    weeklyDocId: (memberId, monthPref) => `weekly:${memberId}:${monthPref}`
+    mode: "v2",
+    membersRef: collection(familyRoot, "members"),
+    entriesRef: collection(familyRoot, "entries"),
+    weeklyRef: collection(familyRoot, "weekly"),
+    memberDocId: (id) => id,
+    entryDocId: (memberId, dateKey) => `${memberId}_${dateKey}`,
+    weeklyDocId: (memberId, monthPref) => `${memberId}_${monthPref}`
   };
 }
 

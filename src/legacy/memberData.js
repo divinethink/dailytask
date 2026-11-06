@@ -1,6 +1,6 @@
 // memberData.js — Member/Entry/Weekly Firestore data-layer (CRUD, stampLastActive, entry history).
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, where, documentId, orderBy, limit } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, orderBy, limit } from "firebase/firestore";
 import { monthPrefix } from "./appHelpers.js";
 import { getFamilyCode, getFamilyId, appStorage, resolvePathContext } from "./familyIdentity.js";
 
@@ -71,20 +71,9 @@ function memberDocId(id) {
 async function loadMembersV2(migrationState) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    if (ctx.mode === "v2") {
-      const snap = await getDocs(ctx.membersRef);
-      return snap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
-    }
-    const snap = await getDocs(query(
-      ctx.membersRef,
-      where(documentId(), ">=", "member:"),
-      where(documentId(), "<", "member:\uf8ff")
-    ));
+    const snap = await getDocs(ctx.membersRef);
     return snap.docs.map(d => ({
-      id: d.id.slice("member:".length),
+      id: d.id,
       ...d.data()
     }));
   } catch (err) {

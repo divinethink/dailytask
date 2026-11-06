@@ -9,7 +9,7 @@ import { pad2 } from "./appHelpers.js";
 export async function loadMonthEntriesOnce(migrationState, memberId, year, month0) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const ym = `${year}-${pad2(month0 + 1)}-`;
-  const prefix = ctx.mode === "v2" ? `${memberId}_${ym}` : `entry:${memberId}:${ym}`;
+  const prefix = `${memberId}_${ym}`;
   const snap = await getDocs(query(
     ctx.entriesRef,
     where(documentId(), ">=", prefix),

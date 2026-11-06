@@ -574,6 +574,9 @@ function App() {
       const migrationFamilyId = getFamilyId();
       migrationUnsub = onSnapshot(doc(dbModular, "families", migrationFamilyId),
         (snap) => {
+          // cache-থেকে-আসা "নেই" snapshot উপেক্ষা (server snapshot-এ ঠিক হবে) —
+          // নইলে নতুন ডিভাইসে ক্ষণিকের জন্য ভুল "সাপোর্টেড নয়" স্ক্রিন ঝলকাতে পারে।
+          if (!snap.exists() && snap.metadata && snap.metadata.fromCache) return;
           const state = snap.exists() ? (snap.data().migrationState || "legacy") : "legacy";
           setMigrationState(state);
           // §Public Invite-Link — একই live listener থেকে mirror(নতুন read
@@ -636,7 +639,7 @@ function App() {
       // পারত)। এই get() ব্যর্থ হলেও (network ইত্যাদি) "legacy" ধরে নেওয়া
       // নিরাপদ — resolvePathContext()-এর ডিফল্ট branch legacy-ই, তাই এটি
       // আগের (এই fix-এর আগের) hardcoded আচরণের সাথে সামঞ্জস্যপূর্ণ fallback।
-      let bootMigrationState = "legacy";
+      let bootMigrationState = "v2";
       try {
         const migFamSnap = await getDoc(doc(dbModular, "families", migrationFamilyId));
         bootMigrationState = migFamSnap.exists() ? (migFamSnap.data().migrationState || "legacy") : "legacy";
@@ -916,9 +919,7 @@ function App() {
     // migrationState "legacy" হলে (বর্তমানে সবসময়ই তাই) prefix ও colRef
     // আগের হার্ডকোডেড মানের সাথে বিট-ফর-বিট অভিন্ন থাকে।
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-    const prefix = ctx.mode === "v2"
-      ? `${selectedId}_${year}-${pad2(month0 + 1)}-`
-      : `entry:${selectedId}:${year}-${pad2(month0 + 1)}-`;
+    const prefix = `${selectedId}_${year}-${pad2(month0 + 1)}-`;
     const q = query(
       ctx.entriesRef,
       where(documentId(), ">=", prefix),
@@ -1990,6 +1991,9 @@ function App() {
     setWeeklySummaryToast(summary);
   }, [monthEntries, monthCursor, selectedId, selectedMember, allFields, isGuestMode]);
   if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement(DashboardSkeleton, null);
+  if (migrationState !== "v2") return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex items-center justify-center p-6 text-center text-slate-700"
+  }, "এই পরিবারের ডেটা-সংস্করণ এই অ্যাপে সাপোর্টেড নয়। অনুগ্রহ করে অ্যাডমিনকে জানান।");
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
   // মোডাল আগে শুধু Dashboard-এর মূল JSX-এর ভিতরে বাঁধা ছিল, তাই early-
   // return branch-এ(নিচে) কখনো render হতো না — ফলে Google Sign-in ধাপে

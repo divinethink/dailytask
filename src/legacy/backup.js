@@ -206,13 +206,6 @@ async function findOrCreateDriveBackupFolder() {
 async function readAllFamilyDataForBackup(migrationState) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const result = {};
-  if (ctx.mode !== "v2") {
-    const snap = await getDocs(collection(db, getCollectionName()));
-    snap.docs.forEach(docSnap => {
-      result[docSnap.id] = docSnap.data();
-    });
-    return result;
-  }
   const [membersSnap, entriesSnap, weeklySnap] = await Promise.all([
     getDocs(ctx.membersRef),
     getDocs(ctx.entriesRef),
@@ -266,11 +259,6 @@ async function writeParsedBackupToFamily(migrationState, items) {
       });
       await batch.commit();
     }
-  }
-  if (ctx.mode !== "v2") {
-    const colRef = collection(db, getCollectionName());
-    await commitInChunks(items.map(({ key, data }) => ({ ref: doc(colRef, key), data })));
-    return;
   }
   const legacyColRef = collection(db, getCollectionName());
   const mainWrites = [];
