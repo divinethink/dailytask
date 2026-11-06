@@ -1,19 +1,4 @@
-// A4-G4-Part E — Member list + release/admin actions, extracted verbatim from
-// legacy App() hamburger dropdown (app.js lines ~6840-6945).
-// Structural-only (Owner Rule 2): no logic/condition change, only moved to its own file.
-// Returns a React.Fragment (label block + list block are siblings inside one wrapper div,
-// so this component returns that single wrapper div as before).
-// §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): "দায়িত্ব নিন"(Member
-// Password claim) ও "রিসেট করুন"(Admin Force-Release) বাটন সরানো হয়েছে — উভয়টাই
-// Google-only identity model(2_4)-এ obsolete(দুটো real family-ই ইতিমধ্যে
-// identityModel:"google-only", Rules-level এই legacy ownerUids-claim path আগে থেকেই
-// বন্ধ)। নিজের device-এর দায়িত্ব ছেড়ে দেওয়া("আপনি" badge → handleReleaseMember,
-// self-only, Member Key-নির্ভর না) ও Make/Remove Admin(googleUid-model-এও active
-// থাকে, 2_4 §৮ "অপরিবর্তিত" নীতি অনুযায়ী) অপরিবর্তিত।
-// §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved): pending
-// memberRequests-এর inline Approve/Reject ব্লক সরানো হয়েছে — Approve-branch
-// createMemberWithKey() দিয়ে private/key তৈরি করত, যা google-only family-তে
-// Rules-level এখন blocked(উভয় real family-ই ইতিমধ্যে google-only)।
+// সদস্য-তালিকা (release/admin বাটন) — App() থেকে আলাদা করা component; শুধু রেন্ডার, লজিক caller থেকে আসে।
 import { InfoIcon, Plus, Trash, User, UsersIcon } from "./icons.jsx";
 
 // §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested): শুধু লেআউট/স্টাইল — সব onClick/শর্ত/

@@ -61,16 +61,6 @@ export function createFamilyActions(c) {
       alert("লিংক নিষ্ক্রিয় করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।");
     }
   }
-  // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
-  // loadPendingAccessRequests/decideAccessRequest(Access Approval Gate
-  // admin-review, কোনো live trigger ছিল না — grep-verify করা হয়েছে) ও
-  // loadPendingMemberRequests/decideMemberRequest("সদস্য হোন" admin-approve,
-  // Approve-branch createMemberWithKey() দিয়ে private/key তৈরি করে, যা
-  // google-only family-তে Rules-level blocked — উভয় real family-ই ইতিমধ্যে
-  // google-only) সরানো হয়েছে। handleAddMember()(সরাসরি admin-add, একই
-  // createMemberWithKey() ব্যবহার করে) এই সেশনে touch করা হয়নি — এটা এখনো
-  // live UI path, যদিও একই কারণে বর্তমানে ভাঙা(পৃথক finding হিসেবে
-  // রিপোর্ট করা হয়েছে, §৮ cleanup scope-এর বাইরে — নতুন feature-work লাগবে)।
   // "নতুন ফ্যামিলি কোড তৈরি করুন" — সব সদস্যের জন্য উন্মুক্ত (কারো নিজস্ব
   // পৃথক family স্পেস দরকার হলে)। সম্পূর্ণ নতুন familyId+data — বর্তমান
   // family/data কোনোভাবে touch হয় না, শুধু এই ডিভাইসটি নতুন (blank)

@@ -26,11 +26,6 @@ export function NotificationPanel({
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => {
       updateDoc(doc(db, "families", getFamilyId(), "notifications", n.id), { read: true }).catch(() => {});
-      // §Old-code cleanup Phase 2(১১ সেপ্টেম্বর ২০২৬, owner-approved):
-      // "member_request" type click → MemberRequestsModal open করার branch
-      // সরানো হয়েছে(সেই মোডাল নিজেই সরানো হয়েছে, app.js দ্রষ্টব্য) — পুরনো,
-      // cutover-এর আগের কোনো stale notification থাকলেও এখন শুধু read:true
-      // mark হবে, কোনো error/no-op ছাড়া।
     },
     className: "flex-1 cursor-pointer"
   }, /*#__PURE__*/React.createElement("div", {

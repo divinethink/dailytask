@@ -1,12 +1,5 @@
-// ২.৪ §৯.৪ / ২.৫ Screen E — নতুন Google-only Profile Dropdown।
-// সম্পূর্ণ নতুন, additive ফাইল — পুরনো ProfileDropdown.jsx(Member Password/
-// Google-link legacy UI) অপরিবর্তিত রাখা হয়েছে, app.js এখনো এটা import/use
-// করে না। বাস্তবায়ন-ধাপ ৬(old-path removal+cutover)-এ app.js-এর wiring
-// বদলে পুরনোটা এটা দিয়ে replace হবে।
-//
-// পুরনো ProfileDropdown.jsx-এর মতোই এই ফাইল উদ্দেশ্যপ্রণোদিতভাবে JSX-syntax
-// না লিখে React.createElement() ব্যবহার করেছে(existing codebase convention,
-// A4 G1 pattern সামঞ্জস্য)।
+// Google-only Profile Dropdown (২.৪ §৯.৪ / ২.৫ Screen E)।
+// JSX না লিখে React.createElement() ব্যবহার — existing codebase convention (A4 G1 pattern)।
 //
 // Business-logic(Firestore write) এই component-এ embed করা হয়নি — সব
 // action(googleIdentity.js: editOwnProfile/leaveFamily, ও existing

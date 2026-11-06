@@ -17,13 +17,7 @@ export function createMemberActions(c) {
     }
     const name = newName.trim();
     if (!name) return;
-    // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬, real gap fix): আগে এখানে
-    // createMemberWithKey()(Member Password-ভিত্তিক) কল হতো, যা google-only
-    // family-তে Rules-level(`private/key` create, `!isGoogleOnly` guard)
-    // blocked — বাটন ভাঙা ছিল(দুটো real family-ই ইতিমধ্যে google-only)। এখন
-    // 2_4 §৫.১ Admin-added Proxy Member pattern(email-ভিত্তিক, googleUid:
-    // null) ব্যবহার করা হচ্ছে — সদস্য পরে নিজে Google Sign-in করলে auto-claim
-    // হবে(googleIdentity.js: signInExistingMemberByGoogle(), অপরিবর্তিত)।
+    // Admin-added Proxy Member (2_4 §৫.১): email-ভিত্তিক, googleUid:null — সদস্য পরে নিজে Google Sign-in করলে auto-claim হবে (googleIdentity.js: signInExistingMemberByGoogle())।
     const email = (newMemberEmail || "").trim();
     if (!email || !email.includes("@")) {
       alert("সদস্যের সঠিক ইমেইল ঠিকানা দিন — পরে Google দিয়ে সাইন-ইন করার জন্য প্রয়োজন।");
@@ -53,17 +47,7 @@ export function createMemberActions(c) {
     }
   }
   async function handleRemoveMember(m) {
-    // §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #৪): আগে এখানে
-    // memberOwnerUids(m)-ভিত্তিক একটা guard ছিল("অন্য ডিভাইসের দায়িত্বে
-    // আছে") — এটা পুরনো ownerUids self-serve মডেলের অবশিষ্টাংশ। বর্তমান
-    // firestore.rules-এ member delete শুধু isAdminOfFamily()-নির্ভর
-    // (ownership-নিরপেক্ষ, "বাগ-ফিক্স ২৭.৪" দ্রষ্টব্য) — তাই admin যেকোনো
-    // claimed member(নিজে owner না হলেও) delete করতে পারার কথা, কিন্তু এই
-    // stale client-guard সেটা ভুলভাবে ব্লক করছিল(test member remove করতে
-    // না পারার আসল কারণ)। Trash বাটন এখন isAdmin-গেটেড(MemberListSection.jsx)
-    // বলে এই ফাংশন কল হওয়া মানেই caller admin — আলাদা client-check
-    // redundant, তাই সরিয়ে ফেলা হলো। Server-side Rules অপরিবর্তিত(একমাত্র
-    // real authorization boundary)।
+    // Trash বাটন isAdmin-গেটেড (MemberListSection.jsx), তাই এখানে আলাদা client-guard নেই; আসল authorization boundary firestore.rules-এ (member delete শুধু isAdminOfFamily())।
     const ok = window.confirm(`আপনি কি নিশ্চিত "${m.name}" কে সদস্য তালিকা থেকে বাদ দিতে চান? এই সদস্যের নাম আর দেখা যাবে না, তবে পূর্বের সেভ করা ডেটা মুছে যাবে না।`);
     if (!ok) return;
     const next = (members || []).filter(x => x.id !== m.id);

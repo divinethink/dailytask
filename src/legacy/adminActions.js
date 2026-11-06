@@ -10,14 +10,6 @@ export function createAdminActions(c) {
     setAdminUidsList, setIsAdmin, setShowProfileDropdown
   } = c;
 
-  // §Old-code cleanup Phase 1(১১ সেপ্টেম্বর ২০২৬, owner-approved): handleClaimMember
-  // (legacy-v1-only free-claim, বাস্তবে উভয় real family v2-তে থাকায় already-dead)
-  // ও handleAdminForceRelease(Member Password/ownerUids claim-system-নির্ভর,
-  // দুটো real family-ই ইতিমধ্যে identityModel:"google-only" — Rules-level এই
-  // legacy claim/force-release path আগে থেকেই বন্ধ) সরানো হয়েছে। "রিসেট
-  // করুন"/"দায়িত্ব নিন" বাটন MemberListSection.jsx থেকেও একই সেশনে সরানো
-  // হয়েছে। handleReleaseMember(self-only device-release, Member Key-নির্ভর
-  // না) অপরিবর্তিত।
   // Admin Visibility UI — একজন claimed সদস্যকে Admin করা। Rules-এ scoped
   // update clause (adminUids-এ ঠিক ১টা নতুন uid যোগ, বাকি সব অপরিবর্তিত)
   // দিয়ে server-side enforced — এই ফাংশন শুধু সেই call করে, permission
