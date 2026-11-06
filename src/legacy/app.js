@@ -1551,6 +1551,9 @@ function App() {
           }]
         });
       }
+    }, () => {
+      // error-callback: permission-denied/নেটওয়ার্ক ত্রুটিতে "Uncaught Error in
+      // snapshot listener" এড়ানো; বিদ্যমান meetingState অক্ষত থাকে।
     });
     return () => unsubscribe();
   }, [meetingCursor]);
