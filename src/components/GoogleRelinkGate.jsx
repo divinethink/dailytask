@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { authModular as auth } from "../legacy/firebaseConfig.js";
 import { getRelinkFlag, hasGoogleProvider, linkGoogleAccountNow, loadUserMapping } from "../legacy/googleIdentity.js";
 import { oldEmailFromFlag, RELINK_FLAG } from "../legacy/googleAccountChange.js";
+import { GoogleGIcon } from "./icons.jsx";
 
 const TEXT = {
   title: "নতুন জিমেইল অ্যাকাউন্ট যুক্ত করুন",

@@ -10,9 +10,54 @@ import { loadReviewsForWeeks } from "../legacy/reviewData.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
+import { MonthPillNav } from "./MonthPillNav.jsx";
+import { ChevronDown } from "./icons.jsx";
 
 const T = REVIEW_TEXT.monthly;
 const { useState, useEffect, useMemo } = React;
+
+function SectionTitle({ children }) {
+  return <div className="text-sm font-bold mb-2" style={{ color: "#16302B" }}>{children}</div>;
+}
+
+// avgs: [{weekday 0-6, count, avg|null}], weakest: [weekday], names: বারের নাম (রবি=০)।
+function WeekdayBars({ avgs, weakest, names, toBn }) {
+  return (
+    <div className="flex items-end gap-1.5" style={{ height: 96 }}>
+      {avgs.map(a => {
+        const weak = weakest.includes(a.weekday);
+        const h = a.avg === null ? 4 : Math.max(4, Math.round(a.avg * 0.6));
+        return (
+          <div key={a.weekday} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full">
+            <span className="text-[10px] text-slate-500 mb-0.5">{a.avg === null ? "—" : toBn(a.avg) + "%"}</span>
+            <div className="w-full rounded-t-md" style={{ height: h, background: a.avg === null ? "#E4E7E2" : weak ? "#D9822B" : "#2D6A5C" }} />
+            <span className="text-[10px] mt-1 text-slate-600 truncate w-full text-center">{names[a.weekday]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// weeks: [{week, count, avg|null}] — ২+ সপ্তাহের ডেটায় ছোট রেখা-চার্ট।
+function TrendChart({ weeks, toBn }) {
+  const pts = weeks.filter(w => w.avg !== null);
+  const W = 300, H = 90, P = 16;
+  const x = i => P + (pts.length === 1 ? 0 : (i * (W - 2 * P)) / (pts.length - 1));
+  const y = v => H - P - (Math.max(0, Math.min(100, v)) / 100) * (H - 2 * P);
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 14}`} className="w-full" role="img" aria-label={T.trendTitle}>
+      <polyline fill="none" stroke="#2D6A5C" strokeWidth="2" points={pts.map((w, i) => `${x(i)},${y(w.avg)}`).join(" ")} />
+      {pts.map((w, i) => (
+        <g key={w.week}>
+          <circle cx={x(i)} cy={y(w.avg)} r="3.5" fill="#C89B3C" />
+          <text x={x(i)} y={y(w.avg) - 7} textAnchor="middle" fontSize="10" fill="#16302B">{toBn(w.avg)}%</text>
+          <text x={x(i)} y={H + 10} textAnchor="middle" fontSize="9" fill="#5B6B64">{T.weekShort.replace("{n}", toBn(w.week)).split("·")[0].trim()}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
 
 const GOAL_ICON = { done: "✅", partial: "🟡", none: "❌" };
 const cardBox = "rounded-2xl bg-white p-3 mb-2";

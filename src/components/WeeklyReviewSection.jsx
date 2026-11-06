@@ -8,6 +8,8 @@ import { weeklyGap, countFieldTotal, weekGlance } from "../legacy/reviewCalc.js"
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
+import { MonthPillNav } from "./MonthPillNav.jsx";
+import { ChevronDown } from "./icons.jsx";
 
 const { useState, useEffect, useMemo } = React;
 
@@ -15,6 +17,16 @@ const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emeral
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
 const G = T.glance;
 const GLANCE_BG = "linear-gradient(135deg,#1F4D44,#2D6A5C)";
+
+function GlanceCell({ label, value, sub }) {
+  return (
+    <div className="rounded-lg p-2" style={{ background: "rgba(255,255,255,0.14)" }}>
+      <div className="text-[11px] opacity-90">{label}</div>
+      <div className="text-base font-bold leading-tight">{value}</div>
+      {sub ? <div className="text-[11px] opacity-90">{sub}</div> : null}
+    </div>
+  );
+}
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
 export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {

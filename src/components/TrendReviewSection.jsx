@@ -8,6 +8,8 @@ import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
+import { MonthPillNav } from "./MonthPillNav.jsx";
+import { ChevronDown } from "./icons.jsx";
 
 const T = REVIEW_TEXT.trend;
 const { useState, useEffect, useMemo, useRef } = React;
@@ -31,6 +33,38 @@ const ARROW = {
   down: { ch: "↓", color: "#D9822B", label: T.down },
   flat: { ch: "→", color: "#8A9A8F", label: T.flat }
 };
+
+// v = {pct, tier, days} | null
+function Pill({ v, monthName, toBn }) {
+  const st = TIER_STYLE[v ? v.tier : "none"] || TIER_STYLE.none;
+  return (
+    <span
+      className="w-11 shrink-0 text-center text-xs font-bold rounded-lg py-1"
+      style={{ background: st.background, color: st.color }}
+      aria-label={monthName + ": " + (v ? toBn(v.pct) + "%" : "—")}
+    >
+      {v ? toBn(v.pct) + "%" : "—"}
+    </span>
+  );
+}
+
+function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
+  const a = r.dir ? ARROW[r.dir] : null;
+  return (
+    <div className="py-1.5 border-b border-slate-100 last:border-b-0">
+      <div className="flex items-center gap-1">
+        <div className="flex-1 min-w-0 pr-1 text-sm text-slate-800 leading-snug">{r.label}</div>
+        {r.vals.map((v, i) => (
+          <Pill key={i} v={v} monthName={BN_MONTHS[months[i].month0]} toBn={toBn} />
+        ))}
+        <span className="w-4 shrink-0 text-center font-bold" style={{ color: a ? a.color : "transparent" }} aria-label={a ? a.label : undefined}>
+          {a ? a.ch : ""}
+        </span>
+      </div>
+      {comment ? <p className="text-xs text-slate-500 mt-0.5">{comment}</p> : null}
+    </div>
+  );
+}
 
 // প্রথমে দেখানো মূল ৮টি আমল (এই ক্রমে); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
 const KEY_ORDER = ["fardPrayers", "jamaat", "exercise", "healthyFood", "noLyingBackbitingPride", "dawah", "earlyMorning"];

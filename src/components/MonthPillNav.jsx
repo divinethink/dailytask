@@ -4,6 +4,8 @@
 
 export const NAV_BTN = "relative w-5 h-7 flex items-center justify-center rounded-md hover:bg-black/10 before:content-[''] before:absolute before:-inset-x-1 before:-inset-y-2";
 
+import { ChevronLeft, ChevronRight } from "./icons.jsx";
+
 export function MonthPillNav({ monthCursor, BN_MONTHS, toBn, onShift, label }) {
   if (!monthCursor || !onShift) return null;
   // ট্যাপের পর উপরের কার্ডের উচ্চতা বদলালেও চিপ আঙুলের নিচেই থাকে(স্ক্রল-অ্যাঙ্কর)।
