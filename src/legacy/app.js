@@ -112,6 +112,8 @@ import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
 import { useCursorEntries } from "./useCursorEntries.js";
 import { fetchDesign, saveDesignPart } from "./appDesign.js";
+import { monthStatsOf, weekSummaryOf, yesterdayEntryOf, yesterdayMissingOf } from "./homeStats.js";
+const STATS_H = { dateKey, pad2, dailyScore, daysInMonth };
 const NO_DIRTY = { current: false };
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
@@ -2042,21 +2044,8 @@ function App() {
   // "আজকের মুহাসাবা" কার্ডের "গতকাল ভরা হয়নি" ব্যানার: শুধু আজকের দিন দেখার সময়, চলতি মাসে, মাসের ২ তারিখ থেকে,
   // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে(নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
   // "গতকালের মতো বসান" শর্টকাটের উৎস: একই শর্তে(চলতি মাস, ২ তারিখ থেকে) গতকালের সেভ-করা এন্ট্রি, নইলে null।
-  const yesterdayEntry = useMemo(() => {
-    const now = new Date();
-    if (dateKey(viewDate) !== dateKey(now)) return null;
-    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
-    if (now.getDate() < 2) return null;
-    return (monthEntries && monthEntries[pad2(now.getDate() - 1)]) || null;
-  }, [viewDate, monthCursor, monthEntries]);
-  const yesterdayMissing = useMemo(() => {
-    const now = new Date();
-    if (dateKey(viewDate) !== dateKey(now)) return false;
-    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return false;
-    if (now.getDate() < 2) return false;
-    if (!monthEntries || Object.keys(monthEntries).length === 0) return false;
-    return !monthEntries[pad2(now.getDate() - 1)];
-  }, [viewDate, monthCursor, monthEntries]);
+  const yesterdayEntry = useMemo(() => yesterdayEntryOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
+  const yesterdayMissing = useMemo(() => yesterdayMissingOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
   const suggestedFocusKey = useMemo(() => {
     const now = new Date();
     if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
@@ -2079,25 +2068,7 @@ function App() {
     localStorage.setItem(seenKey, "1");
     setMilestoneToast(hit);
   }, [streak, selectedId]);
-  const monthStats = useMemo(() => {
-    const total = daysInMonth(monthCursor.year, monthCursor.month0);
-    let filled = 0;
-    let scoreSum = 0;
-    for (let d = 1; d <= total; d++) {
-      const e = monthEntries[pad2(d)];
-      const s = dailyScore(e, selectedMember, allFields);
-      if (s !== null) {
-        filled += 1;
-        scoreSum += s;
-      }
-    }
-    const avg = filled ? scoreSum / filled : 0;
-    return {
-      total,
-      filled,
-      avgPct: Math.round(avg * 100)
-    };
-  }, [monthEntries, monthCursor, selectedMember, allFields]);
+  const monthStats = useMemo(() => monthStatsOf({ entries: monthEntries, year: monthCursor.year, month0: monthCursor.month0, member: selectedMember, fields: allFields }, STATS_H), [monthEntries, monthCursor, selectedMember, allFields]);
   // §B৭ Weekly Summary Notification(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
   // owner-approved, in-app non-push variant — architecture-review note
   // অনুযায়ী প্রকৃত push out-of-scope, Blaze লাগবে): app-open-এ, ইতিমধ্যে-
@@ -2128,25 +2099,12 @@ function App() {
       already = weekKey;
     }
     if (already === weekKey) return;
-    let filled = 0;
-    let scoreSum = 0;
-    for (let d = lastWeek.start; d <= lastWeek.end; d++) {
-      const e = monthEntries[pad2(d)];
-      const s = dailyScore(e, selectedMember, allFields);
-      if (s !== null) {
-        filled += 1;
-        scoreSum += s;
-      }
-    }
+    const summary = weekSummaryOf(lastWeek, monthEntries, selectedMember, allFields, STATS_H);
     try {
       localStorage.setItem(flagKey, weekKey);
     } catch {}
-    if (filled === 0) return;
-    setWeeklySummaryToast({
-      avgPct: Math.round(scoreSum / filled * 100),
-      filled,
-      totalDays: lastWeek.end - lastWeek.start + 1
-    });
+    if (!summary) return;
+    setWeeklySummaryToast(summary);
   }, [monthEntries, monthCursor, selectedId, selectedMember, allFields, isGuestMode]);
   if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement(DashboardSkeleton, null);
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
