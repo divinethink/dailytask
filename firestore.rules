@@ -996,6 +996,32 @@ service cloud.firestore {
       }
     }
 
+    // --- legacy data_<code> কালেকশন (appStorage shared ডক) ---
+    // এখানে থাকে: মাসিক সভা (meeting_rows_v2:YYYY-MM), custom_fields, field_overrides,
+    // tazkirah_custom। আগে এই কালেকশনের কোনো match ছিল না ⇒ default-deny ⇒ সভা সেভে
+    // "Missing or insufficient permissions"। পরিবার চেনা হয় legacyCollectionMap/{নাম}.familyId
+    // থেকে (map না থাকলে অস্বীকৃত); অ্যাক্সেস = isApprovedMember (admin/creator/claimed সদস্য)।
+    // Read-এ ডক-id সীমা নেই (backup পুরো কালেকশন list করে); Write-এ id whitelist + আকার-সীমা।
+    match /{legacyCol}/{legacyDocId} {
+      function legacyMapPath() {
+        return /databases/$(database)/documents/legacyCollectionMap/$(legacyCol);
+      }
+      function legacyAccess() {
+        return request.auth != null
+          && legacyCol.matches('data_.*')
+          && exists(legacyMapPath())
+          && isApprovedMember(get(legacyMapPath()).data.familyId);
+      }
+      allow read: if legacyAccess();
+      allow create, update: if legacyAccess()
+        && legacyDocId.matches('meeting_rows_v2:[0-9]{4}-[0-9]{2}|custom_fields|field_overrides|tazkirah_custom')
+        && request.resource.data.keys().hasOnly(['value', 'updatedAt'])
+        && request.resource.data.value is string
+        && request.resource.data.value.size() <= 200000;
+      allow delete: if legacyAccess()
+        && isAdminOfFamily(get(legacyMapPath()).data.familyId);
+    }
+
     // --- PWA ইনস্টল কাউন্টার (গ্লোবাল, কোনো নির্দিষ্ট পরিবারের ডাটা নয়) ---
     match /app_stats/{statId} {
       allow read: if request.auth != null;

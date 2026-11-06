@@ -30,6 +30,8 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, "families/famA"), fam("famA", "FAMILYA1", "uidA"));
     await setDoc(doc(db, "families/famB"), fam("famB", "FAMILYB1", "uidB"));
+    await setDoc(doc(db, "legacyCollectionMap/data_FAMILYA1"), { familyId: "famA", createdAt: 1 });
+    await setDoc(doc(db, "legacyCollectionMap/data_FAMILYB1"), { familyId: "famB", createdAt: 1 });
     await setDoc(doc(db, "families/famA/members/m1"), { name: "A-member" });
     await setDoc(doc(db, "families/famB/members/m2"), { name: "B-member" });
   });
@@ -57,4 +59,31 @@ test("লগইন ছাড়া (unauthenticated) members list করা য�
   const db = env.unauthenticatedContext().firestore();
   await assertFails(getDocs(collection(db, "families/famA/members")));
   await assertFails(getDoc(doc(db, "families/famA")));
+});
+
+// --- legacy data_<code> (মাসিক সভা ইত্যাদি) ---
+const mtg = { value: "{}", updatedAt: 1 };
+
+test("নিজের পরিবারের admin মাসিক সভা সেভ ও পড়তে পারে", async () => {
+  const db = as("uidA");
+  await assertSucceeds(setDoc(doc(db, "data_FAMILYA1/meeting_rows_v2:2026-11"), mtg));
+  await assertSucceeds(getDoc(doc(db, "data_FAMILYA1/meeting_rows_v2:2026-11")));
+});
+
+test("অন্য পরিবারের সভা পড়া/লেখা যায় না", async () => {
+  await assertFails(setDoc(doc(as("uidA"), "data_FAMILYB1/meeting_rows_v2:2026-11"), mtg));
+  await assertFails(getDoc(doc(as("uidA"), "data_FAMILYB1/meeting_rows_v2:2026-11")));
+});
+
+test("অচেনা ডক-id বা বাড়তি ফিল্ডে লেখা যায় না", async () => {
+  const db = as("uidA");
+  await assertFails(setDoc(doc(db, "data_FAMILYA1/random_doc"), mtg));
+  await assertFails(setDoc(doc(db, "data_FAMILYA1/custom_fields"), { value: "[]", updatedAt: 1, extra: 1 }));
+});
+
+test("map-বিহীন বা data_ নয় এমন কালেকশনে অ্যাক্সেস নেই; লগইন ছাড়া নয়", async () => {
+  await assertFails(setDoc(doc(as("uidA"), "data_NOMAP/custom_fields"), mtg));
+  await assertFails(setDoc(doc(as("uidA"), "other_col/custom_fields"), mtg));
+  const un = env.unauthenticatedContext().firestore();
+  await assertFails(getDoc(doc(un, "data_FAMILYA1/meeting_rows_v2:2026-11")));
 });
