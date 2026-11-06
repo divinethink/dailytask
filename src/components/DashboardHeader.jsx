@@ -28,7 +28,6 @@ export function DashboardHeader({
   isGuestMode,
   onGuestSignInTap,
   handleAddMember,
-  handleChangeGmail,
   handleChangeGoogleAccount,
   handleCopyCode,
   handleFullLogout,

@@ -2533,33 +2533,6 @@ function App() {
     localStorage.removeItem("family_code_is_custom");
     window.location.reload();
   }
-  // §Gmail পরিবর্তন — unlink(uid অপরিবর্তিত) + সাথে সাথে নতুন Google
-  // popup দিয়ে link। প্রথম ধাপ(unlink) সফল হওয়ার পর দ্বিতীয় ধাপ(link)
-  // ব্যর্থ/বাতিল হলেও uid/ownerUid/adminUids অক্ষুণ্ণ থাকে — শুধু account
-  // unlinked অবস্থায় থেকে যায়(পরে আবার সংযুক্ত করা যাবে)।
-  async function handleChangeGmail() {
-    setIsMenuOpen(false);
-    setShowAccountMenu(false);
-    try {
-      await unlinkGoogleAccount();
-      try {
-        await linkGoogleAccount();
-        window.location.reload();
-      } catch (linkErr) {
-        if (linkErr && linkErr.code === "auth/credential-already-in-use") {
-          alert("এই Google Account ইতিমধ্যে অন্য কোনো পরিচয়ের সাথে যুক্ত আছে। ভিন্ন একটি Google Account দিয়ে চেষ্টা করুন।");
-        } else if (linkErr && (linkErr.code === "auth/popup-closed-by-user" || linkErr.code === "auth/cancelled-popup-request")) {
-          // ব্যবহারকারী নিজেই বাতিল করেছেন — নীরবে থেমে যাওয়া, পুরনো
-          // Google account unlink অবস্থায় থেকে যাবে(uid অপরিবর্তিত)।
-        } else {
-          alert("নতুন Google Account সংযুক্ত করতে সমস্যা হয়েছে: " + (linkErr && linkErr.message));
-        }
-        window.location.reload();
-      }
-    } catch (err) {
-      alert("জিমেইল পরিবর্তন করতে সমস্যা হয়েছে: " + err.message);
-    }
-  }
   async function handleDeleteGoogleAccount() {
     try {
       // এখানে অতিরিক্ত নতুন পরিচয় তৈরি করা হয় না
@@ -3186,7 +3159,6 @@ function App() {
     isGuestMode: isGuestMode,
     onGuestSignInTap: () => setShowGuestSignIn(true),
     handleAddMember: handleAddMember,
-    handleChangeGmail: handleChangeGmail,
     handleChangeGoogleAccount: handleChangeGoogleAccount,
     handleCopyCode: handleCopyCode,
     handleFullLogout: handleFullLogout,
