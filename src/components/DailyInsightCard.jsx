@@ -14,7 +14,8 @@ function InsightBody({ insight, toBn }) {
       );
     case "nearMilestone":
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", { className: "text-sm text-slate-700" }, "বর্তমান Streak: ", /*#__PURE__*/React.createElement("b", null, toBn(insight.streak), " দিন"), /*#__PURE__*/React.createElement("span", { className: "text-xs text-[#0E4B43]" }, " · আগামীকাল পূরণ হলে ", toBn(insight.next), "-দিনের মাইলফলক!"))
+        /*#__PURE__*/React.createElement("div", { className: "flex items-center justify-between text-sm text-slate-700" }, /*#__PURE__*/React.createElement("span", null, "বর্তমান Streak"), /*#__PURE__*/React.createElement("b", { className: "text-base text-emerald-950" }, "🔥 ", toBn(insight.streak), " দিন")),
+        /*#__PURE__*/React.createElement("div", { className: "text-xs text-[#0E4B43] mt-0.5" }, "আগামীকাল পূরণ হলে ", toBn(insight.next), "-দিনের মাইলফলক!")
       );
     case "bestDay":
       return /*#__PURE__*/React.createElement(React.Fragment, null,

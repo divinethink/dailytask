@@ -16,6 +16,7 @@ const { useState, useEffect, useMemo } = React;
 const chip = on => "px-3 py-1.5 rounded-full text-sm border " + (on ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300");
 const box = "w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-700 bg-white";
 const G = T.glance;
+const STEP_ICONS = ["🎯", "📉", "🤝", "🔐", "🌱"];
 const GLANCE_BG = "linear-gradient(135deg,#1F4D44,#2D6A5C)";
 
 function GlanceCell({ label, value, sub }) {
@@ -110,10 +111,11 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
 
   const haqq = form.haqq || [];
   const haqqState = id => (haqq.includes(id + ":good") ? "good" : haqq.includes(id + ":care") ? "care" : "none");
-  const cycleHaqq = id => {
+  // একই বাটনে আবার ট্যাপ করলে নির্বাচন মুছে যায়; ডেটা-ফরম্যাট আগের মতোই ("id:good"/"id:care")।
+  const pickHaqq = (id, val) => {
     const st = haqqState(id);
     const rest = haqq.filter(x => !x.startsWith(id + ":"));
-    set("haqq", st === "none" ? [...rest, id + ":good"] : st === "good" ? [...rest, id + ":care"] : rest);
+    set("haqq", st === val ? rest : [...rest, id + ":" + val]);
   };
   const firstCare = T.haqq.people.find(p => haqqState(p.id) === "care");
 
@@ -158,11 +160,24 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
             <button key={w} type="button" onClick={() => setWeek(w)} className={"flex-1 min-w-0 whitespace-nowrap text-center px-1 py-1.5 rounded-full text-sm font-semibold border " + (w === week ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300")}>সপ্তাহ {toBn(w)}</button>
           ))}
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-2">
-          <span className="shrink-0">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} <span title={T.privateTag}>🔒</span></span>
-          <span className="min-w-0 truncate font-semibold text-slate-600">ধাপ {toBn(step)}/{toBn(5)} · {T.steps[step - 1]}</span>
+        <div className="text-xs text-slate-500 mb-2">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} <span title={T.privateTag}>🔒</span></div>
+        <div className="flex items-center mb-2">
+          {T.steps.map((_, i) => {
+            const n = i + 1, done = n < step, cur = n === step;
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && <span className="h-0.5 flex-1 rounded-full" style={{ background: done || cur ? "#1F4D44" : "#E2E8F0" }} />}
+                <span className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-base font-bold" style={{
+                  background: done ? "#1F4D44" : cur ? "#FFF3D6" : "#F1F5F9",
+                  color: done ? "#fff" : "#64748B",
+                  border: cur ? "2px solid #E8A317" : "2px solid transparent",
+                  boxShadow: cur ? "0 0 0 3px rgba(232,163,23,0.18)" : "none"
+                }}>{done ? "✓" : STEP_ICONS[i]}</span>
+              </React.Fragment>
+            );
+          })}
         </div>
-        <div className="flex gap-1.5 mb-4">{T.steps.map((_, i) => <span key={i} className={"h-1 flex-1 rounded-full " + (i + 1 < step ? "bg-emerald-900" : i + 1 === step ? "bg-amber-500" : "bg-slate-200")} />)}</div>
+        <div className="mb-4 text-center"><span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">ধাপ {toBn(step)}/{toBn(5)} · {T.steps[step - 1]}</span></div>
 
         {step === 1 && (
           <div>
@@ -223,13 +238,20 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
         {step === 3 && (
           <div>
             <p className="text-sm text-slate-600 mb-2">{T.haqq.hint}</p>
-            <div className="flex flex-wrap gap-2 mb-1">
+            <div className="flex flex-col gap-2 mb-3">
               {T.haqq.people.map(p => {
                 const st = haqqState(p.id);
-                return <button key={p.id} type="button" onClick={() => cycleHaqq(p.id)} className={"px-3 py-1.5 rounded-full text-sm border font-semibold " + (st === "good" ? "bg-emerald-900 text-white border-emerald-900" : st === "care" ? "bg-orange-50 text-orange-800 border-orange-300" : "bg-white text-slate-700 border-slate-300")}>{p.t}{st === "good" ? " ✓" : st === "care" ? " ⚠" : ""}</button>;
+                return (
+                  <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-2.5">
+                    <div className="text-sm font-bold text-slate-800 mb-1.5">{p.t}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => pickHaqq(p.id, "good")} className={"rounded-lg py-2 text-sm font-bold border " + (st === "good" ? "bg-emerald-900 text-white border-emerald-900" : "bg-emerald-50 text-emerald-900 border-emerald-200")}>✓ {T.haqq.good}</button>
+                      <button type="button" onClick={() => pickHaqq(p.id, "care")} className={"rounded-lg py-2 text-sm font-bold border " + (st === "care" ? "bg-orange-500 text-white border-orange-500" : "bg-orange-50 text-orange-800 border-orange-200")}>⚠ {T.haqq.care}</button>
+                    </div>
+                  </div>
+                );
               })}
             </div>
-            <p className="text-[11px] text-slate-400 mb-3">{T.haqq.tapHint}</p>
             {firstCare && <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm">📌 {T.haqq.pinPrefix}<b>{firstCare.task}</b></p>}
           </div>
         )}

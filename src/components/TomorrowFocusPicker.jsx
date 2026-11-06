@@ -75,16 +75,18 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
             onClick: handleSave
           }, saving ? "..." : "ঠিক আছে")
         )
-      : /*#__PURE__*/React.createElement("div", { className: "flex justify-between items-center" },
-          /*#__PURE__*/React.createElement("span", { className: "text-sm text-emerald-950 font-bold" },
-            /*#__PURE__*/React.createElement("span", { className: "text-slate-600 font-semibold" }, isToday ? "🎯 আজকের ফোকাস: " : "🎯 আগামীকালের ফোকাস: "),
+      : /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { className: "flex justify-between items-center" },
+            /*#__PURE__*/React.createElement("span", { className: "text-sm text-slate-600 font-semibold" }, isToday ? "🎯 আজকের ফোকাস" : "🎯 আগামীকালের ফোকাস"),
+            /*#__PURE__*/React.createElement("button", {
+              className: "text-xs text-[#0E4B43] underline py-3 -my-3 pl-3 shrink-0",
+              onClick: () => { setChoice(activeFieldKey); setEditing(true); }
+            }, "পরিবর্তন করুন")
+          ),
+          /*#__PURE__*/React.createElement("div", { className: "text-sm text-emerald-950 font-bold mt-0.5" },
             activeField.shortLabel || activeField.label,
             activeSource === "auto" ? " (পরামর্শ)" : ""
-          ),
-          /*#__PURE__*/React.createElement("button", {
-            className: "text-xs text-[#0E4B43] underline py-3 -my-3 pl-3 shrink-0",
-            onClick: () => { setChoice(activeFieldKey); setEditing(true); }
-          }, "পরিবর্তন করুন")
+          )
         )
   );
 }
