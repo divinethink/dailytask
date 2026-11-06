@@ -11,17 +11,18 @@ import {
   editOwnProfile, leaveFamily, addProxyMemberByAdmin, loadActiveInviteToken, removeLegacyInviteToken,
   deleteFamilyMemberEmail, normalizeEmail, startGoogleAccountChange
 } from "./googleIdentity.js";
-import { meetingKey, saveMeetingData, loadWeekly, deleteMemberDoc, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
+import { meetingKey, loadWeekly, deleteMemberDoc, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
 import { importBackupFromFile } from "./importBackup.js";
 import { exportBackupToDevice } from "./exportBackup.js";
 import { createDriveBackupActions } from "./driveBackupActions.js";
 import { createFamilyActions } from "./familyActions.js";
+import { createFeedbackAction } from "./feedbackAction.js";
+import { createMeetingActions } from "./meetingActions.js";
 
 // Feedback submission — powered by Web3Forms (no server/coding needed).
 // 1. Go to https://web3forms.com and enter your email to get a free
 //    "Access Key" (arrives instantly by email, no account required).
 // 2. Paste that key below, replacing the placeholder text.
-const WEB3FORMS_ACCESS_KEY = "4e0befa2-68c6-4c9e-92fb-ecffa3b4b2de";
 // Auto-update(fresh-load-only, one-time): controllerchange শুধু page-load-এর
 // প্রথম ৮ সেকেন্ডের "arm window"-এ শোনা হয়(fresh-open-এ আগে থেকে pending
 // update থাকলে সেটাই ধরার জন্য)। Window পার হলে listener remove — mid-session
@@ -1026,110 +1027,15 @@ function App() {
     setViewDate(new Date(archiveYear, archiveMonth0, 1));
     setShowArchiveModal(false);
   }
-  async function handleSendFeedback() {
-    if (!feedbackMsg.trim() || feedbackSending) return;
-    setFeedbackSending(true);
-    setFeedbackStatus(null);
-    try {
-      const res = await fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_ACCESS_KEY,
-          subject: "Daily Task App — নতুন পরামর্শ",
-          message: `${feedbackMsg}\n\nFamily Username: ${getFamilyCode()}`
-        })
-      });
-      const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.message || "Request failed");
-      setFeedbackStatus("sent");
-      setFeedbackMsg("");
-      setTimeout(() => {
-        setShowFeedbackModal(false);
-        setFeedbackStatus(null);
-      }, 1200);
-    } catch (err) {
-      setFeedbackStatus("error");
-    } finally {
-      setFeedbackSending(false);
-    }
-  }
-  function addMeetingRow() {
-    if (isGuestMode) { setShowGuestSignIn(true); return; }
-    meetingDirtyRef.current = true;
-    setMeetingState(prev => ({
-      ...prev,
-      rows: [...(prev.rows || []), {
-        id: String(Date.now()),
-        topic: "",
-        decision: "",
-        person: ""
-      }]
-    }));
-  }
-  // মাসিক রিপোর্ট থেকে "সভায় পাঠান": সারিগুলো শুধু সভার local state-এ বসে (সেভ নয়; সেভ ব্যবহারকারী নিজে করেন)।
-  // id নির্দিষ্ট ("mr-..."), তাই আবার পাঠালে একই সারি বদলায়, ডুপ্লিকেট হয় না। খালি placeholder সারি সরে যায়।
-  function handleSendToMeeting(rows) {
-    if (isGuestMode) { setShowGuestSignIn(true); return false; }
-    if (!Array.isArray(rows) || !rows.length) return false;
-    if (reviewCursor.year !== meetingCursor.year || reviewCursor.month0 !== meetingCursor.month0) {
-      alert("সভা কার্ডে এখন অন্য মাস খোলা আছে। আগে সভা কার্ডে " + BN_MONTHS[reviewCursor.month0] + " " + toBn(reviewCursor.year) + " বেছে নিন, তারপর আবার পাঠান।");
-      return false;
-    }
-    meetingDirtyRef.current = true;
-    setMeetingState(prev => {
-      const cur = Array.isArray(prev.rows) ? prev.rows : [];
-      const base = cur.filter(r => r && (r.topic || r.decision || r.person));
-      const incoming = new Map(rows.map(r => [r.id, r]));
-      const merged = base.map(r => incoming.get(r.id) || r);
-      const added = rows.filter(r => !base.some(b => b.id === r.id));
-      return { ...prev, rows: [...merged, ...added] };
-    });
-    return true;
-  }
-  function removeMeetingRow(idx) {
-    if (isGuestMode) { setShowGuestSignIn(true); return; }
-    meetingDirtyRef.current = true;
-    setMeetingState(prev => {
-      const nextRows = [...prev.rows];
-      nextRows.splice(idx, 1);
-      return {
-        ...prev,
-        rows: nextRows
-      };
-    });
-  }
-  function updateMeetingRow(idx, field, value) {
-    if (isGuestMode) { setShowGuestSignIn(true); return; }
-    meetingDirtyRef.current = true;
-    setMeetingState(prev => {
-      const nextRows = [...prev.rows];
-      nextRows[idx] = {
-        ...nextRows[idx],
-        [field]: value
-      };
-      return {
-        ...prev,
-        rows: nextRows
-      };
-    });
-  }
-  async function handleSaveMeeting() {
-    setSavingMeeting(true);
-    try {
-      await saveMeetingData(meetingCursor.year, meetingCursor.month0, meetingState);
-      meetingDirtyRef.current = false;
-      setMeetingSavedTick(true);
-      setTimeout(() => setMeetingSavedTick(false), 1600);
-    } catch (err) {
-      alert("মাসিক সভা সেভ করতে সমস্যা হয়েছে: " + err.message);
-    } finally {
-      setSavingMeeting(false);
-    }
-  }
+  // --- ফিডব্যাক handler (feedbackAction.js-এ) ---
+  const { handleSendFeedback } = createFeedbackAction({
+    feedbackMsg, feedbackSending, setFeedbackSending, setFeedbackStatus, setFeedbackMsg, setShowFeedbackModal
+  });
+  // --- মাসিক সভার handler (meetingActions.js-এ) ---
+  const { addMeetingRow, handleSendToMeeting, removeMeetingRow, updateMeetingRow, handleSaveMeeting } = createMeetingActions({
+    isGuestMode, setShowGuestSignIn, meetingDirtyRef, setMeetingState, meetingState,
+    meetingCursor, reviewCursor, setSavingMeeting, setMeetingSavedTick
+  });
   // §Member Key সেশন — এই বাটন এখন শুধু Admin-এর(স্মার্টফোন-বিহীন
   // সদস্যকে সরাসরি যোগ করার জন্য — যেমন বাবা/মা)। সাধারণ সদস্য এখন
   // "সদস্য হোন" দিয়ে অনুরোধ করেন(handleRequestToBecomeMember)। ownerUid
