@@ -405,29 +405,31 @@ export function MonthlyOverviewSection({
   })), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-100"
+    className: "flex gap-2 mb-3 pb-3 border-b border-slate-100"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-[120px] rounded-2xl px-3.5 py-2.5 text-white",
+    className: "flex-1 min-w-0 rounded-2xl px-3 py-2 text-white",
     style: { background: "linear-gradient(135deg,#0E4B43,#2D6A5C)", boxShadow: "0 6px 14px -6px rgba(14,75,67,0.55)" }
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-xs font-bold opacity-90"
   }, "গড় স্কোর"), /*#__PURE__*/React.createElement("div", {
-    className: "text-2xl font-bold leading-tight",
+    className: "text-xl font-bold leading-tight",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.avgPct), "%")), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-[120px] rounded-2xl px-3.5 py-2.5",
+    className: "flex-1 min-w-0 rounded-2xl px-3 py-2",
     style: { background: "linear-gradient(135deg,#FBEFC4,#F3D98B)", color: "#5C4300", boxShadow: "0 6px 14px -6px rgba(160,120,40,0.45)" }
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-xs font-bold opacity-90"
   }, "পূরণ করা দিন"), /*#__PURE__*/React.createElement("div", {
-    className: "text-2xl font-bold leading-tight",
+    className: "text-xl font-bold leading-tight",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.filled), "/", toBn(total))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPrintMode(true),
-    className: "w-full justify-center flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
+    title: "PDF / প্রিন্ট (২ পেজ)",
+    "aria-label": "PDF / প্রিন্ট",
+    className: "shrink-0 flex flex-col items-center justify-center gap-0.5 px-3.5 rounded-2xl text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
-    size: 13
-  }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
+    size: 16
+  }), "PDF")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 text-sm font-bold text-slate-600 mt-4 mb-2"
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 13,

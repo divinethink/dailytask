@@ -144,7 +144,6 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       body = <p className="text-sm text-slate-500 mt-3">{T.noData}</p>;
     } else {
       const r = report;
-      const monthName = BN_MONTHS[month0] + " " + toBn(year);
       const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
       const goalParts = [];
       if (goals.counts.done) goalParts.push(fill(T.goalDone, { n: toBn(goals.counts.done) }));
@@ -153,9 +152,8 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       body = (
         <div className="mt-3">
           <div className="rounded-2xl p-3.5 mb-3 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)", boxShadow: "0 8px 18px -8px rgba(31,77,68,0.6)" }}>
-            <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="mb-1">
               <h3 className="font-bold text-[15px]">{T.movesTitle}</h3>
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
             </div>
             <p className="text-[11px] opacity-85 leading-snug mb-3">{T.movesSub}</p>
             {r.prev && (r.moves.improvement || r.moves.drop) ? (
@@ -168,54 +166,43 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
                         <>
                           <div className="text-[15px] font-bold leading-snug break-words">{m.label}</div>
                           <div className="text-[11px] opacity-90 mt-1">{fill(T.movesDays, { prev: toBn(m.prev), cur: toBn(m.cur) })}</div>
-                          <div className="text-lg font-bold leading-none mt-1" style={{ color: fg }}>{m.delta > 0 ? "+" : "−"}{toBn(Math.abs(m.delta))} দিন</div>
+                          <div className="text-base font-bold leading-snug mt-1" style={{ color: fg }}>{fill(m.delta > 0 ? T.movesMore : T.movesLess, { n: toBn(Math.abs(m.delta)) })}</div>
                         </>
-                      ) : <div className="text-xs opacity-85">{T.movesNone}</div>}
+                      ) : <div className="text-xs leading-relaxed opacity-95">{k === "up" ? T.movesUpNone : T.movesDownNone}</div>}
                     </div>
                   ))}
                 </div>
                 <p className="text-xs mt-3 leading-relaxed rounded-lg p-2" style={{ background: "rgba(255,255,255,0.12)" }}>
                   💭 {r.moves.drop ? fill(T.movesThinkDown, { label: r.moves.drop.label }) : fill(T.movesThinkUp, { label: r.moves.improvement.label })}
                 </p>
-                {r.partial && <div className="text-[11px] opacity-80 mt-2 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
+                {r.partial && <div className="text-[11px] opacity-85 mt-2 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
               </>
             ) : (
               <div className="text-xs opacity-90 leading-relaxed">{r.prev ? T.movesAllNone : prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
             )}
           </div>
 
-          <SectionCard icon="🗓️" title={T.weekdayTitle} accent="#D9822B" tint="#FDEFE3">
-            {r.weekdayValid < 3 ? (
-              <p className="text-sm text-slate-500 leading-relaxed rounded-xl p-3" style={{ background: "#F6F8F5" }}>{T.weekdayNeedMore}</p>
-            ) : (
-              <>
-                <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
-                {r.weakest.length > 0 && (
-                  <p className="text-sm rounded-xl p-2.5 mt-2.5 leading-relaxed" style={{ background: "#FDEFE3", color: "#9A3412" }}>
-                    {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
-                  </p>
-                )}
-              </>
-            )}
-          </SectionCard>
+          {r.weekdayValid < 3 ? (
+            <div className="rounded-2xl px-3.5 py-3 mb-3 flex items-center gap-2.5" style={{ background: "#F6F8F5", border: "1px dashed #D5E3D8" }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] shrink-0" style={{ background: "#FDEFE3" }}>🗓️</span>
+              <p className="text-[13px] text-slate-600 leading-snug"><b className="text-slate-800">{T.weekdayTitle}</b> — {T.weekdayNeedMore}</p>
+            </div>
+          ) : (
+            <SectionCard icon="🗓️" title={T.weekdayTitle} accent="#D9822B" tint="#FDEFE3">
+              <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
+              {r.weakest.length > 0 && (
+                <p className="text-sm rounded-xl p-2.5 mt-2.5 leading-relaxed" style={{ background: "#FDEFE3", color: "#9A3412" }}>
+                  {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
+                </p>
+              )}
+            </SectionCard>
+          )}
 
-          <SectionCard icon="📈" title={T.trendTitle} accent="#2D6A5C" tint="#E3F0EA">
-            {r.weeks.filter(w => w.avg !== null).length < 2 ? (
-              <div className="flex flex-col gap-2">
-                {r.weeks.filter(w => w.avg !== null).map(w => (
-                  <div key={w.week} className="flex items-center gap-2">
-                    <span className="text-xs font-bold w-14 shrink-0" style={{ color: "#7A5A00" }}>{T.weekShort.replace("{n}", toBn(w.week))}</span>
-                    <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(15,23,42,0.08)", boxShadow: "0 0 0 1px rgba(15,23,42,0.1)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${w.avg}%`, background: "linear-gradient(90deg,#E3B84F,#C89B3C)" }} />
-                    </div>
-                    <span className="text-sm font-bold w-10 text-right" style={{ color: "#7A5A00" }}>{toBn(w.avg)}%</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
+          {r.weeks.filter(w => w.avg !== null).length >= 2 && (
+            <SectionCard icon="📈" title={T.trendTitle} accent="#2D6A5C" tint="#E3F0EA">
               <TrendChart weeks={r.weeks} toBn={toBn} />
-            )}
-          </SectionCard>
+            </SectionCard>
+          )}
 
           <SectionCard icon="🔎" title={T.whenGoodTitle} accent="#3B7EA1" tint="#E4F0F7">
             {r.whenGood ? (
