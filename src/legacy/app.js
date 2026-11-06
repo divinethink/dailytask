@@ -1861,7 +1861,8 @@ function App() {
     isFieldExcusable: isFieldExcusable,
     dailyScore: dailyScore,
     toBn: toBn,
-    BN_MONTHS: BN_MONTHS
+    BN_MONTHS: BN_MONTHS,
+    onSendToMeeting: handleSendToMeeting
   })),
     weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,

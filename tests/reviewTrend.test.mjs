@@ -57,7 +57,7 @@ test("ধারা: ↑ ↓ → এবং সীমা (±১০)", () => {
 test("কম ডেটা: ৩ দিনের কম ⇒ null, ঠিক ৩ ⇒ বৈধ", () => {
   const f = fBool("x");
   assert.equal(monthValue(month("x", 2, 2), 30, f, h([f])), null);
-  assert.deepEqual(monthValue(month("x", 3, 3), 30, f, h([f])), { pct: 100, tier: "great", days: 3 });
+  assert.deepEqual(monthValue(month("x", 3, 3), 30, f, h([f])), { pct: 100, tier: "great", days: 3, full: 3 });
   assert.equal(monthValue(null, 30, f, h([f])), null);
   assert.equal(monthValue(month("x", 5, 5), 0, f, h([f])), null); // ভবিষ্যৎ মাস
 });

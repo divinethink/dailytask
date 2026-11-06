@@ -36,7 +36,7 @@ function threeMonths(year, month0) {
 function monthValue(entries, upTo, f, h) {
   if (!entries || upTo <= 0) return null;
   const ex = h.isFieldExcusable(f, h.member);
-  let logged = 0, sum = 0;
+  let logged = 0, sum = 0, full = 0;
   for (let d = 1; d <= upTo; d++) {
     const e = entries[pad2(d)];
     if (!e) continue;
@@ -44,12 +44,13 @@ function monthValue(entries, upTo, f, h) {
     const r = h.ratioOf(f, e);
     if (r === null || r === undefined || !Number.isFinite(r)) continue;
     logged += 1; sum += r;
+    if (r >= 1) full += 1; // পুরোপুরি করা দিন (কাযার ক্ষেত্রে: কাযা ছাড়া দিন)
   }
   if (logged < MIN_DAYS) return null;
   const raw = sum / logged; // ratioOf ইতিমধ্যে ভালো-দিকে (কাযা-মুক্ত স্কোর)
   const g = Math.round(raw * 100);
-  if (INVERTED.has(f.key)) return { pct: 100 - g, g, tier: tierOf(raw), days: logged };
-  return { pct: g, tier: tierOf(raw), days: logged };
+  if (INVERTED.has(f.key)) return { pct: 100 - g, g, tier: tierOf(raw), days: logged, full };
+  return { pct: g, tier: tierOf(raw), days: logged, full };
 }
 
 // vals: [ {pct}|null ×৩ ] ⇒ ধারা ও মন্তব্যের ধরন। কমপক্ষে ২ বৈধ মাস না থাকলে dir = null, kind = "few"।

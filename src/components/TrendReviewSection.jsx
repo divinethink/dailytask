@@ -8,6 +8,7 @@ import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { DEEN_CATEGORY_GROUPS, DEFAULT_DUNIYA_FIELDS } from "../legacy/appHelpers.js";
 import { fill } from "../legacy/reviewMonthly.js";
+import { pad2 } from "../legacy/appHelpers.js";
 import { MonthPillNav } from "./MonthPillNav.jsx";
 import { ChevronDown } from "./icons.jsx";
 
@@ -48,11 +49,19 @@ function Pill({ v, monthName, toBn }) {
   );
 }
 
-function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
+function TrendRow({ r, months, BN_MONTHS, toBn, comment, selected, onToggle, onSend, sent }) {
   const a = r.dir ? ARROW[r.dir] : null;
   return (
-    <div className="py-1.5 border-b border-slate-100 last:border-b-0">
-      <div className="flex items-center gap-1">
+    <div id={"trend-row-" + r.key} className="py-1.5 border-b border-slate-100 last:border-b-0">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!!selected}
+        onClick={onToggle}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
+        className="flex items-center gap-1 cursor-pointer rounded-lg"
+        style={selected ? { background: "#F3F7F4" } : undefined}
+      >
         <div className="flex-1 min-w-0 pr-1 text-sm text-slate-800 leading-snug">{r.label}</div>
         {r.vals.map((v, i) => (
           <Pill key={i} v={v} monthName={BN_MONTHS[months[i].month0]} toBn={toBn} />
@@ -62,6 +71,30 @@ function TrendRow({ r, months, BN_MONTHS, toBn, comment }) {
         </span>
       </div>
       {comment ? <p className="text-xs text-slate-500 mt-0.5">{comment}</p> : null}
+      {selected && (
+        <div className="mt-1.5 rounded-xl p-2.5" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
+          {r.vals.map((v, i) => (
+            <div key={i} className="flex items-baseline gap-2 text-xs py-0.5">
+              <span className="w-14 shrink-0 font-bold text-slate-600">{BN_MONTHS[months[i].month0]}</span>
+              <span className="text-slate-700">
+                {v && v.full !== undefined
+                  ? fill(r.key === "fardPrayers" ? T.detailLineFard : T.detailLine, { days: toBn(v.days), full: toBn(v.full) })
+                  : T.detailNone}
+              </span>
+            </div>
+          ))}
+          {onSend && (
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={sent}
+              className="w-full mt-2 py-2 rounded-xl text-sm font-bold bg-emerald-900 text-white disabled:opacity-60"
+            >
+              📨 {sent ? T.sent : T.send}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -75,13 +108,29 @@ function monthTag(months, BN_MONTHS, toBn) {
   return nm(a) + "–" + nm(c);
 }
 
-export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {
+export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS, onSendToMeeting }) {
   const { year, month0 } = monthCursor;
   const [open, setOpen] = useState(fold === "open" || fold === "fixed");
   const [data, setData] = useState({ key: null, status: "idle", entries: [null, null] }); // idle | loading | ready | error
   const loadedKey = useRef(null);
   const [showAll, setShowAll] = useState(false); // সারির বিস্তারিত তালিকা, ডিফল্টে বন্ধ
   const key = memberId + "|" + year + "|" + month0;
+  const [sel, setSel] = useState(null); // বিস্তারিত খোলা আমলের key
+  const [sentKeys, setSentKeys] = useState({});
+  const pickRow = (k, reveal) => {
+    setSel(cur => (cur === k && !reveal ? null : k));
+    if (reveal) {
+      setShowAll(true);
+      setTimeout(() => { const el = document.getElementById("trend-row-" + k); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 60);
+    }
+  };
+  useEffect(() => { setSel(null); setSentKeys({}); }, [key]);
+  const sendRow = r => {
+    if (typeof onSendToMeeting !== "function") return;
+    const row = { id: `tr-${year}-${pad2(month0 + 1)}-${r.key}`, topic: T.sendTopic, decision: fill(T.sendDecision, { label: r.label }).slice(0, 300), person: "" };
+    if (onSendToMeeting([row])) setSentKeys(m => ({ ...m, [r.key]: true }));
+  };
+  const rowProps = r => ({ selected: sel === r.key, onToggle: () => pickRow(r.key, false), onSend: typeof onSendToMeeting === "function" ? () => sendRow(r) : null, sent: !!sentKeys[r.key] });
 
   // আগের দুই মাস: কার্ড খুললে, এবং সদস্য/মাস বদলালে। একই key-তে বন্ধ-খোলায় আবার পড়ে না।
   useEffect(() => {
@@ -163,50 +212,6 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
       <div className="mt-3">
         {data.status === "error" && <p className="text-xs text-orange-700 mb-2">{T.error}</p>}
 
-        {keyRows.length > 0 && (
-          <div className="mb-3">
-            <div className="flex items-end gap-1 pb-1 border-b border-slate-200 text-slate-500" style={{ fontSize: 10.5 }}>
-              <span className="flex-1 min-w-0">{T.labelCol}</span>
-              {trend.months.map(m => (
-                <span key={m.year + "-" + m.month0} className="w-11 shrink-0 text-center whitespace-nowrap">{T.monthShort[m.month0]}</span>
-              ))}
-              <span className="w-4 shrink-0" />
-            </div>
-            {keyRows.map(r => <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} />)}
-          </div>
-        )}
-
-        {otherCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowAll(v => !v)}
-            aria-expanded={showAll}
-            className="w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-emerald-900 mb-3"
-            style={{ minHeight: 44 }}
-          >
-            {showAll ? T.detailsHide : fill(T.detailsShow, { n: toBn(otherCount) })}
-          </button>
-        )}
-
-        {showAll && otherSections.map(sec => (
-          <div key={sec.id} className="mb-2">
-            <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A6A12" }}>{sec.label}</div>
-            {sec.rows.map(r => (
-              <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn}
-                comment={fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })} />
-            ))}
-          </div>
-        ))}
-
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1 text-slate-500" style={{ fontSize: 11 }}>
-          {["great", "good", "mid", "low", "none"].map(t => (
-            <span key={t} className="inline-flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded" style={{ background: TIER_STYLE[t].background, border: "1px solid rgba(0,0,0,0.08)" }} />
-              {T.legend[t]}
-            </span>
-          ))}
-        </div>
-
         {trend.overall && (
           <div className="rounded-xl p-3 mb-3" style={{ background: "#F7F9F7", border: "1px solid #E1E8E3" }}>
             <div className="flex items-end gap-1 text-slate-500" style={{ fontSize: 10.5 }}>
@@ -231,6 +236,70 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </div>
         )}
 
+        {trend.attention.length > 0 && (
+          <div className="mb-3">
+            <div className="text-xs font-bold mb-1.5" style={{ color: "#9A3412" }}>🎯 {T.attTitle}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {trend.attention.map(r => {
+                const last = r.vals[2] || r.vals[1] || r.vals[0];
+                return (
+                  <button key={r.key} type="button" onClick={() => pickRow(r.key, true)} className="text-xs font-bold rounded-full px-3 py-1.5" style={{ background: "#FDEFE3", color: "#9A3412", border: "1px solid #F3D3B5" }}>
+                    {r.label}{last ? " " + toBn(last.pct) + "%" : ""}{r.dir === "down" ? " ↓" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            {trend.attentionCount > trend.attention.length && (
+              <p className="text-[11px] text-slate-500 mt-1">{fill(T.attMore, { n: toBn(trend.attentionCount - trend.attention.length) })}</p>
+            )}
+          </div>
+        )}
+
+        {keyRows.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-end gap-1 pb-1 border-b border-slate-200 text-slate-500" style={{ fontSize: 10.5 }}>
+              <span className="flex-1 min-w-0">{T.labelCol}</span>
+              {trend.months.map(m => (
+                <span key={m.year + "-" + m.month0} className="w-11 shrink-0 text-center whitespace-nowrap">{T.monthShort[m.month0]}</span>
+              ))}
+              <span className="w-4 shrink-0" />
+            </div>
+            {keyRows.map(r => <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)} />)}
+          </div>
+        )}
+
+        {otherCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(v => !v)}
+            aria-expanded={showAll}
+            className="w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-emerald-900 mb-3"
+            style={{ minHeight: 44 }}
+          >
+            {showAll ? T.detailsHide : fill(T.detailsShow, { n: toBn(otherCount) })}
+          </button>
+        )}
+
+        {showAll && otherSections.map(sec => (
+          <div key={sec.id} className="mb-2">
+            <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A6A12" }}>{sec.label}</div>
+            {sec.rows.map(r => (
+              <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)}
+                comment={fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })} />
+            ))}
+          </div>
+        ))}
+
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1 text-slate-500" style={{ fontSize: 11 }}>
+          {["great", "good", "mid", "low", "none"].map(t => (
+            <span key={t} className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded" style={{ background: TIER_STYLE[t].background, border: "1px solid rgba(0,0,0,0.08)" }} />
+              {T.legend[t]}
+            </span>
+          ))}
+        </div>
+
+        <p className="text-[11px] text-slate-500 mb-1">{T.tapHint}</p>
         {trend.curEmpty && (
           <p className="text-xs text-slate-500 mb-2 leading-relaxed">{fill(T.curEmpty, { month: BN_MONTHS[month0] })}</p>
         )}
