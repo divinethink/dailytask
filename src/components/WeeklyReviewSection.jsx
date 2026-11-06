@@ -227,7 +227,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
               {glance.logged > 0 && (
                 <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-sm font-bold">{G.title}</div>
+                    <div className="text-sm font-bold">{G.titleWeek.replace("{w}", G.weekOrd[week - 1] || toBn(week) + "ম")}</div>
                     {glance.delta !== null && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{G.vsPrev} {glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"}</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-2">

@@ -19,27 +19,13 @@ const { useState, useEffect, useMemo } = React;
 // সেকশন-কার্ড: আইকন-বাবল + শিরোনাম, বাঁ-পাশে রঙিন অ্যাকসেন্ট। শুধু ডিজাইন; ভিতরের হিসাব অপরিবর্তিত।
 function SectionCard({ icon, title, accent, tint, right, children }) {
   return (
-    <div className="rounded-2xl bg-white p-3 mb-2.5 shadow-sm" style={{ border: "1px solid #EADFBE", borderLeft: `4px solid ${accent}` }}>
-      <div className="flex items-center gap-2 mb-2.5">
-        <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0" style={{ background: tint }}>{icon}</span>
+    <div className="rounded-2xl bg-white p-3.5 mb-3" style={{ border: "1px solid #EADFBE", boxShadow: "0 4px 14px -8px rgba(22,48,43,0.25)" }}>
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] shrink-0" style={{ background: tint, boxShadow: `0 0 0 1.5px ${accent}55` }}>{icon}</span>
         <h3 className="flex-1 min-w-0 text-sm font-bold" style={{ color: "#16302B" }}>{title}</h3>
         {right}
       </div>
       {children}
-    </div>
-  );
-}
-
-// গড় স্কোরের রিং (০-১০০)।
-function ScoreRing({ value, toBn }) {
-  const R = 29, C = 2 * Math.PI * R, v = Math.max(0, Math.min(100, value));
-  return (
-    <div className="relative shrink-0" style={{ width: 76, height: 76 }}>
-      <svg width="76" height="76" viewBox="0 0 76 76" className="-rotate-90">
-        <circle cx="38" cy="38" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="7" />
-        <circle cx="38" cy="38" r={R} fill="none" stroke="#F3C969" strokeWidth="7" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - v / 100)} />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-base font-bold">{toBn(v)}%</div>
     </div>
   );
 }
@@ -159,7 +145,6 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     } else {
       const r = report;
       const monthName = BN_MONTHS[month0] + " " + toBn(year);
-      const up = r.delta !== null && r.delta > 0, down = r.delta !== null && r.delta < 0;
       const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
       const goalParts = [];
       if (goals.counts.done) goalParts.push(fill(T.goalDone, { n: toBn(goals.counts.done) }));
@@ -167,33 +152,41 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       if (goals.counts.none) goalParts.push(fill(T.goalNone, { n: toBn(goals.counts.none) }));
       body = (
         <div className="mt-3">
-          <div className="rounded-2xl p-3.5 mb-2.5 text-white flex items-center gap-3.5" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)", boxShadow: "0 6px 16px -6px rgba(31,77,68,0.55)" }}>
-            <ScoreRing value={r.avg} toBn={toBn} />
-            <div className="flex-1 min-w-0">
-              <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1.5" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName} · {T.avgNow}</span>
-              {r.prev && r.delta !== null ? (
-                <>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xl font-bold leading-none">{up ? "▲ " : down ? "▼ " : ""}{r.delta === 0 ? T.sameDelta : toBn(Math.abs(r.delta)) + "%"}</span>
-                    <span className="text-xs opacity-90">{T.versus}</span>
-                  </div>
-                  <div className="text-xs opacity-90 mt-1">{fill(T.prevToNow, { prev: BN_MONTHS[r.prev.month0], p: toBn(r.prev.avg), cur: BN_MONTHS[month0], c: toBn(r.avg) })}</div>
-                  {r.partial && <div className="text-[11px] opacity-80 mt-1 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
-                </>
-              ) : (
-                <div className="text-xs opacity-90">{prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
-              )}
+          <div className="rounded-2xl p-3.5 mb-3 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)", boxShadow: "0 8px 18px -8px rgba(31,77,68,0.6)" }}>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <h3 className="font-bold text-[15px]">{T.movesTitle}</h3>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.18)" }}>{monthName}</span>
             </div>
+            <p className="text-[11px] opacity-85 leading-snug mb-3">{T.movesSub}</p>
+            {r.prev && (r.moves.improvement || r.moves.drop) ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {[["up", r.moves.improvement, T.movesUp, "▲", "#BFF0D2", "rgba(46,160,100,0.28)"], ["down", r.moves.drop, T.movesDown, "▼", "#FFD2A8", "rgba(217,130,43,0.30)"]].map(([k, m, lbl, ar, fg, bg]) => (
+                    <div key={k} className="rounded-xl p-2.5 min-w-0" style={{ background: bg }}>
+                      <div className="text-[11px] font-bold mb-1" style={{ color: fg }}>{ar} {lbl}</div>
+                      {m ? (
+                        <>
+                          <div className="text-[15px] font-bold leading-snug break-words">{m.label}</div>
+                          <div className="text-[11px] opacity-90 mt-1">{fill(T.movesDays, { prev: toBn(m.prev), cur: toBn(m.cur) })}</div>
+                          <div className="text-lg font-bold leading-none mt-1" style={{ color: fg }}>{m.delta > 0 ? "+" : "−"}{toBn(Math.abs(m.delta))} দিন</div>
+                        </>
+                      ) : <div className="text-xs opacity-85">{T.movesNone}</div>}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs mt-3 leading-relaxed rounded-lg p-2" style={{ background: "rgba(255,255,255,0.12)" }}>
+                  💭 {r.moves.drop ? fill(T.movesThinkDown, { label: r.moves.drop.label }) : fill(T.movesThinkUp, { label: r.moves.improvement.label })}
+                </p>
+                {r.partial && <div className="text-[11px] opacity-80 mt-2 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
+              </>
+            ) : (
+              <div className="text-xs opacity-90 leading-relaxed">{r.prev ? T.movesAllNone : prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
+            )}
           </div>
 
           <SectionCard icon="🗓️" title={T.weekdayTitle} accent="#D9822B" tint="#FDEFE3">
             {r.weekdayValid < 3 ? (
-              <>
-                <div className="flex items-end gap-1.5 mb-2" style={{ height: 44 }}>
-                  {BN_WEEKDAYS.map((n, i) => <div key={i} className="flex-1 rounded-t-md" style={{ height: [18, 30, 22, 38, 26, 34, 20][i], background: "repeating-linear-gradient(45deg,#EEF1EC,#EEF1EC 4px,#E4E9E2 4px,#E4E9E2 8px)" }} />)}
-                </div>
-                <p className="text-sm text-slate-500 leading-relaxed">{T.weekdayNeedMore}</p>
-              </>
+              <p className="text-sm text-slate-500 leading-relaxed rounded-xl p-3" style={{ background: "#F6F8F5" }}>{T.weekdayNeedMore}</p>
             ) : (
               <>
                 <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
@@ -226,9 +219,9 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
 
           <SectionCard icon="🔎" title={T.whenGoodTitle} accent="#3B7EA1" tint="#E4F0F7">
             {r.whenGood ? (
-              <div className="flex items-center gap-3">
-                <div className="shrink-0 rounded-xl px-3 py-2 text-center" style={{ background: "#E4F0F7", color: "#1F5A7A" }}>
-                  <div className="text-xl font-bold leading-none">▲ {toBn(r.whenGood.diff)}%</div>
+              <div>
+                <div className="inline-block rounded-xl px-3 py-1.5 mb-2" style={{ background: "#E4F0F7", color: "#1F5A7A" }}>
+                  <span className="text-xl font-bold leading-none">▲ {toBn(r.whenGood.diff)}%</span>
                 </div>
                 <p className="text-sm text-slate-700 leading-relaxed">{fill(T.whenGood, { label: r.whenGood.label, n: toBn(r.whenGood.diff) })} <span className="text-slate-400">{T.whenGoodNote}</span></p>
               </div>

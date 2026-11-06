@@ -30,9 +30,9 @@ test("threeMonths: জানুয়ারি/ডিসেম্বর সী�
 });
 
 test("tierOf: ক্যালেন্ডারের চার রঙের সীমা", () => {
-  assert.equal(tierOf(0.85), "great"); assert.equal(tierOf(0.849), "good");
-  assert.equal(tierOf(0.6), "good"); assert.equal(tierOf(0.59), "mid");
-  assert.equal(tierOf(0.35), "mid"); assert.equal(tierOf(0.34), "low");
+  assert.equal(tierOf(0.85), "great"); assert.equal(tierOf(0.844), "good");
+  assert.equal(tierOf(0.7), "good"); assert.equal(tierOf(0.694), "mid");
+  assert.equal(tierOf(0.4), "mid"); assert.equal(tierOf(0.394), "low");
   assert.equal(tierOf(0), "low"); assert.equal(tierOf(null), "none");
 });
 

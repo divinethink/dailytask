@@ -252,20 +252,20 @@ export function MonthlyOverviewInfoModal({ show, onClose }) {
     className: "text-xs text-slate-700 leading-relaxed mb-4 space-y-2"
   },
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
-    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "var(--theme-primary, #0E4B43)" } }),
-    "৮৫% বা তার বেশি — চমৎকার"
+    /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#0E4B43" } }),
+    "৮৫% থেকে ১০০% — চমৎকার"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
     /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#2563A8" } }),
-    "৬০% থেকে ৮৪% — ভালো"
+    "৭০% থেকে ৮৪% — ভালো"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
     /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#F5D061" } }),
-    "৩৫% থেকে ৫৯% — মাঝারি"
+    "৪০% থেকে ৬৯% — মাঝারি"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
     /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0", style: { background: "#C1666B" } }),
-    "০% এর বেশি কিন্তু ৩৫% এর কম — কম"
+    "১% থেকে ৩৯% — কম"
   ),
   /*#__PURE__*/React.createElement("li", { className: "flex items-center gap-2" },
     /*#__PURE__*/React.createElement("span", { className: "w-4 h-4 rounded-md flex-shrink-0 border border-slate-300", style: { background: "#E7EEE3" } }),

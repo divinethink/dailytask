@@ -71,8 +71,8 @@ function activityTierColor(pct) {
   // §Fix(১৯ সেপ্টেম্বর ২০২৬): scoreColor()-এর সাথে সামঞ্জস্যপূর্ণ fixed-green fix,
   // একই কারণ(থিম-color-এর সাথে performance-semantics মিশে যাওয়া প্রতিরোধ)।
   if (pct >= 85) return "#0E4B43";
-  if (pct >= 60) return "#2563A8";
-  if (pct >= 35) return "#D6A400";
+  if (pct >= 70) return "#2563A8";
+  if (pct >= 40) return "#D6A400";
   return "#C1666B";
 }
 const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
@@ -379,9 +379,9 @@ export function MonthlyOverviewSection({
   for (let d = 1; d <= total; d++) {
     const s = dailyScore(monthEntries[pad2(d)], selectedMember, allFields);
     if (s === null || s === undefined) tierCounts.empty += 1;
-    else if (s >= 0.85) tierCounts.excellent += 1;
-    else if (s >= 0.6) tierCounts.good += 1;
-    else if (s >= 0.35) tierCounts.medium += 1;
+    else if (Math.round(s * 100) >= 85) tierCounts.excellent += 1;
+    else if (Math.round(s * 100) >= 70) tierCounts.good += 1;
+    else if (Math.round(s * 100) >= 40) tierCounts.medium += 1;
     else if (s > 0) tierCounts.low += 1;
     else tierCounts.empty += 1;
   }
@@ -394,14 +394,7 @@ export function MonthlyOverviewSection({
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 16,
     color: "var(--theme-primary)"
-  }), " মাসিক ওভারভিউ", /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setShowMonthlyInfoModal(true),
-    className: "text-slate-400 hover:text-emerald-700 -ml-1",
-    title: "তথ্য"
-  }, /*#__PURE__*/React.createElement(InfoIcon, {
-    size: 13
-  }))), /*#__PURE__*/React.createElement(MonthNavControl, {
+  }), " মাসিক ওভারভিউ"), /*#__PURE__*/React.createElement(MonthNavControl, {
     monthCursor: monthCursor,
     setMonthCursor: setMonthCursor,
     setMonthRefreshKey: setMonthRefreshKey,
@@ -412,20 +405,26 @@ export function MonthlyOverviewSection({
   })), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3 pb-3 border-b border-slate-100"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-400 font-bold"
+    className: "flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-[120px] rounded-2xl px-3.5 py-2.5 text-white",
+    style: { background: "linear-gradient(135deg,#0E4B43,#2D6A5C)", boxShadow: "0 6px 14px -6px rgba(14,75,67,0.55)" }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold opacity-90"
   }, "গড় স্কোর"), /*#__PURE__*/React.createElement("div", {
-    className: "text-xl font-bold text-emerald-950",
+    className: "text-2xl font-bold leading-tight",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
-  }, toBn(monthStats.avgPct), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-xs text-slate-400 font-bold"
+  }, toBn(monthStats.avgPct), "%")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-[120px] rounded-2xl px-3.5 py-2.5",
+    style: { background: "linear-gradient(135deg,#FBEFC4,#F3D98B)", color: "#5C4300", boxShadow: "0 6px 14px -6px rgba(160,120,40,0.45)" }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold opacity-90"
   }, "পূরণ করা দিন"), /*#__PURE__*/React.createElement("div", {
-    className: "text-xl font-bold text-emerald-950",
+    className: "text-2xl font-bold leading-tight",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace" }
   }, toBn(monthStats.filled), "/", toBn(total))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPrintMode(true),
-    className: "flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
+    className: "w-full justify-center flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-900 border border-emerald-100 hover:bg-emerald-100 transition-all"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 13
   }), " PDF / প্রিন্ট (২ পেজ)")), /*#__PURE__*/React.createElement("div", {
@@ -433,7 +432,14 @@ export function MonthlyOverviewSection({
   }, /*#__PURE__*/React.createElement(CalIcon, {
     size: 13,
     color: "var(--theme-primary)"
-  }), "এক্টিভিটি ক্যালেন্ডার"), /*#__PURE__*/React.createElement("div", {
+  }), "এক্টিভিটি ক্যালেন্ডার", /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowMonthlyInfoModal(true),
+    className: "text-slate-400 hover:text-emerald-700",
+    title: "ক্যালেন্ডারের রঙ কী বোঝায়?"
+  }, /*#__PURE__*/React.createElement(InfoIcon, {
+    size: 14
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "mt-0"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-7 gap-1.5"
@@ -460,7 +466,7 @@ export function MonthlyOverviewSection({
       className: "h-7 w-full rounded-xl flex items-center justify-center text-xs font-bold transition-transform active:scale-90",
       style: {
         background: scoreColor(s),
-        color: s !== null && s >= 0.6 ? "#fff" : s !== null && s >= 0.35 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
+        color: s !== null && Math.round(s * 100) >= 70 ? "#fff" : s !== null && Math.round(s * 100) >= 40 ? "#7A5C00" : s !== null && s > 0 ? "#3A0D0F" : "#555",
         fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace",
         boxShadow: isToday ? "0 0 0 2px var(--theme-primary), 0 2px 5px -1px rgba(0,0,0,0.15)" : "0 1px 2px rgba(0,0,0,0.06)"
       }

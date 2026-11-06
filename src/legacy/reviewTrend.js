@@ -15,12 +15,13 @@ const gOf = v => (v && v.g !== undefined ? v.g : v.pct);
 const pad2 = n => String(n).padStart(2, "0");
 const labelOf = f => ((f.shortLabel ? String(f.shortLabel).trim() : "") || f.label || f.key);
 
-// ক্যালেন্ডারের scoreColor-এর সীমা (০.৮৫ / ০.৬ / ০.৩৫) হুবহু; raw = ০..১ অকাট (rounding-এর আগে)।
+// ক্যালেন্ডারের scoreColor-এর সীমা (৮৫ / ৭০ / ৪০) হুবহু; raw = ০..১।
 function tierOf(raw) {
   if (raw === null || raw === undefined || !Number.isFinite(raw)) return "none";
-  if (raw >= 0.85) return "great";
-  if (raw >= 0.6) return "good";
-  if (raw >= 0.35) return "mid";
+  const p = Math.round(raw * 100); // ৮৫/৭০/৪০ — ক্যালেন্ডারের মতোই পূর্ণসংখ্যা % দিয়ে
+  if (p >= 85) return "great";
+  if (p >= 70) return "good";
+  if (p >= 40) return "mid";
   return "low";
 }
 

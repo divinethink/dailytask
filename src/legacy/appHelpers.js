@@ -668,9 +668,11 @@ function scoreColor(score) {
   // ইন্ডিকেটর রঙও বদলে যেত(পারফরম্যান্স-সেমান্টিক্স আর decorative brand-accent
   // একই ভ্যারিয়েবলে মিশে ছিল)। Fix: fixed hex(ডিফল্ট থিমের সবুজ, design-system
   // Primary #0E4B43) — থিম যাই হোক, "চমৎকার" সবসময় এই রঙই দেখাবে।
-  if (score >= 0.85) return "#0E4B43";
-  if (score >= 0.6) return "#2563A8";
-  if (score >= 0.35) return "#F5D061";
+  // §রেটিং(৭ নভেম্বর ২০২৬, owner): সীমা ৮৫/৭০/৪০ — দেখানো পূর্ণসংখ্যা % দিয়েই তুলনা।
+  const p = Math.round(score * 100);
+  if (p >= 85) return "#0E4B43";
+  if (p >= 70) return "#2563A8";
+  if (p >= 40) return "#F5D061";
   if (score > 0) return "#C1666B";
   return "#E7EEE3";
 }
