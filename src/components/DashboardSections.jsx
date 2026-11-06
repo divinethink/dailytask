@@ -85,23 +85,20 @@ function TierRow({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
   const color = activityTierColor(pct);
   const shown = shownPct === undefined ? pct : shownPct;
   return /*#__PURE__*/React.createElement("div", {
-    className: "mb-3 last:mb-0"
+    className: "mb-2 last:mb-0",
+    title: rankPrefix
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2.5 mb-1.5"
+    className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm",
+    className: "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0",
     style: { background: color }
-  }, toBn(rank)), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 min-w-0"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-bold text-slate-800 leading-snug"
-  }, labels.slice(0, MAX_LABELS_PER_TIER).join(", ")), /*#__PURE__*/React.createElement("div", {
-    className: "text-[11px] text-slate-500"
-  }, rankPrefix)), /*#__PURE__*/React.createElement("span", {
-    className: "font-bold text-xl flex-shrink-0",
+  }, toBn(rank)), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 min-w-0 text-sm font-bold text-slate-800 leading-snug"
+  }, labels.slice(0, MAX_LABELS_PER_TIER).join(", ")), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-base flex-shrink-0",
     style: { fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace", color }
   }, toBn(shown), "%")), /*#__PURE__*/React.createElement("div", {
-    className: "h-2.5 rounded-full bg-white/80 overflow-hidden shadow-inner"
+    className: "h-1.5 rounded-full bg-white/80 overflow-hidden mt-1 ml-7"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-full rounded-full transition-all duration-500",
     style: { width: `${shown}%`, background: `linear-gradient(90deg, ${color}b3, ${color})` }
@@ -113,10 +110,10 @@ function TierRow({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
 function TierColumn({ heading, icon, headingColor, bg, border, tiers, rankPrefix, toBn }) {
   if (tiers.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", {
-    className: "rounded-xl p-3.5",
+    className: "rounded-xl px-3 py-2.5",
     style: { background: bg, border: `1px solid ${border}` }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm font-bold mb-3 flex items-center gap-1.5",
+    className: "text-sm font-bold mb-2 flex items-center gap-1.5",
     style: { color: headingColor }
   }, /*#__PURE__*/React.createElement("span", null, icon), heading), tiers.map((t, i) => /*#__PURE__*/React.createElement(TierRow, {
     key: t.pct + "-" + (t.shownPct === undefined ? "" : t.shownPct),
@@ -246,7 +243,7 @@ export function TopBottomActivityRanking({
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800 mb-3 text-center"
   }, "📊 চলতি মাসে এ পর্যন্ত আপনার সর্বোচ্চ ও সর্বনিম্ন এক্টিভিটি"), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-col gap-3 mb-4"
+    className: "flex flex-col gap-2 mb-3"
   }, /*#__PURE__*/React.createElement(TierColumn, {
     heading: "সর্বোচ্চ ৩ এক্টিভিটি",
     icon: "🏆",
