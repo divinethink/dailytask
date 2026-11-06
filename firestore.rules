@@ -2,143 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // অ্যাপের নিজস্ব কালেকশন যাচাই করার ফাংশন।
-    // M-1 fix: আগে শুধু '^data_.*' চেক হতো (যেকোনো দৈর্ঘ্য/ক্যারেক্টার),
-    // ফলে UI বাইপাস করে সরাসরি SDK দিয়ে যেকোনো নামের data_* কালেকশনে
-    // read/write সম্ভব ছিল। এখন app.js-এর client-side নিয়মের (৬-৩০
-    // ক্যারেক্টার, space/slash/backslash/quotation চিহ্নবিহীন — দেখুন
-    // FAMILY_CODE_MIN_LENGTH/MAX_LENGTH ও FAMILY_CODE_CHARSET_PATTERN)
-    // সাথে সামঞ্জস্যপূর্ণ একটি সীমা রাখা হয়েছে। Firestore rules-এর regex
-    // ইঞ্জিনে (RE2) lookahead সাপোর্ট নেই, তাই client-side-এর পুরো নিয়ম
-    // (pure-dot/reserved-pattern প্রত্যাখ্যান) হুবহু প্রতিলিপি করা যায়নি —
-    // এটি ইচ্ছাকৃতভাবে একটি নিরাপদ superset, যেন কোনো বিদ্যমান বৈধ
-    // ফ্যামিলি কোড ভেঙে না যায়।
-    // L-cleanup: আগে এখানে '|| name == 'daily_task_data'' নামে একটি লিগ্যাসি
-    // এলাউয়েন্স ছিল। app.js/backup — কোনো ফাইলেই এই কালেকশন নামটা আর
-    // ব্যবহৃত হয় না (getCollectionName() সবসময় `data_${code}` প্যাটার্নই
-    // রিটার্ন করে) — তাই এটি কোনো কার্যকারিতা ছাড়াই শুধু অতিরিক্ত attack
-    // surface তৈরি করছিল (কেউ চাইলে এই নির্দিষ্ট নামে সরাসরি read/write
-    // করতে পারত)। সরিয়ে ফেলা হলো — কোনো ব্রেকিং চেঞ্জ নয়।
-    // §Item(২১ আগস্ট ২০২৬): client-side FAMILY_CODE_MIN_LENGTH ৯→৬ সমন্বয়ে
-    // এই নিম্নসীমাও ৯→৬ করা হয়েছে (নিচের familyCode rename clause-এর সাথেও
-    // সামঞ্জস্যপূর্ণ)।
-    // §English-only validation(২৩ আগস্ট ২০২৬, owner-approved): charset
-    // English letter/digit/underscore/hyphen-এ সংকুচিত(client-side
-    // FAMILY_CODE_CHARSET_PATTERN-এর সাথে সামঞ্জস্যপূর্ণ)। RE2-তে lookahead
-    // সাপোর্ট নেই বলে "__...__$" reserved-prefix guard এখানে প্রতিলিপি করা
-    // যায়নি — আগের মতোই ইচ্ছাকৃত নিরাপদ superset।
-    function isAppCollection(name) {
-      return name.matches('^data_[A-Za-z0-9_-]{6,30}$');
-    }
-
-    // একটা ownerUid ফাঁকা (unclaimed) অথবা বর্তমান ইউজারের কিনা
-    function isUnownedOrMine(uid) {
-      return uid == null || uid == request.auth.uid;
-    }
-
-    // --- §Multi-device(v2-only) — ownerUid(string) → ownerUids(array,max 3) ---
-    // Migration-window transient fallback: পুরনো doc-এ এখনো শুধু single
-    // ownerUid থাকতে পারে(migration script না চলা পর্যন্ত) — তাই null-safe
-    // array-normalize করা হচ্ছে। Migration সম্পন্ন ও verified হওয়ার পরে এই
-    // fallback সরিয়ে ফেলা হবে(স্থায়ী নয়, শুধু transition bridge)।
+    // owner-তালিকায় বর্তমান uid আছে কিনা(তালিকা সবসময় non-empty: googleUid বা sentinel)।
     function isUnownedOrMineArray(uids) {
-      return uids == null || uids.size() == 0 || uids.hasAny([request.auth.uid]);
-    }
-
-    // entry:<memberId>:<date> এবং weekly:<memberId>:<yyyy-mm> — এই দুই
-    // ধরনের ডকুমেন্ট আইডি চেনা (memberId সবসময় দ্বিতীয় অংশ)
-    function isMemberScopedDoc(docId) {
-      return docId.matches('^(entry|weekly):.*');
-    }
-
-    // entry/weekly ডকুমেন্টের নিজের ভেতরের ownerUid না দেখে, সংশ্লিষ্ট
-    // member:<id> ডকুমেন্টের *বর্তমান* ownerUid দেখে অনুমতি দেওয়া হয় —
-    // এতে কোনো সদস্যের দায়িত্ব হাতবদল হলে (নতুন ফোন, ব্রাউজার ডাটা মোছা,
-    // অন্য ডিভাইসে re-claim) নতুন owner পুরনো সব এন্ট্রি/সাপ্তাহিক
-    // রিফ্লেকশনও সমস্যা ছাড়াই এডিট করতে পারে।
-    function currentMemberOwner(collectionName, docId) {
-      let memberId = docId.split(':')[1];
-      let memberPath = /databases/$(database)/documents/$(collectionName)/$('member:' + memberId);
-      // C-2 fix: get().data on a nonexistent document throws in Firestore
-      // Rules (per official docs, get() returns null if the doc doesn't
-      // exist), which fails the whole rule closed — permanently locking
-      // out writes to entry:/weekly: docs whose member: doc was deleted.
-      // Guarding with exists() first and returning null (unowned) instead
-      // restores the same "unclaimed member" access level already used
-      // elsewhere in this ruleset, rather than an unintended hard lock.
-      return exists(memberPath) ? get(memberPath).data.ownerUid : null;
-    }
-
-    // --- Phase C rollback safety fix (আজকের সিদ্ধান্ত) ---
-    // সমস্যা: legacy top-level collection (data_<code>) এর write-rule-এ
-    // কোনো admin-bypass ছিল না (শুধু নতুন families/{id}/members|entries|
-    // weekly subcollection rules-এ ছিল)। ফলে Flip-পরবর্তী rollback-এর
-    // সময় (reverseSyncPhaseCData()) যদি admin-কে অন্য সদস্যের owned
-    // entry/member touch করতে হয় (batch-এ একটাও mismatch থাকলে পুরো
-    // batch reject হয়), সেটা "Missing or insufficient permissions" দিয়ে
-    // ব্যর্থ হয় — বাস্তব real-family টেস্টে (দুই সদস্য, দুই ডিভাইস) এই
-    // সমস্যা ধরা পড়েছে।
-    //
-    // সমাধান (approved): broad/permanent admin-bypass না দিয়ে, শুধু
-    // migrationState == "locked" অবস্থায় সীমাবদ্ধ (time-boxed) bypass —
-    // "locked" state ইতিমধ্যেই Switch-এর transient window হিসেবে approved
-    // concept, তাই কোনো নতুন permission surface তৈরি হচ্ছে না। state
-    // locked থেকে সরে গেলে (v2/legacy-তে ফিরলে) bypass নিজে থেকেই বন্ধ
-    // হয়ে যায় — কোনো manual cleanup লাগে না, স্থায়ী attack-surface তৈরি
-    // হয় না। শুধু rollback-এর প্রকৃত প্রয়োজনের সময়টুকুতেই কার্যকর।
-    //
-    // legacyCollectionMap/{collectionName} থেকে familyId lookup করে,
-    // families/{familyId}-এর migrationState ও adminUids একই get() কলে
-    // চেক করা হয় (read-quota সাশ্রয়ের জন্য পৃথক isAdminOfFamily() কল না
-    // করে একটিমাত্র families doc read-এ দুটো শর্তই যাচাই করা হচ্ছে)।
-    function isFamilyLockedForAdmin(familyId) {
-      let familyPath = /databases/$(database)/documents/families/$(familyId);
-      return exists(familyPath)
-        && get(familyPath).data.migrationState == 'locked'
-        && get(familyPath).data.adminUids.hasAny([request.auth.uid]);
-    }
-    function isLegacyRollbackBypass(collectionName) {
-      let mapPath = /databases/$(database)/documents/legacyCollectionMap/$(collectionName);
-      return exists(mapPath) && isFamilyLockedForAdmin(get(mapPath).data.familyId);
-    }
-
-    // --- Locked-state normal-write deny(নতুন, ২৪ আগস্ট ২০২৬, migration-audit fix) ---
-    // পূর্বের অবস্থা: migrationState == "locked" শুধু admin-এর জন্য
-    // অতিরিক্ত bypass permission যোগ করত(isLegacyRollbackBypass, উপরে) —
-    // কিন্তু normal(non-admin/owner) write সেই সময়েও ঠিক আগের মতোই
-    // অনুমোদিত থেকে যেত(কোনো state-based deny ছিল না); client-side UI
-    // gate(isLockedForSwitch) ছিল, কিন্তু Rules-level backstop ছিল না —
-    // stale/cached tab থেকে locked-window-এ write হলে Copy-ধাপের
-    // consistency নষ্ট হতে পারত। এই ফাংশন শুধু deny-এর জন্য: family
-    // locked হলে true, adminUids-নির্বিশেষে(isFamilyLockedForAdmin থেকে
-    // ইচ্ছাকৃতভাবে আলাদা — এখানে admin-check নেই, শুধু state-check)।
-    function isLegacyCollectionLocked(collectionName) {
-      let mapPath = /databases/$(database)/documents/legacyCollectionMap/$(collectionName);
-      return exists(mapPath)
-        && exists(/databases/$(database)/documents/families/$(get(mapPath).data.familyId))
-        && get(/databases/$(database)/documents/families/$(get(mapPath).data.familyId)).data.migrationState == 'locked';
-    }
-
-    // একটা ডকুমেন্ট এই ইউজার লিখতে পারবে কিনা — centralized permission check
-    // Phase C rollback fix: প্রাথমিক (owner-based) শর্ত false হলেও, যদি
-    // families.migrationState == "locked" এবং এই ইউজার সেই family-এর
-    // admin হন, তাহলে লেখা অনুমোদিত (isLegacyRollbackBypass, উপরে দেখুন)।
-    // || হওয়ায় প্রাথমিক শর্ত true হলে দ্বিতীয় (get()-নির্ভর) শর্ত মূল্যায়িতই
-    // হয় না (Firestore Rules lazy evaluation) — normal/non-locked ব্যবহারে
-    // কোনো অতিরিক্ত read-cost নেই।
-    // Locked-state fix(২৪ আগস্ট ২০২৬): normal-owner branch এখন
-    // !isLegacyCollectionLocked(...) দিয়ে অতিরিক্ত-গেটেড — family locked
-    // থাকলে normal owner আর লিখতে পারবে না, শুধু isLegacyRollbackBypass
-    // (admin, locked-scoped) দিয়েই লেখা সম্ভব। legacy/v2 state(non-locked)
-    // অপরিবর্তিত — normal owner আগের মতোই লিখতে পারবে, কোনো নতুন গেট
-    // মূল্যায়িত হবে না-এমন না(get() হবে, কিন্তু ফলাফল অনুমতি না-ও কেড়ে
-    // নেয়), শুধুমাত্র সেই family-এর জন্য যেটার legacyCollectionMap আছে।
-    function isWritable(collectionName, docId, data) {
-      return (!isLegacyCollectionLocked(collectionName)
-        && (isMemberScopedDoc(docId)
-          ? isUnownedOrMine(currentMemberOwner(collectionName, docId))
-          : (!('ownerUid' in data) || isUnownedOrMine(data.ownerUid))))
-        || isLegacyRollbackBypass(collectionName);
+      return uids.hasAny([request.auth.uid]);
     }
 
     // --- Phase C prep: families/<familyId>/entries|weekly এর জন্য owner
@@ -209,24 +75,6 @@ service cloud.firestore {
       return isAdminOfFamily(familyId)
         || isAppCreator()
         || isClaimedFamilyMember(familyId);
-    }
-
-    // --- Legacy read-rule gate (নতুন) ---
-    // legacyCollectionMap/{collectionName} থেকে familyId বের করে, সেই
-    // familyId-এর জন্য isApprovedMember() একই চেক প্রয়োগ করা হচ্ছে — v2-এর
-    // সাথে সামঞ্জস্যপূর্ণ। mapPath না থাকলে (backfill এখনো হয়নি এমন কোনো
-    // family) fail-closed — read block, কোনো silent bypass না। Deploy করার
-    // আগে app.js-এর ensureLegacyCollectionMap() দিয়ে backfill নিশ্চিত করা
-    // হয়েছে (উভয় real family verified) — তাই এই মুহূর্তে কোনো real family
-    // lock out হবে না।
-    // Cosmetic fix: path inline রাখা হয়েছে (let-bound variable নয়) —
-    // Rules Playground simulator-এ let+exists()/get() combo মাঝেমধ্যে ভুল
-    // "Function not found"/"Invalid argument" error দেখায় (production
-    // engine-এ সমস্যা হয় না, কিন্তু Playground-এ পরিষ্কার টেস্ট করার জন্য
-    // inline রাখা হলো)।
-    function isApprovedLegacyMember(collectionName) {
-      return exists(/databases/$(database)/documents/legacyCollectionMap/$(collectionName))
-        && isApprovedMember(get(/databases/$(database)/documents/legacyCollectionMap/$(collectionName)).data.familyId);
     }
 
     // --- §Google-Login Identity Migration(2_4/2_4_1, dual-path, transitioning) ---
@@ -303,44 +151,6 @@ service cloud.firestore {
     match /publicToolsContent/{sectionId} {
       allow read: if true;
       allow create, update, delete: if request.auth != null && isAppCreator();
-    }
-
-    match /{collectionName}/{docId} {
-
-      // রিড: শুধু approved member (admin অথবা accessRequests-এ approved)
-      // — আগে শুধু auth!=null চেক হতো, ফলে শুধু Family Code জানলেই সব
-      // প্রাইভেট ডাটা পড়া যেত। v2-এর isApprovedMember() gate-এর সাথে
-      // সামঞ্জস্যপূর্ণ করে এখন legacy-তেও একই সুরক্ষা প্রয়োগ করা হলো।
-      allow read: if request.auth != null
-                    && isAppCollection(collectionName)
-                    && isApprovedLegacyMember(collectionName);
-
-      // ক্রিয়েট: unowned অথবা নিজেকে owner বসাতে হবে
-      allow create: if request.auth != null
-                    && isAppCollection(collectionName)
-                    && isWritable(collectionName, docId, request.resource.data);
-
-      // আপডেট: আগের ও নতুন — দুটোই unowned/নিজের হতে হবে
-      allow update: if request.auth != null
-                    && isAppCollection(collectionName)
-                    && isWritable(collectionName, docId, resource.data)
-                    && isWritable(collectionName, docId, request.resource.data);
-
-      // ডিলিট: শুধু unowned/নিজের ডকুমেন্ট
-      allow delete: if request.auth != null
-                    && isAppCollection(collectionName)
-                    && isWritable(collectionName, docId, resource.data);
-
-      // এন্ট্রির এডিট-হিস্ট্রি সাবকালেকশন — প্যারেন্ট এন্ট্রির member-ভিত্তিক
-      // একই (বর্তমান-owner) নিয়ম প্রযোজ্য
-      match /history/{historyId} {
-        allow read: if request.auth != null
-          && isAppCollection(collectionName)
-          && isApprovedLegacyMember(collectionName);
-        allow create, update, delete: if request.auth != null
-          && isAppCollection(collectionName)
-          && isWritable(collectionName, docId, {});
-      }
     }
 
     // --- users/{uid}: Google-linked uid <-> familyCode mapping ---

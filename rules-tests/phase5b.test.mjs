@@ -87,3 +87,10 @@ test("ধাপ৩: না-থাকা member-এর entry non-admin লিখ�
 test("ধাপ৩: না-থাকা member-এর entry admin লিখতে পারে", async () => {
   await assertSucceeds(setDoc(doc(as("uidA"), "families/famA/entries/ghost_2026-11-01"), { memberId: "ghost", x: 1 }));
 });
+
+// ধাপ ৪: পুরনো top-level data_<code> collection পুরোপুরি বন্ধ
+test("ধাপ৪: পুরনো data_ collection-এ read/write দুটোই বন্ধ", async () => {
+  await assertFails(setDoc(doc(as("uidA"), "data_FAMILYA1/member:m1"), { name: "x" }));
+  await assertFails(setDoc(doc(as("uidC"), "data_FAMILYA1/entry:m2:2026-11-01"), { x: 1 }));
+  await assertFails(getDoc(doc(as("uidA"), "data_FAMILYA1/member:m1")));
+});
