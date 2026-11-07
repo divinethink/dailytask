@@ -14,6 +14,23 @@ import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
 const PREVIEW = 3;
+// সময়ভাগ অনুযায়ী রঙের থিম(ভোর=অ্যাম্বার-গোলাপি, দিন=সবুজ/আকাশি, সন্ধ্যা=কমলা-গোলাপি, রাত=গাঢ় নীল)। অচেনা/ক্রিয়েটরের নতুন সময়ভাগ = সবুজ।
+const T = (panel, chipOn, chipOff, o) => Object.assign({ panel, chipOn, chipOff, txt: "text-slate-800", src: "text-slate-500", dot: "bg-slate-300", title: "text-slate-900", time: "bg-white/80 text-[#8A6A1C]", icon: "bg-white shadow-sm", link: "text-slate-700", edit: "text-slate-700" }, o || {});
+const NIGHT = { txt: "text-indigo-50", src: "text-indigo-200", dot: "bg-indigo-300", title: "text-white", time: "bg-white/15 text-amber-200", icon: "bg-white/15", link: "text-indigo-100", edit: "text-indigo-100" };
+const THEMES = {
+  s_lastNight: T("from-indigo-950 to-slate-800 border-indigo-900", "from-indigo-800 to-slate-900", "bg-indigo-50 border-indigo-200 text-indigo-900", NIGHT),
+  s_fajr: T("from-amber-50 to-rose-100 border-amber-200", "from-amber-500 to-rose-400", "bg-amber-50 border-amber-200 text-amber-900", { src: "text-amber-800/80", dot: "bg-amber-400", title: "text-amber-950", link: "text-amber-900" }),
+  s_duha: T("from-yellow-50 to-amber-100 border-yellow-200", "from-yellow-500 to-amber-500", "bg-yellow-50 border-yellow-200 text-yellow-900", { src: "text-yellow-800/80", dot: "bg-yellow-400", title: "text-yellow-950", link: "text-yellow-900" }),
+  s_work: T("from-emerald-50 to-teal-100 border-emerald-200", "from-emerald-600 to-teal-600", "bg-emerald-50 border-emerald-200 text-emerald-900", { src: "text-emerald-800/80", dot: "bg-emerald-400", title: "text-emerald-950", link: "text-emerald-900" }),
+  s_afternoon: T("from-sky-50 to-cyan-100 border-sky-200", "from-sky-500 to-cyan-600", "bg-sky-50 border-sky-200 text-sky-900", { src: "text-sky-800/80", dot: "bg-sky-400", title: "text-sky-950", link: "text-sky-900" }),
+  s_asr: T("from-orange-50 to-amber-100 border-orange-200", "from-orange-500 to-amber-500", "bg-orange-50 border-orange-200 text-orange-900", { src: "text-orange-800/80", dot: "bg-orange-400", title: "text-orange-950", link: "text-orange-900" }),
+  s_maghrib: T("from-orange-100 to-rose-200 border-rose-200", "from-orange-500 to-rose-500", "bg-rose-50 border-rose-200 text-rose-900", { src: "text-rose-900/70", dot: "bg-rose-400", title: "text-rose-950", link: "text-rose-900" }),
+  s_isha: T("from-indigo-900 to-slate-900 border-indigo-800", "from-indigo-600 to-indigo-800", "bg-indigo-50 border-indigo-200 text-indigo-900", NIGHT),
+  s_sleep: T("from-slate-900 to-indigo-950 border-slate-800", "from-slate-700 to-indigo-900", "bg-slate-100 border-slate-200 text-slate-800", NIGHT),
+};
+const THEME_DEFAULT = T("from-emerald-50 to-teal-100 border-emerald-200", "from-emerald-600 to-teal-600", "bg-emerald-50 border-emerald-200 text-emerald-900", { src: "text-emerald-800/80", dot: "bg-emerald-400", title: "text-emerald-950", link: "text-emerald-900" });
+const themeOf = (id) => THEMES[id] || THEME_DEFAULT;
+const NEUTRAL = { txt: "text-slate-700", src: "text-slate-500", dot: "bg-slate-300" };
 // বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
 function groupItems(items) {
   const groups = [];
@@ -27,11 +44,11 @@ function groupItems(items) {
 }
 
 // সূত্র লেখার শেষে ছোট ধূসর বন্ধনীতে(আলাদা লাইন নয়)
-function Src({ src }) {
-  return src ? React.createElement("span", { className: "inline-block text-[11px] text-slate-500 ml-1" }, "(" + src + ")") : null;
+function Src({ src, th }) {
+  return src ? React.createElement("span", { className: "inline-block text-[11px] ml-1 " + th.src }, "(" + src + ")") : null;
 }
 
-function Bullets({ items }) {
+function Bullets({ items, th = NEUTRAL }) {
   return React.createElement(
     "div",
     { className: "space-y-3" },
@@ -43,7 +60,7 @@ function Bullets({ items }) {
         "div",
         { key: g.key || "_" },
         single
-          ? React.createElement("p", { className: "text-sm text-slate-700 leading-relaxed" }, pill, pill && " ", g.items[0].text, React.createElement(Src, { src: g.items[0].src }))
+          ? React.createElement("p", { className: "text-sm leading-relaxed " + th.txt }, pill, pill && " ", g.items[0].text, React.createElement(Src, { src: g.items[0].src, th }))
           : React.createElement(
               React.Fragment,
               null,
@@ -54,9 +71,9 @@ function Bullets({ items }) {
                 g.items.map((it, i) =>
                   React.createElement(
                     "li",
-                    { key: i, className: "flex gap-2 text-sm text-slate-700 leading-relaxed" },
-                    React.createElement("span", { className: "mt-2 w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0", "aria-hidden": true }),
-                    React.createElement("span", null, it.text, React.createElement(Src, { src: it.src }))
+                    { key: i, className: "flex gap-2 text-sm leading-relaxed " + th.txt },
+                    React.createElement("span", { className: "mt-2 w-1.5 h-1.5 rounded-full shrink-0 " + th.dot, "aria-hidden": true }),
+                    React.createElement("span", null, it.text, React.createElement(Src, { src: it.src, th }))
                   )
                 )
               )
@@ -130,6 +147,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
   const nowId = hit.slot.id;
   const slot = (sel && view.find((s) => s.id === sel)) || hit.slot;
   const isNowSlot = slot.id === nowId;
+  const th = themeOf(slot.id);
   const shown = more ? slot.items : slot.items.slice(0, PREVIEW);
   const hasMore = slot.items.length > PREVIEW;
 
@@ -159,39 +177,43 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
             onClick: () => pick(s.id),
             "aria-pressed": active,
             "data-sel": active ? "1" : undefined,
-            className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors " + (active ? "bg-emerald-700 text-white border-emerald-700" : "bg-slate-50 text-slate-600 border-slate-200"),
+            className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff),
           },
           React.createElement("span", { "aria-hidden": true }, s.icon),
           s.title,
-          now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-amber-300" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
+          now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
         );
       })
     ),
-    // হেডার
+    isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
+    // রঙিন প্যানেল: হেডার + বুলেট
+    React.createElement(
+      "div",
+      { className: "rounded-2xl border p-3 bg-gradient-to-br " + th.panel },
     React.createElement(
       "div",
       { className: "flex items-center justify-between gap-2 mb-3" },
       React.createElement(
         "div",
         { className: "flex items-center gap-2.5 min-w-0" },
-        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-xl", "aria-hidden": true }, slot.icon),
+        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, slot.icon),
         React.createElement(
           "div",
           { className: "min-w-0" },
           React.createElement(
             "div",
             { className: "flex items-center gap-1.5 flex-wrap" },
-            React.createElement("span", { className: "text-base font-bold text-emerald-950" }, slot.title),
+            React.createElement("span", { className: "text-base font-bold " + th.title }, slot.title),
             isNowSlot && React.createElement(NowBadge, { exact })
           ),
-          React.createElement("span", { className: "inline-block mt-0.5 text-[11px] font-semibold text-[#8A6A1C] bg-[#FBF3DC] rounded-full px-2 py-0.5 whitespace-nowrap" }, rangeLabel(slot, toBn))
+          React.createElement("span", { className: "inline-block mt-0.5 text-[11px] font-semibold rounded-full px-2 py-0.5 whitespace-nowrap " + th.time }, rangeLabel(slot, toBn))
         )
       ),
-      isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-emerald-800 hover:bg-black/5" }, React.createElement(EditIcon, { size: 16 }))
+      isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 " + th.edit }, React.createElement(EditIcon, { size: 16 }))
     ),
-    isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
-    React.createElement(Bullets, { items: shown }),
-    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-1 min-h-[44px] inline-flex items-center text-xs font-semibold text-emerald-800 underline" }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)"),
+    React.createElement(Bullets, { items: shown, th }),
+    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-1 min-h-[44px] inline-flex items-center text-xs font-semibold underline " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)")
+    ),
     React.createElement(
       "div",
       { className: "mt-2 pt-1 border-t border-slate-100" },
@@ -204,7 +226,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
           const now = exact && s.id === nowId;
           return React.createElement(
             "div",
-            { key: s.id, className: "rounded-xl border " + (now ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-100") },
+            { key: s.id, className: "rounded-xl border " + themeOf(s.id).chipOff + (now ? " ring-2 ring-emerald-400" : "") },
             React.createElement(
               "button",
               { type: "button", onClick: () => toggleOpen(s.id), "aria-expanded": open, className: "w-full min-h-[44px] px-3 flex items-center justify-between gap-2 text-left" },
