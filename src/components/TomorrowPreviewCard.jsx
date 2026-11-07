@@ -135,14 +135,14 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
       { className: "flex items-center justify-between gap-2 mb-3" },
       React.createElement(
         "div",
-        { className: "flex items-center gap-2" },
-        React.createElement("h3", { className: "text-sm font-bold text-emerald-950" }, isTomorrow ? "🌅 আগামীকাল" : "🌅 আজ"),
-        React.createElement("span", { className: "rounded-full bg-emerald-900 text-white text-xs font-semibold px-2.5 py-0.5" }, WEEKDAYS_BN[date.getDay()])
+        { className: "flex items-center gap-2 shrink-0 whitespace-nowrap" },
+        React.createElement("h3", { className: "text-sm font-bold text-emerald-950 whitespace-nowrap" }, isTomorrow ? "🌅 আগামীকাল" : "🌅 আজ"),
+        React.createElement("span", { className: "rounded-full bg-emerald-900 text-white text-xs font-semibold px-2.5 py-0.5 whitespace-nowrap" }, WEEKDAYS_BN[date.getDay()])
       ),
       React.createElement(
         "div",
-        { className: "flex items-center gap-2" },
-        React.createElement("span", { className: "text-xs font-semibold text-[#A47E24]" }, toBn(hijri.day) + " " + hijri.month),
+        { className: "flex items-center gap-1 min-w-0" },
+        React.createElement("span", { className: "text-xs font-semibold text-[#A47E24] text-right leading-tight min-w-0" }, toBn(hijri.day) + " " + hijri.month),
         isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-7 h-7 flex items-center justify-center rounded-lg text-emerald-800 hover:bg-black/5" }, React.createElement(EditIcon, { size: 16 }))
       )
     ),
