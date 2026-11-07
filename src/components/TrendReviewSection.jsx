@@ -60,7 +60,7 @@ function TrendRow({ r, months, BN_MONTHS, toBn, comment, selected, onToggle, onS
         onClick={onToggle}
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
         className="flex items-center gap-1 cursor-pointer rounded-lg"
-        style={selected ? { background: "#F3F7F4" } : undefined}
+        style={selected ? { background: "#E4EEE7" } : undefined}
       >
         <div className="flex-1 min-w-0 pr-1 text-sm text-slate-800 leading-snug">{r.label}</div>
         {r.vals.map((v, i) => (
@@ -130,6 +130,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
     const row = { id: `tr-${year}-${pad2(month0 + 1)}-${r.key}`, topic: T.sendTopic, decision: fill(T.sendDecision, { label: r.label }).slice(0, 300), person: "" };
     if (onSendToMeeting([row])) setSentKeys(m => ({ ...m, [r.key]: true }));
   };
+  const commentOf = r => fill(T.comment[r.kind] || "", { n: r.delta === null || r.delta === undefined ? "" : toBn(Math.abs(r.delta)) });
   const rowProps = r => ({ selected: sel === r.key, onToggle: () => pickRow(r.key, false), onSend: typeof onSendToMeeting === "function" ? () => sendRow(r) : null, sent: !!sentKeys[r.key] });
 
   // আগের দুই মাস: কার্ড খুললে, এবং সদস্য/মাস বদলালে। একই key-তে বন্ধ-খোলায় আবার পড়ে না।
@@ -209,7 +210,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
       </div>
     );
     else body = (
-      <div className="mt-3">
+      <div className="mt-3 rounded-2xl p-3" style={{ background: "#F1F6F2" }}>
         {data.status === "error" && <p className="text-xs text-orange-700 mb-2">{T.error}</p>}
 
         {trend.overall && (
@@ -274,7 +275,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
               ))}
               <span className="w-4 shrink-0" />
             </div>
-            {keyRows.map(r => <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)} />)}
+            {keyRows.map(r => <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)} comment={commentOf(r)} />)}
           </div>
         )}
 
@@ -290,15 +291,13 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
           </button>
         )}
 
-        {showAll && otherSections.map(sec => (
-          <div key={sec.id} className="mb-2">
-            <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A6A12" }}>{sec.label}</div>
-            {sec.rows.map(r => (
-              <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)}
-                comment={fill(T.comment[r.kind], { n: r.delta === null ? "" : toBn(Math.abs(r.delta)) })} />
+        {showAll && (
+          <div className="mb-2">
+            {otherSections.flatMap(sec => sec.rows).map(r => (
+              <TrendRow key={r.key} r={r} months={trend.months} BN_MONTHS={BN_MONTHS} toBn={toBn} {...rowProps(r)} comment={commentOf(r)} />
             ))}
           </div>
-        ))}
+        )}
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1 text-slate-500" style={{ fontSize: 11 }}>
           {["great", "good", "mid", "low", "none"].map(t => (
