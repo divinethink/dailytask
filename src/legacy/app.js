@@ -110,6 +110,7 @@ import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { GoogleRelinkGate } from "../components/GoogleRelinkGate.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
 import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
+import { WeeklyGapOverview } from "../components/WeeklyGapOverview.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
 import { useCursorEntries } from "./useCursorEntries.js";
@@ -1845,6 +1846,17 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     BN_WEEKDAYS: BN_WEEKDAYS,
     onSendToMeeting: handleSendToMeeting
+  })),
+    weeklyGaps: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyGapOverview, {
+    fold: fold,
+    onShiftMonth: reviewShiftMonth,
+    migrationState: migrationState,
+    memberId: selectedId,
+    locked: isLockedForThisDevice,
+    monthCursor: reviewCursor,
+    allFields: allFields,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS
   })),
     trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: trendShiftMonth, monthCursor: trendCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
     fold: fold,

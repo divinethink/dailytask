@@ -63,7 +63,7 @@ export function renderHomeBelow(member, nodes) {
     const key = c.id + ":" + c.fold;
     const title = cardTitle("below", c.id);
     let el;
-    if (c.id === "weekly" || c.id === "meeting" || c.id === "monthlyReport" || c.id === "trend") {
+    if (c.id === "weekly" || c.id === "weeklyGaps" || c.id === "meeting" || c.id === "monthlyReport" || c.id === "trend") {
       el = nodes[c.id](c.fold);
     } else if (c.fold === "fixed") {
       el = PX_WRAPPED[c.id] ? React.createElement("div", { className: "px-5" }, nodes[c.id]()) : nodes[c.id]();
