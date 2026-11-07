@@ -53,7 +53,7 @@ test("normalizeSlots: বৈধ সেভ-করা তালিকা ব্য
   ] } };
   const r = normalizeSlots(raw);
   assert.equal(r.length, 1);
-  assert.deepEqual(r[0], { id: "x", icon: "🕌", title: "ফজর", from: 5, to: 7, items: [{ text: "লেখা", src: "সূত্র" }] });
+  assert.deepEqual(r[0], { id: "x", icon: "🕌", title: "ফজর", from: 5, to: 7, items: [{ cat: "", text: "লেখা", src: "সূত্র" }] });
 });
 
 test("validateSlot: নাম, সময়, বুলেট ও সূত্র বাধ্যতামূলক", () => {
@@ -87,4 +87,11 @@ test("হোম লেআউট: নতুন কার্ড তাযকির
   const hidden = sanitizeCards("entry", [{ id: "tazkirah", visible: false, fold: "fixed" }, { id: "salah", visible: true, fold: "open" }]);
   assert.equal(hidden[0].visible, false);
   assert.equal(hidden[1].id, "nabijiTimeline");
+});
+
+test("বুলেটের ধরন: চেনা মান থাকে, অচেনা মান বাদ", () => {
+  const r = normalizeSlot({ id: "c", title: "ক", from: 5, to: 7, items: [{ cat: "family", text: "a", src: "b" }, { cat: "hack", text: "a", src: "b" }] });
+  assert.equal(r.items[0].cat, "family");
+  assert.equal(r.items[1].cat, "");
+  assert.ok(DEFAULT_SLOTS.every((s) => s.items.every((it) => it.cat)));
 });

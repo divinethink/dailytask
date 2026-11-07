@@ -4,7 +4,7 @@
 // doc না থাকলে/পড়া ব্যর্থ হলে nabijiTimeline.js-এর ডিফল্ট তালিকা — কার্ড আগের মতোই চলে। React global(window.React, globals.js)।
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
-import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAt, inSlot, rangeLabel } from "./nabijiTimeline.js";
+import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAt, inSlot, rangeLabel, CATS } from "./nabijiTimeline.js";
 import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
@@ -22,6 +22,7 @@ function Bullets({ items }) {
         React.createElement(
           "span",
           null,
+          it.cat && CATS[it.cat] && React.createElement("span", { className: "inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md mr-1.5 align-middle " + CATS[it.cat].cls }, CATS[it.cat].label),
           it.text,
           it.src && React.createElement("span", { className: "block text-[11px] text-slate-400 mt-0.5" }, "সূত্র: " + it.src)
         )

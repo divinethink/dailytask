@@ -3,13 +3,13 @@
 // প্রতিটা বদল সাথে সাথে সেভ(পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
 // সূত্রহীন বুলেট সেভ হয় না(validateSlot)। React global(window.React, globals.js)।
 import { saveNabijiTimeline } from "../legacy/editableContent.js";
-import { NABIJI_SECTION_ID, MAX_SLOTS, MAX_ITEMS, LIMITS, DEFAULT_SLOTS, validateSlot, normalizeSlot, makeSlotId, hourLabel, rangeLabel } from "./nabijiTimeline.js";
+import { NABIJI_SECTION_ID, MAX_SLOTS, MAX_ITEMS, LIMITS, CATS, DEFAULT_SLOTS, validateSlot, normalizeSlot, makeSlotId, hourLabel, rangeLabel } from "./nabijiTimeline.js";
 
 const { useState } = React;
 const PRIMARY = "var(--theme-primary, #0E4B43)";
 const INPUT = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base text-slate-800";
 const btn = "px-3 py-2 rounded-xl text-sm font-semibold";
-const EMPTY = { id: "", icon: "🕌", title: "", from: 12, to: 13, items: [{ text: "", src: "" }] };
+const EMPTY = { id: "", icon: "🕌", title: "", from: 12, to: 13, items: [{ cat: "", text: "", src: "" }] };
 
 const bn = (n) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[d]);
 
@@ -67,7 +67,7 @@ export function NabijiTimelineEditor({ slots, onSaved, onClose }) {
   };
   const setItem = (i, k) => (e) => setForm({ ...form, items: form.items.map((it, j) => (j === i ? { ...it, [k]: e.target.value } : it)) });
   const delItem = (i) => setForm({ ...form, items: form.items.filter((_, j) => j !== i) });
-  const addItem = () => form.items.length < MAX_ITEMS && setForm({ ...form, items: [...form.items, { text: "", src: "" }] });
+  const addItem = () => form.items.length < MAX_ITEMS && setForm({ ...form, items: [...form.items, { cat: "", text: "", src: "" }] });
 
   let body;
   if (form) {
@@ -93,11 +93,12 @@ export function NabijiTimelineEditor({ slots, onSaved, onClose }) {
           React.createElement("select", { className: INPUT, value: form.to, onChange: setF("to") }, toOpts.map((v) => React.createElement("option", { key: v, value: v }, hourLabel(v, bn) + (v >= 24 ? " (পরদিন)" : ""))))
         )
       ),
-      React.createElement("p", { className: "text-xs font-bold text-emerald-900 mt-1 mb-1.5" }, "বুলেট (২-৩টি রাখা ভালো; প্রতিটির সূত্র বাধ্যতামূলক)"),
+      React.createElement("p", { className: "text-xs font-bold text-emerald-900 mt-1 mb-1.5" }, "বুলেট (প্রতিটির সূত্র বাধ্যতামূলক)"),
       form.items.map((it, i) =>
         React.createElement(
           "div",
           { key: i, className: "rounded-xl border border-slate-200 bg-white p-2 mb-2" },
+          React.createElement("select", { className: INPUT + " mb-1", value: it.cat || "", onChange: setItem(i, "cat") }, React.createElement("option", { value: "" }, "ধরন (ঐচ্ছিক)"), Object.keys(CATS).map((k) => React.createElement("option", { key: k, value: k }, CATS[k].label))),
           React.createElement("textarea", { className: INPUT, rows: 3, placeholder: "নবিজি ﷺ যা করতেন", value: it.text, maxLength: LIMITS.text, onChange: setItem(i, "text") }),
           React.createElement("input", { className: INPUT + " mt-1", placeholder: "সূত্র, যেমন: সহিহ বুখারি ১১৪৫", value: it.src, maxLength: LIMITS.src, onChange: setItem(i, "src") }),
           React.createElement("div", { className: "flex justify-end mt-1" }, React.createElement("button", { type: "button", className: "text-xs font-semibold text-red-600 px-2 py-1", onClick: () => delItem(i) }, "এই বুলেট মুছুন"))
@@ -133,7 +134,7 @@ export function NabijiTimelineEditor({ slots, onSaved, onClose }) {
           )
         )
       ),
-      React.createElement("button", { type: "button", className: btn + " w-full text-white", style: { background: PRIMARY }, disabled: busy, onClick: () => { setError(""); setForm({ ...EMPTY, items: [{ text: "", src: "" }] }); } }, "+ নতুন সময়ভাগ যোগ করুন"),
+      React.createElement("button", { type: "button", className: btn + " w-full text-white", style: { background: PRIMARY }, disabled: busy, onClick: () => { setError(""); setForm({ ...EMPTY, items: [{ cat: "", text: "", src: "" }] }); } }, "+ নতুন সময়ভাগ যোগ করুন"),
       React.createElement("div", { className: "mt-3 pt-3 border-t border-slate-200 flex justify-end" }, React.createElement("button", { type: "button", className: btn + " border border-amber-300 text-amber-700 disabled:opacity-60", disabled: busy, onClick: resetAll }, "মূল তালিকায় ফেরান"))
     );
   }
