@@ -30,72 +30,41 @@ function Stat({ icon, label, value, sub }) {
   );
 }
 
-// অনুপাত-বার: শীর্ষ মান = ১০০% প্রস্থ।
-function Bar({ label, count, max, color, text }) {
-  return (
-    <div className="mb-2 last:mb-0">
-      <div className="flex items-baseline justify-between gap-2 text-xs mb-1">
-        <span className="font-bold text-slate-700 min-w-0 break-words">{label}</span>
-        <span className="shrink-0 text-slate-500">{text}</span>
-      </div>
-      <div className="h-2 rounded-full overflow-hidden" style={{ background: "#E7EEE9" }}>
-        <div className="h-full rounded-full" style={{ width: Math.max(8, Math.round((count / max) * 100)) + "%", background: color }} />
-      </div>
-    </div>
-  );
-}
-
 function WeekItem({ w, last, open, onToggle, gapLabel, reasonLabel, blockerLabel, recurring, range, toBn }) {
   const hasMore = w.hasReview && (w.blockers.length > 0 || w.moment);
-  const dotBg = !w.hasReview ? "#E7EEE9" : w.hasGap ? "#E8A317" : "#2F9E44";
+  const dotBg = !w.hasReview ? "#C9D6CE" : w.hasGap ? "#E8A317" : "#2F9E44";
   const goal = GOAL_STYLE[w.goalResult];
+  const sub = !w.hasReview ? range + " · " + T.noEntry : w.reasons.length ? range + " · " + w.reasons.map(reasonLabel).join("، ") : range;
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-2.5">
       <div className="flex flex-col items-center shrink-0" style={{ width: 22 }}>
-        <span className="mt-1 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ background: dotBg }}>{toBn(w.week)}</span>
-        {!last && <span className="flex-1 w-0.5 mt-1 rounded" style={{ background: "#D8E4DC", minHeight: 14 }} />}
+        <span className="mt-2 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ background: dotBg }}>{toBn(w.week)}</span>
+        {!last && <span className="flex-1 w-0.5 mt-1 rounded" style={{ background: "#D8E4DC", minHeight: 8 }} />}
       </div>
-      <div className={"flex-1 min-w-0" + (last ? "" : " pb-3")}>
+      <div className={"flex-1 min-w-0" + (last ? "" : " pb-2")}>
         <div
           role={hasMore ? "button" : undefined}
           tabIndex={hasMore ? 0 : undefined}
           aria-expanded={hasMore ? open : undefined}
           onClick={hasMore ? onToggle : undefined}
           onKeyDown={hasMore ? e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } } : undefined}
-          className={"rounded-2xl p-3 bg-white" + (hasMore ? " cursor-pointer" : "")}
-          style={{ border: "1px solid #E1E8E3", boxShadow: "0 1px 2px rgba(31,77,68,0.05)" }}
+          className={"rounded-xl px-3 py-2 bg-white" + (hasMore ? " cursor-pointer" : "")}
+          style={{ border: "1px solid #E1E8E3" }}
         >
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-slate-800">{fill(T.weekLabel, { w: toBn(w.week) })}</div>
-              <div className="text-[11px] text-slate-500">{range}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
+              {w.hasReview && !w.hasGap && <span className="text-sm font-bold" style={{ color: "#2F7D4F" }}>✓ {T.noGap}</span>}
+              {w.gapKey && <span className="text-sm font-bold rounded-md px-2 py-0.5" style={{ background: "#FBEFC4", color: "#7A5A00" }}>{gapLabel}</span>}
+              {recurring && <span className="text-[11px] font-bold" style={{ color: "#9A3412" }}>{T.recurring}</span>}
             </div>
             {goal && <span className="shrink-0 text-[11px] font-bold rounded-full px-2 py-0.5" style={goal}>🎯 {T.goal[w.goalResult]}</span>}
-            {hasMore && <ChevronDown size={16} className={"shrink-0 text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
+            {hasMore && <ChevronDown size={14} className={"shrink-0 text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />}
           </div>
-          {!w.hasReview ? (
-            <p className="text-xs text-slate-400 mt-2">{T.noEntry}</p>
-          ) : !w.hasGap ? (
-            <p className="text-xs mt-2" style={{ color: "#2F7D4F" }}>✓ {T.noGap}</p>
-          ) : (
-            <div className="mt-2">
-              {w.gapKey && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-bold rounded-lg px-2.5 py-1" style={{ background: "#FBEFC4", color: "#7A5A00" }}>{gapLabel}</span>
-                  {recurring && <span className="text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: "#FFF6EC", color: "#9A3412", border: "1px solid #F3D3B5" }}>{T.recurring}</span>}
-                </div>
-              )}
-              {w.reasons.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {w.reasons.map(id => <span key={id} className="text-xs rounded-full px-2.5 py-0.5" style={{ background: "#EEF3F0", color: "#3B5A50", border: "1px solid #DCE6DF" }}>{reasonLabel(id)}</span>)}
-                </div>
-              )}
-            </div>
-          )}
+          <div className="text-[11px] text-slate-500 leading-snug" style={{ marginTop: w.hasReview ? 4 : 0 }}>{sub}</div>
           {open && hasMore && (
-            <div className="mt-2.5 pt-2.5 text-xs text-slate-600 leading-relaxed" style={{ borderTop: "1px dashed #D8E4DC" }}>
+            <div className="mt-2 pt-2 text-xs text-slate-600 leading-relaxed" style={{ borderTop: "1px dashed #D8E4DC" }}>
               {w.blockers.length > 0 && (
-                <p className="mb-1.5"><span className="font-bold text-slate-700">{T.blockers}: </span>{w.blockers.map(blockerLabel).join("، ")}</p>
+                <p className="mb-1"><span className="font-bold text-slate-700">{T.blockers}: </span>{w.blockers.map(blockerLabel).join("، ")}</p>
               )}
               {w.moment && (
                 <p><span className="font-bold text-slate-700">{T.moment}: </span>{w.moment}</p>
@@ -148,8 +117,7 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
   const rangeText = w => toBn(w.start) + "–" + toBn(w.end) + " " + BN_MONTHS[month0];
 
   const hasAny = !!(ov && ov.filled > 0);
-  let subtitle = T.subtitle;
-  if (ov && hasAny) subtitle = ov.gapCount ? fill(T.heroOf, { t: toBn(ov.total) }) + " " + fill(T.heroMain, { g: toBn(ov.gapCount) }) : T.heroNone;
+  const subtitle = T.subtitle;
 
   let body = null;
   if (open) {
@@ -169,19 +137,16 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
       const topGap = ov.topGaps[0];
       const topReason = ov.topReasons[0];
       const goalTotal = ov.goal.done + ov.goal.partial + ov.goal.none;
-      const maxGap = ov.topGaps.length ? ov.topGaps[0].count : 1;
-      const maxReason = ov.topReasons.length ? ov.topReasons[0].count : 1;
       const recurringSet = new Set(ov.recurring);
       let insight = "";
       if (ov.recurring.length) insight = fill(T.insightOne, { name: fieldName(ov.recurring[0]) });
       else if (topReason && topReason.count >= 2) insight = fill(T.insightReason, { name: reasonLabel(topReason.id) });
       body = (
-        <div className="mt-3 rounded-2xl p-3" style={{ background: "#F1F6F2" }}>
+        <div className="mt-3 rounded-2xl p-2.5" style={{ background: "#F1F6F2" }}>
           {data.status === "error" && <p className="text-xs text-orange-700 mb-2">{T.error}</p>}
 
-          <div className="rounded-2xl p-3.5 text-white mb-3" style={{ background: HERO_BG }}>
-            <div className="text-[11px] opacity-90">{fill(T.heroOf, { t: toBn(ov.total) })}</div>
-            <div className="text-lg font-bold leading-snug mb-3">{ov.gapCount ? fill(T.heroMain, { g: toBn(ov.gapCount) }) : T.heroNone}</div>
+          <div className="rounded-2xl p-3 text-white mb-2.5" style={{ background: HERO_BG }}>
+            <div className="text-base font-bold leading-snug mb-2.5">{ov.gapCount ? fill(T.heroMain, { g: toBn(ov.gapCount), t: toBn(ov.total) }) : T.heroNone}</div>
             <div className="flex gap-2">
               <Stat icon="🔁" label={T.statTop} value={topGap ? fieldName(topGap.id) : ""} sub={topGap ? fill(T.times, { n: toBn(topGap.count) }) : ""} />
               <Stat icon="💭" label={T.statReason} value={topReason ? reasonLabel(topReason.id) : ""} sub={topReason ? fill(T.timesReason, { n: toBn(topReason.count) }) : ""} />
@@ -190,28 +155,10 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
           </div>
 
           {insight && (
-            <p className="text-xs leading-relaxed rounded-xl p-2.5 mb-3" style={{ background: "#FFF6EC", border: "1px solid #F3D3B5", color: "#7C3A10" }}>💡 {insight}</p>
+            <p className="text-xs leading-relaxed rounded-xl p-2.5 mb-2.5" style={{ background: "#FFF6EC", border: "1px solid #F3D3B5", color: "#7C3A10" }}>💡 {insight}</p>
           )}
 
-          {ov.topGaps.length > 0 && (
-            <div className="rounded-2xl p-3 mb-3 bg-white" style={{ border: "1px solid #E1E8E3" }}>
-              <div className="text-xs font-bold text-slate-600 mb-2">{T.gapsTitle}</div>
-              {ov.topGaps.slice(0, 5).map(g => (
-                <Bar key={g.id} label={fieldName(g.id)} count={g.count} max={maxGap} color="linear-gradient(90deg,#E8A317,#F2C14E)" text={fill(T.times, { n: toBn(g.count) })} />
-              ))}
-            </div>
-          )}
-
-          {ov.topReasons.length > 0 && (
-            <div className="rounded-2xl p-3 mb-3 bg-white" style={{ border: "1px solid #E1E8E3" }}>
-              <div className="text-xs font-bold text-slate-600 mb-2">{T.reasonsTitle}</div>
-              {ov.topReasons.map(r => (
-                <Bar key={r.id} label={reasonLabel(r.id)} count={r.count} max={maxReason} color="linear-gradient(90deg,#2D6A5C,#5FA08D)" text={fill(T.timesReason, { n: toBn(r.count) })} />
-              ))}
-            </div>
-          )}
-
-          <div className="text-xs font-bold text-slate-600 mb-2 mt-1">{T.weeksTitle}</div>
+          <div className="text-xs font-bold text-slate-600 mb-1.5">{T.weeksTitle}</div>
           {ov.weeks.map((w, i) => (
             <WeekItem
               key={w.week} w={w} last={i === ov.weeks.length - 1} toBn={toBn}
@@ -221,8 +168,7 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
             />
           ))}
 
-          <p className="text-slate-500 text-center mt-2" style={{ fontSize: 11 }}>{T.tapHint}</p>
-          <p className="text-slate-400 text-center mt-1" style={{ fontSize: 11 }}>{T.footnote}</p>
+          <p className="text-slate-400 text-center mt-1.5" style={{ fontSize: 11 }}>{T.footnote}</p>
         </div>
       );
     }
