@@ -99,6 +99,22 @@ async function saveHomeCardExtras(sectionId, data) {
   );
 }
 
+// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ডের সময়ভাগ-তালিকা(নিজস্ব doc; গঠন-যাচাই components/nabijiTimeline.js-এ; Rules-এ শুধু App Creator লিখতে পারে)।
+// slots সম্পূর্ণ প্রতিস্থাপিত(মোছা slot যাতে থেকে না যায়); [] = "মূল তালিকায় ফেরান"(কার্ড কোডের ডিফল্টে ফেরে)।
+async function saveNabijiTimeline(sectionId, slots) {
+  const user = requireCreator();
+  await setDoc(
+    sectionRef(sectionId),
+    {
+      format: "nabijiTimeline",
+      nabijiTimeline: { slots: Array.isArray(slots) ? slots : [] },
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    },
+    { mergeFields: ["format", "nabijiTimeline", "updatedAt", "updatedBy"] }
+  );
+}
+
 // পপআপ-বার্তা ওভাররাইড(App Creator-only, Rules-এ enforced)। mergeFields: popupMessages map সম্পূর্ণ
 // প্রতিস্থাপিত হয়(সাধারণ merge:true-তে মুছে ফেলা আইটেম পুরনো মান নিয়ে থেকে যেত)।
 async function savePopupMessages(sectionId, data) {
@@ -126,6 +142,7 @@ export {
   saveAccordion,
   saveTable,
   saveHomeCardExtras,
+  saveNabijiTimeline,
   savePopupMessages,
   makeAccordionItemId,
 };

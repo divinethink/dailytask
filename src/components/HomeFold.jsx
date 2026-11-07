@@ -47,7 +47,9 @@ export function homeEntryCards(member, nodes) {
         { key },
         c.id === "tazkirah" || c.id === "muhasaba"
           ? React.createElement(FoldWrap, { fold: c.fold, title: cardTitle("entry", c.id) }, nodes[c.id]())
-          : nodes[c.id](c.fold)
+          : c.id === "nabijiTimeline"
+            ? React.createElement(FoldWrap, { fold: c.fold, title: cardTitle("entry", c.id) }, nodes[c.id](c.fold))
+            : nodes[c.id](c.fold)
       )
     );
   });

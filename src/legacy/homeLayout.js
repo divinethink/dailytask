@@ -19,6 +19,7 @@ const d = (id, title, defaultFold) => ({ id, title, defaultFold });
 export const CARD_DEFS = {
   entry: [
     d("tazkirah", "আজকের বাণী", "fixed"),
+    d("nabijiTimeline", "এ সময়ে নবিজি ﷺ যা করতেন", "open"),
     d("muhasaba", "গতকাল ও মাসের স্মরণ", "fixed"),
     d("salah", "সালাত ও সিয়াম", "open"),
     d("quranIlm", "কুরআন ও ইলম", "closed"),

@@ -10,6 +10,7 @@
 // except React and icons.jsx imports).
 import { homeEntryCards } from "./HomeFold.jsx";
 import { MuhasabaStrip } from "./MuhasabaStrip.jsx";
+import { NabijiTimelineCard } from "./NabijiTimelineCard.jsx";
 import { sanitizeTasks, activeTasks, archivedTasks, addTask, renameTask, setArchived, taskFields, MAX_ACTIVE, MAX_LABEL, TASK_KEY_PREFIX } from "../legacy/customTasks.js";
 import { CalIcon, ChevronLeft, ChevronRight, ChevronDown, ClockIcon, Loader2, Plus, X, Check, InfoIcon, ClipboardListIcon, MosqueIcon, BookIcon, SparkleIcon, FamilyIcon, EditIcon, Trash } from "./icons.jsx";
 
@@ -731,6 +732,7 @@ export function DailyEntrySection({
       className: "text-xs text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
   })(),
+    nabijiTimeline: fold => /*#__PURE__*/React.createElement(NabijiTimelineCard, { toBn: toBn, showTitle: fold === "fixed" }),
     muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MuhasabaStrip, {
       cats: muhasabaCats,
       entry: entry,
