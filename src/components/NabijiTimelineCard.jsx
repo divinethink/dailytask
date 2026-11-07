@@ -14,15 +14,6 @@ import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
 const PREVIEW = 3;
-// বুলেটের বাঁ পাশের রঙিন দাগ(ধরন অনুযায়ী)
-const BAR = {
-  ibadat: "border-emerald-500",
-  family: "border-rose-400",
-  society: "border-sky-400",
-  work: "border-amber-400",
-  learn: "border-indigo-400",
-};
-
 // বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
 function groupItems(items) {
   const groups = [];
@@ -50,7 +41,7 @@ function Bullets({ items }) {
       const single = g.items.length === 1;
       return React.createElement(
         "div",
-        { key: g.key || "_", className: "border-l-[3px] pl-3 " + ((g.key && BAR[g.key]) || "border-slate-200") },
+        { key: g.key || "_" },
         single
           ? React.createElement("p", { className: "text-sm text-slate-700 leading-relaxed" }, pill, pill && " ", g.items[0].text, React.createElement(Src, { src: g.items[0].src }))
           : React.createElement(
