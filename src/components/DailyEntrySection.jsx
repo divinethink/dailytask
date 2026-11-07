@@ -732,7 +732,7 @@ export function DailyEntrySection({
       className: "text-xs text-emerald-200/70 mt-1.5 text-right"
     }, "— ", insp.ref));
   })(),
-    nabijiTimeline: fold => /*#__PURE__*/React.createElement(NabijiTimelineCard, { toBn: toBn, showTitle: fold === "fixed" }),
+    nabijiTimeline: fold => /*#__PURE__*/React.createElement(NabijiTimelineCard, { toBn: toBn, fold: fold }),
     muhasaba: () => isFutureDate(viewDate) ? null : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MuhasabaStrip, {
       cats: muhasabaCats,
       entry: entry,
