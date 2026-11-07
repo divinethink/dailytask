@@ -1,7 +1,7 @@
 // চালান: node --test tests/
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SLOTS, normalizeSlots, normalizeSlot, slotAt, inSlot, hourLabel, rangeLabel, validateSlot, MAX_ITEMS } from "../src/components/nabijiTimeline.js";
+import { applyWaqt, waqtBoundaries, slotAtMin, minLabel, DEFAULT_SLOTS, normalizeSlots, normalizeSlot, slotAt, inSlot, inSlotM, hourLabel, rangeLabel, validateSlot, MAX_ITEMS } from "../src/components/nabijiTimeline.js";
 import { CARD_DEFS, sanitizeCards, defaultCards } from "../src/legacy/homeLayout.js";
 
 test("ডিফল্ট: প্রতিটি slot বৈধ এবং প্রতিটি বুলেটে সূত্র আছে", () => {
@@ -94,4 +94,47 @@ test("বুলেটের ধরন: চেনা মান থাকে, অ�
   assert.equal(r.items[0].cat, "family");
   assert.equal(r.items[1].cat, "");
   assert.ok(DEFAULT_SLOTS.every((s) => s.items.every((it) => it.cat)));
+});
+
+// ঢাকা, নভেম্বর(আনুমানিক)
+const DHAKA = { Fajr: "04:55", Sunrise: "06:12", Dhuhr: "11:42", Asr: "15:08", Maghrib: "17:12", Isha: "18:30" };
+
+test("ওয়াক্ত: প্রতিটি মিনিট ঠিক একটি slot-এ পড়ে(ফাঁক/ওভারল্যাপ নেই)", () => {
+  const v = applyWaqt(DEFAULT_SLOTS, DHAKA);
+  assert.notEqual(v, DEFAULT_SLOTS);
+  for (let m = 0; m < 1440; m++) {
+    const n = v.filter((s) => inSlotM(m, s)).length;
+    assert.equal(n, 1, "মিনিট " + m);
+  }
+});
+
+test("ওয়াক্ত: সীমানা ওয়াক্তের সাথে মেলে", () => {
+  const v = applyWaqt(DEFAULT_SLOTS, DHAKA);
+  assert.equal(slotAtMin(v, 4 * 60 + 54).slot.id, "s_lastNight");
+  assert.equal(slotAtMin(v, 4 * 60 + 55).slot.id, "s_fajr");
+  assert.equal(slotAtMin(v, 11 * 60 + 41).slot.id, "s_work");
+  assert.equal(slotAtMin(v, 11 * 60 + 42).slot.id, "s_afternoon");
+  assert.equal(slotAtMin(v, 17 * 60 + 12).slot.id, "s_maghrib");
+  assert.equal(slotAtMin(v, 18 * 60 + 30).slot.id, "s_isha");
+  assert.equal(slotAtMin(v, 23 * 60).slot.id, "s_sleep");
+  assert.equal(slotAtMin(v, 30).slot.id, "s_sleep");
+  assert.equal(slotAtMin(v, 3 * 60).slot.id, "s_lastNight");
+});
+
+test("ওয়াক্ত: timings না থাকলে/ভুল হলে/ক্রিয়েটর সময় বদলালে slots অপরিবর্তিত", () => {
+  assert.equal(applyWaqt(DEFAULT_SLOTS, null), DEFAULT_SLOTS);
+  assert.equal(applyWaqt(DEFAULT_SLOTS, { Fajr: "x" }), DEFAULT_SLOTS);
+  assert.equal(applyWaqt(DEFAULT_SLOTS, { ...DHAKA, Asr: "10:00" }), DEFAULT_SLOTS);
+  assert.equal(waqtBoundaries({ ...DHAKA, Isha: "25:00" }), null);
+  const edited = DEFAULT_SLOTS.map((s) => (s.id === "s_asr" ? { ...s, from: 15 } : s));
+  assert.equal(applyWaqt(edited, DHAKA), edited);
+  const custom = [normalizeSlot({ id: "z", title: "ক", from: 5, to: 7, items: [{ text: "a", src: "b" }] })];
+  assert.equal(applyWaqt(custom, DHAKA), custom);
+});
+
+test("ওয়াক্ত: লেবেলে মিনিট; ঘণ্টা-ভিত্তিক slotAt আগের মতো", () => {
+  const v = applyWaqt(DEFAULT_SLOTS, DHAKA);
+  assert.equal(rangeLabel(v.find((s) => s.id === "s_fajr")), "ভোর 4:55 – সকাল 6:32");
+  assert.equal(minLabel(0), "রাত 12:00");
+  assert.equal(slotAt(DEFAULT_SLOTS, 5).slot.id, "s_fajr");
 });

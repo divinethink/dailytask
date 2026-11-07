@@ -2,10 +2,13 @@
 // এখনকার সময়ের ভাগ অনুযায়ী ২-৩টি বুলেট + প্রতিটির সহিহ সূত্র; "আরও দেখুন"-এ বাকি বুলেট।
 // ওপরে সময়ের চিপ-স্ট্রিপ: যেকোনো চিপে ট্যাপ করলে সেই সময়ভাগ দেখা যায়; "পুরো দিনের তালিকা"-য় প্রতিটি সময়ভাগ ভাঁজ-করা(বর্তমানটি খোলা)।
 // শুধু দেখায় — কোনো ডেটা লেখে না। তালিকা সম্পাদনা শুধু App Creator(isCreatorAuth + Firestore Rules-এ enforced)।
+// সময়ভাগ সেভ-করা লোকেশনের আসল ওয়াক্ত-সময়ে(ফজর, যোহর…) চলে — লোকেশন/নেটওয়ার্ক/ক্যাশ না থাকলে বা ক্রিয়েটর সময় বদলালে স্থির ঘণ্টা।
 // doc না থাকলে/পড়া ব্যর্থ হলে nabijiTimeline.js-এর ডিফল্ট তালিকা — কার্ড আগের মতোই চলে। React global(window.React, globals.js)।
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
-import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAt, rangeLabel, CATS } from "./nabijiTimeline.js";
+import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAtMin, applyWaqt, rangeLabel, CATS } from "./nabijiTimeline.js";
+import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
+import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
 import { EditIcon } from "./icons.jsx";
 
@@ -50,7 +53,8 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
   const [all, setAll] = React.useState(false);
   const [openIds, setOpenIds] = React.useState([]);
   const [sel, setSel] = React.useState(null); // null = এখনকার সময়ভাগ অনুসরণ
-  const [hour, setHour] = React.useState(() => new Date().getHours());
+  const [nowMin, setNowMin] = React.useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  const [timings, setTimings] = React.useState(null);
   const stripRef = React.useRef(null);
   const isCreator = isCreatorAuth();
 
@@ -61,21 +65,42 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
   }, []);
   // ঘণ্টা বদলালে কার্ড নিজে বদলায়(অ্যাপ খোলা রেখে ঘুমালেও)
   React.useEffect(() => {
-    const t = setInterval(() => setHour(new Date().getHours()), 60000);
+    const t = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 60000);
     return () => clearInterval(t);
   }, []);
+  // আজকের ওয়াক্ত-সময়: আগে ক্যাশ(নেটওয়ার্ক ছাড়া), পরে নতুন; লোকেশন সেভ না থাকলে কিছুই করে না
+  const dayStr = new Date().toDateString();
+  React.useEffect(() => {
+    let alive = true;
+    let loc = null;
+    let madhab = 1;
+    try { loc = getSavedLocation(); madhab = getSavedMadhab(); } catch {}
+    if (!loc) return undefined;
+    const d = new Date();
+    try {
+      const cached = peekCachedDailyTimings({ lat: loc.lat, lon: loc.lon, madhab, date: d });
+      if (cached && cached.timings) setTimings(cached.timings);
+    } catch {}
+    fetchDailyPrayerTimes({ lat: loc.lat, lon: loc.lon, madhab, date: d })
+      .then((res) => { if (alive && res && res.timings) setTimings(res.timings); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [dayStr]);
+  // দেখানোর slot-তালিকা(ওয়াক্ত প্রযোজ্য হলে fromM/toM সহ); সম্পাদকের কাছে যায় মূল slots
+  const view = React.useMemo(() => applyWaqt(slots, timings), [slots, timings]);
+  const waqtOn = view !== slots;
   // নির্বাচিত চিপ স্ট্রিপের মাঝে আনা(পেজ স্ক্রল না করে)
   React.useEffect(() => {
     const box = stripRef.current;
     const el = box && box.querySelector("[data-sel='1']");
     if (box && el) box.scrollLeft = el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2;
-  }, [sel, hour, slots]);
+  }, [sel, nowMin, view]);
 
-  const hit = slotAt(slots, hour);
+  const hit = slotAtMin(view, nowMin);
   if (!hit) return null;
   const { exact } = hit;
   const nowId = hit.slot.id;
-  const slot = (sel && slots.find((s) => s.id === sel)) || hit.slot;
+  const slot = (sel && view.find((s) => s.id === sel)) || hit.slot;
   const isNowSlot = slot.id === nowId;
   const shown = more ? slot.items : slot.items.slice(0, PREVIEW);
   const hasMore = slot.items.length > PREVIEW;
@@ -95,7 +120,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
     React.createElement(
       "div",
       { ref: stripRef, className: "relative flex gap-2 overflow-x-auto -mx-1 px-1 pb-2 mb-3", style: { scrollbarWidth: "none" } },
-      slots.map((s) => {
+      view.map((s) => {
         const active = s.id === slot.id;
         const now = exact && s.id === nowId;
         return React.createElement(
@@ -146,7 +171,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
       all && React.createElement(
         "div",
         { className: "mt-1 space-y-2" },
-        slots.map((s) => {
+        view.map((s) => {
           const open = openIds.includes(s.id);
           const now = exact && s.id === nowId;
           return React.createElement(
@@ -169,7 +194,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
           );
         })
       ),
-      React.createElement("p", { className: "mt-2 text-[11px] text-slate-400" }, "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
+      React.createElement("p", { className: "mt-2 text-[11px] text-slate-400" }, (waqtOn ? "সময়ভাগ আপনার সেভ-করা লোকেশনের নামাজের ওয়াক্ত অনুযায়ী। " : "") + "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
     )
   );
 }

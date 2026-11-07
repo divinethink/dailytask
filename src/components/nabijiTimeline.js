@@ -125,29 +125,110 @@ export function inSlot(h, slot) {
   return (((h - slot.from) % 24) + 24) % 24 < slot.to - slot.from;
 }
 
-// এখনকার ঘণ্টার slot। না মিললে(ক্রিয়েটর ফাঁক রাখলে) পরের আসন্ন slot, exact=false।
-export function slotAt(slots, hour) {
-  const h = ((Math.floor(Number(hour)) % 24) + 24) % 24;
-  const hit = slots.find((s) => inSlot(h, s));
+// মিনিট-ভিত্তিক মিল(m = দিনের শুরু থেকে মিনিট ০-১৪৩৯)। slot-এ fromM/toM থাকলে সেটা, নইলে from/to ঘণ্টা×৬০।
+export function inSlotM(m, slot) {
+  const from = slot.fromM != null ? slot.fromM : slot.from * 60;
+  const len = (slot.toM != null ? slot.toM : slot.to * 60) - from;
+  return (((m - from) % 1440) + 1440) % 1440 < len;
+}
+
+// এখনকার মিনিটের slot। না মিললে(ক্রিয়েটর ফাঁক রাখলে) পরের আসন্ন slot, exact=false।
+export function slotAtMin(slots, minute) {
+  const m = ((Math.floor(Number(minute)) % 1440) + 1440) % 1440;
+  const hit = slots.find((s) => inSlotM(m, s));
   if (hit) return { slot: hit, exact: true };
   let best = null;
-  let bestD = 99;
+  let bestD = 99999;
   slots.forEach((s) => {
-    const d = (s.from - h + 24) % 24;
+    const from = s.fromM != null ? s.fromM : s.from * 60;
+    const d = (((from - m) % 1440) + 1440) % 1440;
     if (d < bestD) { bestD = d; best = s; }
   });
   return best ? { slot: best, exact: false } : null;
 }
 
+// এখনকার ঘণ্টার slot(ঘণ্টা-ভিত্তিক পুরনো API; ভেতরে slotAtMin)।
+export function slotAt(slots, hour) {
+  const h = ((Math.floor(Number(hour)) % 24) + 24) % 24;
+  return slotAtMin(slots, h * 60);
+}
+
+// ── আসল ওয়াক্ত-সময়(Aladhan timings, publicToolsPrayerApi.js-এর "HH:MM" মান) ──
+// শুধু যখন সব slot অপরিবর্তিত ডিফল্ট-সময়ের(ক্রিয়েটর সময় বদলাননি) তখনই প্রযোজ্য; নইলে slots যেমন ছিল তেমন(নিরাপদ ফলব্যাক)।
+const DEFAULT_RANGE = {};
+DEFAULT_SLOTS.forEach((s) => { DEFAULT_RANGE[s.id] = s.from + "-" + s.to; });
+
+function toMin(v) {
+  const m = typeof v === "string" ? v.match(/^(\d{1,2}):(\d{2})/) : null;
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  return h > 23 || mi > 59 ? null : h * 60 + mi;
+}
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+// সীমানা(ফজর থেকে পরের ফজর পর্যন্ত একটানা, কোনো ফাঁক/ওভারল্যাপ নেই); ক্রম ভাঙলে null।
+export function waqtBoundaries(timings) {
+  if (!timings || typeof timings !== "object") return null;
+  const fajr = toMin(timings.Fajr);
+  const sunrise = toMin(timings.Sunrise);
+  const dhuhr = toMin(timings.Dhuhr);
+  const asr = toMin(timings.Asr);
+  const maghrib = toMin(timings.Maghrib);
+  const isha = toMin(timings.Isha);
+  if ([fajr, sunrise, dhuhr, asr, maghrib, isha].some((x) => x == null)) return null;
+  const duhaStart = sunrise + 20; // সূর্যোদয়ের ~২০ মিনিট পর দুহা শুরু
+  const nightThird = isha + Math.round(((fajr + 1440 - isha) * 2) / 3); // রাতের শেষ তৃতীয়াংশ
+  if (!(fajr < duhaStart && duhaStart + 60 < dhuhr && dhuhr < asr && asr < maghrib && maghrib < isha && isha + 120 < nightThird && nightThird < fajr + 1440)) return null;
+  const workStart = clamp(540, duhaStart + 30, dhuhr - 30);
+  const sleepStart = clamp(1320, isha + 60, nightThird - 60);
+  return {
+    s_lastNight: [nightThird, fajr + 1440],
+    s_fajr: [fajr, duhaStart],
+    s_duha: [duhaStart, workStart],
+    s_work: [workStart, dhuhr],
+    s_afternoon: [dhuhr, asr],
+    s_asr: [asr, maghrib],
+    s_maghrib: [maghrib, isha],
+    s_isha: [isha, sleepStart],
+    s_sleep: [sleepStart, nightThird],
+  };
+}
+
+// slots-এ আসল ওয়াক্ত-সময় বসায়(fromM/toM যোগ; from/to ঘণ্টা অপরিবর্তিত)। প্রযোজ্য না হলে একই slots ফেরত।
+export function applyWaqt(slots, timings) {
+  const b = waqtBoundaries(timings);
+  if (!b || !Array.isArray(slots) || !slots.length) return slots;
+  if (!slots.every((s) => b[s.id] && DEFAULT_RANGE[s.id] === s.from + "-" + s.to)) return slots;
+  return slots.map((s) => {
+    const [a, z] = b[s.id];
+    const fromM = a % 1440;
+    return { ...s, fromM, toM: fromM + (z - a) };
+  });
+}
+
+function periodOf(h) {
+  return h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 17 ? "বিকাল" : h < 19 ? "সন্ধ্যা" : "রাত";
+}
+const bn = (toBn, v) => (typeof toBn === "function" ? toBn(v) : v);
+
 // ঘণ্টার বাংলা লেবেল: "ভোর ৪টা", "দুপুর ১২টা"। toBn = সংখ্যা→বাংলা ফাংশন।
 export function hourLabel(h24, toBn) {
   const h = ((h24 % 24) + 24) % 24;
-  const period = h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 17 ? "বিকাল" : h < 19 ? "সন্ধ্যা" : "রাত";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return period + " " + (typeof toBn === "function" ? toBn(h12) : h12) + "টা";
+  return periodOf(h) + " " + bn(toBn, h12) + "টা";
+}
+
+// মিনিটসহ লেবেল: "ভোর ৪:৫৫"
+export function minLabel(min, toBn) {
+  const t = ((Math.round(min) % 1440) + 1440) % 1440;
+  const h = Math.floor(t / 60);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return periodOf(h) + " " + bn(toBn, h12) + ":" + bn(toBn, String(t % 60).padStart(2, "0"));
 }
 
 export function rangeLabel(slot, toBn) {
+  if (slot.fromM != null && slot.toM != null) return minLabel(slot.fromM, toBn) + " – " + minLabel(slot.toM, toBn);
   return hourLabel(slot.from, toBn) + " – " + hourLabel(slot.to, toBn);
 }
 
