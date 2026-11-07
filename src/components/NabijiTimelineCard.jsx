@@ -1,6 +1,7 @@
 // "এ সময়ে নবিজি ﷺ যা করতেন" কার্ড(হোম ট্যাবে, তাযকিরার নিচে, owner-approved ৭ নভেম্বর ২০২৬):
 // এখনকার সময়ের ভাগ অনুযায়ী ২-৩টি বুলেট + প্রতিটির সহিহ সূত্র; "আরও দেখুন"-এ বাকি বুলেট।
 // ওপরে সময়ের চিপ-স্ট্রিপ: যেকোনো চিপে ট্যাপ করলে সেই সময়ভাগ দেখা যায়; "পুরো দিনের তালিকা"-য় প্রতিটি সময়ভাগ ভাঁজ-করা(বর্তমানটি খোলা)।
+// বুলেট বিষয়(ইবাদত/পরিবার…) ধরে গ্রুপ; সূত্র লেখার শেষে বন্ধনীতে। ভাঁজ-কার্ডের ভেতরে হলে নিজের ফ্রেম নেই(লেখা চওড়া)।
 // শুধু দেখায় — কোনো ডেটা লেখে না। তালিকা সম্পাদনা শুধু App Creator(isCreatorAuth + Firestore Rules-এ enforced)।
 // সময়ভাগ সেভ-করা লোকেশনের আসল ওয়াক্ত-সময়ে(ফজর, যোহর…) চলে — লোকেশন/নেটওয়ার্ক/ক্যাশ না থাকলে বা ক্রিয়েটর সময় বদলালে স্থির ঘণ্টা।
 // doc না থাকলে/পড়া ব্যর্থ হলে nabijiTimeline.js-এর ডিফল্ট তালিকা — কার্ড আগের মতোই চলে। React global(window.React, globals.js)।
@@ -22,19 +23,55 @@ const BAR = {
   learn: "border-indigo-400",
 };
 
+// বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
+function groupItems(items) {
+  const groups = [];
+  items.forEach((it) => {
+    const key = it.cat && CATS[it.cat] ? it.cat : "";
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, items: [] }; groups.push(g); }
+    g.items.push(it);
+  });
+  return groups;
+}
+
+// সূত্র লেখার শেষে ছোট ধূসর বন্ধনীতে(আলাদা লাইন নয়)
+function Src({ src }) {
+  return src ? React.createElement("span", { className: "inline-block text-[11px] text-slate-500 ml-1" }, "(" + src + ")") : null;
+}
+
 function Bullets({ items }) {
   return React.createElement(
-    "ul",
+    "div",
     { className: "space-y-3" },
-    items.map((it, i) =>
-      React.createElement(
-        "li",
-        { key: i, className: "border-l-[3px] pl-3 " + ((it.cat && BAR[it.cat]) || "border-slate-200") },
-        it.cat && CATS[it.cat] && React.createElement("span", { className: "inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md mb-1 " + CATS[it.cat].cls }, CATS[it.cat].label),
-        React.createElement("p", { className: "text-sm text-slate-700 leading-relaxed" }, it.text),
-        it.src && React.createElement("span", { className: "inline-flex items-center gap-1 mt-1 text-[11px] text-slate-500 bg-slate-100 rounded-full px-2 py-0.5" }, React.createElement("span", { "aria-hidden": true }, "📖"), it.src)
-      )
-    )
+    groupItems(items).map((g) => {
+      const cat = g.key ? CATS[g.key] : null;
+      const pill = cat && React.createElement("span", { className: "inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md " + cat.cls }, cat.label);
+      const single = g.items.length === 1;
+      return React.createElement(
+        "div",
+        { key: g.key || "_", className: "border-l-[3px] pl-3 " + ((g.key && BAR[g.key]) || "border-slate-200") },
+        single
+          ? React.createElement("p", { className: "text-sm text-slate-700 leading-relaxed" }, pill, pill && " ", g.items[0].text, React.createElement(Src, { src: g.items[0].src }))
+          : React.createElement(
+              React.Fragment,
+              null,
+              pill && React.createElement("div", { className: "mb-1" }, pill),
+              React.createElement(
+                "ul",
+                { className: "space-y-1.5" },
+                g.items.map((it, i) =>
+                  React.createElement(
+                    "li",
+                    { key: i, className: "flex gap-2 text-sm text-slate-700 leading-relaxed" },
+                    React.createElement("span", { className: "mt-2 w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0", "aria-hidden": true }),
+                    React.createElement("span", null, it.text, React.createElement(Src, { src: it.src }))
+                  )
+                )
+              )
+            )
+      );
+    })
   );
 }
 
@@ -114,7 +151,7 @@ export function NabijiTimelineCard({ toBn, showTitle = false }) {
 
   return React.createElement(
     "div",
-    { className: "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
+    { className: showTitle ? "bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" : "" }, // showTitle=false: বাইরের ভাঁজ-কার্ডেই মোড়ানো — ভেতরে দ্বিতীয় কার্ড-ফ্রেম নেই
     showTitle && React.createElement("h3", { className: "text-sm font-bold text-emerald-950 mb-3" }, "এ সময়ে নবিজি ﷺ যা করতেন"),
     // সময়ের চিপ-স্ট্রিপ
     React.createElement(
