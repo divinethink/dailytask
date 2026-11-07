@@ -5,7 +5,7 @@
 // passed as explicit props (not assumed global — see G1 toBn lesson).
 import { Printer } from "./icons.jsx";
 import { loadReviewsForWeeks } from "../legacy/reviewData.js";
-import { chunkWeekKey } from "../legacy/reviewSchema.js";
+import { chunkOfRange, chunkWeekKey } from "../legacy/reviewSchema.js";
 
 const { useEffect, useState } = React;
 
@@ -56,7 +56,7 @@ export function PrintReport({
   useEffect(() => {
     if (!printMode || locked || migrationState !== "v2" || !selectedMember || !selectedMember.id) { setGoalRows({}); return undefined; }
     let alive = true;
-    const keys = getWeekRanges(monthStats.total).slice(0, weeklyRowCount).map(r => chunkWeekKey(monthCursor.year, monthCursor.month0, r.week));
+    const keys = getWeekRanges(monthStats.total).slice(0, weeklyRowCount).map(r => chunkOfRange(monthCursor.year, monthCursor.month0, r.start, r.end)).filter(Boolean).map(k => chunkWeekKey(monthCursor.year, monthCursor.month0, k));
     loadReviewsForWeeks(migrationState, selectedMember.id, keys).then(list => {
       if (!alive) return;
       const m = {};
@@ -276,7 +276,8 @@ export function PrintReport({
         whiteSpace: "pre-wrap"
       }
     }, (() => {
-      const g = goalRows[chunkWeekKey(monthCursor.year, monthCursor.month0, w)];
+      const wk = chunkOfRange(monthCursor.year, monthCursor.month0, start, end);
+      const g = wk ? goalRows[chunkWeekKey(monthCursor.year, monthCursor.month0, wk)] : null;
       return g ? (GOAL_ICON[g.result] ? GOAL_ICON[g.result] + " " : "") + g.text : "";
     })()), /*#__PURE__*/React.createElement("td", {
       style: {

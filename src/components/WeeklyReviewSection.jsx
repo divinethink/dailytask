@@ -3,7 +3,8 @@
 // কোথাও সেভ/লগ হয় না; সপ্তাহ বদলালে বা পাতা ছাড়লে মুছে যায়।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
-import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk } from "../legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, dayRelToday, prevChunk } from "../legacy/reviewSchema.js";
+import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { weeklyGap, countFieldTotal, weekGlance, weekFieldExtremes, weekFieldMoves } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
@@ -41,7 +42,11 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const now = new Date();
   const isCurMonth = now.getFullYear() === year && now.getMonth() === month0;
   const [open, setOpen] = useState(fold === "open" || fold === "fixed");
-  const [week, setWeek] = useState(() => (isCurMonth ? chunkOfDay(now.getDate()) : chunkCount(year, month0)));
+  // সপ্তাহ = শুক্র–বৃহস্পতি, মাস = বৃহস্পতিবার যে মাসে। মাসের শেষে চলতি সপ্তাহ পরের মাসের হলে এখানে শেষে "চলতি সপ্তাহ" চিপ আসে (week = count+1)।
+  const curWeek = chunkOfDate(now);
+  const trailing = isCurMonth && !(curWeek.year === year && curWeek.month0 === month0);
+  const maxWeek = chunkCount(year, month0) + (trailing ? 1 : 0);
+  const [week, setWeek] = useState(() => (isCurMonth ? (trailing ? maxWeek : curWeek.week) : chunkCount(year, month0)));
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({});
   const [prevGoal, setPrevGoal] = useState("");
@@ -52,12 +57,16 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const isProxy = !!(member && "googleUid" in member && member.googleUid === null);
   const weekKey = chunkWeekKey(year, month0, week);
   const range = chunkRange(year, month0, week);
+  const sd = new Date(year, month0, range.start), ed = new Date(year, month0, range.end);
+  const rangeLabel = sd.getMonth() === ed.getMonth()
+    ? toBn(sd.getDate()) + "–" + toBn(ed.getDate()) + " " + BN_MONTHS[ed.getMonth()] + " " + toBn(ed.getFullYear())
+    : toBn(sd.getDate()) + " " + BN_MONTHS[sd.getMonth()] + " – " + toBn(ed.getDate()) + " " + BN_MONTHS[ed.getMonth()] + " " + toBn(ed.getFullYear());
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaveState("idle"); };
 
   // মাস বদলালে সপ্তাহ ঠিক রাখা
   useEffect(() => {
-    setWeek(w => Math.min(w, chunkCount(year, month0)));
-  }, [year, month0]);
+    setWeek(w => Math.min(w, maxWeek));
+  }, [year, month0, maxWeek]);
 
   useEffect(() => {
     setClosed([]); setStep(1); setSaveState("idle");
@@ -83,26 +92,46 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     return () => { alive = false; };
   }, [open, locked, migrationState, memberId, weekKey]);
 
+  // সপ্তাহ মাস পেরোলে (১ম/২য় সপ্তাহ) আগের মাসের এন্ট্রি একবার পড়া হয়। day ≤ ০ ⇒ আগের মাসের দিন (new Date(year, month0, day) ঠিক তারিখ দেয়)।
+  const needPrev = range.start <= 0 || (week > 1 && chunkRange(year, month0, week - 1).start <= 0);
+  const pm = month0 === 0 ? { year: year - 1, month0: 11 } : { year, month0: month0 - 1 };
+  const prevKey = memberId + "|" + pm.year + "|" + pm.month0;
+  const [prevMon, setPrevMon] = useState({ key: "", entries: null });
+  useEffect(() => {
+    if (!open || locked || migrationState !== "v2" || !memberId || !needPrev || prevMon.key === prevKey) return undefined;
+    let alive = true;
+    loadMonthEntriesOnce(migrationState, memberId, pm.year, pm.month0)
+      .then(e => { if (alive) setPrevMon({ key: prevKey, entries: e || {} }); })
+      .catch(() => { if (alive) setPrevMon({ key: prevKey, entries: {} }); });
+    return () => { alive = false; };
+  }, [open, locked, migrationState, memberId, needPrev, prevKey]);
+  const dimCur = new Date(year, month0 + 1, 0).getDate();
+  const dimPrev = new Date(year, month0, 0).getDate();
+  const prevEntries = prevMon.key === prevKey ? prevMon.entries : null;
+  const entryOf = d => {
+    if (d >= 1) return d <= dimCur ? ((monthEntries && monthEntries[pad2(d)]) || null) : null;
+    return (prevEntries && prevEntries[pad2(dimPrev + d)]) || null;
+  };
   const days = useMemo(() => {
     const out = [];
-    for (let d = range.start; d <= range.end; d++) out.push({ day: d, entry: (monthEntries && monthEntries[pad2(d)]) || null });
+    for (let d = range.start; d <= range.end; d++) out.push({ day: d, entry: entryOf(d) });
     return out;
-  }, [monthEntries, range.start, range.end]);
+  }, [monthEntries, prevEntries, range.start, range.end]);
   const gaps = useMemo(() => weeklyGap({
     days, fields: allFields,
     ratioOf: (f, e) => fieldRatioToday(f, e),
     applies: f => fieldApplies(f, member),
     excused: (f, e) => isFieldExcusable(f, member) && isExcused(e, f.key)
   }), [days, allFields, member]);
-  // এক নজর: ভবিষ্যতের দিন গণনার বাইরে; আগের সপ্তাহ একই মাসে থাকলেই তুলনা (আগের মাসের ডেটা এখানে লোড হয় না)।
-  const upTo = isCurMonth ? Math.min(range.end, now.getDate()) : (year * 12 + month0 > now.getFullYear() * 12 + now.getMonth() ? 0 : range.end);
+  // এক নজর: ভবিষ্যতের দিন গণনার বাইরে (আজ = মাসের ১ তারিখ ধরে দিন-সংখ্যা); ১ম সপ্তাহের তুলনা নেই।
+  const upTo = dayRelToday(year, month0, now);
   const glance = useMemo(() => {
     const cur = days.filter(d => d.day <= upTo);
     let prevDays = null;
     if (week > 1) {
       const pr = chunkRange(year, month0, week - 1);
       prevDays = [];
-      for (let d = pr.start; d <= pr.end; d++) prevDays.push({ day: d, entry: (monthEntries && monthEntries[pad2(d)]) || null });
+      for (let d = pr.start; d <= pr.end; d++) prevDays.push({ day: d, entry: entryOf(d) });
     }
     return weekGlance({ days: cur, prevDays, scoreOf: e => dailyScore(e, member, allFields) });
   }, [days, upTo, week, year, month0, monthEntries, member, allFields, dailyScore]);
@@ -117,7 +146,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     if (week <= 1) return { improvement: null, drop: null };
     const pr = chunkRange(year, month0, week - 1);
     const prevList = [];
-    for (let d = pr.start; d <= pr.end; d++) prevList.push({ day: d, entry: (monthEntries && monthEntries[pad2(d)]) || null });
+    for (let d = pr.start; d <= pr.end; d++) prevList.push({ day: d, entry: entryOf(d) });
     return weekFieldMoves({
       days: days.filter(d => d.day <= upTo), prevDays: prevList, fields: allFields,
       ratioOf: (f, e) => fieldRatioToday(f, e),
@@ -181,12 +210,12 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     else body = (
       <div className="mt-3">
         {errCode && <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 p-2 mb-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.loadFailed}</p>}
-        <div className="flex gap-1.5 mb-3">
-          {Array.from({ length: chunkCount(year, month0) }, (_, i) => i + 1).map(w => (
-            <button key={w} type="button" onClick={() => setWeek(w)} className={"flex-1 min-w-0 whitespace-nowrap text-center px-1 py-1.5 rounded-full text-sm font-semibold border " + (w === week ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300")}>সপ্তাহ {toBn(w)}</button>
+        <div className="flex gap-1.5 mb-3 overflow-x-auto">
+          {Array.from({ length: maxWeek }, (_, i) => i + 1).map(w => (
+            <button key={w} type="button" onClick={() => setWeek(w)} className={"flex-1 min-w-fit whitespace-nowrap text-center px-2 py-1.5 rounded-full text-sm font-semibold border " + (w === week ? "bg-emerald-900 text-white border-emerald-900" : "bg-white text-slate-700 border-slate-300")}>{w > chunkCount(year, month0) ? "চলতি সপ্তাহ" : "সপ্তাহ " + toBn(w)}</button>
           ))}
         </div>
-        <div className="text-xs text-slate-500 mb-2">{toBn(range.start)}–{toBn(range.end)} {BN_MONTHS[month0]} {toBn(year)} <span title={T.privateTag}>🔒</span></div>
+        <div className="text-xs text-slate-500 mb-2">{rangeLabel} <span title={T.privateTag}>🔒</span></div>
         <div className="flex items-center mb-2">
           {T.steps.map((_, i) => {
             const n = i + 1, done = n < step, cur = n === step;
@@ -227,7 +256,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
               {glance.logged > 0 && (
                 <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-sm font-bold">{G.titleWeek.replace("{w}", G.weekOrd[week - 1] || toBn(week) + "ম")}</div>
+                    <div className="text-sm font-bold">{G.titleWeek.replace("{w}", G.weekOrd[(week > chunkCount(year, month0) ? 1 : week) - 1] || toBn(week) + "ম")}</div>
                     {glance.delta !== null && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{G.vsPrev} {glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"}</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-2">

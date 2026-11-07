@@ -1,6 +1,6 @@
 // "এ সময়ে নবিজি ﷺ যা করতেন" কার্ড(হোম ট্যাবে, তাযকিরার নিচে, owner-approved ৭ নভেম্বর ২০২৬):
 // এখনকার সময়ের ভাগ অনুযায়ী ২-৩টি বুলেট + প্রতিটির সহিহ সূত্র; "আরও দেখুন"-এ বাকি বুলেট।
-// ওপরে সময়ের চিপ-স্ট্রিপ: যেকোনো চিপে ট্যাপ করলে সেই সময়ভাগ দেখা যায়; "পুরো দিনের তালিকা"-য় প্রতিটি সময়ভাগ ভাঁজ-করা(বর্তমানটি খোলা)।
+// ওপরে সময়ের চিপ-স্ট্রিপ: যেকোনো চিপে ট্যাপ করলে সেই সময়ভাগ দেখা যায়; "পুরো দিনের তালিকা" বাদ (owner-approved), শুধু চিপ-স্ট্রিপ।
 // বুলেট বিষয়(ইবাদত/পরিবার…) ধরে গ্রুপ; সূত্র লেখার শেষে বন্ধনীতে। কার্ড নিজেই ভাঁজ(fold = open/closed/fixed) সামলায় — বাইরে আলাদা FoldWrap নেই, তাই একটাই কার্ড।
 // শুধু দেখায় — কোনো ডেটা লেখে না। তালিকা সম্পাদনা শুধু App Creator(isCreatorAuth + Firestore Rules-এ enforced)।
 // সময়ভাগ সেভ-করা লোকেশনের আসল ওয়াক্ত-সময়ে(ফজর, যোহর…) চলে — লোকেশন/নেটওয়ার্ক/ক্যাশ না থাকলে বা ক্রিয়েটর সময় বদলালে স্থির ঘণ্টা।
@@ -96,8 +96,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const [editing, setEditing] = React.useState(false);
   const [openCard, setOpenCard] = React.useState(fold === "open");
   const [more, setMore] = React.useState(false);
-  const [all, setAll] = React.useState(false);
-  const [openIds, setOpenIds] = React.useState([]);
   const [sel, setSel] = React.useState(null); // null = এখনকার সময়ভাগ অনুসরণ
   const [nowMin, setNowMin] = React.useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   const [timings, setTimings] = React.useState(null);
@@ -153,11 +151,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const hasMore = slot.items.length > PREVIEW;
 
   const pick = (id) => { setSel(id === nowId ? null : id); setMore(false); };
-  const toggleAll = () => {
-    if (!all) setOpenIds([nowId]);
-    setAll(!all);
-  };
-  const toggleOpen = (id) => setOpenIds(openIds.includes(id) ? openIds.filter((x) => x !== id) : openIds.concat(id));
 
   const foldable = fold === "open" || fold === "closed";
   const rootCls = "rounded-2xl p-4 border bg-gradient-to-b " + th.card + " " + th.glow;
@@ -226,33 +219,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     React.createElement(
       "div",
       { className: "mt-2 pt-1 border-t border-slate-100" },
-      React.createElement("button", { type: "button", onClick: toggleAll, "aria-expanded": all, className: "min-h-[44px] inline-flex items-center text-xs font-semibold text-slate-500" }, all ? "পুরো দিনের তালিকা লুকান ▲" : "পুরো দিনের তালিকা দেখুন ▼"),
-      all && React.createElement(
-        "div",
-        { className: "mt-1 space-y-2" },
-        view.map((s) => {
-          const open = openIds.includes(s.id);
-          const now = exact && s.id === nowId;
-          return React.createElement(
-            "div",
-            { key: s.id, className: "rounded-xl border " + themeOf(s.id).chipOff + (now ? " ring-2 ring-emerald-400" : "") },
-            React.createElement(
-              "button",
-              { type: "button", onClick: () => toggleOpen(s.id), "aria-expanded": open, className: "w-full min-h-[44px] px-3 flex items-center justify-between gap-2 text-left" },
-              React.createElement(
-                "span",
-                { className: "flex items-center gap-2 min-w-0 flex-wrap" },
-                React.createElement("span", { "aria-hidden": true }, s.icon),
-                React.createElement("span", { className: "text-sm font-bold text-emerald-900" }, s.title),
-                now && React.createElement(NowBadge, { exact: true }),
-                React.createElement("span", { className: "text-[11px] text-slate-500" }, rangeLabel(s, toBn))
-              ),
-              React.createElement("span", { className: "text-xs text-slate-400 shrink-0", "aria-hidden": true }, open ? "▲" : "▼")
-            ),
-            open && React.createElement("div", { className: "px-3 pb-3" }, React.createElement(Bullets, { items: s.items }))
-          );
-        })
-      ),
       React.createElement("p", { className: "mt-2 text-[11px] text-slate-400" }, (waqtOn ? "সময়ভাগ আপনার সেভ-করা লোকেশনের নামাজের ওয়াক্ত অনুযায়ী। " : "") + "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
     )
   );

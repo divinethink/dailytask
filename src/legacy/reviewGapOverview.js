@@ -1,6 +1,6 @@
 // reviewGapOverview.js — "সাপ্তাহিক ঘাটতির চিত্র" কার্ডের হিসাব। Pure (Firebase/UI ছাড়া)।
 // ইনপুট: নিজের সংরক্ষিত সাপ্তাহিক মুহাসাবা (reviews) — নতুন কোনো ডেটা/schema নেই, শুধু পড়ে সাজানো।
-import { chunkCount, chunkRange, chunkWeekKey } from "./reviewSchema.js";
+import { chunkCount, chunkRange, chunkStarted, chunkWeekKey } from "./reviewSchema.js";
 
 function tally(list) {
   const m = new Map();
@@ -8,17 +8,18 @@ function tally(list) {
   return [...m].map(([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count || (a.id < b.id ? -1 : 1));
 }
 
-// elapsed = মাসের কত দিন পেরিয়েছে (ভবিষ্যতের সপ্তাহ বাদ)। reviews = সেই মাসের সংরক্ষিত ডকের তালিকা।
-function buildGapOverview({ year, month0, elapsed, reviews }) {
+// now = এখনকার সময় (যে সপ্তাহের শুক্রবার আসেনি সেটা বাদ)। reviews = সেই মাসের সংরক্ষিত ডকের তালিকা।
+// সপ্তাহ = শুক্র–বৃহস্পতি, মাস = বৃহস্পতিবার যে মাসে (reviewSchema দেখুন)।
+function buildGapOverview({ year, month0, now, reviews }) {
   const byKey = new Map((reviews || []).map(r => [r.weekKey, r]));
   const weeks = [];
   for (let w = 1; w <= chunkCount(year, month0); w++) {
     const range = chunkRange(year, month0, w);
-    if (range.start > elapsed) break;
+    if (!chunkStarted(year, month0, w, now)) break;
     const r = byKey.get(chunkWeekKey(year, month0, w)) || null;
     const reasons = r && Array.isArray(r.gapReasons) ? r.gapReasons : [];
     weeks.push({
-      week: w, start: range.start, end: range.end,
+      week: w, startDate: new Date(year, month0, range.start), endDate: new Date(year, month0, range.end),
       hasReview: !!r,
       hasGap: !!(r && (r.gapKey || reasons.length)),
       gapKey: (r && r.gapKey) || "",

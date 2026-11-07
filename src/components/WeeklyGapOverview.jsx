@@ -4,9 +4,9 @@
 // সব হিসাব reviewGapOverview.js-এ (pure); সব বাংলা লেখা reviewText.js-এ। React global (window.React)।
 import { REVIEW_TEXT } from "../legacy/reviewText.js";
 import { buildGapOverview } from "../legacy/reviewGapOverview.js";
-import { chunkCount, chunkRange, chunkWeekKey } from "../legacy/reviewSchema.js";
+import { chunkCount, chunkStarted, chunkWeekKey } from "../legacy/reviewSchema.js";
 import { loadReviewsForWeeks } from "../legacy/reviewData.js";
-import { elapsedDays, fill } from "../legacy/reviewMonthly.js";
+import { fill } from "../legacy/reviewMonthly.js";
 import { MonthPillNav } from "./MonthPillNav.jsx";
 import { ChevronDown } from "./icons.jsx";
 
@@ -88,10 +88,9 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
 
   useEffect(() => {
     if (!open || locked || !memberId || migrationState !== "v2") return undefined;
-    const elapsed = elapsedDays(year, month0, new Date());
     const keys = [];
     for (let w = 1; w <= chunkCount(year, month0); w++) {
-      if (chunkRange(year, month0, w).start > elapsed) break;
+      if (!chunkStarted(year, month0, w, new Date())) break;
       keys.push(chunkWeekKey(year, month0, w));
     }
     let alive = true;
@@ -106,7 +105,7 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
   const fresh = data.key === key && (data.status === "ready" || data.status === "error");
   const ov = useMemo(() => {
     if (!open || locked || !fresh) return null;
-    return buildGapOverview({ year, month0, elapsed: elapsedDays(year, month0, new Date()), reviews: data.reviews });
+    return buildGapOverview({ year, month0, now: new Date(), reviews: data.reviews });
   }, [open, locked, fresh, data, year, month0]);
 
   if (locked) return null; // শুধু নিজের সদস্যে (সব hook এর পরে)
@@ -114,7 +113,9 @@ export function WeeklyGapOverview({ fold, onShiftMonth, migrationState, memberId
   const fieldName = k => { const f = (allFields || []).find(x => x.key === k); return f ? (f.shortLabel || f.label) : k; };
   const reasonLabel = id => (REVIEW_TEXT.gap.reasons.find(x => x.id === id) || { t: id }).t;
   const blockerLabel = id => (REVIEW_TEXT.goal.blockers.find(x => x.id === id) || { t: id }).t;
-  const rangeText = w => toBn(w.start) + "–" + toBn(w.end) + " " + BN_MONTHS[month0];
+  const rangeText = w => (w.startDate.getMonth() === w.endDate.getMonth()
+    ? toBn(w.startDate.getDate()) + "–" + toBn(w.endDate.getDate()) + " " + BN_MONTHS[w.endDate.getMonth()]
+    : toBn(w.startDate.getDate()) + " " + BN_MONTHS[w.startDate.getMonth()] + " – " + toBn(w.endDate.getDate()) + " " + BN_MONTHS[w.endDate.getMonth()]);
 
   const hasAny = !!(ov && ov.filled > 0);
   const subtitle = T.subtitle;

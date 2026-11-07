@@ -4,8 +4,8 @@
 // "সভায় পাঠান": শুধু আমলের হিসাব থেকে তৈরি সিদ্ধান্ত, সম্পাদনাযোগ্য; ব্যক্তিগত মুহাসাবার লেখা কখনো যায় না।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT } from "../legacy/reviewText.js";
-import { chunkCount, chunkRange, chunkWeekKey } from "../legacy/reviewSchema.js";
-import { buildMonthlyReport, goalSummary, suggestDecisions, elapsedDays, prevMonthOf, fill } from "../legacy/reviewMonthly.js";
+import { chunkCount, chunkStarted, chunkWeekKey } from "../legacy/reviewSchema.js";
+import { buildMonthlyReport, goalSummary, suggestDecisions, prevMonthOf, fill } from "../legacy/reviewMonthly.js";
 import { loadReviewsForWeeks } from "../legacy/reviewData.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
@@ -98,10 +98,9 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   useEffect(() => {
     setReviews([]);
     if (!open || locked || migrationState !== "v2" || !memberId) return undefined;
-    const elapsed = elapsedDays(year, month0, new Date());
     const keys = [];
     for (let w = 1; w <= chunkCount(year, month0); w++) {
-      if (chunkRange(year, month0, w).start > elapsed) break;
+      if (!chunkStarted(year, month0, w, new Date())) break;
       keys.push(chunkWeekKey(year, month0, w));
     }
     if (!keys.length) return undefined;

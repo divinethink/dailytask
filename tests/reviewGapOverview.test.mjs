@@ -9,11 +9,11 @@ const rv = (weekKey, extra) => ({ memberId: "m1", weekKey, updatedAt: 1, ...extr
 
 test("gapOverview: সারাংশ, বারবার আসা ঘাটতি, কারণ-গণনা", () => {
   const ov = buildGapOverview({
-    year: 2026, month0: 10, elapsed: 21,
+    year: 2026, month0: 10, now: new Date(2026, 10, 19),
     reviews: [
-      rv("2026-11-01", { gapKey: "dawah", gapReasons: ["lazy", "company"], goalResult: "none", done: true }),
-      rv("2026-11-08", { gapKey: "dawah", gapReasons: ["lazy"], goalResult: "partial" }),
-      rv("2026-11-15", { gapKey: "quranPages", gapReasons: [], goalResult: "done" })
+      rv("2026-10-30", { gapKey: "dawah", gapReasons: ["lazy", "company"], goalResult: "none", done: true }),
+      rv("2026-11-06", { gapKey: "dawah", gapReasons: ["lazy"], goalResult: "partial" }),
+      rv("2026-11-13", { gapKey: "quranPages", gapReasons: [], goalResult: "done" })
     ]
   });
   assert.equal(ov.total, 3);
@@ -23,12 +23,12 @@ test("gapOverview: সারাংশ, বারবার আসা ঘাটত
   assert.deepEqual(ov.recurring, ["dawah"]);
   assert.deepEqual(ov.topReasons[0], { id: "lazy", count: 2 });
   assert.deepEqual(ov.goal, { done: 1, partial: 1, none: 1 });
-  assert.equal(ov.weeks[0].start, 1);
-  assert.equal(ov.weeks[0].end, 7);
+  assert.equal(ov.weeks[0].startDate.getDate(), 30); // ৩০ অক্টোবর
+  assert.equal(ov.weeks[0].endDate.getDate(), 5);
 });
 
 test("gapOverview: ভবিষ্যতের সপ্তাহ বাদ; লেখা না থাকলে hasReview=false", () => {
-  const ov = buildGapOverview({ year: 2026, month0: 10, elapsed: 9, reviews: [rv("2026-11-08", { gapKey: "dawah" })] });
+  const ov = buildGapOverview({ year: 2026, month0: 10, now: new Date(2026, 10, 9), reviews: [rv("2026-11-06", { gapKey: "dawah" })] });
   assert.equal(ov.total, 2);
   assert.equal(ov.weeks[0].hasReview, false);
   assert.equal(ov.weeks[1].hasGap, true);
@@ -36,10 +36,10 @@ test("gapOverview: ভবিষ্যতের সপ্তাহ বাদ; ল
 });
 
 test("gapOverview: খালি/অবৈধ ইনপুটে ক্র্যাশ নেই", () => {
-  const ov = buildGapOverview({ year: 2026, month0: 10, elapsed: 0, reviews: null });
+  const ov = buildGapOverview({ year: 2026, month0: 10, now: new Date(2026, 9, 1), reviews: null });
   assert.equal(ov.total, 0);
   assert.equal(ov.gapCount, 0);
-  const ov2 = buildGapOverview({ year: 2026, month0: 10, elapsed: 7, reviews: [rv("2026-11-01", { gapReasons: "x", blockers: 5 })] });
+  const ov2 = buildGapOverview({ year: 2026, month0: 10, now: new Date(2026, 10, 7), reviews: [rv("2026-10-30", { gapReasons: "x", blockers: 5 })] });
   assert.deepEqual(ov2.weeks[0].reasons, []);
 });
 

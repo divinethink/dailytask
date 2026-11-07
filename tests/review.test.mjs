@@ -1,24 +1,47 @@
 // চালান: node --test tests/   (কোনো dependency লাগে না)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chunkCount, chunkOfDay, chunkRange, chunkWeekKey, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
 import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 
 const base = { memberId: "m-1", weekKey: "2026-11-01", updatedAt: 1 };
 
-test("সপ্তাহ-খণ্ড", () => {
-  assert.equal(chunkCount(2026, 10), 5);           // নভেম্বর ৩০ দিন ⇒ ৫ (শেষটা ২ দিনের)
-  assert.equal(chunkCount(2026, 1), 4);            // ফেব্রুয়ারি ২৮ ⇒ ৪
-  assert.deepEqual(chunkRange(2026, 10, 5), { start: 29, end: 30 });
-  assert.deepEqual(chunkRange(2026, 10, 1), { start: 1, end: 7 });
-  assert.equal(chunkOfDay(7), 1); assert.equal(chunkOfDay(8), 2); assert.equal(chunkOfDay(30), 5);
-  assert.equal(chunkWeekKey(2026, 10, 1), "2026-11-01");
-  assert.equal(chunkWeekKey(2026, 10, 5), "2026-11-29");
+test("সপ্তাহ = শুক্র–বৃহস্পতি; মাস = বৃহস্পতিবার যে মাসে", () => {
+  // নভেম্বর ২০২৬: বৃহস্পতিবার ৫,১২,১৯,২৬ ⇒ ৪ সপ্তাহ
+  assert.equal(chunkCount(2026, 10), 4);
+  assert.deepEqual(chunkRange(2026, 10, 1), { start: -1, end: 5 });   // ৩০ অক্টোবর–৫ নভেম্বর
+  assert.deepEqual(chunkRange(2026, 10, 4), { start: 20, end: 26 });
+  assert.deepEqual(chunkRange(2026, 10, 5), { start: 27, end: 33 });  // পরের মাসের ১ম সপ্তাহ (trailing)
+  assert.equal(chunkWeekKey(2026, 10, 1), "2026-10-30");
+  assert.equal(chunkWeekKey(2026, 10, 4), "2026-11-20");
+  assert.equal(chunkWeekKey(2026, 10, 5), "2026-11-27");
+  // ডিসেম্বর ২০২৬: বৃহস্পতিবার ৩ তারিখ হলেও সেটা ১ম সপ্তাহ; ৩,১০,১৭,২৪,৩১ ⇒ ৫
+  assert.equal(chunkCount(2026, 11), 5);
+  assert.equal(chunkWeekKey(2026, 11, 1), "2026-11-27");
+  assert.equal(chunkWeekKey(2026, 11, 1), chunkWeekKey(2026, 10, 5)); // একই সপ্তাহ, একই চাবি
+  assert.equal(chunkCount(2026, 1), 4);
   assert.deepEqual(prevChunk(2026, 10, 3), { year: 2026, month0: 10, week: 2 });
-  assert.deepEqual(prevChunk(2026, 10, 1), { year: 2026, month0: 9, week: 5 });  // অক্টোবর ৩১ ⇒ ৫
-  assert.deepEqual(prevChunk(2026, 0, 1), { year: 2025, month0: 11, week: 5 });  // বছর পেরোনো
+  assert.deepEqual(prevChunk(2026, 11, 1), { year: 2026, month0: 10, week: 4 });
+  assert.deepEqual(prevChunk(2026, 0, 1), { year: 2025, month0: 11, week: 4 });  // বছর পেরোনো
+});
+test("chunkOfDate: শুক্রবারে নতুন সপ্তাহ, বৃহস্পতিবারে শেষ", () => {
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 5)), { year: 2026, month0: 10, week: 1 });  // বৃহস্পতি
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 6)), { year: 2026, month0: 10, week: 2 });  // শুক্র = নতুন
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 7)), { year: 2026, month0: 10, week: 2 });
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 12)), { year: 2026, month0: 10, week: 2 });
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 28)), { year: 2026, month0: 11, week: 1 }); // মাস পেরোনো
+  assert.deepEqual(chunkOfDate(new Date(2026, 10, 1)), { year: 2026, month0: 10, week: 1 });  // রবিবার, আগের মাসের শুক্র থেকে
+});
+test("chunkStarted ও chunkOfRange", () => {
+  assert.equal(chunkStarted(2026, 10, 2, new Date(2026, 10, 6)), true);
+  assert.equal(chunkStarted(2026, 10, 2, new Date(2026, 10, 5)), false);
+  assert.equal(chunkStarted(2026, 11, 1, new Date(2026, 10, 28)), true);  // ডিসেম্বরের ১ম সপ্তাহ ২৭ নভেম্বরে শুরু
+  assert.equal(chunkStarted(2026, 11, 1, new Date(2026, 10, 7)), false);
+  assert.equal(chunkOfRange(2026, 10, 1, 7), 1);
+  assert.equal(chunkOfRange(2026, 10, 22, 28), 4);
+  assert.equal(chunkOfRange(2026, 10, 29, 30), 0);
 });
 test("reviewDocId", () => assert.equal(reviewDocId("m-1", "2026-11-01"), "m-1_2026-11-01"));
 
@@ -150,7 +173,7 @@ test("report: গড়, তুলনা ও সপ্তাহ-গড় (আ�
   assert.equal(r.prev, null); assert.equal(r.delta, null);
   assert.equal(r.filled, 12);
   assert.equal(r.avg, Math.round(((7 * 1 + 5 * (1 / 3)) / 12) * 100)); // 72
-  assert.deepEqual(r.weeks.map(w => [w.week, w.count, w.avg]), [[1, 7, 100], [2, 5, 33]]); // ৩য় সপ্তাহ (১৫-২১) শুরু হয়েছে কিন্তু ডেটা নেই ⇒ শেষের ফাঁকা সপ্তাহ বাদ
+  assert.deepEqual(r.weeks.map(w => [w.week, w.count, w.avg]), [[1, 5, 100], [2, 7, 52]]); // সপ্তাহ শুক্র–বৃহস্পতি: ১ম = ৩০ অক্টো–৫ নভে (এ মাসের ১-৫), ২য় = ৬-১২ ⇒ ৫২; ৩য় (১৩-১৯) শুরু হয়েছে কিন্তু ডেটা নেই ⇒ বাদ
 });
 
 test("report: আগের মাসের তুলনা, চলমান মাসে একই দিন-জানালা", () => {
