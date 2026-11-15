@@ -69,20 +69,33 @@ function TrendChart({ weeks, toBn }) {
   );
 }
 
-// জোড়া বার(ধাপ ৩): প্রতি আমলে গত মাস(ধূসর) ও এ মাস(সবুজ; অবনতিতে কমলা)। বারের মাপ = তুলনার জানালার দিন-সংখ্যা(cmp) অনুপাতে, তাই সব সারি একই স্কেলে।
-function MoveRow({ m, cmp, toBn }) {
+// এক-বার সারি(১৫ নভেম্বর ২০২৬, owner-approved ডিজাইন): বারের সবুজ/কমলা অংশ = এ মাস, ছোট দাগ(tick) = গত মাস কতদূর ছিল।
+// বারের মাপ = তুলনার জানালার দিন-সংখ্যা(cmp) অনুপাতে, তাই সব সারি একই স্কেলে। হিসাব(m.prev/cur/delta) অপরিবর্তিত।
+function MoveRow({ m, cmp, toBn, onSend, sent }) {
   const down = m.delta < 0;
+  const same = m.delta === 0;
   const w = n => Math.max(n > 0 ? 3 : 0, Math.min(100, Math.round((n / Math.max(1, cmp)) * 100)));
+  const chipStyle = same ? { background: "#EEF1EF", color: "#475569" } : down ? { background: "#FDEFE3", color: "#9A3412" } : { background: "#EAF5EE", color: "#166534" };
+  const chipText = same ? "= " + T.sameDelta : (down ? "↓ −" : "↑ +") + toBn(Math.abs(m.delta)) + " দিন";
   return (
-    <div className="mb-3 last:mb-0">
-      <div className="flex items-baseline justify-between gap-2 mb-1">
+    <div className="py-2.5 border-t border-slate-100 first:border-t-0 first:pt-0">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-bold text-slate-800 min-w-0 break-words">{m.label}</div>
-        <div className="text-xs font-bold shrink-0" style={{ color: down ? "#C2410C" : "#15803D" }}>{down ? "▼" : "▲"} {fill(down ? T.movesLess : T.movesMore, { n: toBn(Math.abs(m.delta)) })}</div>
+        <span className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap shrink-0" style={chipStyle}>{chipText}</span>
       </div>
-      <div className="h-2.5 rounded-full" style={{ width: w(m.prev) + "%", minWidth: 6, background: "#D5D9DE" }} />
-      <div className="text-[11px] text-slate-500 mb-1">{fill(T.movesPrevDays, { n: toBn(m.prev) })}</div>
-      <div className="h-2.5 rounded-full" style={{ width: w(m.cur) + "%", minWidth: 6, background: down ? "#D9822B" : "#2D6A5C" }} />
-      <div className="text-[11px] text-slate-500">{fill(T.movesCurDays, { n: toBn(m.cur) })}</div>
+      <div className="relative h-2.5 rounded-full my-2" style={{ background: "#EEF1EF" }}>
+        <div className="absolute left-0 top-0 bottom-0 rounded-full" style={{ width: w(m.cur) + "%", minWidth: m.cur > 0 ? 6 : 0, background: down ? "#D9822B" : "#2D6A5C" }} />
+        {m.prev > 0 && <div className="absolute rounded-sm" style={{ left: `calc(${w(m.prev)}% - 1px)`, top: -3, bottom: -3, width: 2, background: "#475569" }} aria-hidden="true" />}
+      </div>
+      <div className="flex justify-between text-[11px] text-slate-500">
+        <span>{fill(T.movesPrevDays, { n: toBn(m.prev) })}</span>
+        <span>{fill(T.movesCurDays, { n: toBn(m.cur) })}</span>
+      </div>
+      {down && onSend && (
+        <button type="button" onClick={onSend} disabled={sent} className="mt-1.5 min-h-[44px] px-3 rounded-xl border text-xs font-bold disabled:opacity-70" style={{ borderColor: "#E9C9A8", color: sent ? "#166534" : "#9A3412", background: sent ? "#EAF5EE" : "#FFF8F1" }}>
+          {sent ? T.movesSent : T.movesSendBtn + " ↗"}
+        </button>
+      )}
     </div>
   );
 }
@@ -100,6 +113,8 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   const [pickErr, setPickErr] = useState(false);
   const [decOpen, setDecOpen] = useState(false); // আগামী মাসের সিদ্ধান্ত: ডিফল্ট বন্ধ
   const [allOpen, setAllOpen] = useState(false); // "সব আমল দেখুন": ডিফল্ট বন্ধ
+  const [mvFilter, setMvFilter] = useState("all"); // সব | up | dn
+  const [mvSent, setMvSent] = useState({}); // আমল-key → সভায় পাঠানো হয়েছে
 
   // আগের মাসের এন্ট্রি: কার্ড খুললে (বা সদস্য/মাস বদলালে) একবার। ব্যর্থ হলে তুলনা ছাড়াই রিপোর্ট চলে।
   useEffect(() => {
@@ -129,7 +144,7 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   }, [open, locked, migrationState, memberId, year, month0]);
 
   // সদস্য বা মাস বদলালে সিদ্ধান্ত-সম্পাদনা মুছে নতুন প্রস্তাব
-  useEffect(() => { setEdits({}); setOff({}); setSent(false); setPickErr(false); }, [memberId, year, month0]);
+  useEffect(() => { setEdits({}); setOff({}); setSent(false); setPickErr(false); setMvFilter("all"); setMvSent({}); }, [memberId, year, month0]);
 
   const h = useMemo(() => ({ member, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, ratioOf: fieldRatioToday }),
     [member, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore]);
@@ -165,37 +180,61 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
       const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
       const mv = r.moves;
       const totalCount = mv.ups.length + mv.downs.length + mv.same.length;
-      const moreCount = totalCount - Math.min(2, mv.ups.length) - Math.min(1, mv.downs.length);
+      const firstRows = [...mv.downs.slice(0, 3), ...mv.ups.slice(0, 2)];
+      const restRows = [...mv.downs.slice(3), ...mv.ups.slice(2), ...mv.same];
+      const moreCount = restRows.length;
+      const canSend = typeof onSendToMeeting === "function";
+      const sendMove = m => {
+        if (!canSend) return;
+        const row = { id: `mv-${year}-${pad2(month0 + 1)}-${m.key}`, topic: T.sendTopic, decision: fill(T.movesSendText, { label: m.label, n: toBn(Math.abs(m.delta)) }).slice(0, 300), person: "" };
+        if (onSendToMeeting([row])) setMvSent(x => ({ ...x, [m.key]: true }));
+      };
+      const showChips = mv.ups.length > 0 && mv.downs.length > 0;
+      const filt = showChips ? mvFilter : "all";
+      const rowsShown = filt === "up" ? mv.ups : filt === "dn" ? mv.downs : allOpen ? [...firstRows, ...restRows] : firstRows;
+      const chip = (id, label, n) => (
+        <button key={id} type="button" onClick={() => setMvFilter(id)} aria-pressed={filt === id} className="px-3 min-h-[36px] rounded-full text-xs font-bold border active:scale-95 transition-transform" style={filt === id ? { background: "#E3F0EA", color: "#1F4D44", borderColor: "#2D6A5C" } : { color: "#64748B", borderColor: "#CBD5E1" }}>{label} {toBn(n)}</button>
+      );
       const goalParts = [];
       if (goals.counts.done) goalParts.push(fill(T.goalDone, { n: toBn(goals.counts.done) }));
       if (goals.counts.partial) goalParts.push(fill(T.goalPartial, { n: toBn(goals.counts.partial) }));
       if (goals.counts.none) goalParts.push(fill(T.goalNone, { n: toBn(goals.counts.none) }));
       body = (
         <div className="mt-3">
-          <div className="rounded-2xl p-3.5 mb-3 text-white" style={{ background: "linear-gradient(135deg,#1F4D44,#2D6A5C)", boxShadow: "0 8px 18px -8px rgba(31,77,68,0.6)" }}>
-            <div className="mb-1">
-              <h3 className="font-bold text-[15px]">{T.movesTitle}</h3>
-            </div>
-            <p className="text-[11px] opacity-85 leading-snug mb-3">{T.movesSub} · <span style={{ color: "#D5D9DE" }}>■</span> {T.movesLegendPrev} <span style={{ color: "#7FD1A5" }}>■</span> {T.movesLegendCur}</p>
+          <div className="rounded-2xl bg-white p-3.5 mb-3" style={{ border: "1px solid #EADFBE", boxShadow: "0 4px 14px -8px rgba(22,48,43,0.25)" }}>
+            <h3 className="font-bold text-[15px]" style={{ color: "#16302B" }}>{T.movesTitle}</h3>
+            <p className="text-[11px] text-slate-500 leading-snug mt-0.5">{T.movesSub} · <span style={{ color: "#475569" }}>|</span> {T.movesLegendPrev} <span style={{ color: "#2D6A5C" }}>■</span> {T.movesLegendCur}</p>
             {r.prev && (r.moves.improvement || r.moves.drop) ? (
               <>
-                <div className="rounded-xl bg-white p-3 text-slate-800">
-                  {[...r.moves.ups.slice(0, 2), ...r.moves.downs.slice(0, 1)].map(m => <MoveRow key={m.key} m={m} cmp={r.cmp} toBn={toBn} />)}
-                  {allOpen && [...r.moves.ups.slice(2), ...r.moves.downs.slice(1), ...r.moves.same].map(m => <MoveRow key={m.key} m={m} cmp={r.cmp} toBn={toBn} />)}
-                  {moreCount > 0 && (
+                {showChips && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {chip("all", T.movesFilterAll, totalCount)}
+                    {chip("up", T.movesFilterUp, mv.ups.length)}
+                    {chip("dn", T.movesFilterDown, mv.downs.length)}
+                  </div>
+                )}
+                {mv.improvement && (
+                  <div className="mt-3 rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: "#EAF5EE", color: "#166534" }}>
+                    ↑ {fill(T.movesHero, { label: mv.improvement.label, n: toBn(Math.abs(mv.improvement.delta)) })}
+                  </div>
+                )}
+                <div className="mt-3">
+                  {rowsShown.map(m => <MoveRow key={m.key} m={m} cmp={r.cmp} toBn={toBn} onSend={canSend ? () => sendMove(m) : null} sent={!!mvSent[m.key]} />)}
+                  {filt === "all" && moreCount > 0 && (
                     <button type="button" onClick={() => setAllOpen(o => !o)} aria-expanded={allOpen} className="w-full mt-2 pt-2 border-t border-slate-100 flex items-center justify-center gap-1 text-sm font-bold text-emerald-900 min-h-11">
                       {allOpen ? T.movesHideAll : fill(T.movesSeeAll, { n: toBn(totalCount) })}
                       <ChevronDown size={15} className={"transition-transform" + (allOpen ? " rotate-180" : "")} />
                     </button>
                   )}
                 </div>
-                <p className="text-xs mt-3 leading-relaxed rounded-lg p-2" style={{ background: "rgba(255,255,255,0.12)" }}>
+                {Object.keys(mvSent).length > 0 && <p className="text-xs text-emerald-800 mt-2">{T.sent}</p>}
+                <p className="text-xs mt-3 leading-relaxed rounded-lg p-2.5" style={{ background: "#F6F8F5", color: "#334155" }}>
                   💭 {r.moves.drop ? fill(T.movesThinkDown, { label: r.moves.drop.label }) : fill(T.movesThinkUp, { label: r.moves.improvement.label })}
                 </p>
-                {r.partial && <div className="text-[11px] opacity-85 mt-2 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
+                {r.partial && <div className="text-[11px] text-slate-500 mt-2 leading-snug">{fill(T.partial, { n: toBn(r.cmp) })}</div>}
               </>
             ) : (
-              <div className="text-xs opacity-90 leading-relaxed">{r.prev ? T.movesAllNone : prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
+              <div className="text-xs text-slate-600 leading-relaxed mt-3">{r.prev ? T.movesAllNone : prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
             )}
           </div>
 
