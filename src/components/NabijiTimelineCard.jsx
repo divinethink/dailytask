@@ -11,7 +11,7 @@ import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAtMin, applyWaqt,
 import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
-import { EditIcon, ChevronDown, Icon } from "./icons.jsx";
+import { EditIcon, ChevronDown, Icon, InfoIcon } from "./icons.jsx";
 
 const PREVIEW = 3;
 // হালকা একরঙা থিম (owner-approved ১৫ নভেম্বর ২০২৬): সব সময়ভাগে একই — অ্যাপের থিম-কালারের emerald স্কেল অনুসারে বদলায়।
@@ -102,11 +102,9 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const [openCard, setOpenCard] = React.useState(fold === "open");
   const [more, setMore] = React.useState(false);
   const [sel, setSel] = React.useState(null); // null = এখনকার সময়ভাগ অনুসরণ
-  const [reveal, setReveal] = React.useState(false); // সোয়াইপ/ফোকাসে পাশের চিপ দেখায়; ২.৫ সেকেন্ড পর আবার লুকায়
-  const revealT = React.useRef(null);
+  const [note, setNote] = React.useState(false); // ⓘ: সূত্র/সতর্কতার নোট
   const [nowMin, setNowMin] = React.useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   const [timings, setTimings] = React.useState(null);
-  const stripRef = React.useRef(null);
   const isCreator = isCreatorAuth();
 
   React.useEffect(() => {
@@ -139,16 +137,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   }, [dayStr]);
   // দেখানোর slot-তালিকা(ওয়াক্ত প্রযোজ্য হলে fromM/toM সহ); সম্পাদকের কাছে যায় মূল slots
   const view = React.useMemo(() => applyWaqt(slots, timings), [slots, timings]);
-  const waqtOn = view !== slots;
-  // নির্বাচিত চিপ স্ট্রিপের মাঝে আনা(পেজ স্ক্রল না করে)
-  React.useEffect(() => {
-    const box = stripRef.current;
-    const el = box && box.querySelector("[data-sel='1']");
-    if (box && el) box.scrollLeft = el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2;
-  }, [sel, nowMin, view]);
-
-  React.useEffect(() => () => clearTimeout(revealT.current), []);
-  const peek = () => { setReveal(true); clearTimeout(revealT.current); revealT.current = setTimeout(() => setReveal(false), 2500); };
 
   const hit = slotAtMin(view, nowMin);
   if (!hit) return null;
@@ -161,22 +149,44 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const hasMore = slot.items.length > PREVIEW;
 
   const pick = (id) => { setSel(id === nowId ? null : id); setMore(false); };
+  // সময়ভাগ বদল: আগের/পরের(শেষে ঘুরে প্রথমে)। চিপ-স্ট্রিপ সরানো হয়েছে(১৫ নভেম্বর ২০২৬, owner-approved)
+  const idx = view.findIndex((x) => x.id === slot.id);
+  const step = (d) => { const n = view.length; if (n > 1 && idx >= 0) pick(view[(idx + d + n) % n].id); };
+  const navBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-xl text-slate-500 active:bg-black/5";
 
   const foldable = fold === "open" || fold === "closed";
   const rootCls = "rounded-2xl overflow-hidden p-4 " + th.card + " " + th.glow;
   const isOpen = !foldable || openCard;
-  const bandCls = "-mx-4 -mt-4 px-4 py-3 bg-gradient-to-r from-emerald-800 to-emerald-900 text-white " + (isOpen ? "mb-4" : "-mb-4");
+  const bandCls = "relative overflow-hidden -mx-4 -mt-4 px-4 py-3 bg-gradient-to-r from-emerald-800 to-emerald-900 text-white " + (isOpen ? "mb-4" : "-mb-4");
+  // মসজিদে নববীর হালকা সিলুয়েট(গম্বুজ+মিনার) — শুধু সাজসজ্জা, লেখা/বাটনের নিচে, ক্লিক-অযোগ্য
+  const mosqueEl = React.createElement(
+    "svg",
+    { viewBox: "0 0 120 48", "aria-hidden": true, focusable: "false", className: "pointer-events-none absolute bottom-0 right-10 h-[88%] w-auto", fill: "#E4D3A8", fillOpacity: "0.17" },
+    React.createElement("rect", { x: 0, y: 44, width: 120, height: 4 }),
+    React.createElement("rect", { x: 30, y: 31, width: 60, height: 13 }),
+    React.createElement("path", { d: "M44 31A16 16 0 0 1 76 31Z" }),
+    React.createElement("rect", { x: 59.2, y: 9, width: 1.6, height: 6 }),
+    React.createElement("circle", { cx: 60, cy: 7, r: 2.4 }),
+    [14, 106].map((x) => React.createElement("g", { key: x },
+      React.createElement("rect", { x: x - 2, y: 14, width: 4, height: 30 }),
+      React.createElement("path", { d: "M" + (x - 2) + " 14L" + x + " 5L" + (x + 2) + " 14Z" }),
+      React.createElement("rect", { x: x - 3, y: 22, width: 6, height: 2 }))),
+    [24, 96].map((x) => React.createElement("g", { key: x },
+      React.createElement("rect", { x: x - 1.5, y: 24, width: 3, height: 20 }),
+      React.createElement("path", { d: "M" + (x - 1.5) + " 24L" + x + " 18L" + (x + 1.5) + " 24Z" })))
+  );
   const titleEl = React.createElement(
     "div",
     { className: bandCls },
+    mosqueEl,
     foldable
       ? React.createElement(
           "button",
-          { type: "button", onClick: () => setOpenCard(!openCard), "aria-expanded": openCard, className: "w-full flex items-center justify-between gap-2 min-h-[28px]" },
+          { type: "button", onClick: () => setOpenCard(!openCard), "aria-expanded": openCard, className: "relative w-full flex items-center justify-between gap-2 min-h-[28px]" },
           React.createElement("h3", { className: "text-sm font-bold text-white text-left" }, "এ সময়ে নবিজি ﷺ যা করতেন"),
           React.createElement(ChevronDown, { size: 15, color: "#E4D3A8", className: "transition-transform" + (openCard ? " rotate-180" : "") })
         )
-      : React.createElement("h3", { className: "text-sm font-bold text-white" }, "এ সময়ে নবিজি ﷺ যা করতেন")
+      : React.createElement("h3", { className: "relative text-sm font-bold text-white" }, "এ সময়ে নবিজি ﷺ যা করতেন")
   );
   if (foldable && !openCard) return React.createElement("div", { className: rootCls }, titleEl);
 
@@ -184,38 +194,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     "div",
     { className: rootCls },
     titleEl,
-    // সময়ের চিপ-স্ট্রিপ: শুধু নির্বাচিত চিপ দেখা যায়, পাশেরগুলো অদৃশ্য — সোয়াইপ/ফোকাস করলে দেখা যায়(২.৫ সেকেন্ড পর আবার লুকায়)
-    React.createElement(
-      "div",
-      { className: "relative mb-3" },
-      React.createElement(
-        "div",
-        { ref: stripRef, onTouchStart: peek, onPointerDown: peek, onWheel: peek, onFocus: peek, className: "relative flex gap-2 overflow-x-auto -mx-4 pb-2", style: { scrollbarWidth: "none" } },
-        React.createElement("span", { className: "shrink-0 w-[38%]", "aria-hidden": true }),
-        view.map((s) => {
-          const active = s.id === slot.id;
-          const now = exact && s.id === nowId;
-          return React.createElement(
-            "button",
-            {
-              key: s.id,
-              type: "button",
-              onClick: () => pick(s.id),
-              "aria-pressed": active,
-              "data-sel": active ? "1" : undefined,
-              className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all duration-200 " + (active ? "font-bold shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff + (reveal ? "" : " opacity-0")),
-            },
-            React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: "text-emerald-700" }),
-            s.title,
-            now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + "bg-emerald-600", "aria-label": "এখনকার সময়" })
-          );
-        }),
-        React.createElement("span", { className: "shrink-0 w-[38%]", "aria-hidden": true })
-      ),
-      // সোয়াইপের ইঙ্গিত: পাশের চিপ লুকানো থাকলে দুই কিনারায় হালকা তীর
-      React.createElement("span", { "aria-hidden": true, className: "pointer-events-none absolute left-1 top-1/2 -translate-y-[60%] text-lg text-emerald-300 transition-opacity " + (reveal ? "opacity-0" : "opacity-100") }, "‹"),
-      React.createElement("span", { "aria-hidden": true, className: "pointer-events-none absolute right-1 top-1/2 -translate-y-[60%] text-lg text-emerald-300 transition-opacity " + (reveal ? "opacity-0" : "opacity-100") }, "›")
-    ),
     isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
     // হেডার
     React.createElement(
@@ -234,17 +212,24 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
             React.createElement("span", { className: "text-[15px] font-bold " + th.title }, slot.title),
             isNowSlot && React.createElement(NowBadge, { exact })
           ),
-          React.createElement("span", { className: "block mt-0.5 text-[11px] font-medium text-slate-500 whitespace-nowrap" }, rangeLabel(slot, toBn))
+          React.createElement(
+            "div",
+            { className: "flex items-center" },
+            React.createElement("span", { className: "text-[11px] font-medium text-slate-500 whitespace-nowrap" }, rangeLabel(slot, toBn)),
+            React.createElement("button", { type: "button", onClick: () => setNote(!note), "aria-expanded": note, "aria-label": "সূত্র ও সতর্কতা", className: "w-11 h-11 -my-4 -ml-1 flex items-center justify-center text-slate-400" }, React.createElement(InfoIcon, { size: 14 }))
+          )
         )
       ),
+      React.createElement(
+        "div",
+        { className: "flex items-center shrink-0" },
+        React.createElement("button", { type: "button", onClick: () => step(-1), "aria-label": "আগের সময়", className: navBtn }, "‹"),
+        React.createElement("button", { type: "button", onClick: () => step(1), "aria-label": "পরের সময়", className: navBtn }, "›"),
       isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 " + th.edit }, React.createElement(EditIcon, { size: 16 }))
+      )
     ),
+    note && React.createElement("p", { className: "mb-3 text-[11px] leading-snug text-slate-500" }, "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।"),
     React.createElement(Bullets, { items: shown, th }),
-    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-3 min-h-[44px] inline-flex items-center px-4 rounded-full border border-emerald-200 bg-white/70 text-xs font-semibold " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)"),
-    React.createElement(
-      "div",
-      { className: "mt-3 pt-1 border-t border-[#EFE3C4]" },
-      React.createElement("p", { className: "mt-2 text-[10px] leading-snug text-slate-400/80" }, (waqtOn ? "সময়ভাগ আপনার সেভ-করা লোকেশনের নামাজের ওয়াক্ত অনুযায়ী। " : "") + "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
-    )
+    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-3 min-h-[44px] inline-flex items-center px-4 rounded-full border border-emerald-200 bg-white/70 text-xs font-semibold " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)")
   );
 }
