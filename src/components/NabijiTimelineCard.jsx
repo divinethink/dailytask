@@ -11,7 +11,7 @@ import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAtMin, applyWaqt,
 import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
-import { EditIcon, ChevronDown, Icon, InfoIcon } from "./icons.jsx";
+import { EditIcon, ChevronDown, Icon } from "./icons.jsx";
 
 const PREVIEW = 3;
 // হালকা একরঙা থিম (owner-approved ১৫ নভেম্বর ২০২৬): সব সময়ভাগে একই — অ্যাপের থিম-কালারের emerald স্কেল অনুসারে বদলায়।
@@ -102,7 +102,6 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const [openCard, setOpenCard] = React.useState(fold === "open");
   const [more, setMore] = React.useState(false);
   const [sel, setSel] = React.useState(null); // null = এখনকার সময়ভাগ অনুসরণ
-  const [note, setNote] = React.useState(false); // ⓘ: সূত্র/সতর্কতার নোট
   const [nowMin, setNowMin] = React.useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   const [timings, setTimings] = React.useState(null);
   const isCreator = isCreatorAuth();
@@ -195,41 +194,33 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     { className: rootCls },
     titleEl,
     isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
-    // হেডার
+    // হেডার: ‹ [ওয়াক্ত-নাম + এখন / সময়] › — মাঝ-বরাবর, দুই পাশে তীর(১৫ নভেম্বর ২০২৬, owner-approved)
     React.createElement(
       "div",
-      { className: "flex items-center justify-between gap-2 mb-3" },
+      { className: "flex items-center justify-between gap-1 mb-3" },
+      React.createElement("button", { type: "button", onClick: () => step(-1), "aria-label": "আগের সময়", className: navBtn }, "‹"),
       React.createElement(
         "div",
-        { className: "flex items-center gap-2.5 min-w-0" },
-        React.createElement("span", { className: "w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, React.createElement(SlotIcon, { id: slot.id, emoji: slot.icon, size: 20 })),
+        { className: "flex-1 min-w-0 flex flex-col items-center text-center" },
         React.createElement(
           "div",
-          { className: "min-w-0" },
-          React.createElement(
-            "div",
-            { className: "flex items-center gap-1.5 flex-wrap" },
-            React.createElement("span", { className: "text-[15px] font-bold " + th.title }, slot.title),
-            isNowSlot && React.createElement(NowBadge, { exact })
-          ),
-          React.createElement(
-            "div",
-            { className: "flex items-center" },
-            React.createElement("span", { className: "text-[11px] font-medium text-slate-500 whitespace-nowrap" }, rangeLabel(slot, toBn)),
-            React.createElement("button", { type: "button", onClick: () => setNote(!note), "aria-expanded": note, "aria-label": "সূত্র ও সতর্কতা", className: "w-11 h-11 -my-4 -ml-1 flex items-center justify-center text-slate-400" }, React.createElement(InfoIcon, { size: 14 }))
-          )
-        )
+          { className: "flex items-center justify-center gap-2 flex-wrap" },
+          React.createElement("span", { className: "w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-lg " + th.icon, "aria-hidden": true }, React.createElement(SlotIcon, { id: slot.id, emoji: slot.icon, size: 18 })),
+          React.createElement("span", { className: "text-[15px] font-bold " + th.title }, slot.title),
+          isNowSlot && React.createElement(NowBadge, { exact })
+        ),
+        React.createElement("span", { className: "mt-0.5 text-[11px] font-medium text-slate-500" }, rangeLabel(slot, toBn))
       ),
-      React.createElement(
-        "div",
-        { className: "flex items-center shrink-0" },
-        React.createElement("button", { type: "button", onClick: () => step(-1), "aria-label": "আগের সময়", className: navBtn }, "‹"),
-        React.createElement("button", { type: "button", onClick: () => step(1), "aria-label": "পরের সময়", className: navBtn }, "›"),
-      isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 " + th.edit }, React.createElement(EditIcon, { size: 16 }))
-      )
+      React.createElement("button", { type: "button", onClick: () => step(1), "aria-label": "পরের সময়", className: navBtn }, "›")
     ),
-    note && React.createElement("p", { className: "mb-3 text-[11px] leading-snug text-slate-500" }, "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।"),
     React.createElement(Bullets, { items: shown, th }),
-    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-3 min-h-[44px] inline-flex items-center px-4 rounded-full border border-emerald-200 bg-white/70 text-xs font-semibold " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)")
+    (hasMore || (isCreator && !editing)) && React.createElement(
+      "div",
+      { className: "mt-3 flex items-center justify-between gap-2" },
+      hasMore ? React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "min-h-[44px] inline-flex items-center px-4 rounded-full border border-emerald-200 bg-white/70 text-xs font-semibold " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)") : React.createElement("span"),
+      isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 " + th.edit }, React.createElement(EditIcon, { size: 16 }))
+    ),
+    // সতর্কবার্তা: ডিফল্টে লুকানো, "আরও দেখুন" খুললে দেখায়(ⓘ আইকন বাদ, owner-approved)
+    more && React.createElement("p", { className: "mt-2 text-[11px] leading-snug text-slate-400" }, "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
   );
 }
