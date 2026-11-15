@@ -270,6 +270,11 @@ const DEFAULT_DUNIYA_FIELDS = [{
   shortLabel: "অলসতা মুক্ত",
   type: "bool"
 }, {
+  key: "forgaveEveryone",
+  label: "ঘুমের পূর্বে সবাইকে ক্ষমা করে দিয়েছি?",
+  shortLabel: "সবাইকে ক্ষমা",
+  type: "bool"
+}, {
   key: "phoneOffBy11",
   label: "ঘুমানোর অন্তত ১ ঘণ্টা আগে ফোন/ইন্টারনেট বন্ধ",
   shortLabel: "ঘুমের আগে ফোন বন্ধ",

@@ -120,8 +120,8 @@ const STATS_H = { dateKey, pad2, dailyScore, daysInMonth };
 const NO_DIRTY = { current: false };
 // ধাপ ১: সেভ-বাটনের নিচের কার্ড দুই ভাগ — হোমে ছোট অংশ, "মুহাসাবা" ট্যাবে বিশ্লেষণ-অংশ(স্থির ক্রম)।
 // "insight"(দৈনিক অন্তর্দৃষ্টি) প্ল্যানে কোথাও নেই — Owner-এর সিদ্ধান্ত না আসা পর্যন্ত হোমেই থাকল(মোছা হয়নি)।
-const HOME_BELOW_IDS = ["streak", "insight", "weekPulse", "tomorrow"];
-const MUHASABA_IDS = ["monthly", "weekly", "monthlyReport", "trend", "meeting"];
+const HOME_BELOW_IDS = ["streak", "insight", "monthly", "weekPulse", "tomorrow"];
+const MUHASABA_IDS = ["weekly", "monthlyReport", "trend", "meeting"];
 const pickNodes = (nodes, ids) => Object.fromEntries(ids.filter(id => nodes[id]).map(id => [id, nodes[id]]));
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
@@ -214,6 +214,10 @@ function App() {
   });
   useEffect(() => {
     try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
+  }, [activeTab]);
+  // হোম ছাড়া অন্য ট্যাবে ঢুকলে পাতা সবসময় ওপর থেকে শুরু(হোমের নিচ থেকে এলে নিচে থেকে যেত)।
+  useEffect(() => {
+    if (activeTab !== TAB_FAMILY) { try { window.scrollTo(0, 0); } catch {} }
   }, [activeTab]);
   // ব্যাক বাটন: হোম ছাড়া যেকোনো ট্যাব থেকে ব্যাক = হোমে ফেরা(হোমে ব্যাক = আগের মতো এক্সিট)।
   useBackLayer(activeTab !== TAB_FAMILY, () => setActiveTab(TAB_FAMILY));
@@ -1913,7 +1917,7 @@ function App() {
     streak: streak,
     yesterdayMissing: yesterdayMissing,
     yesterdayEntry: yesterdayEntry
-  }), ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, HOME_BELOW_IDS)), React.createElement(MuhasabaLinkCard, {
+  }), ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, HOME_BELOW_IDS), HOME_BELOW_IDS), React.createElement(MuhasabaLinkCard, {
     avgPct: homeIsCurrentMonth && monthStats.filled > 0 ? monthStats.avgPct : null,
     toBn: toBn,
     onOpen: () => setActiveTab(TAB_MUHASABA)

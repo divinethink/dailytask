@@ -18,7 +18,7 @@ const PREVIEW = 3;
 // কার্ডে পাতলা টিন্ট-ভরাট + বর্ডারের চারপাশে হালকা আভা (ring); আইকন নেভ-বারের মতো আউটলাইন SVG, থিম-অ্যাকসেন্ট রঙে।
 // ডিফল্ট সময়ভাগের আইকন SVG; ক্রিয়েটরের নতুন/অচেনা সময়ভাগ = তার emoji (হালকা)।
 const CALM = {
-  card: "bg-white border-[#E4D3A8] ring-4 ring-[#F7EEDB]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
+  card: "bg-white border-[#E4D3A8]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
   chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-emerald-200 text-emerald-900",
   txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-400", title: "text-slate-900",
   time: "bg-white text-emerald-800", icon: "bg-emerald-100 text-emerald-800", link: "text-emerald-800", edit: "text-emerald-800"
