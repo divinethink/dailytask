@@ -42,6 +42,8 @@ const SHAPES = {
   dayNight: '<circle cx="7.5" cy="7.5" r="2.6"/><path d="M7.5 1.6v1.2M7.5 12.2v1.2M1.6 7.5h1.2M12.2 7.5h1.2M3.3 3.3l.9.9M11.7 3.3l-.9.9M3.3 11.7l.9-.9"/><path transform="translate(9.5 9.5) scale(0.6)" stroke-width="3.3" d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   tasbih: '<circle cx="12" cy="9.5" r="7.2" stroke-width="1.2"/><g fill="currentColor" stroke="none"><circle cx="12" cy="2.3" r="2"/><circle cx="17.1" cy="4.4" r="2"/><circle cx="19.2" cy="9.5" r="2"/><circle cx="17.1" cy="14.6" r="2"/><circle cx="12" cy="16.7" r="2"/><circle cx="6.9" cy="14.6" r="2"/><circle cx="4.8" cy="9.5" r="2"/><circle cx="6.9" cy="4.4" r="2"/></g><path d="M12 18.7v1.6"/><path d="M10.5 20.3h3l-.6 2.7h-1.8z"/>',
   dua: '<path d="M3 11h18c0 5-4 9-9 9s-9-4-9-9z"/><path d="M6 11V7.5M9.3 11V5M14.7 11V5M18 11V7.5"/>',
+  // ১৫ নভেম্বর ২০২৬: কুরআন-ট্যাইল — খোলা কুরআন(দুই পাতা+স্পাইন) ও ওপরে ছোট তারা।
+  quran: '<path d="M12 9.5C10 8 7 7.5 4 8v11c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V8c-3-.5-6 0-8 1.5z"/><path d="M12 9.5v11"/><path d="M12 1.6l.8 1.6 1.8.3-1.3 1.2.3 1.8-1.6-.9-1.6.9.3-1.8-1.3-1.2 1.8-.3z"/>',
   chevronRight: '<path d="M9 6l6 6-6 6"/>',
   grip: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
 };

@@ -13,24 +13,24 @@ export const TAB_DEFS = {
     defs: [
       { id: "azkar", title: "সকাল-সন্ধ্যার আমল" },
       { id: "fullDayAmol", title: "সারাদিনের আমল" },
+      { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "dhikr", title: "যিকির" },
       { id: "dua", title: "দু'আ" },
       { id: "duaAcceptance", title: "দোয়া কবুলের সময়" },
-      { id: "deathReminder", title: "মৃত্যুর স্মরণ" },
-      { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" }
+      { id: "deathReminder", title: "মৃত্যুর স্মরণ" }
     ]
   },
   tools: {
     title: "সহায়িকা",
     defs: [
-      { id: "amol", title: "সকল আমল ও দু'আ" },
-      { id: "qibla", title: "কিবলা" },
-      { id: "salah", title: "সালাত ও পবিত্রতা" },
       { id: "quran", title: "কুরআন" },
-      { id: "toolsTracking", title: "ইসলামি টুলস ও ট্র্যাকিং" },
+      { id: "salah", title: "সালাত ও পবিত্রতা" },
+      { id: "amol", title: "সকল আমল ও দু'আ" },
       { id: "specialDays", title: "বিশেষ দিন ও উপলক্ষ" },
+      { id: "blog", title: "ডিভাইন ব্লগ" },
       { id: "quiz", title: "ইসলামি কুইজ" },
-      { id: "blog", title: "ডিভাইন ব্লগ" }
+      { id: "qibla", title: "কিবলা" },
+      { id: "toolsTracking", title: "ইসলামি টুলস ও ট্র্যাকিং" }
     ]
   }
 };

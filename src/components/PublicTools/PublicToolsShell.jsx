@@ -11,7 +11,7 @@ import { ChevronLeft } from "../icons.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
 import { useBackLayer } from "../../legacy/backNav.js";
 import { ReaderTitleContext } from "./readerContext.js";
-import { ToolGridSection, PageHeader, VerseCard, DetailHeader } from "./ToolGrid.jsx";
+import { ToolGridSection, PageHeader, DetailHeader } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
 import { ZakatCalculator } from "./ZakatCalculator.jsx";
@@ -95,7 +95,7 @@ const CATEGORIES = [
   },
   {
     id: "quran",
-    icon: "bookmarkCheck",
+    icon: "quran",
     label: "কুরআন",
     items: [
       { key: "paraIndex", icon: "list", label: "৩০ পারার সূচি" },
@@ -133,15 +133,19 @@ const CATEGORIES = [
 // দিনের বিশেষ আমল নিজ নিজ ক্যাটাগরি(toolsTracking/specialDays, উপরে) থেকে
 // বের করে সরাসরি front-এ আনা হয়েছে। বাকি ৪টা ক্যাটাগরি + কুইজ/ব্লগ একই
 // সারিতে, একটাই ToolGridSection দিয়ে(কোনো section-title ছাড়া, flat)।
+// আলাদা রঙ(ঐচ্ছিক accent): "সকল আমল ও দু'আ" = ব্রোঞ্জ, "ডিভাইন ব্লগ" = টেরাকোটা — থিম বদলালেও একই থাকে।
+const ACCENT_BRONZE = { bg: "linear-gradient(160deg, #FBF1DC 0%, #F0D9A6 100%)", border: "#D9B36A", disc: "radial-gradient(circle at 30% 25%, #FFF8E6 0%, #F1DBA8 100%)", ring: "#D9B36A", icon: "#8A5A12", text: "#5A3A0A" };
+const ACCENT_TERRACOTTA = { bg: "linear-gradient(160deg, #FBEAE2 0%, #F0C4B0 100%)", border: "#D98E73", disc: "radial-gradient(circle at 30% 25%, #FFF3EE 0%, #F3C9B7 100%)", ring: "#D98E73", icon: "#A8472A", text: "#6E2B16" };
+
 const FRONT_ITEMS = [
-  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দু'আ" },
-  { kind: "tool", key: "qibla", icon: "compass", label: "কিবলা" },
+  { kind: "category", id: "quran", icon: "quran", label: "কুরআন" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
-  { kind: "category", id: "quran", icon: "bookmarkCheck", label: "কুরআন" },
-  { kind: "category", id: "toolsTracking", icon: "calculator", label: "ইসলামি টুলস ও ট্র্যাকিং" },
+  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দু'আ", accent: ACCENT_BRONZE },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
+  { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার", accent: ACCENT_TERRACOTTA },
   { kind: "single", id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },
-  { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার" },
+  { kind: "tool", key: "qibla", icon: "compass", label: "কিবলা" },
+  { kind: "category", id: "toolsTracking", icon: "calculator", label: "ইসলামি টুলস ও ট্র্যাকিং" },
 ];
 
 export function PublicToolsShell({ tabLayout } = {}) {
@@ -251,8 +255,7 @@ export function PublicToolsShell({ tabLayout } = {}) {
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
-    // ওপরে আয়াত-কার্ড, তারপর ৮ টাইলের গ্রিড (প্রথমে "সকল আমল ও দু'আ"), সবার নিচে তাসবীহ।
-    /*#__PURE__*/React.createElement("div", { className: "mb-3" }, /*#__PURE__*/React.createElement(VerseCard, { text: "“আল্লাহর স্মরণেই হৃদয় প্রশান্ত হয়।”", source: "— সূরা আর-রা'দ ১৩:২৮" })),
+    // ৮ টাইলের গ্রিড (আয়াত-কার্ড এখন "সকল আমল ও দু'আ"-র ভেতরে), সবার নিচে তাসবীহ।
     /*#__PURE__*/React.createElement(ToolGridSection, {
       variant: "hero",
       items: visibleIds("tools", tabLayout).map((id) => FRONT_ITEMS.find((i) => (i.key || i.id) === id)).filter(Boolean),

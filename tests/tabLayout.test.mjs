@@ -50,7 +50,8 @@ test("আইডি-সামঞ্জস্য: TAB_DEFS ও আসল UI-এর
 });
 
 test("সহায়িকা পুনর্বিন্যাস: সকল-আমল প্রথম টাইল, জুমা আমল হাবে, তাসবীহ কাস্টমাইজ-তালিকায় নেই, পুনরাবৃত্তি নেই", () => {
-  assert.equal(defaultOrder("tools")[0], "amol");
+  assert.deepEqual(defaultOrder("tools"), ["quran", "salah", "amol", "specialDays", "blog", "quiz", "qibla", "toolsTracking"]);
+  assert.deepEqual(defaultOrder("amol").slice(0, 4), ["azkar", "fullDayAmol", "jumuahAmol", "dhikr"]);
   assert.ok(!defaultOrder("tools").includes("jumuahAmol"));
   assert.ok(defaultOrder("amol").includes("jumuahAmol"));
   assert.ok(!defaultOrder("amol").includes("tasbih"));

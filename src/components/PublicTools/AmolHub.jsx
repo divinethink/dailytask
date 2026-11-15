@@ -7,7 +7,7 @@
 // এই ফাইলে নেই(3_1-এর Core Decision)।
 // React global(window.React, globals.js)।
 
-import { ToolGridSection, PageHeader } from "./ToolGrid.jsx";
+import { ToolGridSection, PageHeader, VerseCard } from "./ToolGrid.jsx";
 import { JumuahAmol } from "./JumuahAmol.jsx";
 import { SubScreenHeader } from "./SubScreenHeader.jsx";
 import { ReaderTitleContext } from "./readerContext.js";
@@ -66,6 +66,7 @@ export function AmolHub({ tabLayout, onBack } = {}) {
       items,
       onSelect: (item) => setActiveItem(item.key),
     }),
+    /*#__PURE__*/React.createElement(VerseCard, { key: "verse", text: "“আল্লাহর স্মরণেই হৃদয় প্রশান্ত হয়।”", source: "— সূরা আর-রা'দ ১৩:২৮" }),
   ];
 
   return /*#__PURE__*/React.createElement(

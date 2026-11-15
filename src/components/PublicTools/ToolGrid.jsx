@@ -72,7 +72,9 @@ const PREMIUM = {
   hero: { cols: "grid-cols-2", height: "clamp(88px, 12vh, 112px)", disc: 44, icon: 22, font: 13.5, chevron: true },
 };
 
-function PremiumTile({ icon, label, onClick, cfg }) {
+function PremiumTile({ icon, label, onClick, cfg, accent }) {
+  // accent(ঐচ্ছিক): নির্দিষ্ট টাইলকে আলাদা রঙ দেয় — {bg, border, disc, ring, icon, text}; না থাকলে আগের থিম-রঙ।
+  const ac = accent || null;
   return React.createElement(
     "button",
     {
@@ -81,8 +83,8 @@ function PremiumTile({ icon, label, onClick, cfg }) {
       className: "relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border px-1.5 active:scale-95 transition-transform",
       style: {
         height: cfg.height,
-        background: "linear-gradient(160deg, #FFFFFF 0%, #F3F8F6 100%)",
-        borderColor: "#E1EBE7",
+        background: ac ? ac.bg : "linear-gradient(160deg, #FFFFFF 0%, #F3F8F6 100%)",
+        borderColor: ac ? ac.border : "#E1EBE7",
         boxShadow: "0 1px 2px rgba(14,75,67,0.06), 0 4px 12px rgba(14,75,67,0.05)",
       },
     },
@@ -99,11 +101,11 @@ function PremiumTile({ icon, label, onClick, cfg }) {
         style: {
           width: cfg.disc,
           height: cfg.disc,
-          background: "radial-gradient(circle at 30% 25%, #FFFFFF 0%, var(--theme-tint, #E3EEEA) 100%)",
-          boxShadow: "inset 0 0 0 1px var(--theme-line, #D3E3DD)",
+          background: ac ? ac.disc : "radial-gradient(circle at 30% 25%, #FFFFFF 0%, var(--theme-tint, #E3EEEA) 100%)",
+          boxShadow: ac ? "inset 0 0 0 1px " + ac.ring : "inset 0 0 0 1px var(--theme-line, #D3E3DD)",
         },
       },
-      React.createElement(ToolIcon, { name: icon, size: cfg.icon, color: PRIMARY })
+      React.createElement(ToolIcon, { name: icon, size: cfg.icon, color: ac ? ac.icon : PRIMARY })
     ),
     React.createElement(
       "span",
@@ -111,7 +113,7 @@ function PremiumTile({ icon, label, onClick, cfg }) {
         className: "leading-snug text-center w-full",
         style: {
           fontSize: cfg.font,
-          color: "#1A2621",
+          color: ac ? ac.text : "#1A2621",
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical",
@@ -152,6 +154,7 @@ export function ToolGridSection({ title, icon, items, onSelect, variant }) {
           icon: item.icon,
           label: item.label,
           cfg,
+          accent: item.accent,
           onClick: () => onSelect(item),
         })
       )
