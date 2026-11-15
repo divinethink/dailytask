@@ -118,6 +118,11 @@ import { fetchDesign, saveDesignPart } from "./appDesign.js";
 import { monthStatsOf, weekSummaryOf, yesterdayEntryOf, yesterdayMissingOf } from "./homeStats.js";
 const STATS_H = { dateKey, pad2, dailyScore, daysInMonth };
 const NO_DIRTY = { current: false };
+// ধাপ ১: সেভ-বাটনের নিচের কার্ড দুই ভাগ — হোমে ছোট অংশ, "মুহাসাবা" ট্যাবে বিশ্লেষণ-অংশ(স্থির ক্রম)।
+// "insight"(দৈনিক অন্তর্দৃষ্টি) প্ল্যানে কোথাও নেই — Owner-এর সিদ্ধান্ত না আসা পর্যন্ত হোমেই থাকল(মোছা হয়নি)।
+const HOME_BELOW_IDS = ["streak", "insight", "weekPulse", "tomorrow"];
+const MUHASABA_IDS = ["monthly", "weekly", "monthlyReport", "trend", "meeting"];
+const pickNodes = (nodes, ids) => Object.fromEntries(ids.filter(id => nodes[id]).map(id => [id, nodes[id]]));
 import { MonthlyOverviewSection, MeetingMinutesSection, DeleteAccountWarningModal, FeedbackModal, MilestoneToast, WeeklySummaryToast, StreakCard, TopBottomActivityRanking } from "../components/DashboardSections.jsx";
 import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
@@ -134,6 +139,8 @@ import { GoogleSignInGate } from "../components/GoogleSignInGate.jsx";
 import { InviteJoinGate } from "../components/InviteJoinGate.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
+import { MuhasabaTab } from "../components/MuhasabaTab.jsx";
+import { MuhasabaLinkCard } from "../components/MuhasabaLinkCard.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
 // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬): আগে
 // DashboardHeader.jsx-এর হ্যামবার্গার dropdown ছিল, এখন bottom-nav "মেনু"
@@ -151,7 +158,7 @@ const TabLayoutScreen = React.lazy(() => import("../components/TabLayoutScreen.j
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
-import { TAB_FAMILY, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
+import { TAB_FAMILY, TAB_MUHASABA, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 import { useBackLayer } from "./backNav.js";
 // §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো(3_2 §১-এর নীতি
@@ -1371,11 +1378,195 @@ function App() {
               }))),
               React.createElement("div", { className: "px-2 py-1.5 text-[11px] font-bold leading-tight", style: { color: t.color } }, (on ? "✓ " : "") + t.name));
           })))));
+  // ধাপ ১(মুহাসাবা ট্যাব): সেভ-বাটনের নিচের কার্ডগুলোর node-তালিকা এখন এখানে(আগে হোম-রিটার্নের ভেতরে ছিল, হুবহু একই কোড);
+  // হোম ও মুহাসাবা-ট্যাব দুজনেই এখান থেকে নেয়। total/leadBlanks আগের মতোই monthStats থেকে।
+  const total = monthStats.total;
+  const leadBlanks = new Date(monthCursor.year, monthCursor.month0, 1).getDay();
+  const homeIsCurrentMonth = new Date().getFullYear() === monthCursor.year && new Date().getMonth() === monthCursor.month0;
+  const homeBelowNodes = {
+    streak: () => /*#__PURE__*/React.createElement(StreakCard, {
+    streak: streak,
+    toBn: toBn,
+    // §Stable "আজকের অগ্রগতি"(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড bug): আগে
+    // রাত ১২টার পর(আজকের এন্ট্রি এখনো সেভ না হলে) todayPercent null হয়ে
+    // পুরো কার্ডই অদৃশ্য হয়ে যেত। Fix: আজকের এন্ট্রি না থাকলে গতকালের এন্ট্রি
+    // fallback হিসেবে দেখানো হয়("গতকালের অগ্রগতি", তুলনা তার আগের দিনের
+    // সাথে) — নতুন কোনো Firestore read/listener লাগেনি, existing
+    // monthEntries-ই যথেষ্ট। মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে(load করা
+    // নেই) — সেই edge-case-এ আগের existing limitation অনুযায়ীই silently
+    // card hidden থাকে(নতুন cross-month fetch যোগ করা হয়নি, over-engineering
+    // এড়াতে)।
+    ...(() => {
+      const now_ = new Date();
+      const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
+      if (!isCurrentMonth) return { mode: "today", primaryPercent: null, comparisonPercent: null };
+      const scoreOf_ = (d) => {
+        if (d < 1) return null;
+        const s = dailyScore(monthEntries[pad2(d)], selectedMember, allFields);
+        return s === null || s === undefined ? null : Math.round(s * 100);
+      };
+      const todayNum_ = now_.getDate();
+      const todayPct_ = scoreOf_(todayNum_);
+      if (todayPct_ !== null) {
+        return { mode: "today", primaryPercent: todayPct_, comparisonPercent: scoreOf_(todayNum_ - 1) };
+      }
+      const yesterdayPct_ = scoreOf_(todayNum_ - 1);
+      if (yesterdayPct_ !== null) {
+        return { mode: "yesterday", primaryPercent: yesterdayPct_, comparisonPercent: scoreOf_(todayNum_ - 2) };
+      }
+      return { mode: "today", primaryPercent: null, comparisonPercent: null };
+    })()
+  }),
+    insight: () => /*#__PURE__*/React.createElement(DailyInsightCard, {
+    insight: dailyInsight,
+    toBn: toBn
+  }),
+    tomorrow: () => /*#__PURE__*/React.createElement(TomorrowPreviewCard, {
+    toBn: toBn,
+    todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })()
+  }),
+    monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
+    allFields: allFields,
+    entryDirtyRef: entryDirtyRef,
+    leadBlanks: leadBlanks,
+    meetingDirtyRef: NO_DIRTY,
+    monthCursor: monthCursor,
+    monthEntries: monthEntries,
+    monthStats: monthStats,
+    selectedMember: selectedMember,
+    setMonthCursor: setMonthCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    setPrintMode: setPrintMode,
+    setShowMonthlyInfoModal: setShowMonthlyInfoModal,
+    // মুহাসাবা-ট্যাবে দিন ট্যাপ করলে হোমে সেই দিনের এন্ট্রি খোলে(নইলে ট্যাপ বোঝা যেত না)।
+    setViewDate: d => { setViewDate(d); setActiveTab(TAB_FAMILY); },
+    total: total,
+    weeklyDirtyRef: weeklyDirtyRef,
+    BN_MONTHS: BN_MONTHS,
+    BN_WEEKDAYS: BN_WEEKDAYS,
+    dailyScore: dailyScore,
+    fieldPercent: fieldPercent,
+    pad2: pad2,
+    scoreColor: scoreColor,
+    toBn: toBn,
+    streak: streak,
+    // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking
+    // আগে আলাদা sibling card হিসেবে Monthly Overview-এর উপরে ছিল — এখন এখানে
+    // prop হিসেবে দেওয়া হচ্ছে, MonthlyOverviewSection নিজে এটাকে stats-row-এর
+    // নিচে ও heatmap grid-এর উপরে বসায়(DashboardSections.jsx দ্রষ্টব্য)।
+    // TopBottomActivityRanking component-এর নিজস্ব calculation+presentation
+    // সম্পূর্ণ অপরিবর্তিত(props হুবহু আগেরই) — শুধু render-tree-এর অবস্থান বদলেছে।
+    rankingSlot: /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
+      monthEntries: monthEntries,
+      totalDays: total,
+      member: selectedMember,
+      allFields: allFields,
+      fieldPercent: fieldPercent,
+      pad2: pad2,
+      toBn: toBn,
+      monthCursor: monthCursor
+    })
+  })),
+    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
+    fold: fold,
+    onShiftMonth: reviewShiftMonth,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice,
+    monthCursor: reviewCursor,
+    monthEntries: reviewEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS,
+    BN_WEEKDAYS: BN_WEEKDAYS,
+    onSendToMeeting: handleSendToMeeting
+  })),
+    trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: trendShiftMonth, monthCursor: trendCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
+    fold: fold,
+    onShiftMonth: trendShiftMonth,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice,
+    monthCursor: trendCursor,
+    monthEntries: trendEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS,
+    onSendToMeeting: handleSendToMeeting
+  })),
+    weekPulse: () => /*#__PURE__*/React.createElement(WeeklyPulseCard, {
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice,
+    liveMonth: monthCursor,
+    liveEntries: monthEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    toBn: toBn
+  }),
+    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
+    fold: fold,
+    onShiftMonth: reviewShiftMonth,
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice,
+    monthCursor: reviewCursor,
+    monthEntries: reviewEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    dailyScore: dailyScore,
+    toBn: toBn,
+    BN_MONTHS: BN_MONTHS
+  })),
+    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: meetingShiftMonth, monthCursor: meetingCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
+    fold: fold,
+    addMeetingRow: addMeetingRow,
+    handleSaveMeeting: handleSaveMeeting,
+    meetingSavedTick: meetingSavedTick,
+    meetingState: meetingState,
+    monthCursor: meetingCursor,
+    removeMeetingRow: removeMeetingRow,
+    savingMeeting: savingMeeting,
+    setShowMeetingInfoModal: setShowMeetingInfoModal,
+    updateMeetingRow: updateMeetingRow,
+    BN_MONTHS: BN_MONTHS,
+    toBn: toBn,
+    setMonthCursor: setMeetingCursor,
+    setMonthRefreshKey: setMonthRefreshKey,
+    weeklyDirtyRef: NO_DIRTY,
+    meetingDirtyRef: meetingDirtyRef
+  }))
+  };
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
   // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
   // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
   // gate-logic byte-identical অপরিবর্তিত।
-  if (activeTab !== TAB_FAMILY) {
+  // মুহাসাবা-ট্যাবে accessPending/printMode হলে নিচের একই স্ক্রিন(অনুমোদন-অপেক্ষা/প্রিন্ট) দেখাতে এই early-return এড়ানো হয়।
+  if (activeTab !== TAB_FAMILY && !(activeTab === TAB_MUHASABA && (accessPending || printMode))) {
+    if (activeTab === TAB_MUHASABA) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(MuhasabaTab, null, ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, MUHASABA_IDS), MUHASABA_IDS)),
+        React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }),
+        React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }),
+        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+      );
+    }
     // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬):
     // TAB_SETTINGS("মেনু") এখন আর generic PublicToolsPlaceholder না — আগে
     // DashboardHeader.jsx-এর হ্যামবার্গার dropdown-এ যা ছিল(family
@@ -1610,9 +1801,6 @@ function App() {
     pad2: pad2,
     toBn: toBn
   }));
-  const total = monthStats.total;
-  const firstOfMonth = new Date(monthCursor.year, monthCursor.month0, 1);
-  const leadBlanks = firstOfMonth.getDay();
   // (themeColorPickerEl এখন উপরে, early-return-এর আগে define করা হয়েছে — bug-fix
   // নোট দ্রষ্টব্য। এখানে শুধু ব্যবহার হচ্ছে, নতুন declaration নেই।)
   return /*#__PURE__*/React.createElement("div", {
@@ -1735,174 +1923,10 @@ function App() {
     streak: streak,
     yesterdayMissing: yesterdayMissing,
     yesterdayEntry: yesterdayEntry
-  }), ...renderHomeBelow(designSrc, {
-    streak: () => /*#__PURE__*/React.createElement(StreakCard, {
-    streak: streak,
+  }), ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, HOME_BELOW_IDS)), React.createElement(MuhasabaLinkCard, {
+    avgPct: homeIsCurrentMonth && monthStats.filled > 0 ? monthStats.avgPct : null,
     toBn: toBn,
-    // §Stable "আজকের অগ্রগতি"(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড bug): আগে
-    // রাত ১২টার পর(আজকের এন্ট্রি এখনো সেভ না হলে) todayPercent null হয়ে
-    // পুরো কার্ডই অদৃশ্য হয়ে যেত। Fix: আজকের এন্ট্রি না থাকলে গতকালের এন্ট্রি
-    // fallback হিসেবে দেখানো হয়("গতকালের অগ্রগতি", তুলনা তার আগের দিনের
-    // সাথে) — নতুন কোনো Firestore read/listener লাগেনি, existing
-    // monthEntries-ই যথেষ্ট। মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে(load করা
-    // নেই) — সেই edge-case-এ আগের existing limitation অনুযায়ীই silently
-    // card hidden থাকে(নতুন cross-month fetch যোগ করা হয়নি, over-engineering
-    // এড়াতে)।
-    ...(() => {
-      const now_ = new Date();
-      const isCurrentMonth = now_.getFullYear() === monthCursor.year && now_.getMonth() === monthCursor.month0;
-      if (!isCurrentMonth) return { mode: "today", primaryPercent: null, comparisonPercent: null };
-      const scoreOf_ = (d) => {
-        if (d < 1) return null;
-        const s = dailyScore(monthEntries[pad2(d)], selectedMember, allFields);
-        return s === null || s === undefined ? null : Math.round(s * 100);
-      };
-      const todayNum_ = now_.getDate();
-      const todayPct_ = scoreOf_(todayNum_);
-      if (todayPct_ !== null) {
-        return { mode: "today", primaryPercent: todayPct_, comparisonPercent: scoreOf_(todayNum_ - 1) };
-      }
-      const yesterdayPct_ = scoreOf_(todayNum_ - 1);
-      if (yesterdayPct_ !== null) {
-        return { mode: "yesterday", primaryPercent: yesterdayPct_, comparisonPercent: scoreOf_(todayNum_ - 2) };
-      }
-      return { mode: "today", primaryPercent: null, comparisonPercent: null };
-    })()
-  }),
-    insight: () => /*#__PURE__*/React.createElement(DailyInsightCard, {
-    insight: dailyInsight,
-    toBn: toBn
-  }),
-    tomorrow: () => /*#__PURE__*/React.createElement(TomorrowPreviewCard, {
-    toBn: toBn,
-    todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })()
-  }),
-    monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
-    allFields: allFields,
-    entryDirtyRef: entryDirtyRef,
-    leadBlanks: leadBlanks,
-    meetingDirtyRef: NO_DIRTY,
-    monthCursor: monthCursor,
-    monthEntries: monthEntries,
-    monthStats: monthStats,
-    selectedMember: selectedMember,
-    setMonthCursor: setMonthCursor,
-    setMonthRefreshKey: setMonthRefreshKey,
-    setPrintMode: setPrintMode,
-    setShowMonthlyInfoModal: setShowMonthlyInfoModal,
-    setViewDate: setViewDate,
-    total: total,
-    weeklyDirtyRef: weeklyDirtyRef,
-    BN_MONTHS: BN_MONTHS,
-    BN_WEEKDAYS: BN_WEEKDAYS,
-    dailyScore: dailyScore,
-    fieldPercent: fieldPercent,
-    pad2: pad2,
-    scoreColor: scoreColor,
-    toBn: toBn,
-    streak: streak,
-    // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking
-    // আগে আলাদা sibling card হিসেবে Monthly Overview-এর উপরে ছিল — এখন এখানে
-    // prop হিসেবে দেওয়া হচ্ছে, MonthlyOverviewSection নিজে এটাকে stats-row-এর
-    // নিচে ও heatmap grid-এর উপরে বসায়(DashboardSections.jsx দ্রষ্টব্য)।
-    // TopBottomActivityRanking component-এর নিজস্ব calculation+presentation
-    // সম্পূর্ণ অপরিবর্তিত(props হুবহু আগেরই) — শুধু render-tree-এর অবস্থান বদলেছে।
-    rankingSlot: /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
-      monthEntries: monthEntries,
-      totalDays: total,
-      member: selectedMember,
-      allFields: allFields,
-      fieldPercent: fieldPercent,
-      pad2: pad2,
-      toBn: toBn,
-      monthCursor: monthCursor
-    })
-  })),
-    monthlyReport: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyReportSection, {
-    fold: fold,
-    onShiftMonth: reviewShiftMonth,
-    migrationState: migrationState,
-    memberId: selectedId,
-    member: selectedMember,
-    locked: isLockedForThisDevice,
-    monthCursor: reviewCursor,
-    monthEntries: reviewEntries,
-    allFields: allFields,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    dailyScore: dailyScore,
-    toBn: toBn,
-    BN_MONTHS: BN_MONTHS,
-    BN_WEEKDAYS: BN_WEEKDAYS,
-    onSendToMeeting: handleSendToMeeting
-  })),
-    trend: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: trendShiftMonth, monthCursor: trendCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(TrendReviewSection, {
-    fold: fold,
-    onShiftMonth: trendShiftMonth,
-    migrationState: migrationState,
-    memberId: selectedId,
-    member: selectedMember,
-    locked: isLockedForThisDevice,
-    monthCursor: trendCursor,
-    monthEntries: trendEntries,
-    allFields: allFields,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    dailyScore: dailyScore,
-    toBn: toBn,
-    BN_MONTHS: BN_MONTHS,
-    onSendToMeeting: handleSendToMeeting
-  })),
-    weekPulse: () => /*#__PURE__*/React.createElement(WeeklyPulseCard, {
-    migrationState: migrationState,
-    memberId: selectedId,
-    member: selectedMember,
-    locked: isLockedForThisDevice,
-    liveMonth: monthCursor,
-    liveEntries: monthEntries,
-    allFields: allFields,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    toBn: toBn
-  }),
-    weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
-    fold: fold,
-    onShiftMonth: reviewShiftMonth,
-    migrationState: migrationState,
-    memberId: selectedId,
-    member: selectedMember,
-    locked: isLockedForThisDevice,
-    monthCursor: reviewCursor,
-    monthEntries: reviewEntries,
-    allFields: allFields,
-    fieldApplies: fieldApplies,
-    isExcused: isExcused,
-    isFieldExcusable: isFieldExcusable,
-    dailyScore: dailyScore,
-    toBn: toBn,
-    BN_MONTHS: BN_MONTHS
-  })),
-    meeting: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: meetingShiftMonth, monthCursor: meetingCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MeetingMinutesSection, {
-    fold: fold,
-    addMeetingRow: addMeetingRow,
-    handleSaveMeeting: handleSaveMeeting,
-    meetingSavedTick: meetingSavedTick,
-    meetingState: meetingState,
-    monthCursor: meetingCursor,
-    removeMeetingRow: removeMeetingRow,
-    savingMeeting: savingMeeting,
-    setShowMeetingInfoModal: setShowMeetingInfoModal,
-    updateMeetingRow: updateMeetingRow,
-    BN_MONTHS: BN_MONTHS,
-    toBn: toBn,
-    setMonthCursor: setMeetingCursor,
-    setMonthRefreshKey: setMonthRefreshKey,
-    weeklyDirtyRef: NO_DIRTY,
-    meetingDirtyRef: meetingDirtyRef
-  }))
+    onOpen: () => setActiveTab(TAB_MUHASABA)
   })), React.createElement(React.Suspense, { fallback: null }, React.createElement(ArchiveModal, {show: showArchiveModal, onClose: () => setShowArchiveModal(false), archiveMonth0, setArchiveMonth0, archiveYear, setArchiveYear, BN_MONTHS, toBn, handleGoToArchive})), React.createElement(FamilyCodeChoiceModal, {
     show: showFamilyCodeChoiceModal,
     onClose: () => setShowFamilyCodeChoiceModal(false),

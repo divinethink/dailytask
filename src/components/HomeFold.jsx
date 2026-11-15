@@ -56,9 +56,15 @@ export function homeEntryCards(member, nodes) {
 
 // সেভ-বাটনের নিচের সেকশন। weekly/meeting/monthlyReport/trend-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
 const PX_WRAPPED = { streak: true, insight: true, tomorrow: true, weekPulse: true };
-export function renderHomeBelow(member, nodes) {
+// order(ঐচ্ছিক): id-এর তালিকা — দিলে সেভ-করা ক্রম বদলে এই ক্রমে বসে(মুহাসাবা-ট্যাবের স্থির ক্রম); সেভ-করা দৃশ্যমানতা/fold অক্ষত থাকে।
+export function renderHomeBelow(member, nodes, order) {
   const out = [];
-  sanitizeLayout(effectiveHomeLayout(member)).below.forEach(c => {
+  let cards = sanitizeLayout(effectiveHomeLayout(member)).below;
+  if (Array.isArray(order)) {
+    const rank = id => { const i = order.indexOf(id); return i < 0 ? order.length : i; };
+    cards = [...cards].sort((a, b) => rank(a.id) - rank(b.id));
+  }
+  cards.forEach(c => {
     if (!c.visible || !nodes[c.id]) return;
     const key = c.id + ":" + c.fold;
     const title = cardTitle("below", c.id);

@@ -857,3 +857,23 @@ export function GoogleGIcon({ size = 20 }) {
     /*#__PURE__*/React.createElement("path", { fill: "#1976D2", d: "M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" })
   );
 }
+
+// মুহাসাবা নেভ-আইকন: তিনটা বার(stroke-based; active হলে ঘন রঙ, অন্য আইকনের মতো)।
+export function ChartBarIcon({
+  size = 18,
+  color = "currentColor",
+  className,
+  style
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: className,
+    style: { stroke: color, ...style }
+  }, /*#__PURE__*/React.createElement("path", { d: "M3 20h18" }), /*#__PURE__*/React.createElement("path", { d: "M6 20v-6" }), /*#__PURE__*/React.createElement("path", { d: "M11 20V8" }), /*#__PURE__*/React.createElement("path", { d: "M16 20v-9" }), /*#__PURE__*/React.createElement("path", { d: "M21 20V4" }));
+}
