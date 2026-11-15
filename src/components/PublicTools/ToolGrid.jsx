@@ -69,7 +69,7 @@ function ListRow({ icon, label, subtitle, onClick }) {
 // --- premium variants ---
 const PREMIUM = {
   compact3: { cols: "grid-cols-3", height: "clamp(92px, 12vh, 108px)", disc: 40, icon: 20, font: 12.5, chevron: false },
-  hero: { cols: "grid-cols-2", height: "clamp(88px, 12vh, 112px)", disc: 44, icon: 22, font: 13.5, chevron: true },
+  hero: { cols: "grid-cols-2", height: "clamp(70px, 9.5vh, 84px)", disc: 36, icon: 20, font: 13.5, chevron: true },
 };
 
 function PremiumTile({ icon, label, onClick, cfg, accent }) {

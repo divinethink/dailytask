@@ -46,10 +46,10 @@ export function TasbihCounter() {
 
   return React.createElement(
     "section",
-    { className: "mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 flex flex-col items-center" },
+    { className: "mb-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-2.5 flex flex-col items-center" },
     React.createElement(
       "div",
-      { className: "w-full flex items-center justify-between mb-3" },
+      { className: "w-full flex items-center justify-between mb-2" },
       React.createElement(
         "div",
         { className: "flex items-center gap-2 text-sm font-bold", style: { color: PRIMARY } },
@@ -86,8 +86,8 @@ export function TasbihCounter() {
         type: "button",
         onClick: handleTap,
         "aria-label": "তাসবীহ গণনা করুন",
-        className: "relative w-40 h-40 rounded-full flex items-center justify-center active:scale-[0.97] transition-transform select-none",
-        style: { background: "#F4F7F1", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" },
+        className: "relative rounded-full flex items-center justify-center active:scale-[0.97] transition-transform select-none",
+        style: { width: "clamp(104px, 14vh, 132px)", height: "clamp(104px, 14vh, 132px)", background: "#F4F7F1", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" },
       },
       React.createElement(
         "svg",
@@ -111,10 +111,10 @@ export function TasbihCounter() {
         { className: "relative flex flex-col items-center" },
         React.createElement(
           "span",
-          { className: "text-4xl font-bold leading-none", style: { fontFamily: "'Hind Siliguri', sans-serif", color: PRIMARY } },
+          { className: "text-3xl font-bold leading-none", style: { fontFamily: "'Hind Siliguri', sans-serif", color: PRIMARY } },
           toBn(progress)
         ),
-        React.createElement("span", { className: "text-xs text-slate-500 mt-2" }, "/ " + toBn(target)),
+        React.createElement("span", { className: "text-xs text-slate-500 mt-1" }, "/ " + toBn(target)),
         React.createElement(
           "span",
           { className: "text-[11px] mt-1 font-semibold", style: { color: roundDone ? "#C89B3C" : "#8A9A8F" } },
@@ -124,7 +124,7 @@ export function TasbihCounter() {
     ),
     React.createElement(
       "div",
-      { className: "w-full flex bg-[#F4F7F1] rounded-full p-1 mt-3" },
+      { className: "w-full flex bg-[#F4F7F1] rounded-full p-1 mt-2" },
       TASBIH_TARGET_OPTIONS.map((t) =>
         React.createElement(
           "button",
