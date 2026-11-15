@@ -36,8 +36,7 @@ import { QurbaniGuide } from "./QurbaniGuide.jsx";
 import { HajjGuide } from "./HajjGuide.jsx";
 import { HijriImportantDays } from "./HijriImportantDays.jsx";
 import { AmolHub } from "./AmolHub.jsx";
-import { TasbihShortcut } from "./TasbihShortcut.jsx";
-import { ToolIcon } from "./ToolIcons.jsx";
+import { TasbihCounter } from "./TasbihCounter.jsx";
 
 const { useState } = React;
 
@@ -135,9 +134,9 @@ const CATEGORIES = [
 // বের করে সরাসরি front-এ আনা হয়েছে। বাকি ৪টা ক্যাটাগরি + কুইজ/ব্লগ একই
 // সারিতে, একটাই ToolGridSection দিয়ে(কোনো section-title ছাড়া, flat)।
 const FRONT_ITEMS = [
+  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দু'আ" },
   { kind: "tool", key: "qibla", icon: "compass", label: "কিবলা" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
-  { kind: "tool", key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল" },
   { kind: "category", id: "quran", icon: "bookmarkCheck", label: "কুরআন" },
   { kind: "category", id: "toolsTracking", icon: "calculator", label: "ইসলামি টুলস ও ট্র্যাকিং" },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
@@ -252,34 +251,15 @@ export function PublicToolsShell({ tabLayout } = {}) {
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
-    // ধাপ ২: সবার ওপরে তাসবীহ-শর্টকাট, তারপর "আমল ও দু'আ" বড় টাইল(দুটোই স্থির, কাস্টমাইজের তালিকার বাইরে), তারপর আগের ৮ টাইল।
-    /*#__PURE__*/React.createElement(TasbihShortcut, null),
-    /*#__PURE__*/React.createElement(
-      "button",
-      {
-        type: "button",
-        onClick: () => setView({ amol: true }),
-        className: "mb-3 flex w-full items-center gap-3 rounded-[20px] border bg-white p-3 text-left active:scale-[0.99] transition-transform",
-        style: { borderColor: "#E4D3A8", boxShadow: "0 3px 12px -3px rgba(160,120,40,0.25)" }
-      },
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "flex h-14 w-14 shrink-0 items-center justify-center rounded-full", style: { background: "var(--theme-tint, #E3EEEA)", boxShadow: "inset 0 0 0 1px var(--theme-line, #D3E3DD)" } },
-        /*#__PURE__*/React.createElement(ToolIcon, { name: "hands", size: 26, color: "var(--theme-primary, #0E4B43)" })
-      ),
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "min-w-0 flex-1" },
-        /*#__PURE__*/React.createElement("div", { className: "text-base font-bold", style: { color: "var(--theme-primary, #0E4B43)" } }, "আমল ও দু'আ"),
-        /*#__PURE__*/React.createElement("div", { className: "text-xs text-slate-500" }, "সকাল-সন্ধ্যা · সারাদিন · যিকির · দু'আ · দোয়া কবুলের সময় · মৃত্যুর স্মরণ")
-      ),
-      /*#__PURE__*/React.createElement(ChevronLeft, { size: 16, className: "rotate-180", color: "#C89B3C" })
-    ),
+    // ওপরে আয়াত-কার্ড, তারপর ৮ টাইলের গ্রিড (প্রথমে "সকল আমল ও দু'আ"), সবার নিচে তাসবীহ।
+    /*#__PURE__*/React.createElement("div", { className: "mb-3" }, /*#__PURE__*/React.createElement(VerseCard, { text: "“আল্লাহর স্মরণেই হৃদয় প্রশান্ত হয়।”", source: "— সূরা আর-রা'দ ১৩:২৮" })),
     /*#__PURE__*/React.createElement(ToolGridSection, {
       variant: "hero",
       items: visibleIds("tools", tabLayout).map((id) => FRONT_ITEMS.find((i) => (i.key || i.id) === id)).filter(Boolean),
       onSelect: (item) => {
-        if (item.kind === "category") {
+        if (item.kind === "amol") {
+          setView({ amol: true });
+        } else if (item.kind === "category") {
           setView({ category: CATEGORIES.find((c) => c.id === item.id) });
         } else if (item.kind === "tool") {
           setView({ tool: item });
@@ -288,6 +268,6 @@ export function PublicToolsShell({ tabLayout } = {}) {
         }
       },
     }),
-    /*#__PURE__*/React.createElement(VerseCard, { text: "“আল্লাহর স্মরণেই হৃদয় প্রশান্ত হয়।”", source: "— সূরা আর-রা'দ ১৩:২৮" })
+    /*#__PURE__*/React.createElement("div", { className: "mt-3" }, /*#__PURE__*/React.createElement(TasbihCounter, null))
   );
 }

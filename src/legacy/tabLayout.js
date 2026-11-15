@@ -17,15 +17,15 @@ export const TAB_DEFS = {
       { id: "dua", title: "দু'আ" },
       { id: "duaAcceptance", title: "দোয়া কবুলের সময়" },
       { id: "deathReminder", title: "মৃত্যুর স্মরণ" },
-      { id: "tasbih", title: "তাসবীহ কাউন্টার" }
+      { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" }
     ]
   },
   tools: {
     title: "সহায়িকা",
     defs: [
+      { id: "amol", title: "সকল আমল ও দু'আ" },
       { id: "qibla", title: "কিবলা" },
       { id: "salah", title: "সালাত ও পবিত্রতা" },
-      { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "quran", title: "কুরআন" },
       { id: "toolsTracking", title: "ইসলামি টুলস ও ট্র্যাকিং" },
       { id: "specialDays", title: "বিশেষ দিন ও উপলক্ষ" },

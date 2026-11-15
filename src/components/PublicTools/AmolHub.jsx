@@ -8,7 +8,9 @@
 // React global(window.React, globals.js)।
 
 import { ToolGridSection, PageHeader } from "./ToolGrid.jsx";
-import { TasbihCounter } from "./TasbihCounter.jsx";
+import { JumuahAmol } from "./JumuahAmol.jsx";
+import { SubScreenHeader } from "./SubScreenHeader.jsx";
+import { ReaderTitleContext } from "./readerContext.js";
 import { MorningEveningAzkar } from "./MorningEveningAzkar.jsx";
 import { FullDayAmol } from "./FullDayAmol.jsx";
 import { DhikrCountGuide } from "./DhikrCountGuide.jsx";
@@ -21,6 +23,16 @@ import { ChevronLeft } from "../icons.jsx";
 
 const { useState } = React;
 
+// জুমার দিনের বিশেষ আমল (সহায়িকার সামনের গ্রিড থেকে এখানে এসেছে): হাবের অন্য আইটেমের মতো নিজের হেডারসহ।
+function JumuahAmolScreen({ onBack }) {
+  return /*#__PURE__*/React.createElement(
+    "div",
+    { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
+    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "জুমার দিনের বিশেষ আমল" }),
+    /*#__PURE__*/React.createElement("div", { className: "px-4" }, /*#__PURE__*/React.createElement(JumuahAmol, null))
+  );
+}
+
 const HUB_ITEMS = [
   { key: "azkar", icon: "sun", label: "সকাল-সন্ধ্যার আমল", Component: MorningEveningAzkar },
   { key: "fullDayAmol", icon: "dayNight", label: "সারাদিনের আমল", Component: FullDayAmol },
@@ -28,6 +40,7 @@ const HUB_ITEMS = [
   { key: "dua", icon: "dua", label: "দু'আ", Component: DuaSection },
   { key: "duaAcceptance", icon: "alarm", label: "দোয়া কবুলের সময়", Component: DuaAcceptanceCard },
   { key: "deathReminder", icon: "hourglass", label: "মৃত্যুর স্মরণ", Component: DeathReminderCard },
+  { key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল", Component: JumuahAmolScreen },
 ];
 
 // onBack(ঐচ্ছিক, ধাপ ২): সহায়িকার ভেতর থেকে খুললে ওপরে "‹ সহায়িকা" ফেরার বোতাম দেখায়।
@@ -37,33 +50,23 @@ export function AmolHub({ tabLayout, onBack } = {}) {
 
   if (activeItem) {
     const item = HUB_ITEMS.find((i) => i.key === activeItem);
-    return /*#__PURE__*/React.createElement(item.Component, { onBack: () => setActiveItem(null) });
+    return /*#__PURE__*/React.createElement(
+      ReaderTitleContext.Provider,
+      { value: item.label },
+      /*#__PURE__*/React.createElement(item.Component, { onBack: () => setActiveItem(null) })
+    );
   }
 
-  // ক্রম+লুকানো(owner-approved ২ নভেম্বর ২০২৬, member.tabLayout): পরপর টাইলগুলো একটা গ্রিডে, তাসবীহ নিজের জায়গায়।
-  // ডিফল্ট = ৬ টাইল গ্রিডে, তারপর তাসবীহ(আগের আচরণ হুবহু)।
-  const blocks = [];
-  let run = [];
-  const flush = () => {
-    if (!run.length) return;
-    blocks.push(/*#__PURE__*/React.createElement(ToolGridSection, {
-      key: "grid" + blocks.length,
+  // ক্রম+লুকানো(member/app_design tabLayout): সব টাইল একটা গ্রিডে। তাসবীহ এখান থেকে সহায়িকার সামনের পাতায় গেছে।
+  const items = visibleIds("amol", tabLayout).map((id) => HUB_ITEMS.find((i) => i.key === id)).filter(Boolean);
+  const blocks = [
+    /*#__PURE__*/React.createElement(ToolGridSection, {
+      key: "grid",
       variant: "compact3",
-      items: run,
+      items,
       onSelect: (item) => setActiveItem(item.key),
-    }));
-    run = [];
-  };
-  visibleIds("amol", tabLayout).forEach((id) => {
-    if (id === "tasbih") {
-      flush();
-      blocks.push(/*#__PURE__*/React.createElement(TasbihCounter, { key: "tasbih" }));
-    } else {
-      const it = HUB_ITEMS.find((i) => i.key === id);
-      if (it) run.push(it);
-    }
-  });
-  flush();
+    }),
+  ];
 
   return /*#__PURE__*/React.createElement(
     "div",
@@ -74,7 +77,7 @@ export function AmolHub({ tabLayout, onBack } = {}) {
       /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
       "সহায়িকা"
     ),
-    /*#__PURE__*/React.createElement(PageHeader, { title: "আমল ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
+    /*#__PURE__*/React.createElement(PageHeader, { title: "সকল আমল ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
     ...blocks
   );
 }

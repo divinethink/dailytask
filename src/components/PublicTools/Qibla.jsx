@@ -81,6 +81,22 @@ export function Qibla() {
     return () => window.removeEventListener(eventName, handleOrientation, true);
   }, [compassActive]);
 
+  // সরাসরি লাইভ কিবলা (owner-request ১৫ নভেম্বর ২০২৬): যেসব ডিভাইসে অনুমতির ধাপ নেই(Android Chrome ইত্যাদি)
+  // সেখানে পাতা খুললেই কম্পাস চালু। iOS 13+-এ requestPermission বাটন-ট্যাপ ছাড়া চলে না(ব্রাউজারের
+  // নিয়ম), তাই শুধু সেখানে বাটন থাকে। সেন্সর সাড়া না দিলে ৪ সেকেন্ড পরে স্থির কোণে ফেরে।
+  useEffect(() => {
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission !== "function") setCompassActive(true);
+  }, []);
+  useEffect(() => {
+    if (!compassActive || heading != null) return undefined;
+    const tm = setTimeout(() => {
+      setCompassActive(false);
+      setCompassError("সেন্সর থেকে দিক পাওয়া যায়নি — নিচের স্থির কোণ ব্যবহার করুন");
+    }, 4000);
+    return () => clearTimeout(tm);
+  }, [compassActive, heading]);
+
   function requestCompassAccess() {
     setCompassError(null);
     const DOE = window.DeviceOrientationEvent;

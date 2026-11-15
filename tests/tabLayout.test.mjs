@@ -46,5 +46,19 @@ test("আইডি-সামঞ্জস্য: TAB_DEFS ও আসল UI-এর
   const amol = readFileSync(new URL("../src/components/PublicTools/AmolHub.jsx", import.meta.url), "utf8");
   const hub = amol.slice(amol.indexOf("const HUB_ITEMS"), amol.indexOf("export function AmolHub"));
   const hubIds = [...hub.matchAll(/\{ key: "(\w+)"/g)].map(m => m[1]);
-  assert.deepEqual([...hubIds, "tasbih"].sort(), [...defaultOrder("amol")].sort());
+  assert.deepEqual([...hubIds].sort(), [...defaultOrder("amol")].sort());
+});
+
+test("সহায়িকা পুনর্বিন্যাস: সকল-আমল প্রথম টাইল, জুমা আমল হাবে, তাসবীহ কাস্টমাইজ-তালিকায় নেই, পুনরাবৃত্তি নেই", () => {
+  assert.equal(defaultOrder("tools")[0], "amol");
+  assert.ok(!defaultOrder("tools").includes("jumuahAmol"));
+  assert.ok(defaultOrder("amol").includes("jumuahAmol"));
+  assert.ok(!defaultOrder("amol").includes("tasbih"));
+  const all = [...defaultOrder("tools"), ...defaultOrder("amol")];
+  assert.equal(new Set(all).size, all.length);
+  // পুরনো সেভ-করা লেআউট: বাদ-পড়া id (tasbih/jumuahAmol) ঝেড়ে ফেলে, নতুন id শেষে যুক্ত
+  assert.ok(!sanitizeOrder("amol", ["tasbih", "dua"]).includes("tasbih"));
+  assert.equal(sanitizeOrder("amol", ["dua"]).includes("jumuahAmol"), true);
+  assert.equal(sanitizeOrder("tools", ["quiz", "jumuahAmol"]).includes("jumuahAmol"), false);
+  assert.equal(sanitizeOrder("tools", ["quiz"]).includes("amol"), true);
 });
