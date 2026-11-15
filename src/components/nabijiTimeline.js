@@ -10,11 +10,11 @@ export const MAX_ITEMS = 12;
 export const LIMITS = { icon: 8, title: 60, text: 500, src: 120 };
 // বুলেটের ধরন(ঐচ্ছিক): কার্ডে ছোট লেবেল হয়ে দেখা যায়; অচেনা/খালি মান = লেবেল নেই।
 export const CATS = {
-  ibadat: { label: "ইবাদত", cls: "bg-emerald-100 text-emerald-800" },
-  family: { label: "পরিবার", cls: "bg-rose-100 text-rose-800" },
-  society: { label: "সমাজ", cls: "bg-sky-100 text-sky-800" },
-  work: { label: "কর্ম", cls: "bg-amber-100 text-amber-800" },
-  learn: { label: "শিক্ষা", cls: "bg-indigo-100 text-indigo-800" },
+  ibadat: { label: "ইবাদত", cls: "bg-emerald-50 text-emerald-800" },
+  family: { label: "পরিবার", cls: "bg-emerald-50 text-emerald-800" },
+  society: { label: "সমাজ", cls: "bg-emerald-50 text-emerald-800" },
+  work: { label: "কর্ম", cls: "bg-emerald-50 text-emerald-800" },
+  learn: { label: "শিক্ষা", cls: "bg-emerald-50 text-emerald-800" },
 };
 
 export const DEFAULT_SLOTS = [

@@ -14,22 +14,16 @@ import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
 import { EditIcon, ChevronDown } from "./icons.jsx";
 
 const PREVIEW = 3;
-// সময়ভাগ অনুযায়ী রঙের থিম: কার্ডের বর্ডার + চারপাশের রঙিন আভা(glow) + চিপ/আইকন/লেবেল। একটাই কার্ড, ভেতরে আলাদা প্যানেল নেই।
-// ভোর=অ্যাম্বার-গোলাপি, দিন=সবুজ/আকাশি, সন্ধ্যা=কমলা-গোলাপি, রাত=নীল। অচেনা/ক্রিয়েটরের নতুন সময়ভাগ = সবুজ।
-const T = (card, glow, chipOn, chipOff, o) => Object.assign({ card, glow, chipOn, chipOff, txt: "text-slate-800", src: "text-slate-500", dot: "bg-slate-300", title: "text-slate-900", time: "bg-white/80 text-[#8A6A1C]", icon: "bg-white shadow-sm", link: "text-slate-700", edit: "text-slate-700" }, o || {});
-const THEMES = {
-  s_lastNight: T("from-indigo-100 via-indigo-50 to-white border-indigo-400", "shadow-[0_3px_12px_-3px_rgba(99,102,241,0.3)]", "from-indigo-800 to-slate-900", "bg-indigo-50 border-indigo-200 text-indigo-900", { src: "text-indigo-800/70", dot: "bg-indigo-400", title: "text-indigo-950", link: "text-indigo-900", time: "bg-indigo-100 text-indigo-900", icon: "bg-indigo-100", edit: "text-indigo-900" }),
-  s_fajr: T("from-amber-50 to-white border-amber-300", "shadow-[0_3px_12px_-3px_rgba(251,146,60,0.3)]", "from-amber-500 to-rose-400", "bg-amber-50 border-amber-200 text-amber-900", { src: "text-amber-800/80", dot: "bg-amber-400", title: "text-amber-950", link: "text-amber-900", time: "bg-amber-100 text-amber-900", icon: "bg-amber-100", edit: "text-amber-900" }),
-  s_duha: T("from-yellow-50 to-white border-yellow-300", "shadow-[0_3px_12px_-3px_rgba(250,204,21,0.3)]", "from-yellow-500 to-amber-500", "bg-yellow-50 border-yellow-200 text-yellow-900", { src: "text-yellow-800/80", dot: "bg-yellow-400", title: "text-yellow-950", link: "text-yellow-900", time: "bg-yellow-100 text-yellow-900", icon: "bg-yellow-100", edit: "text-yellow-900" }),
-  s_work: T("from-emerald-50 to-white border-emerald-300", "shadow-[0_3px_12px_-3px_rgba(16,185,129,0.3)]", "from-emerald-600 to-teal-600", "bg-emerald-50 border-emerald-200 text-emerald-900", { src: "text-emerald-800/80", dot: "bg-emerald-400", title: "text-emerald-950", link: "text-emerald-900", time: "bg-emerald-100 text-emerald-900", icon: "bg-emerald-100", edit: "text-emerald-900" }),
-  s_afternoon: T("from-sky-50 to-white border-sky-300", "shadow-[0_3px_12px_-3px_rgba(14,165,233,0.3)]", "from-sky-500 to-cyan-600", "bg-sky-50 border-sky-200 text-sky-900", { src: "text-sky-800/80", dot: "bg-sky-400", title: "text-sky-950", link: "text-sky-900", time: "bg-sky-100 text-sky-900", icon: "bg-sky-100", edit: "text-sky-900" }),
-  s_asr: T("from-orange-50 to-white border-orange-300", "shadow-[0_3px_12px_-3px_rgba(249,115,22,0.3)]", "from-orange-500 to-amber-500", "bg-orange-50 border-orange-200 text-orange-900", { src: "text-orange-800/80", dot: "bg-orange-400", title: "text-orange-950", link: "text-orange-900", time: "bg-orange-100 text-orange-900", icon: "bg-orange-100", edit: "text-orange-900" }),
-  s_maghrib: T("from-rose-50 to-white border-rose-300", "shadow-[0_3px_12px_-3px_rgba(244,63,94,0.3)]", "from-orange-500 to-rose-500", "bg-rose-50 border-rose-200 text-rose-900", { src: "text-rose-900/70", dot: "bg-rose-400", title: "text-rose-950", link: "text-rose-900", time: "bg-rose-100 text-rose-900", icon: "bg-rose-100", edit: "text-rose-900" }),
-  s_isha: T("from-indigo-100 via-indigo-50 to-white border-indigo-400", "shadow-[0_3px_12px_-3px_rgba(79,70,229,0.3)]", "from-indigo-600 to-indigo-800", "bg-indigo-50 border-indigo-200 text-indigo-900", { src: "text-indigo-800/70", dot: "bg-indigo-400", title: "text-indigo-950", link: "text-indigo-900", time: "bg-indigo-100 text-indigo-900", icon: "bg-indigo-100", edit: "text-indigo-900" }),
-  s_sleep: T("from-violet-100 via-indigo-50 to-white border-violet-400", "shadow-[0_3px_12px_-3px_rgba(139,92,246,0.3)]", "from-violet-700 to-indigo-900", "bg-violet-50 border-violet-200 text-violet-900", { src: "text-violet-800/70", dot: "bg-violet-400", title: "text-violet-950", link: "text-violet-900", time: "bg-violet-100 text-violet-900", icon: "bg-violet-100", edit: "text-violet-900" }),
+// শান্ত একরঙা থিম (owner-approved ১৫ নভেম্বর ২০২৬): সব সময়ভাগে একই হালকা রং — অ্যাপের থিম-কালারের emerald স্কেল অনুসারে বদলায়।
+// আইকন (emoji) হালকা/ধূসরাভ করা (grayscale+opacity), যাতে কার্ড চোখে না লাগে। অচেনা/ক্রিয়েটরের নতুন সময়ভাগও একই।
+const CALM = {
+  card: "from-emerald-50/50 to-white border-emerald-100", glow: "shadow-sm",
+  chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-slate-200 text-slate-600",
+  txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-300", title: "text-slate-900",
+  time: "bg-emerald-50 text-emerald-800", icon: "bg-emerald-50", link: "text-emerald-800", edit: "text-slate-600"
 };
-const THEME_DEFAULT = T("from-emerald-50 to-white border-emerald-300", "shadow-[0_3px_12px_-3px_rgba(16,185,129,0.3)]", "from-emerald-600 to-teal-600", "bg-emerald-50 border-emerald-200 text-emerald-900", { src: "text-emerald-800/80", dot: "bg-emerald-400", title: "text-emerald-950", link: "text-emerald-900", time: "bg-emerald-100 text-emerald-900", icon: "bg-emerald-100", edit: "text-emerald-900" });
-const themeOf = (id) => THEMES[id] || THEME_DEFAULT;
+const ICON_SOFT = " grayscale opacity-70";
+const themeOf = () => CALM;
 const NEUTRAL = { txt: "text-slate-700", src: "text-slate-500", dot: "bg-slate-300" };
 // বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
 function groupItems(items) {
@@ -86,7 +80,7 @@ function Bullets({ items, th = NEUTRAL }) {
 function NowBadge({ exact }) {
   return React.createElement(
     "span",
-    { className: "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap " + (exact ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-800") },
+    { className: "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap " + (exact ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600") },
     exact ? "এখন" : "পরের সময়"
   );
 }
@@ -185,7 +179,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
             "data-sel": active ? "1" : undefined,
             className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff),
           },
-          React.createElement("span", { "aria-hidden": true }, s.icon),
+          React.createElement("span", { "aria-hidden": true, className: active ? "" : ICON_SOFT.trim() }, s.icon),
           s.title,
           now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
         );
@@ -199,7 +193,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
       React.createElement(
         "div",
         { className: "flex items-center gap-2.5 min-w-0" },
-        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, slot.icon),
+        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon + ICON_SOFT, "aria-hidden": true }, slot.icon),
         React.createElement(
           "div",
           { className: "min-w-0" },
