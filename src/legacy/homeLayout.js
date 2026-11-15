@@ -36,7 +36,6 @@ export const CARD_DEFS = {
     d("tomorrow", "আগামীকাল", "fixed"),
     d("weekPulse", "এ সপ্তাহের ফোকাস", "fixed"),
     d("weekly", "সাপ্তাহিক মুহাসাবা", "open"),
-    d("weeklyGaps", "সাপ্তাহিক ঘাটতির চিত্র", "open"),
     d("monthlyReport", "মাসিক মুহাসাবা রিপোর্ট", "open"),
     d("trend", "তিন মাসের চিত্র", "open"),
     d("meeting", "মাসিক পারিবারিক সভা ও সিদ্ধান্ত", "closed")

@@ -8,7 +8,7 @@ import { loadReview } from "../legacy/reviewData.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { weeklyGap } from "../legacy/reviewCalc.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
-import { buildWeekPulse, lineKind, pickVariant, clip } from "../legacy/weekPulse.js";
+import { buildWeekPulse, lineKind, pickVariant, gapRepeat, clip } from "../legacy/weekPulse.js";
 import { fill } from "../legacy/reviewMonthly.js";
 import { pad2 } from "../legacy/appHelpers.js";
 
@@ -38,16 +38,17 @@ export function WeeklyPulseCard({ migrationState, memberId, member, locked, live
   const canRead = !locked && !!memberId && migrationState === "v2";
 
   // পরিকল্পনা: গত সপ্তাহের মুহাসাবা (লক্ষ্য/ঘাটতি/যদি-তাহলে) + এ সপ্তাহেরটা সম্পন্ন কিনা। পড়া ব্যর্থ হলে null।
-  const [plan, setPlan] = useState({ key: "", prev: null, cur: null });
+  const [plan, setPlan] = useState({ key: "", prevs: [], cur: null });
   const planKey = memberId + "|" + weekKey;
   useEffect(() => {
     if (!canRead) return undefined;
     let alive = true;
-    const p = prevChunk(cw.year, cw.month0, cw.week);
-    Promise.all([
-      loadReview(migrationState, memberId, chunkWeekKey(p.year, p.month0, p.week)).catch(() => null),
-      loadReview(migrationState, memberId, weekKey).catch(() => null)
-    ]).then(([prev, cur]) => { if (alive) setPlan({ key: planKey, prev, cur }); });
+    // গত ৩ সপ্তাহ (বারবার আসা ঘাটতি দেখতে) + এ সপ্তাহ; প্রতিটা id ধরে get, ব্যর্থ হলে null
+    const keys = [];
+    let p = { year: cw.year, month0: cw.month0, week: cw.week };
+    for (let i = 0; i < 3; i++) { p = prevChunk(p.year, p.month0, p.week); keys.push(chunkWeekKey(p.year, p.month0, p.week)); }
+    Promise.all([...keys, weekKey].map(k => loadReview(migrationState, memberId, k).catch(() => null)))
+      .then(rows => { if (alive) setPlan({ key: planKey, prevs: rows.slice(0, 3), cur: rows[3] }); });
     return () => { alive = false; };
   }, [canRead, migrationState, planKey]);
 
@@ -77,7 +78,7 @@ export function WeeklyPulseCard({ migrationState, memberId, member, locked, live
   };
 
   const planOk = plan.key === planKey;
-  const prev = planOk ? plan.prev : null;
+  const prev = planOk ? plan.prevs[0] : null;
   const reviewDone = !!(planOk && plan.cur && plan.cur.done);
   const applies = f => !!f.key && fieldApplies(f, member);
   const days = dates.map(d => ({ day: d, entry: entryOf(d) }));
@@ -105,6 +106,8 @@ export function WeeklyPulseCard({ migrationState, memberId, member, locked, live
   }, [focusField && focusField.key, todayIdx, liveEntries, others, member, tick]);
 
   if (locked) return null; // সব hook-এর পরে
+  const repeat = planned && planOk ? gapRepeat(plan.prevs, planned.key) : { weeks: 0, reason: "" };
+  const reasonText = (REVIEW_TEXT.gap.reasons.find(x => x.id === repeat.reason) || {}).t || "";
   const goal = prev && prev.nextGoal ? prev.nextGoal : "";
   if (!goal && !pulse) return null;
 
@@ -133,6 +136,11 @@ export function WeeklyPulseCard({ migrationState, memberId, member, locked, live
             <b>{fill(planned ? T.focusLine : T.fallbackLine, { focus: name })}</b>
             {pulse.counted > 0 && <span> · {fill(T.progress, { counted: toBn(pulse.counted), full: toBn(pulse.full) })}</span>}
           </div>
+          {repeat.weeks >= 2 && (
+            <p className="text-xs rounded-lg p-2 mb-2" style={{ background: "#FFF6EC", color: "#7C3A10" }}>
+              {fill(T.repeatLine, { n: toBn(repeat.weeks) })}{reasonText ? " " + fill(T.reasonLine, { reason: reasonText }) + "।" : ""}
+            </p>
+          )}
           <div className="grid grid-cols-7 gap-1.5" role="img" aria-label={T.title}>
             {pulse.cells.map((c, i) => (
               <div key={i} className="text-center">

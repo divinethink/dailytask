@@ -65,9 +65,23 @@ function pickVariant(n, weekKey, idx) {
   return (h + idx) % n;
 }
 
+// reviews: নতুন→পুরনো ক্রমে [গত সপ্তাহ, তার আগের, …] (না থাকলে null); key = ফোকাস আমল।
+// টানা কত সপ্তাহ একই আমল ঘাটতি ছিল + সবচেয়ে বেশি আসা কারণ (২+ সপ্তাহে অন্তত ২ বার)।
+function gapRepeat(reviews, key) {
+  let weeks = 0;
+  const tally = {};
+  for (const r of reviews || []) {
+    if (!r || !key || r.gapKey !== key) break;
+    weeks += 1;
+    for (const id of Array.isArray(r.gapReasons) ? r.gapReasons : []) tally[id] = (tally[id] || 0) + 1;
+  }
+  const top = Object.entries(tally).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];
+  return { weeks, reason: top && (weeks === 1 || top[1] >= 2) ? top[0] : "" };
+}
+
 function clip(s, n) {
   const t = String(s || "").trim();
   return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
 }
 
-export { PHASES, phaseOf, cellState, buildWeekPulse, lineKind, pickVariant, clip };
+export { PHASES, phaseOf, cellState, buildWeekPulse, lineKind, pickVariant, gapRepeat, clip };

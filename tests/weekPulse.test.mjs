@@ -1,7 +1,7 @@
 // চালান: node --test tests/
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWeekPulse, lineKind, pickVariant, phaseOf, clip } from "../src/legacy/weekPulse.js";
+import { buildWeekPulse, lineKind, pickVariant, phaseOf, gapRepeat, clip } from "../src/legacy/weekPulse.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 import { sanitizeCards, defaultCards } from "../src/legacy/homeLayout.js";
 
@@ -83,4 +83,23 @@ test("weekPulse কার্ড: পুরনো সেভ-করা লেআ�
   const out = sanitizeCards("below", saved).map(c => c.id);
   assert.equal(out.indexOf("weekPulse") + 1, out.indexOf("weekly"));
   assert.equal(defaultCards("below").find(c => c.id === "weekPulse").fold, "fixed");
+});
+
+test("gapRepeat: টানা সপ্তাহ ও প্রধান কারণ", () => {
+  const r = (gapKey, gapReasons) => ({ gapKey, gapReasons });
+  const a = gapRepeat([r("dawah", ["company"]), r("dawah", ["company", "lazy"]), r("quran", [])], "dawah");
+  assert.equal(a.weeks, 2); assert.equal(a.reason, "company");
+  assert.equal(gapRepeat([r("dawah", ["lazy"]), r("dawah", ["tired"])], "dawah").reason, "");
+  assert.equal(gapRepeat([r("dawah", ["lazy"])], "dawah").reason, "lazy");
+  assert.equal(gapRepeat([null, r("dawah", [])], "dawah").weeks, 0);
+  assert.equal(gapRepeat([r("quran", [])], "dawah").weeks, 0);
+  assert.equal(gapRepeat(null, "dawah").weeks, 0);
+  assert.equal(gapRepeat([r("dawah", "x")], "dawah").weeks, 1);
+});
+
+test("ঘাটতি কার্ড মোছা: পুরনো সেভ-করা লেআউটে weeklyGaps থাকলে বাদ যায়, বাকি অক্ষত", () => {
+  const saved = [{ id: "weekly", visible: true, fold: "open" }, { id: "weeklyGaps", visible: true, fold: "open" }, { id: "trend", visible: false, fold: "closed" }];
+  const out = sanitizeCards("below", saved);
+  assert.ok(!out.some(c => c.id === "weeklyGaps"));
+  assert.equal(out.find(c => c.id === "trend").visible, false);
 });
