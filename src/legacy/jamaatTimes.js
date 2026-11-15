@@ -1,6 +1,6 @@
 // jamaatTimes.js — "সময়সূচি" ট্যাবের "মসজিদের জামায়াত" কার্ডের pure logic + per-device localStorage।
 // কোনো Firestore/Rules/schema নেই; React/DOM নেই। (Dev Rule: lib purity)
-// জামায়াতের সময় দুই উপায়ে: "auto" = (ওয়াক্ত-শুরু | সূর্যোদয় | সূর্যাস্ত) ± N মিনিট, "fixed" = হাতে বসানো সময়(HH:MM, ২৪-ঘণ্টা)।
+// জামায়াতের সময় দুই উপায়ে: "auto" = (ওয়াক্ত-শুরু | সূর্যোদয় | সূর্যাস্ত) ± N মিনিট, "fixed" = হাতে বসানো সময় (HH:MM, ২৪-ঘণ্টা)।
 // হিসাবে না মিললে Owner যেকোনো ওয়াক্ত "fixed" করে সরাসরি ঠিক করতে পারেন।
 
 export const JAMAAT_KEY = "dt_pt_jamaat";
@@ -9,7 +9,7 @@ export const JAMAAT_LABEL = { fajr: "ফজর", dhuhr: "যোহর", asr: "�
 export const BASES = { start: "ওয়াক্ত শুরু", sunrise: "সূর্যোদয়", sunset: "সূর্যাস্ত" };
 const STALE_DAYS = 35; // মসজিদ সাধারণত ঋতুতে/মাসে সময় বদলায় — এর বেশি পুরনো হলে মিলিয়ে নিতে বলা হয়
 
-// Edit-ফর্মের শুরুর পরামর্শ(বাইতুল আমান জামে মসজিদ বোর্ড, ২ নভেম্বর ২০২৬ থেকে)। সংরক্ষণের আগে কিছুই সেভ হয় না।
+// Edit-ফর্মের শুরুর পরামর্শ (বাইতুল আমান জামে মসজিদ বোর্ড, ২ নভেম্বর ২০২৬ থেকে)। সংরক্ষণের আগে কিছুই সেভ হয় না।
 export const SUGGESTED = {
   rules: {
     fajr: { mode: "auto", base: "sunrise", offset: -25, fixed: "05:40" },
@@ -137,7 +137,7 @@ export function resolveJamaat(cfg, schedule, day) {
   });
 }
 
-// এখনের পরের প্রথম জামায়াত(আজকের মধ্যে); না থাকলে null।
+// এখনের পরের প্রথম জামায়াত (আজকের মধ্যে); না থাকলে null।
 export function nextJamaatKey(rows, now) {
   const r = rows.find((x) => x.time > now);
   return r ? r.key : null;

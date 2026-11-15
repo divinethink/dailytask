@@ -1,7 +1,7 @@
-// publicToolsTasbih.js — তাসবীহ কাউন্টার, Phase A item ৩(3_1_Public_Tools_Roadmap.md)।
-// Pure per-device localStorage — শুধু ঐচ্ছিক target সংরক্ষণ করে(3_2 §৩:
+// publicToolsTasbih.js — তাসবীহ কাউন্টার, Phase A item ৩ (3_1_Public_Tools_Roadmap.md)।
+// Pure per-device localStorage — শুধু ঐচ্ছিক target সংরক্ষণ করে (3_2 §৩:
 // "তাসবীহ target(ঐচ্ছিক, counter-এর নিজস্ব সেটিং, checklist না)")। চলমান
-// গণনা(running count) সংরক্ষিত হয় না(3_2 §৩-এর storage-table-এ শুধু target-key
+// গণনা (running count) সংরক্ষিত হয় না (3_2 §৩-এর storage-table-এ শুধু target-key
 // আছে) — tab reload/session-শেষে ০-তে ফিরে আসাই ইচ্ছাকৃত ডিজাইন।
 // data/ layer convention(Dev Rule ২): এই ফাইলে কোনো UI/JSX নেই।
 

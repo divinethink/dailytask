@@ -1,13 +1,13 @@
 // publicToolsGeocode.js — "সময়সূচি" ট্যাব, এলাকা/উপজেলা/জেলা-ভিত্তিক accurate
 // location search। data/ layer(Dev Rule ২): external call এই ফাইলেই সীমাবদ্ধ।
 //
-// §Architecture-নোট(১৮ সেপ্টেম্বর ২০২৬, owner-instruction): division-level
-// হার্ডকোডেড ৮-শহর লিস্ট(publicToolsSettings.js: MANUAL_LOCATIONS) উপজেলা/
-// এলাকা-স্তরের accuracy দিতে পারছিল না(owner: "জেলা, উপজেলা, এলাকা সব লাগবে,
+// §Architecture-নোট (১৮ সেপ্টেম্বর ২০২৬, owner-instruction): division-level
+// হার্ডকোডেড ৮-শহর লিস্ট (publicToolsSettings.js: MANUAL_LOCATIONS) উপজেলা/
+// এলাকা-স্তরের accuracy দিতে পারছিল না (owner: "জেলা, উপজেলা, এলাকা সব লাগবে,
 // নতুবা একুরেট সময় দেখাবে না") — ৬৪ জেলা+৪৯৫ উপজেলা+অগণিত এলাকা হার্ডকোড করা
 // অবাস্তব ও ভুল-প্রবণ। তাই নতুন external dependency হিসেবে Nominatim(OpenStreetMap)
 // free, no-API-key geocoding endpoint যোগ করা হলো — এটা Aladhan ছাড়া প্রথম নতুন
-// external service, তাই এখানে explicitly flag রাখা হলো(Dev Rule ২: unrelated
+// external service, তাই এখানে explicitly flag রাখা হলো (Dev Rule ২: unrelated
 // external service অনুমতি ছাড়া যোগ করা যাবে না — এই ক্ষেত্রে owner নিজেই
 // accuracy-সমস্যা রিপোর্ট করে সমাধান চেয়েছেন, তাই সরাসরি সমাধানযোগ্য বলে যোগ
 // করা হলো, কিন্তু owner review-এর জন্য এই নোট রাখা আবশ্যক)।
@@ -15,7 +15,7 @@ const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
 const NOMINATIM_REVERSE_BASE = "https://nominatim.openstreetmap.org/reverse";
 
 // display_name সাধারণত "এলাকা, উপজেলা, জেলা, বিভাগ, বাংলাদেশ" ফরম্যাটে আসে —
-// প্রথম ৩ অংশ(এলাকা/উপজেলা/জেলা) রেখে বাকি(বিভাগ/দেশ) বাদ দেওয়া হয়, UI-তে
+// প্রথম ৩ অংশ (এলাকা/উপজেলা/জেলা) রেখে বাকি (বিভাগ/দেশ) বাদ দেওয়া হয়, UI-তে
 // compact রাখতে।
 function shortenDisplayName(displayName, fallback) {
   if (!displayName) return fallback;
@@ -57,7 +57,7 @@ async function reverseGeocodeBangladesh(lat, lon) {
   return name;
 }
 
-// Nominatim ব্যর্থ/ধীর হলে fallback: বিদ্যমান জেলা-dataset থেকে নিকটতম জেলা(কোনো network লাগে না)।
+// Nominatim ব্যর্থ/ধীর হলে fallback: বিদ্যমান জেলা-dataset থেকে নিকটতম জেলা (কোনো network লাগে না)।
 async function nearestDistrictName(lat, lon) {
   const mod = await import("./bangladeshGeoData.js");
   let best = null;

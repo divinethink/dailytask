@@ -1,4 +1,4 @@
-// publicToolsSadaqa.js — সদকা লগ(3_1 Phase D item ২৮)। Pure per-device localStorage
+// publicToolsSadaqa.js — সদকা লগ (3_1 Phase D item ২৮)। Pure per-device localStorage
 // array(3_2 §৩ key: dt_pt_sadaqa_log), কোনো Firestore/family-data touch করে না।
 // data/ layer(Dev Rule ২): এই ফাইল শুধু CRUD করে, কোনো UI/JSX নেই।
 

@@ -7,7 +7,7 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc,
 import { normalizeEmail } from "./googleIdentity.js";
 import { isCreatorAuth } from "./familyIdentity.js";
 
-// §১.১ — owner-চূড়ান্ত, ১৮টা(১৬ সেপ্টেম্বর ২০২৬ সংস্করণ)
+// §১.১ — owner-চূড়ান্ত, ১৮টা (১৬ সেপ্টেম্বর ২০২৬ সংস্করণ)
 const BLOG_CATEGORIES = [
   "আকীদা",
   "কুরআন",
@@ -15,7 +15,7 @@ const BLOG_CATEGORIES = [
   "ইবাদত, আমল ও শরয়ি নির্দেশনা",
   "হালাল-হারাম",
   "আখলাক ও তাযকিয়াহ",
-  "সীরাত(নবীজি ﷺ-এর জীবনী)",
+  "সীরাত (নবীজি ﷺ-এর জীবনী)",
   "ইসলামী ইতিহাস",
   "পরকাল",
   "পরিবার, সমাজ ও সন্তান প্রতিপালন",
@@ -72,7 +72,7 @@ const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 async function addWriter(email) {
   const emailKey = normalizeEmail(email);
   if (!emailKey) throw new Error("email প্রয়োজন");
-  if (!EMAIL_FORMAT_PATTERN.test(emailKey)) throw new Error("সঠিক ইমেইল ফরম্যাট দিন(যেমন name@example.com)");
+  if (!EMAIL_FORMAT_PATTERN.test(emailKey)) throw new Error("সঠিক ইমেইল ফরম্যাট দিন (যেমন name@example.com)");
   await setDoc(doc(writersRef(), emailKey), {
     addedAt: serverTimestamp(),
     addedBy: auth.currentUser ? auth.currentUser.uid : null,
@@ -126,9 +126,9 @@ async function deletePost(postId) {
   await deleteDoc(doc(postsRef(), postId));
 }
 
-// --- ডিফল্ট পোস্ট ইম্পোর্ট(App Creator-only, লেখক-তালিকাভুক্ত হতে হবে — Rules-এ create-এ
+// --- ডিফল্ট পোস্ট ইম্পোর্ট (App Creator-only, লেখক-তালিকাভুক্ত হতে হবে — Rules-এ create-এ
 // isBlogWriter() লাগে) ---
-// Idempotent: স্থির doc-id(seed_blog_NN) — আগে থেকে থাকা(এডিট-করা সহ) পোস্ট skip হয়,
+// Idempotent: স্থির doc-id(seed_blog_NN) — আগে থেকে থাকা (এডিট-করা সহ) পোস্ট skip হয়,
 // overwrite হয় না। seed ফাইল dynamic import — main bundle-এ যায় না।
 async function importSeedPosts() {
   const user = auth.currentUser;

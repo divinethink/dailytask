@@ -18,8 +18,8 @@ export function createFamilyActions(c) {
     setTimeout(() => setCopiedCode(false), 2000);
   }
   // §Public Invite-Link(নতুন, 2_4 §৫.২, Pending #2 UI): admin বাটনে ক্লিক
-  // করলে সক্রিয় token না থাকলে(বা revoked হলে) নতুন rotate করে, নাহলে
-  // বিদ্যমান token-ই পুনরায় শেয়ার করে(unnecessary rotate এড়িয়ে link
+  // করলে সক্রিয় token না থাকলে (বা revoked হলে) নতুন rotate করে, নাহলে
+  // বিদ্যমান token-ই পুনরায় শেয়ার করে (unnecessary rotate এড়িয়ে link
   // multi-use থাকে, §৫.২ নীতি অনুযায়ী)। Link root-path query-param
   // ব্যবহার করে(§App() early-return, উপরে দ্রষ্টব্য) — কোনো নতুন Cloudflare
   // routing config লাগে না।
@@ -39,7 +39,7 @@ export function createFamilyActions(c) {
       const myUid = auth.currentUser ? auth.currentUser.uid : null;
       const myOwnMember = (members || []).find(x => x.googleUid === myUid);
       const inviterName = (myOwnMember && myOwnMember.name) || "একজন সদস্য";
-      const text = `আসসালামু আলাইকুম 🌸\nDaily Task (দৈনিক আমল ও পারিবারিক ট্র্যাকার)- App এর ${getFamilyCode()} পরিবারে যোগদানের জন্য ${inviterName} আপনাকে আমন্ত্রণ জানিয়েছেন।\nপরিবারের সদস্য হতে নিচের লিংকে ক্লিক করে প্রয়োজনীয় তথ্য পূরণ করুন এবং পরিবারের সদস্য হোন।\n\n🔗 লিংক: ${link}`;
+      const text = `আসসালামু আলাইকুম 🌸\nDaily Task (দৈনিক আমল ও পারিবারিক ট্র্যাকার) অ্যাপের ${getFamilyCode()} পরিবারে যোগ দিতে ${inviterName} আপনাকে আমন্ত্রণ জানিয়েছেন।\nনিচের লিংকে ক্লিক করে প্রয়োজনীয় তথ্য দিন এবং পরিবারের সদস্য হয়ে যান।\n\n🔗 লিংক: ${link}`;
       if (navigator.share) {
         await navigator.share({ title: "Daily Task", text });
       } else if (navigator.clipboard) {
@@ -70,24 +70,24 @@ export function createFamilyActions(c) {
     const code = newFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} অক্ষর হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
+      window.alert("অনুগ্রহ করে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন।");
       return;
     }
-    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সম্পূর্ণ নতুন, খালি একটি পরিবার তৈরি হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান পরিবারের ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
     setNewFamCodeBusy(true);
     try {
       const result = await createNewFamily(code);
       if (result && result.aborted) {
         const reasonMsg = {
-          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-          charset: "অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।",
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`,
+          charset: "অনুগ্রহ করে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন।",
           "code-taken": "এই কোড ইতিমধ্যে ব্যবহৃত হচ্ছে, অন্য একটি কোড ব্যবহার করুন।",
           error: result.error || "একটি সমস্যা হয়েছে।"
-        }[result.reason] || "নতুন ফ্যামিলি তৈরি করা যায়নি।";
+        }[result.reason] || "নতুন পরিবার তৈরি করা যায়নি।";
         window.alert(reasonMsg);
       }
       // success হলে createNewFamily নিজেই reload করে।
@@ -104,15 +104,15 @@ export function createFamilyActions(c) {
   async function handleJoinExistingFamily() {
     const code = joinFamCodeInput.trim();
     if (!code) return;
-    if (!window.confirm(`"${code}" কোড দিয়ে সেই ফ্যামিলিতে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
+    if (!window.confirm(`"${code}" কোড দিয়ে সেই পরিবারে যোগ দেওয়ার অনুরোধ পাঠানো হবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান পরিবারের ডেটা অক্ষত থাকবে, কিন্তু এই ডিভাইস থেকে আর দেখা যাবে না। এগিয়ে যাবেন?`)) return;
     setJoinFamCodeBusy(true);
     try {
       const result = await joinExistingFamily(code);
       if (result && result.aborted) {
         const reasonMsg = {
-          "same-family": "আপনি ইতিমধ্যে এই ফ্যামিলিতে আছেন।",
-          "not-found": "এই কোডের কোনো ফ্যামিলি পাওয়া যায়নি। কোডটি আবার যাচাই করুন।",
-          "not-v2": "এই ফ্যামিলি এখনো এই ফিচারের জন্য প্রস্তুত নয়। ফ্যামিলির Admin-এর সাথে সরাসরি যোগাযোগ করুন।",
+          "same-family": "আপনি ইতিমধ্যে এই পরিবারে আছেন।",
+          "not-found": "এই কোডের কোনো পরিবার পাওয়া যায়নি। কোডটি আবার যাচাই করুন।",
+          "not-v2": "এই পরিবারে এই সুবিধা এখনো চালু হয়নি। পরিবারের অ্যাডমিনের সাথে সরাসরি যোগাযোগ করুন।",
           error: result.error || "একটি সমস্যা হয়েছে।"
         }[result.reason] || "যোগ দেওয়া যায়নি।";
         window.alert(reasonMsg);
@@ -130,22 +130,22 @@ export function createFamilyActions(c) {
     const code = renameFamCodeInput.trim();
     if (!code) return;
     if (code.length < FAMILY_CODE_MIN_LENGTH) {
-      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+      window.alert(`ফ্যামিলি ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} অক্ষর হতে হবে।`);
       return;
     }
     if (!isFamilyCodeCharsetValid(code)) {
-      window.alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
+      window.alert("অনুগ্রহ করে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন।");
       return;
     }
-    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডেটা অক্ষত থাকবে (কোনো কপি/লস হবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে অটো নতুন কোড বসে যাবে ও নোটিশ দেখাবে।`)) return;
+    if (!window.confirm(`কোড "${code}"-তে পরিবর্তন করবেন? আপনার পরিবারের সব ডেটা অক্ষত থাকবে (কোনো ডেটা হারাবে না) — শুধু পরিবারের পরিচিতি-কোড বদলাবে। বাকি সদস্যদের ডিভাইসে নিজে থেকেই নতুন কোড বসে যাবে এবং একটি নোটিশ দেখানো হবে।`)) return;
     setRenameFamCodeBusy(true);
     try {
       const result = await changeFamilyCodeForExistingFamily(code);
       if (result && result.aborted) {
         const reasonMsg = {
-          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`,
-          charset: "অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।",
-          "no-auth": "সাইন ইন করা নেই।",
+          length: `কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`,
+          charset: "অনুগ্রহ করে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন।",
+          "no-auth": "সাইন-ইন করা নেই।",
           error: result.error || "একটি সমস্যা হয়েছে।"
         }[result.reason] || "কোড পরিবর্তন করা যায়নি।";
         window.alert(reasonMsg);

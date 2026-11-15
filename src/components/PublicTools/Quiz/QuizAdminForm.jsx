@@ -1,7 +1,7 @@
-// QuizAdminForm.jsx — শুধু App Creator দেখেন(3_5 §৪, mockup 3_3 §৯.৪)। বিষয়
-// dropdown + প্রশ্ন-টেক্সট + ৪টা option(radio দিয়ে সঠিক-উত্তর) + ব্যাখ্যা(ঐচ্ছিক)
-// + "প্রশ্ন যোগ করুন", নিচে বিষয়-ফিল্টারযোগ্য বিদ্যমান প্রশ্নের তালিকা(এডিট/ডিলিট
-// সহ)। BlogWriterAdmin.jsx+BlogForm.jsx-এর pattern একত্রে(3_2 §৫-এর single-file
+// QuizAdminForm.jsx — শুধু App Creator দেখেন (3_5 §৪, mockup 3_3 §৯.৪)। বিষয়
+// dropdown + প্রশ্ন-টেক্সট + ৪টা option(radio দিয়ে সঠিক-উত্তর) + ব্যাখ্যা (ঐচ্ছিক)
+// + "প্রশ্ন যোগ করুন", নিচে বিষয়-ফিল্টারযোগ্য বিদ্যমান প্রশ্নের তালিকা (এডিট/ডিলিট
+// সহ)। BlogWriterAdmin.jsx+BlogForm.jsx-এর pattern একত্রে (3_2 §৫-এর single-file
 // সিদ্ধান্ত অনুযায়ী — কুইজের আলাদা "QuizForm.jsx" ফাইল নেই)।
 // React global(window.React, globals.js)।
 
@@ -216,7 +216,7 @@ export function QuizAdminForm({ onBack }) {
       /*#__PURE__*/React.createElement(
         "label",
         { className: "text-xs font-semibold text-slate-600" },
-        "ব্যাখ্যা(ঐচ্ছিক)",
+        "ব্যাখ্যা (ঐচ্ছিক)",
         /*#__PURE__*/React.createElement("textarea", {
           value: form.explanation,
           onChange: (e) => setForm((f) => ({ ...f, explanation: e.target.value })),

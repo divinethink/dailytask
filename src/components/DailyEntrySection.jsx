@@ -78,7 +78,7 @@ function BoolToggle({
   }));
 }
 
-// §Part B Phase ৪(touch-target, 2_5 Part B §B৩.২/§B৬, ১৫ সেপ্টেম্বর ২০২৬):
+// §Part B Phase ৪ (touch-target, 2_5 Part B §B৩.২/§B৬, ১৫ সেপ্টেম্বর ২০২৬):
 // +/− বাটন ৩২→৩৬px(w-9 h-9, interactive-mockup-confirmed spec) — CSS-only,
 // CountStepper ও NumberField উভয়ের +/− বাটনে। ক্যালেন্ডার-নেভ chevron(◀/▶,
 // নিচে date-nav card-এ) ইচ্ছাকৃতভাবে touch করা হয়নি — mockup-এ শুধু
@@ -167,13 +167,13 @@ function NumberField({
   // (which still passes `target: f.target`) needs no change.
 }
 
-// §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
+// §Part B Phase ২ (category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
 // FieldGroup এখন সবসময় collapsible(আগে সবসময় খোলা flat card ছিল, নিচের নতুন
 // DailyEntrySection render-এ ৪টা category-ই এই একই FieldGroup ব্যবহার করে)।
-// percent/percentColor না দিলে badge দেখা যাবে না(backward-compatible, ভবিষ্যতে
+// percent/percentColor না দিলে badge দেখা যাবে না (backward-compatible, ভবিষ্যতে
 // অন্য কোনো caller percent ছাড়া ব্যবহার করলেও ভাঙবে না)।
-// §Part B §B৫(Category collapse-state persist, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর
-// ২০২৬): `categoryId` দিলে open/close state sessionStorage-এ(key:
+// §Part B §B৫ (Category collapse-state persist, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর
+// ২০২৬): `categoryId` দিলে open/close state sessionStorage-এ (key:
 // `dt_home_accordion_<categoryId>`, existing `dt_`-prefix pattern) persist
 // হয় — একই tab-session-এ tab-বদল/reload-এও accordion-state মনে থাকে।
 // `categoryId` optional(backward-compatible): না দিলে আগের in-memory-only
@@ -370,7 +370,7 @@ function CollapsibleCard({
   }))), open && children);
 }
 
-// কাস্টম টাস্ক কার্ডের ভেতরের অংশ(সদস্যভিত্তিক, owner-approved): যোগ("সেভ"), এডিট(রিনেম/আর্কাইভ), আর্কাইভ-তালিকা(ফিরিয়ে আনা)।
+// কাস্টম টাস্ক কার্ডের ভেতরের অংশ (সদস্যভিত্তিক, owner-approved): যোগ("সেভ"), এডিট (রিনেম/আর্কাইভ), আর্কাইভ-তালিকা (ফিরিয়ে আনা)।
 // আর্কাইভ মানে মোছা নয় — পুরনো এন্ট্রির ডেটা অক্ষত থাকে। সেভ ব্যর্থ হলে তালিকা আগের অবস্থায় থাকে ও বার্তা দেখায়।
 function CustomTasksBody({
   tasks,
@@ -432,7 +432,7 @@ function CustomTasksBody({
       className: "flex flex-col items-center gap-2 text-center py-3"
     }, h(ClipboardListIcon, { size: 28, color: "#B9C2B2" }), h("p", {
       className: "text-sm text-slate-400"
-    }, "কোনো কাস্টম টাস্ক নেই। নিচে নতুন টাস্ক চাপ দিয়ে যোগ করুন।")),
+    }, "কোনো কাস্টম টাস্ক নেই। নিচের নতুন টাস্ক বোতামে চাপ দিয়ে যোগ করুন।")),
     active.map(t => editId === t.id ? h("div", {
       key: t.id,
       className: "py-2 border-b border-slate-100 space-y-2"
@@ -556,7 +556,7 @@ export function DailyEntrySection({
   yesterdayMissing,
   yesterdayEntry
 }) {
-  // "আজকের মুহাসাবা" কার্ডের জন্য ক্যাটাগরি-তালিকা(নিচের কার্ড-তালিকার হুবহু একই ফিল্ড-গ্রুপ; শুধু গণনার জন্য)।
+  // "আজকের মুহাসাবা" কার্ডের জন্য ক্যাটাগরি-তালিকা (নিচের কার্ড-তালিকার হুবহু একই ফিল্ড-গ্রুপ; শুধু গণনার জন্য)।
   const muhasabaCats = [...DEEN_CATEGORY_GROUPS.map(g => ({
     id: g.id,
     fields: [...DEFAULT_DEEN_FIELDS.filter(f => g.keys.includes(f.key)), ...customFields.filter(f => f.category === g.id)]
@@ -618,7 +618,7 @@ export function DailyEntrySection({
     className: "flex-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
-  }, "সাপ্তাহিক রিফ্লেকশন করতে ভুলবেন না যেন"), /*#__PURE__*/React.createElement("p", {
+  }, "সাপ্তাহিক রিফ্লেকশন করতে ভুলবেন না"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-white/80 leading-relaxed mt-0.5"
   }, "এই সপ্তাহের ভালো-মন্দ ও পরিকল্পনা লিখে রাখুন — নিচে স্ক্রল করে পূরণ করতে পারবেন।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissWeeklyReminder,
@@ -637,7 +637,7 @@ export function DailyEntrySection({
     className: "text-sm font-bold text-white"
   }, "আজ মাসিক পারিবারিক পর্যালোচনার দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-white/80 leading-relaxed mt-0.5"
-  }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে পিডিএফ ফাইল ডাউনলোড ও ডেটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
+  }, "পরিবারের সবাইকে নিয়ে বসুন এবং অগ্রগতি মূল্যায়ন করুন। সভা শেষে PDF ফাইল ডাউনলোড ও ডেটার ব্যাকআপ নিতে ভুলবেন না।")), /*#__PURE__*/React.createElement("button", {
     onClick: dismissMonthlyReminder,
     className: "text-white/70 hover:text-white shrink-0"
   }, /*#__PURE__*/React.createElement(X, {
@@ -652,7 +652,7 @@ export function DailyEntrySection({
     className: "flex-1"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-bold text-white"
-  }, "আপনাদের ফ্যামিলি ইউজারনেম এডমিন কর্তৃক পরিবর্তন করা হয়েছে"), /*#__PURE__*/React.createElement("p", {
+  }, "অ্যাডমিন আপনাদের ফ্যামিলি ইউজারনেম পরিবর্তন করেছেন"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-white/80 leading-relaxed mt-0.5"
   }, "বর্তমান কোড: " + codeChangeNotice)), /*#__PURE__*/React.createElement("button", {
     onClick: () => setCodeChangeNotice(null),
@@ -755,17 +755,17 @@ export function DailyEntrySection({
       /*#__PURE__*/React.createElement("span", { className: "flex-1 h-px bg-[#C89B3C]/40" })
     )),
     ...(() => { const m = {};
-    /* §Part B Phase ২(category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
+    /* §Part B Phase ২ (category-accordion, 2_5 Part B §B৩.২, ১৫ সেপ্টেম্বর ২০২৬):
        আগে এখানে ২টা flat FieldGroup(দৈনন্দিন আমল = পুরো DEFAULT_DEEN_FIELDS একসাথে,
        ব্যক্তিগত ও পারিবারিক অভ্যাস = DEFAULT_DUNIYA_FIELDS) ছিল — এখন ৪টা collapsible
        category(সালাত/কুরআন ও ইলম/যিকির ও দাওয়াহ/ব্যক্তিগত ও পারিবারিক অভ্যাস) হিসেবে,
-       field-list/onChange/fieldApplies ইত্যাদি কোনো logic বদলায়নি(structural-only,
+       field-list/onChange/fieldApplies ইত্যাদি কোনো logic বদলায়নি (structural-only,
        DEEN_CATEGORY_GROUPS mapping appHelpers.js-এ)। ওজর-info-বাটন এখন শুধু "সালাত"
-       category-এ(যেহেতু excusable:true ফিল্ড শুধু ঐ ৪টাই — fardPrayers/jamaat/
+       category-এ (যেহেতু excusable:true ফিল্ড শুধু ঐ ৪টাই — fardPrayers/jamaat/
        sunnahNafl/tahajjud, appHelpers.js DEFAULT_DEEN_FIELDS দ্রষ্টব্য), আগে পুরো
        দৈনন্দিন-আমল হেডারে একটাই ছিল যেটা কার্যত এই একই ৪ ফিল্ডের জন্যই প্রযোজ্য ছিল —
        তাই কোনো functionality হারায়নি, শুধু আরও সুনির্দিষ্ট জায়গায় বসেছে। প্রথম
-       category(সালাত) ডিফল্টে খোলা(defaultOpen), বাকি ৩টা বন্ধ — mockup-অনুযায়ী। */
+       category(সালাত) ডিফল্টে খোলা (defaultOpen), বাকি ৩টা বন্ধ — mockup-অনুযায়ী। */
     [...DEEN_CATEGORY_GROUPS.map(g => ({
       id: g.id,
       title: g.label,

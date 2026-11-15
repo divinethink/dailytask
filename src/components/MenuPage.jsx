@@ -2,7 +2,7 @@
 // §৯.৫ ও 2_5_Identity_Simplification_Final_Mockup.md Screen E.1-এর owner-approved
 // design বাস্তবায়ন)। আগে DashboardHeader.jsx-এর হ্যামবার্গার "মেনু" বাটনে অ্যাংকরড
 // dropdown-sheet ছিল — bottom-nav TAB_SETTINGS("মেনু") ট্যাপ করলে এখন এই component
-// পুরো-পৃষ্ঠা(full-page) হিসেবে render হয়। Content/hierarchy অপরিবর্তিত(structural-only
+// পুরো-পৃষ্ঠা (full-page) হিসেবে render হয়। Content/hierarchy অপরিবর্তিত (structural-only
 // move, DashboardHeader.jsx-এর পুরনো JSX থেকে verbatim সরানো হয়েছে — কোনো নতুন
 // logic/condition যোগ হয়নি) — শুধু container dropdown-sheet→full-page,
 // positioning(absolute/fixed backdrop)→normal in-flow layout।
@@ -15,8 +15,8 @@ import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection, saveRichtext } from "../legacy/editableContent.js";
 
 // §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested "আরো সুন্দর ও গোছানো"): শুধু
-// দৃশ্য/লেআউট বদল — প্রতিটা বাটনের onClick/শর্ত(isAdmin/onOpen* গেট) আগের মতোই,
-// props অপরিবর্তিত। কার্ড-গ্রুপ(পরিচয়/সদস্য/ডেটা/কাস্টমাইজ/চেহারা), আইকন-চিপ ও
+// দৃশ্য/লেআউট বদল — প্রতিটা বাটনের onClick/শর্ত (isAdmin/onOpen* গেট) আগের মতোই,
+// props অপরিবর্তিত। কার্ড-গ্রুপ (পরিচয়/সদস্য/ডেটা/কাস্টমাইজ/চেহারা), আইকন-চিপ ও
 // ≥48px সারি; রং থিম-টোকেন(--theme-*) থেকে।
 const h = React.createElement;
 const CARD = "bg-white rounded-2xl shadow-sm border overflow-hidden";
@@ -24,8 +24,8 @@ const CARD_STYLE = { borderColor: "var(--theme-line, #E2E8F0)" };
 function SectionLabel({ children }) {
   return h("div", { className: "px-2 pt-1 text-[11px] font-bold tracking-wider text-slate-500" }, children);
 }
-// ছোট টাইল(আইকন-চিপ উপরে, নাম নিচে) — গ্রিডে বসে, লিস্টের চেয়ে অনেক কম উচ্চতা নেয়।
-// label = পূর্ণ নাম(screen-reader/tooltip), title = টাইলে দৃশ্যমান ছোট নাম।
+// ছোট টাইল (আইকন-চিপ উপরে, নাম নিচে) — গ্রিডে বসে, লিস্টের চেয়ে অনেক কম উচ্চতা নেয়।
+// label = পূর্ণ নাম (screen-reader/tooltip), title = টাইলে দৃশ্যমান ছোট নাম।
 function MenuTile({ icon, title, label, onClick }) {
   return h(
     "button",
@@ -50,7 +50,7 @@ function MenuTile({ icon, title, label, onClick }) {
   );
 }
 
-// "আমাদের জানান" সারি — শিরোনাম+হিন্ট App Creator সম্পাদনা করতে পারেন(ডানে-উপরে ✏️)।
+// "আমাদের জানান" সারি — শিরোনাম+হিন্ট App Creator সম্পাদনা করতে পারেন (ডানে-উপরে ✏️)।
 // সংরক্ষণ: publicToolsContent/menuFeedbackButton(richtext: ১ম লাইন=শিরোনাম, ২য়=হিন্ট;
 // বিদ্যমান saveRichtext/Rules reuse, নতুন schema/rule নেই)। doc না থাকলে/ফাঁকা হলে ডিফল্ট।
 const FEEDBACK_ID = "menuFeedbackButton";
@@ -97,7 +97,7 @@ function FeedbackRow({ onOpen }) {
       "div",
       { className: CARD + " p-3 space-y-2", style: CARD_STYLE },
       h("input", { value: draftT, maxLength: 40, onChange: e => setDraftT(e.target.value), placeholder: "শিরোনাম", className: input }),
-      h("input", { value: draftH, maxLength: 60, onChange: e => setDraftH(e.target.value), placeholder: "ছোট বিবরণ(ঐচ্ছিক)", className: input }),
+      h("input", { value: draftH, maxLength: 60, onChange: e => setDraftH(e.target.value), placeholder: "ছোট বিবরণ (ঐচ্ছিক)", className: input }),
       err && h("p", { className: "text-xs text-red-500" }, err),
       h(
         "div",
@@ -309,9 +309,9 @@ export function MenuPage({
               onClick: async () => { try { await handleShareInviteLink(); } catch {} }
             })
           ),
-          // ২.৫) নোটিফিকেশন সেটিং(১৫ নভেম্বর ২০২৬, প্রতি-ডিভাইস; নতুন Firestore লেখা নেই)
+          // ২.৫) নোটিফিকেশন সেটিং (১৫ নভেম্বর ২০২৬, প্রতি-ডিভাইস; নতুন Firestore লেখা নেই)
           h(NotificationSettingsCard, { uid: auth && auth.currentUser ? auth.currentUser.uid : null }),
-          // ৩) ডেটা ম্যানেজমেন্ট(৩-কলাম টাইল-গ্রিড)
+          // ৩) ডেটা ম্যানেজমেন্ট (৩-কলাম টাইল-গ্রিড)
           h(SectionLabel, null, "ডেটা ম্যানেজমেন্ট"),
           h(
             "div",
@@ -342,7 +342,7 @@ export function MenuPage({
               }
             })
           ),
-          // ৪) কাস্টমাইজ(৪-কলাম টাইল-গ্রিড; প্রতিটা টাইল আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
+          // ৪) কাস্টমাইজ (৪-কলাম টাইল-গ্রিড; প্রতিটা টাইল আগের মতোই নিজ নিজ onOpen* prop-এর গেটে)
           (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(SectionLabel, null, "কাস্টমাইজ"),
           (onOpenHomeLayout || onOpenPrayerLayout || onOpenAmolLayout || onOpenToolsLayout || onOpenFieldManager || onOpenTazkirah || onOpenPopupMessages) && h(
             "div",
@@ -355,9 +355,9 @@ export function MenuPage({
             onOpenTazkirah && h(MenuTile, { icon: h(BookIcon, { size: 17 }), title: "তাযকিরাহ", label: "তাযকিরাহ ম্যানেজ (নিজের বাণী)", onClick: () => { onOpenTazkirah(); } }),
             onOpenPopupMessages && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "পপআপ বার্তা", label: "পপআপ বার্তা সম্পাদনা (শুধু অ্যাপ ক্রিয়েটর)", onClick: () => { onOpenPopupMessages(); } })
           ),
-          // ৫) ফিডব্যাক(লেখা ক্রিয়েটর-সম্পাদনযোগ্য)
+          // ৫) ফিডব্যাক (লেখা ক্রিয়েটর-সম্পাদনযোগ্য)
           h(FeedbackRow, { onOpen: () => { setShowFeedbackModal(true); } }),
-          // ৬) চেহারা: ডিসপ্লে মোড + থিম কালার(app.js-এর themeColorPickerEl)
+          // ৬) চেহারা: ডিসপ্লে মোড + থিম কালার (app.js-এর themeColorPickerEl)
           themeColorPickerEl
         )
   );

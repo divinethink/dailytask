@@ -35,7 +35,7 @@ function useFonts() {
   }, []);
 }
 
-// §থিম ধাপ ১(owner-approved, ১০টা): color=প্রধান রং(localStorage "theme_color"-এ এই hex-ই
+// §থিম ধাপ ১ (owner-approved, ১০টা): color=প্রধান রং (localStorage "theme_color"-এ এই hex-ই
 // সংরক্ষিত — schema/backup অপরিবর্তিত); accent=সোনালি-স্থানের রং; page=পেজ ব্যাকগ্রাউন্ড।
 const EMERALD_DEFAULT = ["236 253 245", "209 250 229", "167 243 208", "110 231 183", "52 211 153", "16 185 129", "5 150 105", "4 120 87", "6 95 70", "6 78 59", "2 44 34"];
 const EMERALD_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -47,9 +47,9 @@ const THEME_PRESETS = [
   { id: "olive", name: "অলিভ", color: "#657834", accent: "#BFA94A", page: "#F4F6EA", pal: ["247 249 241", "240 244 230", "228 235 210", "212 224 183", "194 210 152", "174 196 119", "152 180 81", "123 147 64", "101 120 52", "93 110 48", "56 66 29"], ink: "#2A3216", deep: "#56662C", soft: "#F0F3E8", accentSoft: "#EAE2C3", tint: "#EDF0E6", line: "#DFE3D3", wash: "#F6F7F2" },
   { id: "ledger", name: "লেজার পেপার", color: "#5B4636", accent: "#B08D57", page: "#F5ECD7", pal: ["247 244 242", "241 236 231", "229 219 212", "214 198 186", "196 173 156", "177 146 123", "152 117 90", "117 90 69", "91 70 54", "84 64 50", "50 39 30"], ink: "#2D221B", deep: "#4D3C2E", soft: "#F2EDE9", accentSoft: "#E5D9C7", tint: "#F0EAE6", line: "#E3DAD3", wash: "#F7F4F2" }
 ];
-// §থিম-তালিকা ছাঁটাই(১ নভেম্বর ২০২৬, owner-requested): টিল+লেমন/গাঢ় সবুজ+বাটার/টেরাকোটা/মোকা সরানো,
-// "নর্ড" → "নর্ড ফ্রস্ট"। আগে সংরক্ষিত(localStorage/ব্যাকআপ) hex অপরিবর্তিত থাকে; এই ম্যাপ শুধু
-// পড়ার সময় অনুবাদ করে — সরানো থিম → ডিফল্ট সবুজ, পুরনো নর্ড → নর্ড ফ্রস্ট(storage নিজে মোছা/বদলানো হয় না)।
+// §থিম-তালিকা ছাঁটাই (১ নভেম্বর ২০২৬, owner-requested): টিল+লেমন/গাঢ় সবুজ+বাটার/টেরাকোটা/মোকা সরানো,
+// "নর্ড" → "নর্ড ফ্রস্ট"। আগে সংরক্ষিত (localStorage/ব্যাকআপ) hex অপরিবর্তিত থাকে; এই ম্যাপ শুধু
+// পড়ার সময় অনুবাদ করে — সরানো থিম → ডিফল্ট সবুজ, পুরনো নর্ড → নর্ড ফ্রস্ট (storage নিজে মোছা/বদলানো হয় না)।
 const LEGACY_THEME_COLOR_MAP = {
   "#3e6092": "#4A78AD",
   "#4f7099": "#4A78AD",
@@ -78,12 +78,12 @@ function getThemeColor(fallback) {
 }
 function applyThemeColor(color) {
   const t = THEME_PRESETS.find(x => x.color.toLowerCase() === String(color).toLowerCase());
-  // অজানা/পুরনো সংরক্ষিত রং: শুধু প্রধান রং বদলায়, বাকি ডিফল্ট(আগের আচরণ অপরিবর্তিত)
+  // অজানা/পুরনো সংরক্ষিত রং: শুধু প্রধান রং বদলায়, বাকি ডিফল্ট (আগের আচরণ অপরিবর্তিত)
   const root = document.documentElement.style;
   root.setProperty("--theme-primary", color);
   root.setProperty("--theme-accent", t ? t.accent : THEME_PRESETS[0].accent);
   root.setProperty("--theme-page", t ? t.page : THEME_PRESETS[0].page);
-  // §থিম ধাপ ২: Tailwind emerald-স্কেল(tailwind.config.js-এ --e-* এ বাঁধা) থিম অনুযায়ী
+  // §থিম ধাপ ২: Tailwind emerald-স্কেল (tailwind.config.js-এ --e-* এ বাঁধা) থিম অনুযায়ী
   const pal = t ? t.pal : EMERALD_DEFAULT;
   const D = THEME_PRESETS[0];
   root.setProperty("--theme-ink", (t || D).ink);
@@ -125,7 +125,7 @@ function useThemeColor() {
 // (broad, ১০+ ফাইল, উচ্চ-ঝুঁকি) না করে — global CSS filter(`<html
 // data-display-mode="...">`, index.html-এ সংজ্ঞায়িত) দিয়ে low-risk, single-
 // point বাস্তবায়ন। "light"(ডিফল্ট) attribute-value ফাঁকা রাখা হয় যাতে কোনো
-// CSS selector match না করে(no-op, বর্তমান visual অপরিবর্তিত)।
+// CSS selector match না করে (no-op, বর্তমান visual অপরিবর্তিত)।
 const DISPLAY_MODES = [{
   id: "light",
   name: "লাইট (ডিফল্ট)"
@@ -193,8 +193,8 @@ const DEFAULT_DEEN_FIELDS = [{
   type: "bool"
 }, {
   key: "dhikr",
-  label: "ইস্তেগফার, যিকির, দরুদ শরীফ ও দু'আ",
-  shortLabel: "যিকির/দু'আ",
+  label: "ইস্তেগফার, যিকির, দরুদ শরীফ ও দোয়া",
+  shortLabel: "যিকির/দোয়া",
   type: "bool"
 }, {
   key: "quranPages",
@@ -287,7 +287,7 @@ const DEFAULT_DUNIYA_FIELDS = [{
 // group-এর ভিতরে DEFAULT_DEEN_FIELDS-এর original array-order অপরিবর্তিত রাখা হয়েছে
 // (এখানে শুধু "কোন key কোন category"-এর তালিকা, নিচে DailyEntrySection.jsx এই তালিকা
 // দিয়ে DEFAULT_DEEN_FIELDS filter করে, তাই order-preservation স্বয়ংক্রিয়)। "ব্যক্তিগত ও
-// পারিবারিক অভ্যাস" ক্যাটাগরি(DEFAULT_DUNIYA_FIELDS, ৯টা) এখানে repeat করা হয়নি —
+// পারিবারিক অভ্যাস" ক্যাটাগরি (DEFAULT_DUNIYA_FIELDS, ৯টা) এখানে repeat করা হয়নি —
 // DailyEntrySection.jsx সরাসরি DEFAULT_DUNIYA_FIELDS ব্যবহার করে ৪র্থ ক্যাটাগরি হিসেবে।
 const DEEN_CATEGORY_GROUPS = [{
   id: "salah",
@@ -526,7 +526,7 @@ const DAILY_INSPIRATIONS = [{
   ref: "তারিক রামাদান"
 }, {
   type: "quote",
-  text: "আপনি যখন কাউকে সাহায্য করার সুযোগ পেয়ে থাকেন, তখন আনন্দিত হোন এইজন্য যে আল্লাহ ওই ব্যক্তির দু'আর সাড়া আপনার মাধ্যমেই দিচ্ছেন।",
+  text: "আপনি যখন কাউকে সাহায্য করার সুযোগ পেয়ে থাকেন, তখন আনন্দিত হোন এইজন্য যে আল্লাহ ওই ব্যক্তির দোয়ার সাড়া আপনার মাধ্যমেই দিচ্ছেন।",
   ref: "নুমান আলী খান"
 }, {
   type: "quote",
@@ -546,7 +546,7 @@ const DAILY_INSPIRATIONS = [{
   ref: "ইমাম শাফিঈ (রাহিমাহুল্লাহ)"
 }, {
   type: "quote",
-  text: "তাহাজ্জুদের সময়ে করা দু'আ হলো এমন একটি তীরের মতন যা লক্ষ্যভ্রষ্ট হয় না।",
+  text: "তাহাজ্জুদের সময়ে করা দোয়া হলো এমন একটি তীরের মতন যা লক্ষ্যভ্রষ্ট হয় না।",
   ref: "ইমাম শাফিঈ (রাহিমাহুল্লাহ)"
 }, {
   type: "quote",
@@ -669,11 +669,11 @@ function dailyScore(entry, member, allFields) {
 function scoreColor(score) {
   if (score === null || score === undefined) return "#E7EEE3";
   // §Fix(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): আগে "চমৎকার"-tier রঙ সরাসরি
-  // var(--theme-primary) ব্যবহার করত — ফলে থিম বদলালে(যেমন পিংক) পারফরম্যান্স-
-  // ইন্ডিকেটর রঙও বদলে যেত(পারফরম্যান্স-সেমান্টিক্স আর decorative brand-accent
+  // var(--theme-primary) ব্যবহার করত — ফলে থিম বদলালে (যেমন পিংক) পারফরম্যান্স-
+  // ইন্ডিকেটর রঙও বদলে যেত (পারফরম্যান্স-সেমান্টিক্স আর decorative brand-accent
   // একই ভ্যারিয়েবলে মিশে ছিল)। Fix: fixed hex(ডিফল্ট থিমের সবুজ, design-system
   // Primary #0E4B43) — থিম যাই হোক, "চমৎকার" সবসময় এই রঙই দেখাবে।
-  // §রেটিং(৭ নভেম্বর ২০২৬, owner): সীমা ৮৫/৭০/৪০ — দেখানো পূর্ণসংখ্যা % দিয়েই তুলনা।
+  // §রেটিং (৭ নভেম্বর ২০২৬, owner): সীমা ৮৫/৭০/৪০ — দেখানো পূর্ণসংখ্যা % দিয়েই তুলনা।
   const p = Math.round(score * 100);
   if (p >= 85) return "#0E4B43";
   if (p >= 70) return "#2563A8";
@@ -697,18 +697,18 @@ function fieldPercent(field, monthEntries, totalDays, member) {
   let hit = 0;
   if (field.type === "count") {
     let sum = 0;
-    // §Bug fix(owner-reported, ১৬ সেপ্টেম্বর ২০২৬): আগের ফিক্স(৮ সেপ্টেম্বর
+    // §Bug fix(owner-reported, ১৬ সেপ্টেম্বর ২০২৬): আগের ফিক্স (৮ সেপ্টেম্বর
     // ২০২৬, নিচের কমেন্ট) সম্পূর্ণ-খালি দিনকে(`!e`, কোনো entry-ই সেভ হয়নি)
     // "০ ক্রেডিট" দিত ঠিকই, কিন্তু সেই দিনটা তখনো effectiveDays denominator-এ
     // থেকে যেত — ফলে fardPrayers-এর ইনভার্টেড হিসাবে সেই দিন "সর্বোচ্চ কাযা"
     // (সব ওয়াক্ত মিসড) হিসেবে গণনা হয়ে যাচ্ছিল, অথচ খালি দিনের প্রকৃত অর্থ
     // শুধু "ডেটা নেই"(app-ই খোলা হয়নি সেদিন), "সব ওয়াক্ত কাযা" নয়। বাস্তব
-    // কেস(owner-report): পুরো মাসে একদিনও প্রকৃত কাযা রিপোর্ট না করা সত্ত্বেও
-    // কাযার হার ৫৭% দেখাচ্ছিল — কারণ ফাঁকা/অ-পূরণ দিনগুলো(app না খোলা)
+    // কেস (owner-report): পুরো মাসে একদিনও প্রকৃত কাযা রিপোর্ট না করা সত্ত্বেও
+    // কাযার হার ৫৭% দেখাচ্ছিল — কারণ ফাঁকা/অ-পূরণ দিনগুলো (app না খোলা)
     // denominator-এ থেকে প্রতিটাই "৫/৫ কাযা" হিসেবে যোগ হচ্ছিল। Fix: শুধু
     // fardPrayers-এর জন্য সম্পূর্ণ-খালি দিন excused-দিনের মতোই denominator
-    // থেকে বাদ(true N/A, না ০% না ১০০%) — অন্য কোনো count-type field(যেমন
-    // জামায়াতে সালাত)-এর আচরণ অপরিবর্তিত(scope ইচ্ছাকৃতভাবে সীমিত)।
+    // থেকে বাদ (true N/A, না ০% না ১০০%) — অন্য কোনো count-type field(যেমন
+    // জামায়াতে সালাত)-এর আচরণ অপরিবর্তিত (scope ইচ্ছাকৃতভাবে সীমিত)।
     let activeDays = effectiveDays;
     if (field.key === "fardPrayers") {
       let emptyDays = 0;
@@ -732,21 +732,21 @@ function fieldPercent(field, monthEntries, totalDays, member) {
       // "খালি দিন = পূর্ণ ক্রেডিট" হয়ে যাচ্ছিল, যা মাসিক ওভারভিউ ও প্রিন্ট
       // PDF-এর "ফরজ কাযা"-র শতাংশকে কৃত্রিমভাবে বাড়িয়ে দেখাচ্ছিল, বিশেষত
       // যেসব মাসে অনেক দিন পূরণ করা হয়নি। এখন খালি দিনকে বাকি সব ফিল্ডের
-      // মতোই "০ ক্রেডিট" হিসেবে গণনা করা হচ্ছে(এবং উপরের নতুন fix অনুযায়ী
+      // মতোই "০ ক্রেডিট" হিসেবে গণনা করা হচ্ছে (এবং উপরের নতুন fix অনুযায়ী
       // denominator থেকেও বাদ, §১৬ সেপ্টেম্বর ২০২৬ fix দ্রষ্টব্য)।
       if (field.key === "fardPrayers") {
         // BUG FIX(৮ সেপ্টেম্বর ২০২৬): আগের কোড শুধু entry সম্পূর্ণ অনুপস্থিত
-        // (`!e`) থাকা দিনকেই "০ ক্রেডিট" দেওয়ার কথা ছিল(উপরের কমেন্ট অনুযায়ী),
+        // (`!e`) থাকা দিনকেই "০ ক্রেডিট" দেওয়ার কথা ছিল (উপরের কমেন্ট অনুযায়ী),
         // কিন্তু `hasValue` চেক আসলে entry থাকা সত্ত্বেও শুধু "ফরজ কাযা"
-        // ফিল্ডটা আলাদাভাবে অস্পর্শিত(undefined/"") থাকলেও একই "০ ক্রেডিট"(অর্থাৎ
+        // ফিল্ডটা আলাদাভাবে অস্পর্শিত (undefined/"") থাকলেও একই "০ ক্রেডিট"(অর্থাৎ
         // পূর্ণ ৫ ওয়াক্ত কাযা ধরে নেওয়া) প্রয়োগ করছিল — অথচ বাকি সব ফিল্ডে
         // entry থাকলে untouched sub-field মানেই "০"(এখানে "০ কাযা", তাই পূর্ণ
-        // ক্রেডিট) ধরা হয়(নিচের `else` শাখার মতোই)। ফলে যেসব দিনে অন্য ফিল্ড
+        // ক্রেডিট) ধরা হয় (নিচের `else` শাখার মতোই)। ফলে যেসব দিনে অন্য ফিল্ড
         // পূরণ হলেও "ফরজ কাযা" আলাদাভাবে টাচ করা হয়নি, সেই দিনগুলো ভুলভাবে
         // "সর্বোচ্চ কাযা" হিসেবে গণনা হয়ে কাযার হার কৃত্রিমভাবে বাড়িয়ে
         // দেখাচ্ছিল। Fix: entry(`e`) থাকলেই বাকি ফিল্ডের মতো স্বাভাবিক
-        // হিসাব(untouched sub-field → raw ০ → পূর্ণ ক্রেডিট), শুধু সম্পূর্ণ
-        // খালি দিন(`!e`)-এই কিছু যোগ হবে না(০ ক্রেডিট, এবং উপরের fix-এ
+        // হিসাব (untouched sub-field → raw ০ → পূর্ণ ক্রেডিট), শুধু সম্পূর্ণ
+        // খালি দিন(`!e`)-এই কিছু যোগ হবে না (০ ক্রেডিট, এবং উপরের fix-এ
         // denominator থেকেও বাদ পড়ে)।
         if (e) {
           const capped = Math.min(field.max, Number(e[field.key]) || 0);

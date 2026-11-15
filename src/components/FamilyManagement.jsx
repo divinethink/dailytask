@@ -52,7 +52,7 @@ export function CreateNewFamilyModal({
     className: "font-bold text-sm mb-1 text-slate-800"
   }, "নতুন ফ্যামিলি ইউজারনেম তৈরি করুন"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "একটি অনন্য কোড দিন — এটি সম্পূর্ণ নতুন, খালি একটি ফ্যামিলি স্পেস তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৯ ক্যারেক্টার।"), /*#__PURE__*/React.createElement("input", {
+  }, "এমন একটি কোড দিন যা আর কেউ ব্যবহার করেনি — এটি সম্পূর্ণ নতুন, খালি একটি পরিবার তৈরি করবে এবং এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে। বর্তমান পরিবারের ডেটা অক্ষত থাকবে। ছোট/বড় হাতের ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে (space, /, \\, ' এবং \" ছাড়া), কমপক্ষে ৬ অক্ষর।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
     autoComplete: "username",
     value: newFamCodeInput,
@@ -93,7 +93,7 @@ export function JoinFamilyModal({
     className: "font-bold text-sm mb-1 text-slate-800"
   }, "বিদ্যমান ফ্যামিলি ইউজারনেম দিয়ে যোগ দিন"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "যে ফ্যামিলিতে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই ফ্যামিলির Admin-এর অনুমোদনের অপেক্ষায় থাকবে। বর্তমান ফ্যামিলির ডেটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
+  }, "যে পরিবারে যোগ দিতে চান তার কোড লিখুন — এই ডিভাইসটি সেখানে সুইচ হয়ে যাবে এবং আপনার যোগদানের অনুরোধ সেই পরিবারের অ্যাডমিনের অনুমোদনের অপেক্ষায় থাকবে। বর্তমান পরিবারের ডেটা অক্ষত থাকবে।"), /*#__PURE__*/React.createElement("input", {
     name: "family-code",
     autoComplete: "username",
     value: joinFamCodeInput,
@@ -152,7 +152,7 @@ export function RenameFamilyCodeModal({
   }, /*#__PURE__*/React.createElement(X, { size: 18, className: "text-slate-400" }))),
   /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "পরিবর্তন করলে পরিবারের সব সদস্যের ডিভাইসে অটো নতুন ইউজারনেম বসে যাবে। ডেটা অক্ষত থাকবে।"),
+  }, "পরিবর্তন করলে পরিবারের সব সদস্যের ডিভাইসে নিজে থেকেই নতুন ইউজারনেম বসে যাবে। ডেটা অক্ষত থাকবে।"),
   /*#__PURE__*/React.createElement("label", {
     className: "text-xs text-slate-400 mb-1 block"
   }, "বর্তমান ইউজারনেম"),
@@ -184,7 +184,7 @@ export function RenameFamilyCodeModal({
     value: renameFamCodeInput,
     onChange: e => setRenameFamCodeInput(e.target.value),
     disabled: renameFamCodeBusy,
-    placeholder: "নতুন ইউজারনেম দিন (কমপক্ষে ৬ ক্যারেক্টার)",
+    placeholder: "নতুন ইউজারনেম দিন (কমপক্ষে ৬ অক্ষর)",
     maxLength: 30,
     className: "w-full h-10 px-3 pr-9 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-[#0E4B43] transition-colors disabled:opacity-50",
     style: { fontFamily: "'Hind Siliguri', sans-serif" }
@@ -195,7 +195,7 @@ export function RenameFamilyCodeModal({
     : /*#__PURE__*/React.createElement(X, { size: 16, className: "text-red-500" }))),
   /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 mb-1.5"
-  }, "(কমপক্ষে ৬ ডিজিটের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও জটিল চিহ্ন ব্যবহার করা যাবে।)"),
+  }, "(কমপক্ষে ৬ অক্ষরের হতে হবে — ইংরেজি অক্ষর, সংখ্যা ও বিশেষ চিহ্ন ব্যবহার করা যাবে।)"),
   /*#__PURE__*/React.createElement("label", {
     className: "text-xs text-slate-400 mb-1 block"
   }, "ইউজারনেম কনফার্ম করুন"),
@@ -225,11 +225,11 @@ export function RenameFamilyCodeModal({
       const code = renameFamCodeInput.trim();
       const confirmVal = renameConfirmInput.trim();
       if (!code) {
-        alert("নতুন ইউজারনেম লিখুন (কমপক্ষে ৬ ক্যারেক্টার)।");
+        alert("নতুন ইউজারনেম লিখুন (কমপক্ষে ৬ অক্ষর)।");
         return;
       }
       if (code.length < FAMILY_CODE_MIN_LENGTH) {
-        alert(`ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} ক্যারেক্টার হতে হবে।`);
+        alert(`ইউজারনেম কমপক্ষে ${FAMILY_CODE_MIN_LENGTH} অক্ষর হতে হবে।`);
         return;
       }
       if (code !== confirmVal) {

@@ -3,7 +3,7 @@ import { InfoIcon, Plus, Trash, User, UsersIcon } from "./icons.jsx";
 
 // §Menu UI polish(১ নভেম্বর ২০২৬, owner-requested): শুধু লেআউট/স্টাইল — সব onClick/শর্ত/
 // guard(dirty-confirm, isAdmin, uid-যাচাই) আগের মতোই অপরিবর্তিত।
-// সারি এখন এক-লাইন(অবতার+নাম+ব্যাজ/বাটন+ডিলিট) — কার্ডের উচ্চতা ন্যূনতম; নাম দীর্ঘ হলে truncate।
+// সারি এখন এক-লাইন (অবতার+নাম+ব্যাজ/বাটন+ডিলিট) — কার্ডের উচ্চতা ন্যূনতম; নাম দীর্ঘ হলে truncate।
 export function MemberListSection({
   members,
   selectedId,
@@ -28,7 +28,7 @@ export function MemberListSection({
     },
       h("span", { className: "flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-slate-500" },
         h(UsersIcon, { size: 13 }), " সদস্যবৃন্দ"),
-      // §Add-Member-button fix(১২ সেপ্টেম্বর ২০২৬): persistent "নতুন সদস্য" বাটন(admin-only)।
+      // §Add-Member-button fix(১২ সেপ্টেম্বর ২০২৬): persistent "নতুন সদস্য" বাটন (admin-only)।
       isAdmin && h("button", {
         type: "button",
         onClick: e => {
@@ -83,7 +83,7 @@ export function MemberListSection({
             handleMakeAdmin(m);
           },
           className: pill + " bg-white text-slate-600 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
-          title: "এডমিন করুন"
+          title: "অ্যাডমিন করুন"
         }, "Make Admin"),
         isAdmin && hasOwner && uids.some(u => adminUidsList.includes(u)) && !isMine && h("button", {
           type: "button",
@@ -92,7 +92,7 @@ export function MemberListSection({
             handleRemoveAdmin(m);
           },
           className: pill + " bg-white text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
-          title: "এডমিন পদ থেকে বাদ দিন"
+          title: "অ্যাডমিন পদ থেকে বাদ দিন"
         }, "Remove Admin"),
         isAdmin && h("button", {
           type: "button",

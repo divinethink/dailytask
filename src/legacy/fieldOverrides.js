@@ -40,7 +40,7 @@ export function applyOverrides(fields, overrides) {
   });
 }
 
-/** label বদল। খালি বা মূল label-এর সমান হলে override মুছে যায়(hidden থাকলে অক্ষত)। নতুন map ফেরত। */
+/** label বদল। খালি বা মূল label-এর সমান হলে override মুছে যায় (hidden থাকলে অক্ষত)। নতুন map ফেরত। */
 export function setLabel(overrides, key, label, originalLabel) {
   const next = { ...overrides };
   const cur = { ...(next[key] || {}) };

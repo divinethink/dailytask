@@ -1,5 +1,5 @@
-// পপআপ বার্তা সম্পাদনা(শুধু App Creator): অনবোর্ড/সদস্য/ওজর/সাপ্তাহিক/মিটিং/মাসিক তথ্য-পপআপের লেখা।
-// খসড়া লোকাল state-এ; "সেভ করুন" চাপলে তবেই Firestore-এ লেখা হয়(আসল নিরাপত্তা Rules-এ: write শুধু App Creator)।
+// পপআপ বার্তা সম্পাদনা (শুধু App Creator): অনবোর্ড/সদস্য/ওজর/সাপ্তাহিক/মিটিং/মাসিক তথ্য-পপআপের লেখা।
+// খসড়া লোকাল state-এ; "সেভ করুন" চাপলে তবেই Firestore-এ লেখা হয় (আসল নিরাপত্তা Rules-এ: write শুধু App Creator)।
 // ডিফল্টের সমান বা খালি লেখা সেভ হয় না — তখন অ্যাপ নিজের ডিফল্ট লেখাই দেখায়।
 import { POPUP_ITEMS, TITLE_MAX, BODY_MAX, loadPopupMessagesFresh, savePopupMessageOverrides } from "../legacy/popupMessages.js";
 
@@ -14,7 +14,7 @@ function toDraft(saved) {
   return d;
 }
 
-// ডিফল্টের সাথে একই হলে বাদ(override নেই ধরা হয়)
+// ডিফল্টের সাথে একই হলে বাদ (override নেই ধরা হয়)
 function toOverrides(draft) {
   const out = {};
   POPUP_ITEMS.forEach((it) => {

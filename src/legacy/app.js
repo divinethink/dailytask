@@ -5,7 +5,7 @@ import { useFonts, THEME_PRESETS, useThemeColor, DISPLAY_MODES, useDisplayMode, 
 import { isCreatorAuth, getFamilyCode, getFamilyId, ensureFamilyCodeMapping, familyDocRef, ensureFamilyMeta, ensureDataCollectionName, ensureLegacyCollectionMap, claimFirstAdminIfEligible, saveUserFamilyCode, syncFamilyCodeWithAccount, getCollectionName, appStorage, resolvePathContext, FAMILY_CODE_MIN_LENGTH, isGoogleLinked } from "./familyIdentity.js";
 // §ProfileDropdownGoogle wiring(১১ সেপ্টেম্বর ২০২৬): নতুন Google-only
 // Profile Dropdown("প্রোফাইল এডিট"/"পরিবার ত্যাগ করুন")-এর জন্য প্রয়োজনীয়
-// দুটো action — এই আগে থেকেই লেখা(additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
+// দুটো action — এই আগে থেকেই লেখা (additive, অব্যবহৃত) ফাংশন এই প্রথম কোনো
 // UI থেকে wire হচ্ছে।
 import {
   editOwnProfile, leaveFamily, loadActiveInviteToken, removeLegacyInviteToken,
@@ -26,11 +26,11 @@ import { createAdminActions } from "./adminActions.js";
 //    "Access Key" (arrives instantly by email, no account required).
 // 2. Paste that key below, replacing the placeholder text.
 // Auto-update(fresh-load-only, one-time): controllerchange শুধু page-load-এর
-// প্রথম ৮ সেকেন্ডের "arm window"-এ শোনা হয়(fresh-open-এ আগে থেকে pending
+// প্রথম ৮ সেকেন্ডের "arm window"-এ শোনা হয় (fresh-open-এ আগে থেকে pending
 // update থাকলে সেটাই ধরার জন্য)। Window পার হলে listener remove — mid-session
 // background SW update কখনো এই পথে reload trigger করবে না। `reloaded` flag
 // দিয়ে one-time guard(reload-loop প্রতিরোধ)। প্রকৃত reload dt-sw-updated
-// event dispatch করে App()-এর ভেতরের dirty-state-aware handler করে(নিচে)।
+// event dispatch করে App()-এর ভেতরের dirty-state-aware handler করে (নিচে)।
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").then(reg => {
@@ -88,7 +88,7 @@ import {
 import { HistoryModal } from "../components/HistoryModal.jsx";
 import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFamilyCodeModal } from "../components/FamilyManagement.jsx";
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, বিদ্যমান PrintReport/Public-Tools lazy
-// pattern reuse): এই ৪টা মোডাল সবসময় mount থাকে(শুধু `show` prop visibility
+// pattern reuse): এই ৪টা মোডাল সবসময় mount থাকে (শুধু `show` prop visibility
 // নিয়ন্ত্রণ করে), তাই static import থাকলে প্রতিটা boot-এ parse হতো যদিও
 // বেশিরভাগ session-এ কখনো খোলা হয় না। এখন React.lazy()+ব্যবহারের জায়গায়
 // React.Suspense(fallback: null, কারণ show=false-এ এমনিতেও কিছু render হয়
@@ -98,12 +98,12 @@ const BackupOptionsModal = React.lazy(() => import("../components/BackupRestore.
 const DriveRestoreModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.DriveRestoreModal })));
 const ImportOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ImportOptionsModal })));
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
-// §Part B §B৫(Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
-// শুধু `printMode` true হলেই render হয়(নিচে), কিন্তু আগে static import ছিল
+// §Part B §B৫ (Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
+// শুধু `printMode` true হলেই render হয় (নিচে), কিন্তু আগে static import ছিল
 // বলে প্রতিটা normal home-tab load-এ অপ্রয়োজনে bundle হতো। এখন React.lazy()
 // দিয়ে আলাদা chunk(existing `3_2` §২.১-এর lazy-load pattern reuse, নতুন
 // convention না) — named-export বলে `.then(m => ({default: m.PrintReport}))`
-// wrapper লাগে। ব্যবহারের জায়গায়(নিচে, printMode-branch) React.Suspense-এ
+// wrapper লাগে। ব্যবহারের জায়গায় (নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
@@ -118,8 +118,8 @@ import { fetchDesign, saveDesignPart } from "./appDesign.js";
 import { monthStatsOf, weekSummaryOf, yesterdayEntryOf, yesterdayMissingOf } from "./homeStats.js";
 const STATS_H = { dateKey, pad2, dailyScore, daysInMonth };
 const NO_DIRTY = { current: false };
-// ধাপ ১: সেভ-বাটনের নিচের কার্ড দুই ভাগ — হোমে ছোট অংশ, "মুহাসাবা" ট্যাবে বিশ্লেষণ-অংশ(স্থির ক্রম)।
-// "insight"(দৈনিক অন্তর্দৃষ্টি) প্ল্যানে কোথাও নেই — Owner-এর সিদ্ধান্ত না আসা পর্যন্ত হোমেই থাকল(মোছা হয়নি)।
+// ধাপ ১: সেভ-বাটনের নিচের কার্ড দুই ভাগ — হোমে ছোট অংশ, "মুহাসাবা" ট্যাবে বিশ্লেষণ-অংশ (স্থির ক্রম)।
+// "insight"(দৈনিক অন্তর্দৃষ্টি) প্ল্যানে কোথাও নেই — Owner-এর সিদ্ধান্ত না আসা পর্যন্ত হোমেই থাকল (মোছা হয়নি)।
 const HOME_BELOW_IDS = ["streak", "insight", "monthly", "weekPulse", "tomorrow"];
 const MUHASABA_IDS = ["weekly", "monthlyReport", "trend", "meeting"];
 const pickNodes = (nodes, ids) => Object.fromEntries(ids.filter(id => nodes[id]).map(id => [id, nodes[id]]));
@@ -144,7 +144,7 @@ import { MuhasabaLinkCard } from "../components/MuhasabaLinkCard.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
 // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬): আগে
 // DashboardHeader.jsx-এর হ্যামবার্গার dropdown ছিল, এখন bottom-nav "মেনু"
-// ট্যাব(TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
+// ট্যাব (TAB_SETTINGS)-এর ভিতরে full-page হিসেবে render হয়।
 // §Lazy-load(নতুন, ২১ সেপ্টেম্বর ২০২৬, একই pattern): TAB_SETTINGS-এ ট্যাপ না
 // করলে এই chunk লোড হবে না।
 import { renderHomeBelow } from "../components/HomeFold.jsx";
@@ -160,20 +160,20 @@ const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessages
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_MUHASABA, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 import { useBackLayer } from "./backNav.js";
-// §Public Tools Phase A, item ২(3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
-// PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো(3_2 §১-এর নীতি
+// §Public Tools Phase A, item ২ (3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
+// PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো (3_2 §১-এর নীতি
 // অনুযায়ী শুধু import বদল, routing-switch touch হয়নি)। lazy-load(3_2 §২.১ standing
 // rule, PrintReport-এর একই pattern reuse) — prayerTimes ট্যাপ না করলে chunk লোড হবে না।
 const PrayerTimes = React.lazy(() => import("../components/PublicTools/PrayerTimes.jsx").then(m => ({ default: m.PrayerTimes })));
-// §Public Tools Phase A, item ৩/৫ক(3_1 §"আমল হাব", ১৮ সেপ্টেম্বর ২০২৬): "আমল" ট্যাব —
+// §Public Tools Phase A, item ৩/৫ক (3_1 §"আমল হাব", ১৮ সেপ্টেম্বর ২০২৬): "আমল" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual hub component(তাসবীহ inline + বাকি
 // ৭ item "শীঘ্রই আসছে" sub-screen, content pending) বসানো হলো, একই lazy pattern।
-// §Public Tools Phase A, item ৫(3_1/3_2 §২.২, ১৮ সেপ্টেম্বর ২০২৬): "সহায়িকা" ট্যাব —
+// §Public Tools Phase A, item ৫ (3_1/3_2 §২.২, ১৮ সেপ্টেম্বর ২০২৬): "সহায়িকা" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে ৬-ক্যাটাগরি shell বসানো হলো, একই lazy pattern।
 const PublicToolsShell = React.lazy(() => import("../components/PublicTools/PublicToolsShell.jsx").then(m => ({ default: m.PublicToolsShell })));
 // boot-loading gate(নিচে, `members === null || migrationState === undefined`)
-// আগে শুধু center-spinner দেখাত(blank-screen)। এই pure-presentational, props/
-// state-বিহীন helper সেই একই gate-এ card-shape gray-skeleton দেখায়(header-bar
+// আগে শুধু center-spinner দেখাত (blank-screen)। এই pure-presentational, props/
+// state-বিহীন helper সেই একই gate-এ card-shape gray-skeleton দেখায় (header-bar
 // + date-nav-bar + তাযকিরাহ-কার্ড + accordion-এর ৪টা category-card outline,
 // প্রথমটা খোলা-সদৃশ লম্বা, বাকি ৩টা বন্ধ-সদৃশ ছোট) — existing design-token
 // (rounded-2xl/shadow-sm/border-color, 2_5 Part B §B২.১) ও Tailwind
@@ -203,7 +203,7 @@ function App() {
   // localStorage-এ family_id/family_code(hasExistingSession-এর পুরনো একই
   // শর্ত) না থাকলে — guest ধরা হয়। এই একটা flag-ই বাকি সব guard নিয়ন্ত্রণ
   // করে। auth.currentUser/localStorage কোনোটাই এই component mount-এর
-  // ভিতরে বদলায় না(সফল sign-in হলে সবসময় reload হয়, নিচের
+  // ভিতরে বদলায় না (সফল sign-in হলে সবসময় reload হয়, নিচের
   // handleGuestSignInSuccess() দ্রষ্টব্য) — তাই plain const হিসেবে প্রতি
   // render-এ recompute করা নিরাপদ, আলাদা state লাগে না।
   const isGuestMode = !auth.currentUser || !(localStorage.getItem("family_id") && localStorage.getItem("family_code"));
@@ -215,13 +215,13 @@ function App() {
   useEffect(() => {
     try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
   }, [activeTab]);
-  // হোম ছাড়া অন্য ট্যাবে ঢুকলে পাতা সবসময় ওপর থেকে শুরু(হোমের নিচ থেকে এলে নিচে থেকে যেত)।
+  // হোম ছাড়া অন্য ট্যাবে ঢুকলে পাতা সবসময় ওপর থেকে শুরু (হোমের নিচ থেকে এলে নিচে থেকে যেত)।
   useEffect(() => {
     if (activeTab !== TAB_FAMILY) { try { window.scrollTo(0, 0); } catch {} }
   }, [activeTab]);
-  // ব্যাক বাটন: হোম ছাড়া যেকোনো ট্যাব থেকে ব্যাক = হোমে ফেরা(হোমে ব্যাক = আগের মতো এক্সিট)।
+  // ব্যাক বাটন: হোম ছাড়া যেকোনো ট্যাব থেকে ব্যাক = হোমে ফেরা (হোমে ব্যাক = আগের মতো এক্সিট)।
   useBackLayer(activeTab !== TAB_FAMILY, () => setActiveTab(TAB_FAMILY));
-  // নেভ-লোডিং: অন্য ট্যাবের ফাইল অবসর সময়ে আগেভাগে নামানো(Data Saver চালু থাকলে নয়)।
+  // নেভ-লোডিং: অন্য ট্যাবের ফাইল অবসর সময়ে আগেভাগে নামানো (Data Saver চালু থাকলে নয়)।
   // একই import() path হওয়ায় React.lazy একই chunk পায়; ব্যর্থ হলে চুপচাপ বাদ।
   useEffect(() => {
     try { if (navigator.connection && navigator.connection.saveData) return undefined; } catch {}
@@ -245,7 +245,7 @@ function App() {
   // authenticated(non-guest) সদস্যের প্রথম Dashboard-load-এ একবারই ৪-ধাপ
   // walkthrough — existing one-time-flag pattern(localStorage, uid-keyed,
   // V1 ফাইল ১.২ §৩-এর dt_google_welcome_shown_<uid>-এর মতোই)। Guest-mode-এ
-  // কখনো trigger হয় না(demo-shell-এ walkthrough অপ্রাসঙ্গিক)।
+  // কখনো trigger হয় না (demo-shell-এ walkthrough অপ্রাসঙ্গিক)।
   const [showCoachMark, setShowCoachMark] = useState(false);
   useEffect(() => {
     if (isGuestMode || !auth.currentUser) return;
@@ -260,7 +260,7 @@ function App() {
   // §Guest-mode fix: guest অবস্থায় boot-loader effect(নিচে) কখনো চলে না,
   // তাই members কখনো populate হবে না — null থাকলে যেকোনো .map()/.find()
   // যেখানে `|| []` fallback নেই সেখানে crash করতে পারে। শুধু guest-এই
-  // ডিফল্ট []-এ পরিবর্তন(authenticated member-দের loading-state UX(null =
+  // ডিফল্ট []-এ পরিবর্তন (authenticated member-দের loading-state UX(null =
   // "এখনো লোড হচ্ছে") সম্পূর্ণ অপরিবর্তিত)।
   const [members, setMembers] = useState(isGuestMode ? [] : null);
   const [showGuestSignIn, setShowGuestSignIn] = useState(false);
@@ -270,7 +270,7 @@ function App() {
   // পাওয়া যায়। এই মুহূর্তে কোনো caller এই state ব্যবহার করছে না
   // (unwired), শুধু loading-gate-কে প্রভাবিত করে।
   // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬, বাগ-ফিক্স): boot-loader effect
-  // guest-এ skip হয় বলে migrationState কখনো set হতো না(চিরস্থায়ী
+  // guest-এ skip হয় বলে migrationState কখনো set হতো না (চিরস্থায়ী
   // `undefined` থেকে যেত) — নিচের loading-gate(`migrationState ===
   // undefined`) তাই কখনো pass করতো না, ফলে logout-এর পর অনন্ত spinner
   // (owner-রিপোর্টেড বাগ)। guest-এ শুধু placeholder মান("v2", কোনো real
@@ -291,7 +291,7 @@ function App() {
   // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — read+unread উভয় notification
   // live-updated(boot-এ onSnapshot দিয়ে) ও panel খোলা আছে কিনা। আগে শুধু
   // unread(read==false) filter করা হতো, ফলে "seen" করলেই item panel থেকে
-  // হারিয়ে যেত(bug)। এখন পুরো list রাখা হয়, শুধু delete/Clear-all দিয়েই
+  // হারিয়ে যেত (bug)। এখন পুরো list রাখা হয়, শুধু delete/Clear-all দিয়েই
   // item সরে; badge/unread-count আলাদাভাবে notifications.filter(!read) থেকে
   // derive করা হয়।
   const [notifications, setNotifications] = useState([]);
@@ -304,11 +304,11 @@ function App() {
   const [newName, setNewName] = useState("");
   const [newGender, setNewGender] = useState("male");
   // §Add-Member fix(১১ সেপ্টেম্বর ২০২৬) — google-only model-এ নতুন সদস্যের
-  // email আবশ্যক(2_4 §৫.১ proxy-member pattern, নিচে handleAddMember())।
+  // email আবশ্যক (2_4 §৫.১ proxy-member pattern, নিচে handleAddMember())।
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [customFields, setCustomFields] = useState([]);
   const [fieldOverrides, setFieldOverrides] = useState({});
-  // গ্লোবাল অ্যাপ ডিজাইন(ক্রিয়েটরের সাজানো, সবার জন্য এক) — null = ডিফল্ট/ফলব্যাক
+  // গ্লোবাল অ্যাপ ডিজাইন (ক্রিয়েটরের সাজানো, সবার জন্য এক) — null = ডিফল্ট/ফলব্যাক
   const [design, setDesign] = useState(null);
   const [showFieldManager, setShowFieldManager] = useState(false);
   const [showTazkirah, setShowTazkirah] = useState(false);
@@ -325,7 +325,7 @@ function App() {
       month0: d.getMonth()
     };
   });
-  // §আলাদা মাস-কার্সর(owner-approved): সাপ্তাহিক+মাসিক মুহাসাবা একসাথে(reviewCursor), ট্রেন্ড ও সভা প্রত্যেকে নিজের।
+  // §আলাদা মাস-কার্সর (owner-approved): সাপ্তাহিক+মাসিক মুহাসাবা একসাথে (reviewCursor), ট্রেন্ড ও সভা প্রত্যেকে নিজের।
   // ওভারভিউ ও দৈনিক এন্ট্রি/প্রিন্ট মূল monthCursor-এ। শুরুতে সবাই চলতি মাসে।
   const [reviewCursor, setReviewCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month0: d.getMonth() }; });
   const [trendCursor, setTrendCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month0: d.getMonth() }; });
@@ -355,7 +355,7 @@ function App() {
   const entryDirtyRef = useRef(false);
   const weeklyDirtyRef = useRef(false);
   // সোয়াইপে মাস বদল (মাসিক ওভারভিউ/মাসিক মুহাসাবা/সাপ্তাহিক মুহাসাবা/পারিবারিক সভা) — ◀ ▶ বাটনের হুবহু একই dirty-confirm।
-  // সোয়াইপ-পরবর্তী ছোট টোস্টে দেখানোর মাসের নাম(দৃশ্যমান ফিডব্যাক — ভাঁজ-বন্ধ কার্ডেও মাস বদল বোঝা যায়)
+  // সোয়াইপ-পরবর্তী ছোট টোস্টে দেখানোর মাসের নাম (দৃশ্যমান ফিডব্যাক — ভাঁজ-বন্ধ কার্ডেও মাস বদল বোঝা যায়)
   const swipeMonthLabel = (c) => BN_MONTHS[c.month0] + " " + toBn(c.year);
   const swipeShiftMonth = (delta) => {
     if (weeklyDirtyRef.current && !window.confirm("সাপ্তাহিক রিফ্লেকশনে সেভ না করা পরিবর্তন আছে। মাস পরিবর্তন করলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
@@ -369,7 +369,7 @@ function App() {
   };
   // Auto-update reload(fresh-load-only, dt-sw-updated event — dispatch হয়
   // top-level SW-registration কোড থেকে, দেখুন ফাইলের শুরুর দিকে)। Unsaved
-  // entry/weekly/meeting থাকলে reload skip করা হয়(data-loss এড়াতে); পরের
+  // entry/weekly/meeting থাকলে reload skip করা হয় (data-loss এড়াতে); পরের
   // স্বাভাবিক নেভিগেশন/reload-এ আপডেট এমনিতেই প্রযোজ্য হয়ে যাবে।
   useEffect(() => {
     const handler = () => {
@@ -380,8 +380,8 @@ function App() {
     window.addEventListener("dt-sw-updated", handler);
     return () => window.removeEventListener("dt-sw-updated", handler);
   }, []);
-  // §খসড়া ও ভুলে-বেরিয়ে-যাওয়া সতর্কতা(owner-approved): সেভ-না-করা এন্ট্রি ফোনে(localStorage) খসড়া হিসেবে রাখা হয়;
-  // সেভ হলে মুছে যায়। অ্যাপ বন্ধ করতে গেলে(ব্রাউজার সমর্থন করলে) সতর্ক করে। শুধু স্থানীয়, Firestore-এ কিছু লেখে না।
+  // §খসড়া ও ভুলে-বেরিয়ে-যাওয়া সতর্কতা (owner-approved): সেভ-না-করা এন্ট্রি ফোনে (localStorage) খসড়া হিসেবে রাখা হয়;
+  // সেভ হলে মুছে যায়। অ্যাপ বন্ধ করতে গেলে (ব্রাউজার সমর্থন করলে) সতর্ক করে। শুধু স্থানীয়, Firestore-এ কিছু লেখে না।
   function draftStorageKey(memberId, dk) {
     return "dt_draft_" + getFamilyCode() + "_" + memberId + "_" + dk;
   }
@@ -437,7 +437,7 @@ function App() {
   const [showMonthlyInfoModal, setShowMonthlyInfoModal] = useState(false);
   // §৫ Family Code Lifecycle Fix — Admin-only "কোড রিনেম" মোডাল (একই
   // familyId+data, শুধু কোড বদলায়) — বিদ্যমান "কাস্টম কোড" মোডাল থেকে
-  // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডাটা-বিচ্ছিন্নতা না ঘটে।
+  // ইচ্ছাকৃতভাবে আলাদা রাখা হয়েছে যাতে ভুলবশত ডেটা-বিচ্ছিন্নতা না ঘটে।
   const [showRenameFamilyCodeModal, setShowRenameFamilyCodeModal] = useState(false);
   const [renameFamCodeInput, setRenameFamCodeInput] = useState("");
   const [renameFamCodeBusy, setRenameFamCodeBusy] = useState(false);
@@ -463,10 +463,10 @@ function App() {
   const [feedbackStatus, setFeedbackStatus] = useState(null); // null | "sent" | "error"
   const [copiedCode, setCopiedCode] = useState(false);
   // §Public Invite-Link(নতুন, 2_4 §৫.২): family root doc-এর activeInviteToken
-  // field local state-এ mirror করা(existing family-doc fetch/listener থেকে,
+  // field local state-এ mirror করা (existing family-doc fetch/listener থেকে,
   // নিচে দেখুন — কোনো নতুন read লাগেনি)। null = কখনো generate হয়নি।
   const [activeInviteToken, setActiveInviteToken] = useState(null);
-  // §Security-fix: invite token শুধু admin পড়তে পারে(families/{id}/inviteLinks/active)।
+  // §Security-fix: invite token শুধু admin পড়তে পারে (families/{id}/inviteLinks/active)।
   useEffect(() => {
     if (isAdmin !== true || isGuestMode) return;
     let cancelled = false;
@@ -496,7 +496,7 @@ function App() {
   }
   useEffect(() => {
     // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬): guest অবস্থায় family/member/
-    // notification কোনো Firestore read/listener-ই শুরু হবে না(2_5 Screen
+    // notification কোনো Firestore read/listener-ই শুরু হবে না (2_5 Screen
     // 0-এর "zero Firestore call" নীতি অনুযায়ী) — permission-denied fallback
     // ভরসা না করে সরাসরি skip করা হচ্ছে।
     if (isGuestMode) return;
@@ -519,7 +519,7 @@ function App() {
       // self-heal সম্পন্ন হয়েছে কিনা নিশ্চিত করতে এই awaited কলটি প্রয়োজন।
       await ensureFamilyCodeMapping();
       // §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — families/{id}
-      // এখন এখানে একবারই fetch হয়(self-heal-পরবর্তী, সঠিক familyId দিয়ে);
+      // এখন এখানে একবারই fetch হয় (self-heal-পরবর্তী, সঠিক familyId দিয়ে);
       // আগের redundant non-awaited "Phase A prep" fire-and-forget কলটি
       // (self-heal-এর *আগে* ফায়ার হতো, ভুল/stale familyId-এর ঝুঁকি ছিল)
       // সম্পূর্ণ সরানো হয়েছে — নিচের awaited ensureFamilyMeta() একই কাজ
@@ -636,7 +636,7 @@ function App() {
         // (token এখন admin-only subdoc থেকে আলাদা effect-এ লোড হয়)
         // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — নিজের সব
         // notification(read+unread)-এ live listener, যাতে "seen"(read:true)
-        // করার পরও item panel থেকে হারিয়ে না যায়(শুধু explicit delete/Clear-all
+        // করার পরও item panel থেকে হারিয়ে না যায় (শুধু explicit delete/Clear-all
         // দিয়েই সরবে)। badge unread-count আলাদাভাবে filter করে বের করা হয়।
         // Spark-এ negligible cost(৩-member স্কেলে খুবই কম doc)।
         if (myUid) {
@@ -674,7 +674,7 @@ function App() {
         family_code: getFamilyCode(),
         member_count: m.length
       });
-      // গ্লোবাল ডিজাইন থাকলে সেটাই সবার জন্য; না থাকলে পরিবারের আগের সেভ-করা মান(ফলব্যাক, কিছু হারায় না)।
+      // গ্লোবাল ডিজাইন থাকলে সেটাই সবার জন্য; না থাকলে পরিবারের আগের সেভ-করা মান (ফলব্যাক, কিছু হারায় না)।
       const dz = await fetchDesign();
       setDesign(dz);
       const cf = dz && Array.isArray(dz.customFields) ? dz.customFields : await loadCustomFields();
@@ -685,7 +685,7 @@ function App() {
       try {
         // §Google Sign-in landing gate(১১ সেপ্টেম্বর ২০২৬) — সদ্য
         // matched/তৈরি হওয়া নিজের memberId one-time preference হিসেবে
-        // localStorage-এ থাকে(renderGoogleLandingGate() দেখুন), এটাই
+        // localStorage-এ থাকে (renderGoogleLandingGate() দেখুন), এটাই
         // প্রথম-বুট-এ সবচেয়ে নির্ভরযোগ্য "নিজের member" সংকেত।
         const preferredGoogleMember = localStorage.getItem("dt_google_preferred_member");
         if (preferredGoogleMember) {
@@ -709,7 +709,7 @@ function App() {
         setSelectedId(m[0].id);
       }
       // "credential-already-in-use" রিকভারি-রিলোডের পর (Incognito-তে আগে
-      // থেকে Google-লিংকড অ্যাকাউন্টে সাইন ইন করলে এই path-ই চলে) এই flag
+      // থেকে Google-লিংকড অ্যাকাউন্টে সাইন-ইন করলে এই path-ই চলে) এই flag
       // সেট থাকে — সেই মুহূর্তে onLinked() কল করার সুযোগ ছিল না, তাই এখন
       // বুট হওয়ার সময় সেটা পূরণ করা হচ্ছে।
       let pendingDriveCheck = false;
@@ -721,7 +721,7 @@ function App() {
       } catch {}
       if (isGoogleLinked() && (!m.length || pendingDriveCheck)) {
         // নতুন/খালি ডিভাইস অথবা এইমাত্র রিকভারি-রিলোড হয়েছে, আর Google
-        // সাইন ইন করা আছে — Drive-এ ব্যাকআপ আছে কিনা নীরবে চেক করা হচ্ছে।
+        // সাইন-ইন করা আছে — Drive-এ ব্যাকআপ আছে কিনা নীরবে চেক করা হচ্ছে।
         const found = await findAndOfferDriveRestore(false);
         if (!found && !m.length) {
           setAddingMember(true);
@@ -779,13 +779,13 @@ function App() {
     localStorage.setItem("monthly_reminder_dismissed_on", dateKey(new Date()));
     setMonthlyReminderBanner(false);
   }
-  // §লেবেল ম্যানেজ(ধাপ গ): রিনেম/লুকানো override প্রয়োগ। override না থাকলে তালিকা আগের মতোই।
+  // §লেবেল ম্যানেজ (ধাপ গ): রিনেম/লুকানো override প্রয়োগ। override না থাকলে তালিকা আগের মতোই।
   const deenFieldsView = useMemo(() => applyOverrides(DEFAULT_DEEN_FIELDS, fieldOverrides), [fieldOverrides]);
   const duniyaFieldsView = useMemo(() => applyOverrides(DEFAULT_DUNIYA_FIELDS, fieldOverrides), [fieldOverrides]);
-  // পরিবার-স্তরের পুরনো "অন্যান্য" কাস্টম টাস্ক(ক্যাটেগরি-বিহীন)এখন আর ফর্ম/হিসাবে ধরা হয় না(owner-সিদ্ধান্ত);
-  // ডেটা Firestore-এ অক্ষত থাকে। ক্যাটেগরিসহ লেবেল(ধাপ গ)আগের মতোই চলে।
+  // পরিবার-স্তরের পুরনো "অন্যান্য" কাস্টম টাস্ক (ক্যাটেগরি-বিহীন)এখন আর ফর্ম/হিসাবে ধরা হয় না (owner-সিদ্ধান্ত);
+  // ডেটা Firestore-এ অক্ষত থাকে। ক্যাটেগরিসহ লেবেল (ধাপ গ)আগের মতোই চলে।
   const customFieldsView = useMemo(() => applyOverrides(customFields.filter(f => f.category && f.category !== "other"), fieldOverrides), [customFields, fieldOverrides]);
-  // নির্বাচিত সদস্যের নিজের কাস্টম টাস্ক — শুধু তার হিসাবেই ঢোকে(সব হিসাব selectedMember + allFields দিয়ে চলে)।
+  // নির্বাচিত সদস্যের নিজের কাস্টম টাস্ক — শুধু তার হিসাবেই ঢোকে (সব হিসাব selectedMember + allFields দিয়ে চলে)।
   const memberTaskFields = useMemo(() => {
     const m = (members || []).find(x => x.id === selectedId);
     return taskFields(m && m.customTasks);
@@ -821,7 +821,7 @@ function App() {
   // googleUid থাকলে সেটাই একমাত্র owner-uid (পুরনো ownerUids আর পড়া হয় না)।
   const memberOwnerUids = m => (m && m.googleUid) ? [m.googleUid] : [];
   // (memberOwnerUids-এর নিচে রাখা জরুরি — const, আগে ডাকলে ReferenceError)
-  // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান(ফলব্যাক), অন্যদের ডিফল্ট।
+  // সবাই যে লেআউট দেখে: গ্লোবাল ডিজাইন; না থাকলে শুধু ক্রিয়েটরের নিজের আগের সেভ-করা মান (ফলব্যাক), অন্যদের ডিফল্ট।
   const designSrc = (() => {
     const legacy = (isCreatorAuth() && selectedMember && auth.currentUser && memberOwnerUids(selectedMember).includes(auth.currentUser.uid)) ? selectedMember : null;
     const d = design || {};
@@ -846,7 +846,7 @@ function App() {
       setEntry(data || {});
       originalEntryRef.current = data || null;
       entryDirtyRef.current = false;
-      // §খসড়া(owner-approved): আগের সেশনে সেভ-না-করা পরিবর্তন থাকলে ফিরিয়ে আনার প্রস্তাব। সেভড ডেটা কখনো নিজে থেকে বদলায় না।
+      // §খসড়া (owner-approved): আগের সেশনে সেভ-না-করা পরিবর্তন থাকলে ফিরিয়ে আনার প্রস্তাব। সেভড ডেটা কখনো নিজে থেকে বদলায় না।
       try {
         const dk = draftStorageKey(selectedId, dateKey(viewDate));
         const raw = localStorage.getItem(dk);
@@ -934,7 +934,7 @@ function App() {
   useEffect(() => {
     // §Guest-mode fix(১২ সেপ্টেম্বর ২০২৬): এই effect selectedId-নির্বিশেষে
     // মাউন্ট হওয়ার সাথে সাথেই meeting-doc listener চালু করে — guest
-    // অবস্থায় এটাই একমাত্র "অরক্ষিত" Firestore call ছিল(বাকিগুলো আগে থেকেই
+    // অবস্থায় এটাই একমাত্র "অরক্ষিত" Firestore call ছিল (বাকিগুলো আগে থেকেই
     // selectedId/myUid না থাকলে self-guard করে)। এখন এখানেও skip।
     if (isGuestMode) return;
     // New document (different month) — nothing local worth protecting yet.
@@ -1009,15 +1009,15 @@ function App() {
     isAdmin, newName, newGender, newMemberEmail, members, selectedId, migrationState,
     setMembers, setSelectedId, setNewName, setNewGender, setNewMemberEmail, setAddingMember
   });
-  // --- এডমিন ভূমিকা handler (adminActions.js-এ; Make/Remove Admin, Self-Demote) ---
+  // --- অ্যাডমিন ভূমিকা handler (adminActions.js-এ; Make/Remove Admin, Self-Demote) ---
   const { handleMakeAdmin, handleRemoveAdmin, handleSelfDemote } = createAdminActions({
     members, firstAdminUid, adminUidsList, memberOwnerUids,
     setAdminUidsList, setIsAdmin, setShowProfileDropdown
   });
   // §ProfileDropdownGoogle(নতুন, ১১ সেপ্টেম্বর ২০২৬) — "প্রোফাইল এডিট"।
-  // নিজের(googleUid-matched) member খুঁজে familyId+memberId দিয়ে
+  // নিজের (googleUid-matched) member খুঁজে familyId+memberId দিয়ে
   // editOwnProfile() কল করা — Firestore write logic googleIdentity.js-এ,
-  // এখানে শুধু "কোনটা নিজের member" resolve করা হচ্ছে(App() state-owner,
+  // এখানে শুধু "কোনটা নিজের member" resolve করা হচ্ছে (App() state-owner,
   // Owner Rule ২)।
   async function handleEditOwnProfile(name, gender) {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
@@ -1027,8 +1027,8 @@ function App() {
   }
   // §ProfileDropdownGoogle — "এই পরিবার ত্যাগ করুন"। সফল হলে এই ডিভাইসের
   // local family session(family_id/family_code) পরিষ্কার করে reload করা
-  // হয়(handleFullLogout()-এর tail-এর একই cleanup-pattern reuse) — Google
-  // sign-out করা হয় না(শুধু family membership ত্যাগ, account/session না)।
+  // হয় (handleFullLogout()-এর tail-এর একই cleanup-pattern reuse) — Google
+  // sign-out করা হয় না (শুধু family membership ত্যাগ, account/session না)।
   async function handleLeaveFamily() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     const myOwn = myUid ? (members || []).find(x => x.googleUid === myUid) : null;
@@ -1054,7 +1054,7 @@ function App() {
   // এই ডিভাইসের local session/identity রিসেট হয়। multi-family ব্যবহারকারী
   // fresh state-এ শুরু করতে পারবেন; আবার প্রবেশ করতে Family Code লাগবে।
   async function handleFullLogout() {
-    const ok = window.confirm("লগ আউট করবেন নিশ্চিত?");
+    const ok = window.confirm("আপনি কি লগআউট করতে চান?");
     if (!ok) return;
     try {
       // Anonymous sign-in বন্ধ — নতুন পরিচয় তৈরি হয় না; reload-এর পর guest mode।
@@ -1075,10 +1075,10 @@ function App() {
       // বজায় রাখে, তাই সদস্যদের এডিট-অধিকার অক্ষুণ্ণ থাকে।
       await unlinkGoogleAccount();
       setShowDeleteAccountWarning(false);
-      window.alert("গুগল অ্যাকাউন্ট সফলভাবে রিমুভ করা হয়েছে এবং সাইন আউট সম্পন্ন হয়েছে। আপনার অ্যাপের সম্পূর্ণ ডেটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত আছে।");
+      window.alert("Google অ্যাকাউন্ট সরানো হয়েছে এবং আপনাকে সাইন-আউট করা হয়েছে। আপনার সম্পূর্ণ ডেটা ফ্যামিলি ইউজারনেমের সাথে নিরাপদে সংরক্ষিত আছে।");
       window.location.reload();
     } catch (err) {
-      window.alert("একাউন্ট ডিলিট করতে সমস্যা হয়েছে: " + (err && err.message));
+      window.alert("অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে: " + (err && err.message));
     }
   }
   function updateField(key, value) {
@@ -1105,7 +1105,7 @@ function App() {
   // §Guest-mode sign-in success(১২ সেপ্টেম্বর ২০২৬) — আগে এই ঠিক একই logic
   // renderGoogleLandingGate()(আলাদা root)-এর handleGoogleGateSuccess()-এ
   // ছিল, এখন App()-এর ভিতরের guest-mode popover থেকে সরাসরি reuse। familyId
-  // থেকে আসল familyCode fetch করে(না পারলে familyId-ই fallback, login-loop
+  // থেকে আসল familyCode fetch করে (না পারলে familyId-ই fallback, login-loop
   // এড়াতে) localStorage সেট করে reload — reload-এর পরে normal bootOnce()
   // path-ই চলে, isGuestMode আর true থাকবে না।
   async function handleGuestSignInSuccess(familyId, memberId) {
@@ -1124,9 +1124,9 @@ function App() {
     // §Bug-fix(১৩ সেপ্টেম্বর ২০২৬, owner-reported #৪ — Invite-Link loop):
     // আগে এখানে plain reload() হতো, কিন্তু URL-এ তখনও Invite-Link-এর
     // ?joinFid=/joinToken= query-param থেকে যেত — reload-এর পর app.js-এর
-    // সবার-আগের early-return route শুধু URL-param দেখেই(join ইতিমধ্যে সফল
+    // সবার-আগের early-return route শুধু URL-param দেখেই (join ইতিমধ্যে সফল
     // হয়েছে কিনা না দেখে) আবার fresh InviteJoinGate("form" stage) render
-    // করে ফেলত, অসীম-লুপ-এর মতো দেখাত(join আসলে প্রথমবারই সফল হয়ে গিয়েছিল)।
+    // করে ফেলত, অসীম-লুপ-এর মতো দেখাত (join আসলে প্রথমবারই সফল হয়ে গিয়েছিল)।
     // origin-এ hard-redirect করলে param strip হয়ে যায় — normal guest
     // sign-in flow(যেখানে URL এমনিতেই origin) আচরণ অপরিবর্তিত, existing
     // onBackToMain()-এর একই pattern reuse।
@@ -1154,10 +1154,10 @@ function App() {
       entryDirtyRef.current = false;
       try { localStorage.removeItem(draftStorageKey(selectedId, key)); } catch (e) {}
       localStorage.setItem("last_active_date", dateKey(new Date()));
-      // §Motivational Layer — Phase 1.5: শুধু "আজ"-এর save-এই ট্রিগার হয়(পুরনো
+      // §Motivational Layer — Phase 1.5: শুধু "আজ"-এর save-এই ট্রিগার হয় (পুরনো
       // দিনের backfill-edit বাদ, dailyInsight.js-এর মতোই "আজ"-কেন্দ্রিক scope)।
       // Best-effort, non-blocking(await না) — মূল save-flow/UI-tick-কে ধীর করবে
-      // না, ব্যর্থ হলেও silently ignore হয়(memberData.js-এ try/catch আছে)।
+      // না, ব্যর্থ হলেও silently ignore হয় (memberData.js-এ try/catch আছে)।
       if (key === dateKey(new Date())) {
         const pct = dailyScore(toSave, selectedMember, allFields);
         if (pct !== null) {
@@ -1207,8 +1207,8 @@ function App() {
   // real-month-এ browse করলে অর্থবহ — dailyInsight-এর একই month-scope guard)।
   const tomorrowKey = useMemo(() => dateKey(new Date(Date.now() + 86400000)), []);
   // "আজকের মুহাসাবা" কার্ডের "গতকাল ভরা হয়নি" ব্যানার: শুধু আজকের দিন দেখার সময়, চলতি মাসে, মাসের ২ তারিখ থেকে,
-  // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে(নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
-  // "গতকালের মতো বসান" শর্টকাটের উৎস: একই শর্তে(চলতি মাস, ২ তারিখ থেকে) গতকালের সেভ-করা এন্ট্রি, নইলে null।
+  // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে (নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
+  // "গতকালের মতো বসান" শর্টকাটের উৎস: একই শর্তে (চলতি মাস, ২ তারিখ থেকে) গতকালের সেভ-করা এন্ট্রি, নইলে null।
   const yesterdayEntry = useMemo(() => yesterdayEntryOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
   const yesterdayMissing = useMemo(() => yesterdayMissingOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
   const suggestedFocusKey = useMemo(() => {
@@ -1237,12 +1237,12 @@ function App() {
   // §B৭ Weekly Summary Notification(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬,
   // owner-approved, in-app non-push variant — architecture-review note
   // অনুযায়ী প্রকৃত push out-of-scope, Blaze লাগবে): app-open-এ, ইতিমধ্যে-
-  // loaded monthEntries থেকে গত("আগের")-সপ্তাহের গড়-স্কোর গণনা(নতুন কোনো
+  // loaded monthEntries থেকে গত("আগের")-সপ্তাহের গড়-স্কোর গণনা (নতুন কোনো
   // Firestore read না)। Week-definition existing getWeekRanges()(app-এর
   // নিজস্ব ৭-দিন-চাংক, Weekly Reflection feature-এর সাথে সামঞ্জস্যপূর্ণ)।
-  // সরলীকরণ(ঝুঁকি কমাতে, owner-approved plan অনুযায়ী): শুধু বর্তমান-মাস
+  // সরলীকরণ (ঝুঁকি কমাতে, owner-approved plan অনুযায়ী): শুধু বর্তমান-মাস
   // দেখা অবস্থায় ও current-week মাসের প্রথম সপ্তাহ না হলেই trigger হয় —
-  // মাস-boundary ক্রস করা সপ্তাহের জন্য আলাদা মাস fetch করা হয় না(স্কিপ,
+  // মাস-boundary ক্রস করা সপ্তাহের জন্য আলাদা মাস fetch করা হয় না (স্কিপ,
   // কোনো error/crash না, শুধু সেই একটা edge-case-এ summary skip হয়)।
   const [weeklySummaryToast, setWeeklySummaryToast] = useState(null);
   useEffect(() => {
@@ -1274,12 +1274,12 @@ function App() {
   if (members === null || migrationState === undefined) return /*#__PURE__*/React.createElement(DashboardSkeleton, null);
   if (migrationState !== "v2") return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen flex items-center justify-center p-6 text-center text-slate-700"
-  }, "এই পরিবারের ডেটা-সংস্করণ এই অ্যাপে সাপোর্টেড নয়। অনুগ্রহ করে অ্যাডমিনকে জানান।");
+  }, "এই পরিবারের ডেটা-সংস্করণ এই অ্যাপ ভার্সনে সমর্থিত নয়। অনুগ্রহ করে অ্যাডমিনকে জানান।");
   // §Onboarding Gate fix(১৮ আগস্ট ২০২৬): GoogleAccountModal ও ClaimKey
   // মোডাল আগে শুধু Dashboard-এর মূল JSX-এর ভিতরে বাঁধা ছিল, তাই early-
-  // return branch-এ(নিচে) কখনো render হতো না — ফলে Google Sign-in ধাপে
+  // return branch-এ (নিচে) কখনো render হতো না — ফলে Google Sign-in ধাপে
   // সাদা পেজ এবং keyClaim ধাপে নাম ক্লিক করলে কিছু হতো না। এখন একবার
-  // variable-এ বের করে দুই জায়গাতেই(early-return branch + নিচের আগের
+  // variable-এ বের করে দুই জায়গাতেই (early-return branch + নিচের আগের
   // অবস্থান) reuse করা হচ্ছে — কোনো নতুন logic/state/collection নেই।
   const googleAccountModalNode = showGoogleAccountModal && /*#__PURE__*/React.createElement(GoogleAccountModal, {
     onClose: () => setShowGoogleAccountModal(false),
@@ -1292,11 +1292,11 @@ function App() {
     syncFamilyCodeWithAccount: syncFamilyCodeWithAccount
   });
   // §Public Invite-Link Join(2_4 §৫.২/Screen D):
-  // root path-এ ?joinFid=&joinToken= থাকলে(শেয়ার করা আমন্ত্রণ লিংক থেকে
+  // root path-এ ?joinFid=&joinToken= থাকলে (শেয়ার করা আমন্ত্রণ লিংক থেকে
   // আসা) পুরো normal render(guest/member সব) bypass করে
   // শুধু InviteJoinGate(Screen D) দেখানো হয়। Cloudflare Pages-এ আলাদা
-  // "/join" path route করতে নতুন _redirects config লাগত(বর্তমানে নেই) —
-  // তাই root query-param ব্যবহার করা হলো(owner-approved deviation, spec-এর
+  // "/join" path route করতে নতুন _redirects config লাগত (বর্তমানে নেই) —
+  // তাই root query-param ব্যবহার করা হলো (owner-approved deviation, spec-এর
   // ".../join?fid=...&token=..." থেকে সামান্য ভিন্ন URL-shape, ফাংশনালিটি
   // অভিন্ন, কোনো নতুন server-config লাগে না)। সম্পূর্ণ additive early-
   // return — params না থাকলে এই ব্লক কখনো fire করে না, existing routing/
@@ -1321,22 +1321,22 @@ function App() {
     });
   }
   // §Bug-fix(১৫ সেপ্টেম্বর ২০২৬, "মেনু" ট্যাব সাদা-পেজ ক্র্যাশ): themeColorPickerEl
-  // আগে নিচে(family-tab render-flow-এর ভিতরে, monthCursor-নির্ভর হিসাব-চালার পরে)
+  // আগে নিচে (family-tab render-flow-এর ভিতরে, monthCursor-নির্ভর হিসাব-চালার পরে)
   // "const" দিয়ে define হতো — কিন্তু TAB_SETTINGS("মেনু") early-return branch(ঠিক
-  // নিচে) সেই ঘোষণার *আগেই* একই ভ্যারিয়েবল ব্যবহার করত(MenuPage prop হিসেবে),
+  // নিচে) সেই ঘোষণার *আগেই* একই ভ্যারিয়েবল ব্যবহার করত (MenuPage prop হিসেবে),
   // যা প্রতিটা render-এ JS-এর "const" temporal-dead-zone নিয়ম অনুযায়ী
-  // ReferenceError ছুঁড়ত(themeColorPickerEl-এর নিজস্ব dependency — themeColor/
+  // ReferenceError ছুঁড়ত (themeColorPickerEl-এর নিজস্ব dependency — themeColor/
   // setThemeColor/THEME_PRESETS — সব এর অনেক আগেই সংজ্ঞায়িত, তাই early-move
   // নিরাপদ, কোনো নতুন dependency তৈরি হয়নি)। কোনো Error Boundary না থাকায়
   // React পুরো tree unmount করে সাদা পেজ দেখাতো; commit না হওয়ায়
   // sessionStorage(dt_active_tab)-ও আগের("family") মানেই থেকে যেত — তাই
-  // reload করলে হোম-পেজ ফিরে আসতো(ভুল-fix না, শুধু pre-crash state)। Fix:
-  // এই const-টা এখানে(early-return-এর আগে) move করা হলো, নিচের ব্যবহার-স্থানে
-  // (family-tab render-flow) অপরিবর্তিত রয়ে গেছে(same variable, শুধু
+  // reload করলে হোম-পেজ ফিরে আসতো (ভুল-fix না, শুধু pre-crash state)। Fix:
+  // এই const-টা এখানে (early-return-এর আগে) move করা হলো, নিচের ব্যবহার-স্থানে
+  // (family-tab render-flow) অপরিবর্তিত রয়ে গেছে (same variable, শুধু
   // declaration-position বদলেছে)।
   // §Order swap(১৬ সেপ্টেম্বর ২০২৬, owner-approved): ডিসপ্লে মোড এখন থিম
   // কালার-এর উপরে — শুধু render-order বদলেছে, দুই ব্লকের ভিতরের
-  // logic/structure/props অপরিবর্তিত(byte-identical, শুধু অবস্থান বদল)।
+  // logic/structure/props অপরিবর্তিত (byte-identical, শুধু অবস্থান বদল)।
   // §Menu UI polish(১ নভেম্বর ২০২৬): ডিসপ্লে মোড + থিম এখন একটাই "অ্যাপের চেহারা" কার্ড
   // (segmented-control + ৩-কলাম থিম গ্রিড)। logic(setDisplayMode/setThemeColor/তুলনা) অপরিবর্তিত।
   const themeColorPickerEl = /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1380,7 +1380,7 @@ function App() {
               }))),
               React.createElement("div", { className: "px-2 py-1.5 text-[11px] font-bold leading-tight", style: { color: t.color } }, (on ? "✓ " : "") + t.name));
           })))));
-  // ধাপ ১(মুহাসাবা ট্যাব): সেভ-বাটনের নিচের কার্ডগুলোর node-তালিকা এখন এখানে(আগে হোম-রিটার্নের ভেতরে ছিল, হুবহু একই কোড);
+  // ধাপ ১ (মুহাসাবা ট্যাব): সেভ-বাটনের নিচের কার্ডগুলোর node-তালিকা এখন এখানে (আগে হোম-রিটার্নের ভেতরে ছিল, হুবহু একই কোড);
   // হোম ও মুহাসাবা-ট্যাব দুজনেই এখান থেকে নেয়। total/leadBlanks আগের মতোই monthStats থেকে।
   const total = monthStats.total;
   const leadBlanks = new Date(monthCursor.year, monthCursor.month0, 1).getDay();
@@ -1390,13 +1390,13 @@ function App() {
     streak: streak,
     toBn: toBn,
     // §Stable "আজকের অগ্রগতি"(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড bug): আগে
-    // রাত ১২টার পর(আজকের এন্ট্রি এখনো সেভ না হলে) todayPercent null হয়ে
+    // রাত ১২টার পর (আজকের এন্ট্রি এখনো সেভ না হলে) todayPercent null হয়ে
     // পুরো কার্ডই অদৃশ্য হয়ে যেত। Fix: আজকের এন্ট্রি না থাকলে গতকালের এন্ট্রি
     // fallback হিসেবে দেখানো হয়("গতকালের অগ্রগতি", তুলনা তার আগের দিনের
     // সাথে) — নতুন কোনো Firestore read/listener লাগেনি, existing
-    // monthEntries-ই যথেষ্ট। মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে(load করা
+    // monthEntries-ই যথেষ্ট। মাসের ১ তারিখে "গতকাল" আগের মাসে পড়ে (load করা
     // নেই) — সেই edge-case-এ আগের existing limitation অনুযায়ীই silently
-    // card hidden থাকে(নতুন cross-month fetch যোগ করা হয়নি, over-engineering
+    // card hidden থাকে (নতুন cross-month fetch যোগ করা হয়নি, over-engineering
     // এড়াতে)।
     ...(() => {
       const now_ = new Date();
@@ -1440,7 +1440,7 @@ function App() {
     setMonthRefreshKey: setMonthRefreshKey,
     setPrintMode: setPrintMode,
     setShowMonthlyInfoModal: setShowMonthlyInfoModal,
-    // মুহাসাবা-ট্যাবে দিন ট্যাপ করলে হোমে সেই দিনের এন্ট্রি খোলে(নইলে ট্যাপ বোঝা যেত না)।
+    // মুহাসাবা-ট্যাবে দিন ট্যাপ করলে হোমে সেই দিনের এন্ট্রি খোলে (নইলে ট্যাপ বোঝা যেত না)।
     setViewDate: d => { setViewDate(d); setActiveTab(TAB_FAMILY); },
     total: total,
     weeklyDirtyRef: weeklyDirtyRef,
@@ -1455,9 +1455,9 @@ function App() {
     // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking
     // আগে আলাদা sibling card হিসেবে Monthly Overview-এর উপরে ছিল — এখন এখানে
     // prop হিসেবে দেওয়া হচ্ছে, MonthlyOverviewSection নিজে এটাকে stats-row-এর
-    // নিচে ও heatmap grid-এর উপরে বসায়(DashboardSections.jsx দ্রষ্টব্য)।
+    // নিচে ও heatmap grid-এর উপরে বসায় (DashboardSections.jsx দ্রষ্টব্য)।
     // TopBottomActivityRanking component-এর নিজস্ব calculation+presentation
-    // সম্পূর্ণ অপরিবর্তিত(props হুবহু আগেরই) — শুধু render-tree-এর অবস্থান বদলেছে।
+    // সম্পূর্ণ অপরিবর্তিত (props হুবহু আগেরই) — শুধু render-tree-এর অবস্থান বদলেছে।
     rankingSlot: /*#__PURE__*/React.createElement(TopBottomActivityRanking, {
       monthEntries: monthEntries,
       totalDays: total,
@@ -1556,10 +1556,10 @@ function App() {
   }))
   };
   // §Bottom Navigation(2_4 §৯.২) — Public Tools/Settings ট্যাব কখনো Onboarding Gate-এর
-  // অধীনে না(auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
-  // early-return। "family" ট্যাবে(ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
+  // অধীনে না (auth-status নির্বিশেষে সবসময় accessible), তাই নিচের সব gate-check-এর আগে এই
+  // early-return। "family" ট্যাবে (ডিফল্ট) এই ব্লক কখনো fire করে না — নিচের existing
   // gate-logic byte-identical অপরিবর্তিত।
-  // মুহাসাবা-ট্যাবে accessPending/printMode হলে নিচের একই স্ক্রিন(অনুমোদন-অপেক্ষা/প্রিন্ট) দেখাতে এই early-return এড়ানো হয়।
+  // মুহাসাবা-ট্যাবে accessPending/printMode হলে নিচের একই স্ক্রিন (অনুমোদন-অপেক্ষা/প্রিন্ট) দেখাতে এই early-return এড়ানো হয়।
   if (activeTab !== TAB_FAMILY && !(activeTab === TAB_MUHASABA && (accessPending || printMode))) {
     if (activeTab === TAB_MUHASABA) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1571,14 +1571,14 @@ function App() {
     }
     // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬):
     // TAB_SETTINGS("মেনু") এখন আর generic PublicToolsPlaceholder না — আগে
-    // DashboardHeader.jsx-এর হ্যামবার্গার dropdown-এ যা ছিল(family
+    // DashboardHeader.jsx-এর হ্যামবার্গার dropdown-এ যা ছিল (family
     // username/সদস্য-তালিকা/আমন্ত্রণ-লিংক/ডেটা ম্যানেজমেন্ট/ফিডব্যাক/থিম),
-    // সেই একই content এখন এখানে full-page হিসেবে render হয়(structural-only
+    // সেই একই content এখন এখানে full-page হিসেবে render হয় (structural-only
     // move, কোনো logic/condition বদলায়নি — MenuPage.jsx দ্রষ্টব্য)। এই
     // ট্যাব থেকে ট্রিগার হওয়া modal-cluster(Archive/FamilyCodeChoice+
     // Rename/Backup+Import+DriveRestore/Feedback) পূর্বে শুধু family-tab
-    // tree-এর ভিতরেই mount হতো(নিচে অপরিবর্তিত রাখা হয়েছে) — তাই এখানে
-    // আলাদাভাবে(byte-identical props) mount করা আবশ্যক, নাহলে Menu-ট্যাব
+    // tree-এর ভিতরেই mount হতো (নিচে অপরিবর্তিত রাখা হয়েছে) — তাই এখানে
+    // আলাদাভাবে (byte-identical props) mount করা আবশ্যক, নাহলে Menu-ট্যাব
     // থেকে ট্রিগার করা বাটনগুলো কোনো modal-ই দেখাবে না।
     if (activeTab === TAB_SETTINGS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1639,7 +1639,7 @@ function App() {
           onSave: handleSaveFieldManager,
           onClose: () => setShowFieldManager(false)
         })),
-        // নেভ-ট্যাব কাস্টমাইজ(২ নভেম্বর ২০২৬, owner-approved): সময়সূচি/আমল/সহায়িকা — একই স্ক্রিন, ভিন্ন tab।
+        // নেভ-ট্যাব কাস্টমাইজ (২ নভেম্বর ২০২৬, owner-approved): সময়সূচি/আমল/সহায়িকা — একই স্ক্রিন, ভিন্ন tab।
         ...[["prayer", showPrayerLayout, setShowPrayerLayout], ["amol", showAmolLayout, setShowAmolLayout], ["tools", showToolsLayout, setShowToolsLayout]].map(([tab, shown, setShown]) =>
           shown && isCreatorAuth() && React.createElement(React.Suspense, { key: "tablayout-" + tab, fallback: null }, React.createElement(TabLayoutScreen, {
             tab: tab,
@@ -1712,7 +1712,7 @@ function App() {
           showFeedbackModal: showFeedbackModal
         }),
         // §Guest-mode sign-in popover — family-tab tree-এর একই block(নিচে,
-        // byte-identical) থেকে reuse, Menu-ট্যাবেও(guest অবস্থায়)
+        // byte-identical) থেকে reuse, Menu-ট্যাবেও (guest অবস্থায়)
         // "🔵 Google দিয়ে সাইন-ইন করুন" ট্যাপে প্রযোজ্য হতে হবে।
         showGuestSignIn && /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("div", {
@@ -1727,9 +1727,9 @@ function App() {
       );
     }
     // §Public Tools Phase A, item ২: TAB_PRAYER_TIMES এখন actual PrayerTimes.jsx
-    // render করে(lazy+Suspense, উপরের import-নোট দ্রষ্টব্য) — PublicToolsPlaceholder
-    // fallback শুধু Suspense-loading window-এ দেখায়(chunk লোড হওয়া পর্যন্ত), তারপর
-    // actual UI বসে। TAB_TOOLS এখন PublicToolsShell(নিচে; "আমল ও দু'আ" তার ভেতরে)।
+    // render করে (lazy+Suspense, উপরের import-নোট দ্রষ্টব্য) — PublicToolsPlaceholder
+    // fallback শুধু Suspense-loading window-এ দেখায় (chunk লোড হওয়া পর্যন্ত), তারপর
+    // actual UI বসে। TAB_TOOLS এখন PublicToolsShell(নিচে; "আমল ও দোয়া" তার ভেতরে)।
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
@@ -1759,7 +1759,7 @@ function App() {
     style: { color: "var(--theme-primary)", fontFamily: "'Noto Serif Bengali', serif" }
   }, "অনুমোদনের অপেক্ষায়"), /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-gray-600 max-w-xs"
-  }, "এই পরিবারের ডেটা দেখতে এডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
+  }, "এই পরিবারের ডেটা দেখতে অ্যাডমিনের অনুমোদন প্রয়োজন। অনুমোদন হলে এই পেজ রিফ্রেশ করুন।"), /*#__PURE__*/React.createElement("button", {
     className: "px-4 py-2 rounded-2xl border shadow-sm bg-white",
     style: { color: "var(--theme-primary)" },
     onClick: () => window.location.reload()
@@ -1895,7 +1895,7 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     DEFAULT_DEEN_FIELDS: deenFieldsView,
     DEFAULT_DUNIYA_FIELDS: duniyaFieldsView,
-    // §Part B Phase ২(category-accordion, ১৫ সেপ্টেম্বর ২০২৬): নতুন prop-দুটো —
+    // §Part B Phase ২ (category-accordion, ১৫ সেপ্টেম্বর ২০২৬): নতুন prop-দুটো —
     // DEEN_CATEGORY_GROUPS(field→category mapping) ও dailyScore(single-entry
     // multi-field aggregate ratio, appHelpers.js-এ আগে থেকেই বিদ্যমান, এতদিন শুধু
     // calculateStreak()-এ ব্যবহৃত হতো) — ক্যাটাগরি-হেডারের %-badge গণনায়। কোনো নতুন
@@ -1993,7 +1993,7 @@ function App() {
   }),
   // §Guest-mode sign-in popover(১২ সেপ্টেম্বর ২০২৬) — profile-pill/মেনু/যেকোনো
   // write-action(updateField/updateExcuse/updateWeekly/meeting-actions)
-  // guest অবস্থায় ট্যাপ করলে এটা খোলে(existing GoogleSignInGate reuse)।
+  // guest অবস্থায় ট্যাপ করলে এটা খোলে (existing GoogleSignInGate reuse)।
   showGuestSignIn && /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       className: "fixed inset-0 bg-black/40 z-[60]",
@@ -2034,7 +2034,7 @@ function mountApp() {
   // ভিন্ন component(App vs আলাদা landing-gate root) render হতো। এখন App()
   // নিজেই ভিতরে isGuestMode(auth.currentUser + localStorage উভয় চেক করে)
   // দিয়ে guest/member উভয় অবস্থা সামলায় — একই component, একই root,
-  // কোনো আলাদা "landing page" নেই(2_4 §২-এর মূল Core Decision অনুযায়ী:
+  // কোনো আলাদা "landing page" নেই (2_4 §২-এর মূল Core Decision অনুযায়ী:
   // "App খুললেই Main Page — কোনো Onboarding Gate/auth-check নেই")। তাই
   // এখানে branching সরিয়ে সবসময় সরাসরি App() render করা হচ্ছে।
   const container = document.getElementById("root");

@@ -1,6 +1,6 @@
 // EditableSection.jsx — shared wrapper component(3_6_Editable_Content_Plan.md
 // §৫)। format("richtext"|"accordion"|"table") prop নিয়ে সঠিক UI render করে +
-// App-Creator-only edit-controls conditionally দেখায়(isCreatorAuth())। প্রতিটা
+// App-Creator-only edit-controls conditionally দেখায় (isCreatorAuth())। প্রতিটা
 // content-component(MorningEveningAzkar.jsx ইত্যাদি) নিজের sectionId+format
 // দিয়ে এই একটা shared component call করে — প্রতিটা আলাদাভাবে edit-UI বানাতে হয় না।
 //
@@ -302,8 +302,8 @@ function AccordionBlock({ defaultContent, doc, isCreator, busy, error, withBusy,
     });
   }
 
-  // ড্র্যাগ-রিঅর্ডার(creator-only): filterItems-এর দৃশ্যমান অংশের নতুন ক্রম পূর্ণ
-  // তালিকায় ফিরিয়ে বসানো হয় — লুকানো(অন্য ট্যাবের) item নিজ নিজ অবস্থানেই থাকে।
+  // ড্র্যাগ-রিঅর্ডার (creator-only): filterItems-এর দৃশ্যমান অংশের নতুন ক্রম পূর্ণ
+  // তালিকায় ফিরিয়ে বসানো হয় — লুকানো (অন্য ট্যাবের) item নিজ নিজ অবস্থানেই থাকে।
   // Optimistic update, save ব্যর্থ হলে আগের ক্রমে ফেরত।
   async function commitReorder(newIds) {
     const byId = {};

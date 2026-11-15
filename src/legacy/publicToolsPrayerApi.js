@@ -64,8 +64,8 @@ async function fetchDailyPrayerTimes({ lat, lon, madhab, date }) {
   }
 }
 
-// মাসিক সময়সূচি — item ১০(Phase B, মাসিক নামাজ-সময়সূচি টেবিল)-এর জন্য wrapper,
-// এই মুহূর্তে কোনো UI এটা কল করে না(future-use, একই data-layer-এ রাখা হলো যাতে
+// মাসিক সময়সূচি — item ১০ (Phase B, মাসিক নামাজ-সময়সূচি টেবিল)-এর জন্য wrapper,
+// এই মুহূর্তে কোনো UI এটা কল করে না (future-use, একই data-layer-এ রাখা হলো যাতে
 // Phase B-তে আলাদা fetch-লজিক নতুন করে লিখতে না হয়)।
 async function fetchMonthlyPrayerTimes({ lat, lon, madhab, year, month }) {
   const cacheId = `${year}-${month}_${lat.toFixed(2)}_${lon.toFixed(2)}_${madhab}`;
@@ -86,7 +86,7 @@ async function fetchMonthlyPrayerTimes({ lat, lon, madhab, year, month }) {
   }
 }
 
-// §তাৎক্ষণিক cache-পাঠ(network ছাড়া) — ট্যাব খুললেই সর্বশেষ সিংক-করা সময় দেখাতে।
+// §তাৎক্ষণিক cache-পাঠ (network ছাড়া) — ট্যাব খুললেই সর্বশেষ সিংক-করা সময় দেখাতে।
 function peekCachedDailyTimings({ lat, lon, madhab, date }) {
   const cache = readCache(DAILY_CACHE_KEY);
   const id = `${dateKeyFor(date)}_${lat.toFixed(2)}_${lon.toFixed(2)}_${madhab}`;

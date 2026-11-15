@@ -1,10 +1,10 @@
-// PublicToolsShell.jsx — "সহায়িকা" bottom-nav ট্যাব(Phase A item ৫)। ৬-ক্যাটাগরি
+// PublicToolsShell.jsx — "সহায়িকা" bottom-nav ট্যাব (Phase A item ৫)। ৬-ক্যাটাগরি
 // grid(3_1 গ্রুপিং-টেবিল/3_2 §২.২/3_3 §৭)। সাধারণ item(Qibla/ZakatCalculator
 // ইত্যাদি) ট্যাপে এই শেল নিজেই back+title header দেখিয়ে ActiveComponent বসায়।
-// একক-এন্ট্রি ক্যাটাগরি(কুইজ/ব্লগ) ব্যতিক্রম — এরা নিজস্ব পূর্ণাঙ্গ
-// header+back-navigation বহন করে(BlogSection.jsx/QuizSection.jsx), তাই শেল
+// একক-এন্ট্রি ক্যাটাগরি (কুইজ/ব্লগ) ব্যতিক্রম — এরা নিজস্ব পূর্ণাঙ্গ
+// header+back-navigation বহন করে (BlogSection.jsx/QuizSection.jsx), তাই শেল
 // generic wrapper না বসিয়ে সরাসরি component render করে, শুধু onBack prop
-// দিয়ে(SINGLE_ENTRY_COMPONENTS, নিচে)।
+// দিয়ে (SINGLE_ENTRY_COMPONENTS, নিচে)।
 // React global(window.React, globals.js)।
 
 import { ChevronLeft } from "../icons.jsx";
@@ -67,7 +67,7 @@ const ACTIVE_ITEM_COMPONENTS = {
   hijriDates: HijriImportantDays,
 };
 
-// একক-এন্ট্রি ক্যাটাগরি(কুইজ/ব্লগ) — id দিয়ে lookup, নিজস্ব header/back বহন করে
+// একক-এন্ট্রি ক্যাটাগরি (কুইজ/ব্লগ) — id দিয়ে lookup, নিজস্ব header/back বহন করে
 // বলে ACTIVE_ITEM_COMPONENTS-এর generic wrapped-header pattern এখানে প্রযোজ্য না।
 const SINGLE_ENTRY_COMPONENTS = {
   quiz: QuizSection,
@@ -75,7 +75,7 @@ const SINGLE_ENTRY_COMPONENTS = {
 };
 
 // প্রতিটা ক্যাটাগরির item-list(3_1 "সহায়িকা ট্যাবের ভিতরে গ্রুপিং" টেবিল অনুযায়ী)।
-// কুইজ/ব্লগ(single-entry ক্যাটাগরি) আলাদাভাবে নিচে handle হয়েছে(§renderCategory)।
+// কুইজ/ব্লগ (single-entry ক্যাটাগরি) আলাদাভাবে নিচে handle হয়েছে(§renderCategory)।
 const CATEGORIES = [
   {
     id: "salah",
@@ -87,7 +87,7 @@ const CATEGORIES = [
       { key: "sahuSijdah", icon: "repeat", label: "সাহু সিজদার নিয়ম" },
       { key: "qasrPrayer", icon: "suitcase", label: "কসর নামাজের নিয়ম" },
       { key: "janazah", icon: "leaf", label: "জানাজার নামাজের নিয়ম" },
-      { key: "wudu", icon: "drop", label: "অযুর নিয়ম" },
+      { key: "wudu", icon: "drop", label: "ওজুর নিয়ম" },
       { key: "ghusl", icon: "drops", label: "ফরজ গোসলের নিয়ম" },
       { key: "tayammum", icon: "palm", label: "তায়াম্মুমের নিয়ম" },
       { key: "istikhara", icon: "moonStar", label: "ইস্তিখারার সালাতের নিয়ম" },
@@ -130,17 +130,17 @@ const CATEGORIES = [
 ];
 
 // front-level flat grid(owner-request, ১৯ সেপ্টেম্বর ২০২৬) — কিবলা ও জুমার
-// দিনের বিশেষ আমল নিজ নিজ ক্যাটাগরি(toolsTracking/specialDays, উপরে) থেকে
+// দিনের বিশেষ আমল নিজ নিজ ক্যাটাগরি (toolsTracking/specialDays, উপরে) থেকে
 // বের করে সরাসরি front-এ আনা হয়েছে। বাকি ৪টা ক্যাটাগরি + কুইজ/ব্লগ একই
-// সারিতে, একটাই ToolGridSection দিয়ে(কোনো section-title ছাড়া, flat)।
-// আলাদা রঙ(ঐচ্ছিক accent): "সকল আমল ও দু'আ" = ব্রোঞ্জ, "ডিভাইন ব্লগ" = আকাশী নীল — থিম বদলালেও একই থাকে।
+// সারিতে, একটাই ToolGridSection দিয়ে (কোনো section-title ছাড়া, flat)।
+// আলাদা রঙ (ঐচ্ছিক accent): "সকল আমল ও দোয়া" = ব্রোঞ্জ, "ডিভাইন ব্লগ" = আকাশী নীল — থিম বদলালেও একই থাকে।
 const ACCENT_BRONZE = { bg: "linear-gradient(160deg, #FBF1DC 0%, #F0D9A6 100%)", border: "#D9B36A", disc: "radial-gradient(circle at 30% 25%, #FFF8E6 0%, #F1DBA8 100%)", ring: "#D9B36A", icon: "#8A5A12", text: "#5A3A0A" };
 const ACCENT_SKY = { bg: "linear-gradient(160deg, #EAF6FD 0%, #BFE3F7 100%)", border: "#86C5E8", disc: "radial-gradient(circle at 30% 25%, #F4FBFF 0%, #C9E8F8 100%)", ring: "#86C5E8", icon: "#1F6FA3", text: "#134A70" };
 
 const FRONT_ITEMS = [
   { kind: "category", id: "quran", icon: "quran", label: "কুরআন" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
-  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দু'আ", accent: ACCENT_BRONZE },
+  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দোয়া", accent: ACCENT_BRONZE },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
   { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার", accent: ACCENT_SKY },
   { kind: "single", id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },
@@ -152,11 +152,11 @@ export function PublicToolsShell({ tabLayout } = {}) {
   // "front" | { tool: {key,label} } | { single: {id,label} } |
   // { category: catObj } | { category: catObj, item: {key,label} }
   const [view, setView] = useState("front");
-  // ব্যাক বাটন: স্তর-১(ক্যাটাগরি/টুল/সিঙ্গেল)→সহায়িকা; স্তর-২(ক্যাটাগরির আইটেম)→ক্যাটাগরি।
+  // ব্যাক বাটন: স্তর-১ (ক্যাটাগরি/টুল/সিঙ্গেল)→সহায়িকা; স্তর-২ (ক্যাটাগরির আইটেম)→ক্যাটাগরি।
   useBackLayer(view !== "front", () => setView("front"));
   useBackLayer(view !== "front" && !!view.item, () => setView((v) => (v !== "front" && v.category ? { category: v.category } : "front")));
 
-  // ধাপ ২: "আমল ও দু'আ" এখন সহায়িকার ভেতরের সাব-পেজ(আগের আমল-ট্যাবের হুবহু)।
+  // ধাপ ২: "আমল ও দোয়া" এখন সহায়িকার ভেতরের সাব-পেজ (আগের আমল-ট্যাবের হুবহু)।
   if (view !== "front" && view.amol) {
     return /*#__PURE__*/React.createElement(AmolHub, { tabLayout, onBack: () => setView("front") });
   }
@@ -255,7 +255,7 @@ export function PublicToolsShell({ tabLayout } = {}) {
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
     /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
-    // ৮ টাইলের গ্রিড (আয়াত-কার্ড এখন "সকল আমল ও দু'আ"-র ভেতরে), সবার নিচে তাসবীহ।
+    // ৮ টাইলের গ্রিড (আয়াত-কার্ড এখন "সকল আমল ও দোয়া"-র ভেতরে), সবার নিচে তাসবীহ।
     /*#__PURE__*/React.createElement(ToolGridSection, {
       variant: "hero",
       items: visibleIds("tools", tabLayout).map((id) => FRONT_ITEMS.find((i) => (i.key || i.id) === id)).filter(Boolean),

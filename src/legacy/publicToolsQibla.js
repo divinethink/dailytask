@@ -1,5 +1,5 @@
 // publicToolsQibla.js — কিবলা bearing calculation(3_2_Public_Tools_Architecture_Plan.md
-// §৫)। Pure trig, কোনো UI/SDK না(Dev Rule ২: lib/data layer, SDK/UI-মুক্ত)।
+// §৫)। Pure trig, কোনো UI/SDK না (Dev Rule ২: lib/data layer, SDK/UI-মুক্ত)।
 // Live device-compass ব্যবহার হবে না(§৫-এ ইচ্ছাকৃত সিদ্ধান্ত) — শুধু static bearing।
 
 const KAABA_LAT = 21.4225;

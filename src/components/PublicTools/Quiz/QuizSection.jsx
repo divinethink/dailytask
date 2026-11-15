@@ -4,7 +4,7 @@
 // সহ)। React global(window.React, globals.js)।
 //
 // §Bottom-nav hide(3_5 UI Layout — "bottom-nav সাময়িক hidden"): app.js/
-// BottomNav.jsx এখানে touch করা হয়নি(৩৪০০+ লাইনের ফাইল, Zero-Risk নীতি) —
+// BottomNav.jsx এখানে touch করা হয়নি (৩৪০০+ লাইনের ফাইল, Zero-Risk নীতি) —
 // QuizRunner ও Result-screen fixed full-screen overlay(z-50, inset-0)
 // হিসেবে render হয়, যা visually বটম-নেভ ঢেকে দেয় — BlogSection.jsx-এর
 // sidebar-drawer(z-40 fixed overlay)-এর একই established pattern reuse,

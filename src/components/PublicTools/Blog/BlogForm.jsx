@@ -1,6 +1,6 @@
-// BlogForm.jsx — writer add/edit ফর্ম(3_4 §৪)। category dropdown + title +
+// BlogForm.jsx — writer add/edit ফর্ম (3_4 §৪)। category dropdown + title +
 // body(+[MORE]-marker guidance) + tags + sourceNote। নিজের পোস্ট এডিট বা নতুন
-// পোস্ট তৈরি — দুটোতেই reuse হয়(post prop থাকলে edit-mode)।
+// পোস্ট তৈরি — দুটোতেই reuse হয় (post prop থাকলে edit-mode)।
 // React global(window.React, globals.js)।
 
 import { BLOG_CATEGORIES, createPost, updatePost } from "../../../legacy/blogData.js";
@@ -93,7 +93,7 @@ export function BlogForm({ post, onDone, onCancel }) {
       /*#__PURE__*/React.createElement(
         "label",
         { className: "text-xs font-semibold text-slate-600" },
-        "লেখা(প্রিভিউ শেষ করতে [MORE] লিখুন যেখানে চান)",
+        "লেখা (প্রিভিউ শেষ করতে [MORE] লিখুন যেখানে চান)",
         /*#__PURE__*/React.createElement("textarea", {
           value: body,
           onChange: (e) => setBody(e.target.value),
@@ -104,7 +104,7 @@ export function BlogForm({ post, onDone, onCancel }) {
       /*#__PURE__*/React.createElement(
         "label",
         { className: "text-xs font-semibold text-slate-600" },
-        "ট্যাগ(কমা দিয়ে আলাদা, ঐচ্ছিক)",
+        "ট্যাগ (কমা দিয়ে আলাদা, ঐচ্ছিক)",
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           value: tagsText,
@@ -115,7 +115,7 @@ export function BlogForm({ post, onDone, onCancel }) {
       /*#__PURE__*/React.createElement(
         "label",
         { className: "text-xs font-semibold text-slate-600" },
-        "সূত্র/রেফারেন্স(ঐচ্ছিক)",
+        "সূত্র/রেফারেন্স (ঐচ্ছিক)",
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           value: sourceNote,

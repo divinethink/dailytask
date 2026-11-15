@@ -63,7 +63,7 @@ function prevChunk(year, month0, week) {
   return { year: y, month0: m, week: chunkCount(y, m) };
 }
 
-// ধাপ ৪(লক): সপ্তাহের ফর্ম খোলে সপ্তাহের শেষ দিন(বৃহস্পতিবার) রাত ৮টায়(Owner-অনুমোদিত); শেষ হওয়া সপ্তাহ সবসময় খোলা।
+// ধাপ ৪ (লক): সপ্তাহের ফর্ম খোলে সপ্তাহের শেষ দিন (বৃহস্পতিবার) রাত ৮টায় (Owner-অনুমোদিত); শেষ হওয়া সপ্তাহ সবসময় খোলা।
 const UNLOCK_HOUR = 20;
 function weekUnlockAt(year, month0, week) {
   return new Date(year, month0, chunkRange(year, month0, week).end, UNLOCK_HOUR, 0, 0);

@@ -1,4 +1,4 @@
-// "আগামীকাল" কার্ড(রাতে-ভরা অ্যাপের জন্য, owner-approved): কালকের বার ও হিজরি তারিখ অনুযায়ী স্মরণ — জুমা, সোম-বৃহস্পতি, আইয়ামে বীজ,
+// "আগামীকাল" কার্ড (রাতে-ভরা অ্যাপের জন্য, owner-approved): কালকের বার ও হিজরি তারিখ অনুযায়ী স্মরণ — জুমা, সোম-বৃহস্পতি, আইয়ামে বীজ,
 // মুহাররম/শাবান/রমযান/শাওয়াল/জিলহজ্জের আমল, ঈদ — প্রতিটায় সহীহ সূত্র; সাথে "ইসলামের ইতিহাসে কাল", সিয়ামের সময়-হিসাব, বড় দিবসের কাউন্টডাউন।
 // তথ্য: tomorrowCalendarData.js(pure)। শুধু দেখায় — কোনো ডেটা লেখে না; সময় পড়ে শুধু সেভ-করা cache থেকে।
 // হিজরি তারিখ tabular(≈±১ দিন) বলে বিশেষ-দিনের লাইনে "সম্ভাব্য/চাঁদ দেখা সাপেক্ষে" লেখা।
@@ -17,13 +17,13 @@ const DEFAULT_SLEEP = "ওজু করে আয়াতুল কুরসি
 
 // তথ্য-ফাইলের বার্তা "কাল"-দৃষ্টিকোণে লেখা; আজকের তারিখ দেখালে শুধু শব্দ "কাল/কালকের"→"আজ/আজকের"।
 // (সকাল/বিকাল-এর মতো শব্দ ছোঁয় না: আগে ফাঁকা/চিহ্ন থাকতে হবে, পরে ফাঁকা/চিহ্ন।)
-const KAL_RE = /(^|[\s—“(])কাল(কের)?(?=[\s—,।:?)”]|$)/g;
+const KAL_RE = /(^|[\s—“(])কাল (কের)?(?=[\s—,।:?)”]|$)/g;
 const toToday = s => (typeof s === "string" ? s.replace(KAL_RE, (_, a, k) => a + (k ? "আজকের" : "আজ")) : s);
 
 export function tomorrowNotes(date, hijri, isTomorrow = true) {
   const hm = HIJRI_MONTHS_BN.indexOf(hijri.month) + 1;
   const r = calendarNotes(date.getDay(), hm, hijri.day);
-  r.notes = r.notes.map(n => ({ ...n, id: builtinId(n.title) })); // মূল শিরোনাম থেকে স্থির আইডি(সম্পাদনা/লুকানোর জন্য)
+  r.notes = r.notes.map(n => ({ ...n, id: builtinId(n.title) })); // মূল শিরোনাম থেকে স্থির আইডি (সম্পাদনা/লুকানোর জন্য)
   if (!isTomorrow) r.notes = r.notes.map(n => ({ ...n, title: toToday(n.title), text: toToday(n.text) }));
   return { ...r, hm, history: historyFor(hm, hijri.day) };
 }
@@ -104,7 +104,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
   const [extras, setExtras] = React.useState({ items: [], sleepText: "", overrides: {} });
   const [editing, setEditing] = React.useState(false);
-  const [showRoutine, setShowRoutine] = React.useState(true); // সাধারণ(রোজকার) তথ্য ডিফল্টে খোলা(১৫ নভেম্বর ২০২৬, owner-requested); ভাঁজ করা যায়
+  const [showRoutine, setShowRoutine] = React.useState(true); // সাধারণ (রোজকার) তথ্য ডিফল্টে খোলা (১৫ নভেম্বর ২০২৬, owner-requested); ভাঁজ করা যায়
   React.useEffect(() => {
     let alive = true;
     fetchSection(EXTRAS_SECTION_ID).then((d) => { if (alive) setExtras(normalizeExtras(d)); });
@@ -121,7 +121,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });
   }
   extrasFor(extras, date.getDay()).forEach((n) => notes.push(n));
-  // সাধারণ তথ্য(প্রতিদিনের আমল, ইতিহাস, ঘুমের আগে) আলাদা ভাঁজযোগ্য অংশে; বিশেষ দিনের তথ্য(notes) সবসময় খোলা।
+  // সাধারণ তথ্য (প্রতিদিনের আমল, ইতিহাস, ঘুমের আগে) আলাদা ভাঁজযোগ্য অংশে; বিশেষ দিনের তথ্য (notes) সবসময় খোলা।
   const routine = [{ tone: "ibadat", icon: "🌿", title: "প্রতিদিনের আমল", bullets: DAILY_AMOL }];
   history.forEach((t) => routine.push({ tone: "history", icon: "📜", title: isTomorrow ? "ইতিহাসের পাতায় কাল" : "ইতিহাসের পাতায় আজ", text: t }));
   const ms = nextMilestone(date);

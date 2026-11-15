@@ -1,5 +1,5 @@
 // §Notification Settings card (১৫ নভেম্বর ২০২৬, owner-requested) — মেনুতে সদস্যের নিজের
-// রিমাইন্ডার চালু/বন্ধ। এখন শুধু সেটিং সংরক্ষণ(প্রতি-ডিভাইস, notifPrefs.js); আসল নোটিফিকেশন
+// রিমাইন্ডার চালু/বন্ধ। এখন শুধু সেটিং সংরক্ষণ (প্রতি-ডিভাইস, notifPrefs.js); আসল নোটিফিকেশন
 // অ্যান্ড্রয়েড অ্যাপ ধাপে যুক্ত হবে। Firestore/rules/বিদ্যমান ফিচার অপরিবর্তিত।
 import { Icon, ClockIcon, UsersIcon } from "./icons.jsx";
 import { PRAYER_IDS, SPECIAL_IDS, countEnabled, loadNotifPrefs, saveNotifPrefs } from "../legacy/notifPrefs.js";
@@ -12,8 +12,8 @@ const BN = "০১২৩৪৫৬৭৮৯";
 const bn = s => String(s).replace(/[0-9]/g, d => BN[d]);
 
 const PRAYER_L = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা" };
-const LEAD_L = { start: "ওয়াক্ত শুরুতে", min10: "১০ মিনিট আগে", jamaat: "জামাতের সময়" };
-const SPECIAL_L = { jumuah: "জুমুআ", ashura: "আশুরা", arafah: "আরাফা", qadr: "শবে কদর", barat: "শবে বরাত", eid: "ঈদ", bidh: "আইয়ামে বীজ" };
+const LEAD_L = { start: "ওয়াক্ত শুরুতে", min10: "১০ মিনিট আগে", jamaat: "জামায়াতের সময়" };
+const SPECIAL_L = { jumuah: "জুমা", ashura: "আশুরা", arafah: "আরাফাহ", qadr: "শবে কদর", barat: "শবে বরাত", eid: "ঈদ", bidh: "আইয়ামে বীজ" };
 const MEETING_L = { "1": "১ম", "15": "১৫ই", "25": "২৫শে", last: "শেষ দিন" };
 const timeL = t => {
   const [hh, mm] = t.split(":").map(Number);
@@ -78,7 +78,7 @@ export function NotificationSettingsCard({ uid }) {
         h("span", { className: "block text-[11px] text-slate-500 mt-0.5" }, !p.master ? "সব বন্ধ" : n === 0 ? "প্রয়োজনমতো চালু করুন" : bn(n) + "টি চালু")),
       h(Switch, { on: p.master, onChange: v => upd({ ...p, master: v }), label: "সব নোটিফিকেশন চালু/বন্ধ" })),
     h("div", { className: "px-4 py-2 text-[11px] leading-snug flex gap-2 items-start", style: { background: "#FEF6E7", color: "#8A5A00" } },
-      h("span", null, "অ্যান্ড্রয়েড অ্যাপ চালু হলে এই রিমাইন্ডারগুলো ফোনে আসবে। আপনার সেটিং এখনই সংরক্ষিত থাকবে।")),
+      h("span", null, "অ্যান্ড্রয়েড অ্যাপ চালু হলে এই রিমাইন্ডারগুলো ফোনে আসবে। আপনার সেটিংস এখনই সংরক্ষিত থাকবে।")),
     h(Row, {
       icon: h(ClockIcon, { size: 17 }), title: "সালাতের সময়সূচি", disabled: dis, on: p.prayer.on, onToggle: v => set("prayer", { on: v }),
       hint: p.prayer.which.length ? p.prayer.which.map(x => PRAYER_L[x]).join(", ") + " · " + LEAD_L[p.prayer.lead] : "কোনো ওয়াক্ত বাছা নেই",
@@ -112,6 +112,6 @@ export function NotificationSettingsCard({ uid }) {
     },
       h(Lb, null, "সময়"),
       h("div", { className: "flex flex-wrap gap-1.5" }, ["20:00", "21:00", "22:00"].map(t => h(Chip, { key: t, on: p.daily.time === t, onClick: () => set("daily", { time: t }) }, timeL(t))))),
-    saveErr && h("div", { className: "px-4 py-2 text-[11px] text-red-500 border-t", style: LINE }, "সেটিং সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।")
+    saveErr && h("div", { className: "px-4 py-2 text-[11px] text-red-500 border-t", style: LINE }, "সেটিংস সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।")
   );
 }

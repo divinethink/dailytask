@@ -1,6 +1,6 @@
 // useCursorEntries.js — আলাদা মাস-কার্সরের কার্ডের জন্য ওই মাসের এন্ট্রি।
-// কার্সর মূল (ওভারভিউ) কার্সরের সমান হলে মূল live monthEntries-ই ব্যবহার হয়(বাড়তি পড়া নেই)।
-// আলাদা হলে একবার(one-shot) পড়ে; ব্যর্থ হলে ফাঁকা {} — কখনো crash নয়।
+// কার্সর মূল (ওভারভিউ) কার্সরের সমান হলে মূল live monthEntries-ই ব্যবহার হয় (বাড়তি পড়া নেই)।
+// আলাদা হলে একবার (one-shot) পড়ে; ব্যর্থ হলে ফাঁকা {} — কখনো crash নয়।
 import { useState, useEffect } from "react";
 import { loadMonthEntriesOnce } from "./monthEntriesOnce.js";
 

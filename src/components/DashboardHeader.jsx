@@ -2,12 +2,12 @@
 // wiring, inline add-member form), extracted verbatim from legacy App()
 // (app.js lines ~6765-7014).
 // §Menu→bottom-nav migration(১৫ সেপ্টেম্বর ২০২৬, 2_4 §৯.৫/2_5 Screen E.1
-// owner-approved design): হেডারের হ্যামবার্গার "মেনু" ড্রপডাউন(family
+// owner-approved design): হেডারের হ্যামবার্গার "মেনু" ড্রপডাউন (family
 // username/MemberListSection/invite-link/data-management/feedback/theme)
 // সরানো হয়েছে — এই একই content এখন bottom-nav "মেনু" ট্যাব থেকে
-// full-page হিসেবে MenuPage.jsx-এ render হয়(app.js routing, structural-only
+// full-page হিসেবে MenuPage.jsx-এ render হয় (app.js routing, structural-only
 // move, কোনো logic/condition বদলায়নি)। isMenuOpen/setIsMenuOpen prop এখনো
-// signature-এ থাকতে পারে(app.js call-site অপরিবর্তিত রাখতে) কিন্তু এই
+// signature-এ থাকতে পারে (app.js call-site অপরিবর্তিত রাখতে) কিন্তু এই
 // ফাইলে আর ব্যবহৃত হয় না।
 // State ownership stays in App() (Owner Rule 2) — all state/handlers passed
 // as explicit props, including module-level helpers (db, auth, toBn, etc.) that
@@ -130,8 +130,8 @@ export function DashboardHeader({
   toBn,
   // §Google-only Profile Dropdown(১১ সেপ্টেম্বর ২০২৬): "নিজের" member —
   // googleUid এই ডিভাইসের auth uid-এর সাথে মেলে। App()-এর boot-effect-এর
-  // myOwnMember লজিকের(app.js) হুবহু একই derive-pattern, presentational
-  // component-এই সীমাবদ্ধ(নতুন state না, শুধু render-time computation)।
+  // myOwnMember লজিকের (app.js) হুবহু একই derive-pattern, presentational
+  // component-এই সীমাবদ্ধ (নতুন state না, শুধু render-time computation)।
   ownMember: (members || []).find(x => x.googleUid === (auth.currentUser ? auth.currentUser.uid : null)) || null,
   userEmail: auth.currentUser ? auth.currentUser.email : null,
   isAdmin,
@@ -158,8 +158,8 @@ export function DashboardHeader({
         const next = !v;
         if (next) {
           // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — seen করলে item
-          // panel থেকে সরে না(শুধু delete/Clear-all করলেই সরবে); এখানে শুধু
-          // read:true mark করা হয়(badge কমানোর জন্য), list অপরিবর্তিত থাকে।
+          // panel থেকে সরে না (শুধু delete/Clear-all করলেই সরবে); এখানে শুধু
+          // read:true mark করা হয় (badge কমানোর জন্য), list অপরিবর্তিত থাকে।
           const toMark = notifications.filter(n => !n.read);
           if (toMark.length > 0) {
             const batch = writeBatch(db);
@@ -171,7 +171,7 @@ export function DashboardHeader({
             });
             batch.commit().catch(() => {});
             // Instant badge update — onSnapshot নিজে থেকেও শীঘ্রই sync করবে,
-            // এটা শুধু তাৎক্ষণিক UI feedback-এর জন্য(item মোছে না, শুধু read flag)।
+            // এটা শুধু তাৎক্ষণিক UI feedback-এর জন্য (item মোছে না, শুধু read flag)।
             const markedIds = new Set(toMark.map(n => n.id));
             setNotifications(prev => prev.map(n => markedIds.has(n.id) ? { ...n, read: true } : n));
           }
@@ -210,7 +210,7 @@ export function DashboardHeader({
     type: "email",
     value: newMemberEmail,
     onChange: e => setNewMemberEmail(e.target.value),
-    placeholder: "সদস্যের ইমেইল(Google সাইন-ইনের জন্য)...",
+    placeholder: "সদস্যের ইমেইল (Google সাইন-ইনের জন্য)...",
     className: "flex-1 px-3 py-1.5 rounded-xl text-xs text-slate-900 outline-none font-medium"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: handleAddMember,

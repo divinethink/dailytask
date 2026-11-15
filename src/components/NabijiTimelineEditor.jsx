@@ -1,7 +1,7 @@
-// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ডের সম্পাদনা-প্যানেল — শুধু App Creator-এর জন্য(কার্ড নিজেই isCreatorAuth() দেখে দেখায়; লেখার অনুমতি Firestore Rules-এ enforced)।
-// সময়ভাগ যোগ/সম্পাদনা/মোছা, প্রতিটিতে বুলেট(লেখা + সূত্র) যোগ/বদল/মোছা, আর "মূল তালিকায় ফেরান"।
-// প্রতিটা বদল সাথে সাথে সেভ(পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
-// সূত্রহীন বুলেট সেভ হয় না(validateSlot)। React global(window.React, globals.js)।
+// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ডের সম্পাদনা-প্যানেল — শুধু App Creator-এর জন্য (কার্ড নিজেই isCreatorAuth() দেখে দেখায়; লেখার অনুমতি Firestore Rules-এ enforced)।
+// সময়ভাগ যোগ/সম্পাদনা/মোছা, প্রতিটিতে বুলেট (লেখা + সূত্র) যোগ/বদল/মোছা, আর "মূল তালিকায় ফেরান"।
+// প্রতিটা বদল সাথে সাথে সেভ (পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
+// সূত্রহীন বুলেট সেভ হয় না (validateSlot)। React global(window.React, globals.js)।
 import { saveNabijiTimeline } from "../legacy/editableContent.js";
 import { NABIJI_SECTION_ID, MAX_SLOTS, MAX_ITEMS, LIMITS, CATS, DEFAULT_SLOTS, validateSlot, normalizeSlot, makeSlotId, hourLabel, rangeLabel } from "./nabijiTimeline.js";
 

@@ -59,7 +59,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const [closed, setClosed] = useState([]); // বদ্ধ ঘর — কখনো সেভ হয় না
   const isProxy = !!(member && "googleUid" in member && member.googleUid === null);
   const weekKey = chunkWeekKey(year, month0, week);
-  // ধাপ ৪: সপ্তাহের শেষ দিন রাত ৮টার আগে ফর্ম লক(শেষ হওয়া সপ্তাহ খোলা); মিনিটে একবার হালনাগাদ।
+  // ধাপ ৪: সপ্তাহের শেষ দিন রাত ৮টার আগে ফর্ম লক (শেষ হওয়া সপ্তাহ খোলা); মিনিটে একবার হালনাগাদ।
   const [, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 60000); return () => clearInterval(t); }, []);
   const lock = unlockCountdown(weekUnlockAt(year, month0, week), new Date());

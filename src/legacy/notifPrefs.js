@@ -1,7 +1,7 @@
 // §Notification Settings (১৫ নভেম্বর ২০২৬, owner-requested) — মেনুর "নোটিফিকেশন" কার্ডের সেটিং।
-// Pure module(React/Firebase নেই)। সেটিং প্রতি-ডিভাইস localStorage-এ(সংবেদনশীল নয়; নতুন
+// Pure module(React/Firebase নেই)। সেটিং প্রতি-ডিভাইস localStorage-এ (সংবেদনশীল নয়; নতুন
 // Firestore schema/rules নেই)। এখন শুধু সেটিং সংরক্ষণ — আসল নোটিফিকেশন পাঠানো পরে
-// অ্যান্ড্রয়েড অ্যাপ(Capacitor) ধাপে যুক্ত হবে।
+// অ্যান্ড্রয়েড অ্যাপ (Capacitor) ধাপে যুক্ত হবে।
 export const NOTIF_PREFS_VERSION = 1;
 export const PRAYER_IDS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 export const SPECIAL_IDS = ["jumuah", "ashura", "arafah", "qadr", "barat", "eid", "bidh"];

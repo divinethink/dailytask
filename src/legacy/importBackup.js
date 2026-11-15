@@ -28,7 +28,7 @@ export async function importBackupFromFile(e, migrationState) {
         // আচরণই বহাল থাকছে — বিদ্যমান সদস্য কখনো ছোঁয়া হবে না, শুধু নতুন
         // সদস্য যোগ হবে; entry:/weekly:/অন্যান্য ডকুমেন্ট আগের মতোই সবসময়
         // লেখা হবে (merge: true সহ)। ownerUid normalize logic এবং অন্য
-        // ডিভাইসের claim করা সদস্যের ডাটা স্কিপ করার নিয়ম অপরিবর্তিত আছে
+        // ডিভাইসের claim করা সদস্যের ডেটা স্কিপ করার নিয়ম অপরিবর্তিত আছে
         // (mergeBackupData()-এর ভেতরেই)।
         const result = await mergeBackupData(migrationState, parsed.data, { compareUpdatedAt: false });
         if (result.skippedKeys.length) {

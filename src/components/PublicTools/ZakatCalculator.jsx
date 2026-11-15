@@ -1,4 +1,4 @@
-// ZakatCalculator.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১১(3_1 Phase B)।
+// ZakatCalculator.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১১ (3_1 Phase B)।
 // Pure calculator(কোনো storage/state persist না, প্রতিবার re-open-এ ফাঁকা ফর্ম)।
 // Calculation logic publicToolsZakat.js(data/lib layer)-এ, এই ফাইলে শুধু UI।
 // React global(window.React, globals.js)।
@@ -63,26 +63,26 @@ export function ZakatCalculator() {
     /*#__PURE__*/React.createElement(
       "p",
       { className: "text-xs text-slate-500" },
-      "নিসাব-হিসাবের জন্য সোনা/রুপার আজকের বাজার-দর(টাকা/গ্রাম) নিজে লিখুন — কোনো live দর এই মুহূর্তে স্বয়ংক্রিয়ভাবে আনা হয় না।"
+      "নিসাব-হিসাবের জন্য সোনা/রুপার আজকের বাজার-দর (টাকা/গ্রাম) নিজে লিখুন — কোনো live দর এই মুহূর্তে স্বয়ংক্রিয়ভাবে আনা হয় না।"
     ),
     /*#__PURE__*/React.createElement(
       "div",
       { className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 flex flex-col gap-3" },
-      /*#__PURE__*/React.createElement(FieldRow, { label: "নগদ টাকা+ব্যাংক ব্যালেন্স(৳)", value: cash, onChange: setCash }),
+      /*#__PURE__*/React.createElement(FieldRow, { label: "নগদ টাকা+ব্যাংক ব্যালেন্স (৳)", value: cash, onChange: setCash }),
       /*#__PURE__*/React.createElement(
         "div",
         { className: "grid grid-cols-2 gap-2" },
-        /*#__PURE__*/React.createElement(FieldRow, { label: "সোনা(গ্রাম)", value: goldGrams, onChange: setGoldGrams }),
-        /*#__PURE__*/React.createElement(FieldRow, { label: "সোনার দর(৳/গ্রাম)", value: goldPrice, onChange: setGoldPrice })
+        /*#__PURE__*/React.createElement(FieldRow, { label: "সোনা (গ্রাম)", value: goldGrams, onChange: setGoldGrams }),
+        /*#__PURE__*/React.createElement(FieldRow, { label: "সোনার দর (৳/গ্রাম)", value: goldPrice, onChange: setGoldPrice })
       ),
       /*#__PURE__*/React.createElement(
         "div",
         { className: "grid grid-cols-2 gap-2" },
-        /*#__PURE__*/React.createElement(FieldRow, { label: "রুপা(গ্রাম)", value: silverGrams, onChange: setSilverGrams }),
-        /*#__PURE__*/React.createElement(FieldRow, { label: "রুপার দর(৳/গ্রাম)", value: silverPrice, onChange: setSilverPrice })
+        /*#__PURE__*/React.createElement(FieldRow, { label: "রুপা (গ্রাম)", value: silverGrams, onChange: setSilverGrams }),
+        /*#__PURE__*/React.createElement(FieldRow, { label: "রুপার দর (৳/গ্রাম)", value: silverPrice, onChange: setSilverPrice })
       ),
-      /*#__PURE__*/React.createElement(FieldRow, { label: "বিনিয়োগ/অন্যান্য সম্পদ(৳)", value: investments, onChange: setInvestments }),
-      /*#__PURE__*/React.createElement(FieldRow, { label: "ঋণ/দেনা(৳)", value: debts, onChange: setDebts }),
+      /*#__PURE__*/React.createElement(FieldRow, { label: "বিনিয়োগ/অন্যান্য সম্পদ (৳)", value: investments, onChange: setInvestments }),
+      /*#__PURE__*/React.createElement(FieldRow, { label: "ঋণ/দেনা (৳)", value: debts, onChange: setDebts }),
       /*#__PURE__*/React.createElement(
         "button",
         {
@@ -100,7 +100,7 @@ export function ZakatCalculator() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "flex items-center justify-between text-sm" },
-        /*#__PURE__*/React.createElement("span", { className: "text-slate-600" }, "মোট সম্পদ(ঋণ বাদে)"),
+        /*#__PURE__*/React.createElement("span", { className: "text-slate-600" }, "মোট সম্পদ (ঋণ বাদে)"),
         /*#__PURE__*/React.createElement("span", { className: "font-semibold text-emerald-950" }, "৳" + formatTaka(result.netAssets))
       ),
       /*#__PURE__*/React.createElement(
@@ -135,7 +135,7 @@ export function ZakatCalculator() {
     /*#__PURE__*/React.createElement(
       "p",
       { className: "text-[11px] text-slate-400" },
-      "নিসাব: সোনা " + toBn(GOLD_NISAB_GRAMS) + " গ্রাম অথবা রুপা " + toBn(SILVER_NISAB_GRAMS) + " গ্রাম(যেটার মূল্য কম, সেটাই ব্যবহৃত)। এটা সাধারণ হিসাব — নির্দিষ্ট মাসআলার জন্য স্থানীয় আলেমের পরামর্শ নিন।"
+      "নিসাব: সোনা " + toBn(GOLD_NISAB_GRAMS) + " গ্রাম অথবা রুপা " + toBn(SILVER_NISAB_GRAMS) + " গ্রাম (যেটার মূল্য কম, সেটাই ব্যবহৃত)। এটা সাধারণ হিসাব — নির্দিষ্ট মাসআলার জন্য স্থানীয় আলেমের পরামর্শ নিন।"
     )
   );
 }

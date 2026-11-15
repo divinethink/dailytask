@@ -7,26 +7,26 @@ const { useState } = React;
 
 // §B৭ Onboarding Coach-mark(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // প্রথম-লগইনে ৪-ধাপের one-time walkthrough। Anchored/positioned tooltip(nav-icon-এর
-// পাশে ভাসমান) না করে existing centered-modal pattern reuse করা হয়েছে(এই ফাইলের
+// পাশে ভাসমান) না করে existing centered-modal pattern reuse করা হয়েছে (এই ফাইলের
 // অন্য Info-modal-গুলোর মতোই) — ref-based coordinate-measurement/positioning-logic
 // ছাড়াই low-risk, screen-size-independent বাস্তবায়ন। One-time flag(localStorage,
-// `dt_coachmark_shown_<uid>`) ও trigger-condition app.js-এ(state ownership সেখানেই)।
+// `dt_coachmark_shown_<uid>`) ও trigger-condition app.js-এ (state ownership সেখানেই)।
 const COACH_MARK_STEPS = [{
   title: "স্বাগতম! 👋",
-  body: "প্রতিদিন এখানে আপনার আমল(সালাত, কুরআন, যিকির ইত্যাদি) রেকর্ড করুন — [+]/[−] বাটনে চেপে সংখ্যা বাড়ান-কমান, টিক দিয়ে সম্পন্ন করুন।"
+  body: "প্রতিদিন এখানে আপনার আমল (সালাত, কুরআন, যিকির ইত্যাদি) রেকর্ড করুন — [+]/[−] বাটনে চেপে সংখ্যা বাড়ান বা কমান, টিক দিয়ে সম্পন্ন করুন।"
 }, {
   title: "নিচের ট্যাব থেকে ঘুরে দেখুন",
   body: "সময়সূচি, তাসবীহ, সহায়িকা — এই ট্যাবগুলো যে কেউ লগইন ছাড়াই ব্যবহার করতে পারবেন।"
 }, {
   title: "মেনু",
-  body: "মেনু ট্যাপ করে সদস্য যোগ, ডেটা ব্যাকআপ, থিম কালার ও ডার্ক/সেপিয়া মোড(চোখের সুরক্ষা) পাবেন।"
+  body: "মেনু ট্যাপ করে সদস্য যোগ, ডেটা ব্যাকআপ, থিম কালার ও ডার্ক/সেপিয়া মোড (চোখের সুরক্ষা) পাবেন।"
 }, {
   title: "ধারাবাহিকতা 🔥",
-  body: "প্রতিদিন পূরণ করলে স্ট্রিক বাড়বে, এবং মাসিক ওভারভিউ-তে নিজের অগ্রগতি দেখতে পারবেন।"
+  body: "প্রতিদিন পূরণ করলে স্ট্রিক বাড়বে, এবং মাসিক ওভারভিউতে নিজের অগ্রগতি দেখতে পারবেন।"
 }];
 
-// App Creator-সম্পাদিত লেখা দেখানোর সাধারণ পপআপ(মূল পপআপের মতোই চেহারা)। শুধু custom লেখা থাকলে ব্যবহৃত;
-// না থাকলে নিচের মূল(অপরিবর্তিত) পপআপই দেখায়। লেখা plain text(React escape করে), নতুন লাইন বজায় থাকে।
+// App Creator-সম্পাদিত লেখা দেখানোর সাধারণ পপআপ (মূল পপআপের মতোই চেহারা)। শুধু custom লেখা থাকলে ব্যবহৃত;
+// না থাকলে নিচের মূল (অপরিবর্তিত) পপআপই দেখায়। লেখা plain text(React escape করে), নতুন লাইন বজায় থাকে।
 function CustomMessagePopup({ title, body, onClose }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-5 z-50"
@@ -159,7 +159,7 @@ export function ExcuseInfoModal({ show, onClose }) {
     className: "text-xs font-bold text-slate-800 mb-1.5"
   }, "ওজর সিলেক্ট করলে যা হবে:"), /*#__PURE__*/React.createElement("ul", {
     className: "text-xs text-slate-600 leading-relaxed mb-3 space-y-1 list-disc pl-4"
-  }, /*#__PURE__*/React.createElement("li", null, "ইনপুট অপশনটি বন্ধ হয়ে যাবে।"), /*#__PURE__*/React.createElement("li", null, "সেদিনের দৈনিক স্কোর, স্ট্রীক (ধারাবাহিকতা), ক্যালেন্ডার, গ্রাফ ও রিপোর্টে আমলটি সেদিনের \"হিসাবের বাইরে\" থাকবে — অর্থাৎ নেগেটিভ বা মিসড হিসেবে গণ্য হবে না।")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("li", null, "ইনপুট অপশনটি বন্ধ হয়ে যাবে।"), /*#__PURE__*/React.createElement("li", null, "সেদিনের দৈনিক স্কোর, স্ট্রিক (ধারাবাহিকতা), ক্যালেন্ডার, গ্রাফ ও রিপোর্টে আমলটি সেদিনের \"হিসাবের বাইরে\" থাকবে — অর্থাৎ ঘাটতি বা ছুটে যাওয়া হিসেবে গণ্য হবে না।")), /*#__PURE__*/React.createElement("div", {
     className: "bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-bold text-amber-900 mb-1"
@@ -194,7 +194,7 @@ export function WeeklyInfoModal({ show, onClose }) {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "প্রতি সপ্তাহ শেষে নিজের আমল ও কাজের পর্যালোচনা করুন। এই সপ্তাহে কোন কাজগুলো ভালো হয়েছে এবং কোথায় আরও উন্নতি করা প্রয়োজন, তা এখানে সংক্ষিপ্ত নোট হিসেবে লিখে রাখুন। নতুন সপ্তাহ বা তথ্য যোগ করতে \"+ সারি যোগ করুন\" বোতামে ক্লিক করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হয়ে যাবে।"), /*#__PURE__*/React.createElement("button", {
+  }, "প্রতি সপ্তাহ শেষে নিজের আমল ও কাজের পর্যালোচনা করুন। এই সপ্তাহে কোন কাজগুলো ভালো হয়েছে এবং কোথায় আরও উন্নতি করা প্রয়োজন, তা এখানে সংক্ষিপ্ত নোট হিসেবে লিখে রাখুন। নতুন সপ্তাহ বা তথ্য যোগ করতে \"+ সারি যোগ করুন\" বোতামে ট্যাপ করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হয়ে যাবে।"), /*#__PURE__*/React.createElement("button", {
     onClick: () => onClose(),
     className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
   }, "বুঝেছি")));
@@ -221,7 +221,7 @@ export function MeetingInfoModal({ show, onClose }) {
     className: "text-slate-400"
   }))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "মাস শেষে পরিবারের সবাইকে নিয়ে বসুন এবং বিগত মাসের অগ্রগতি মূল্যায়ন করুন। নতুন বিষয় বা সিদ্ধান্ত যোগ করতে \"+ সারি যোগ করুন\" বোতামে ক্লিক করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হবে। সভায় আলোচিত গুরুত্বপূর্ণ বিষয় ও সিদ্ধান্তগুলো লিখুন এবং সভা শেষে চাইলে পিডিএফ ফাইল ডাউনলোড এবং ডেটা ব্যাকআপ করে রাখতে পারেন।"), /*#__PURE__*/React.createElement("button", {
+  }, "মাস শেষে পরিবারের সবাইকে নিয়ে বসুন এবং বিগত মাসের অগ্রগতি মূল্যায়ন করুন। নতুন বিষয় বা সিদ্ধান্ত যোগ করতে \"+ সারি যোগ করুন\" বোতামে ট্যাপ করুন; এতে স্বয়ংক্রিয়ভাবে পরবর্তী ক্রমিক নম্বর যুক্ত হবে। সভায় আলোচিত গুরুত্বপূর্ণ বিষয় ও সিদ্ধান্তগুলো লিখুন এবং সভা শেষে চাইলে PDF ফাইল ডাউনলোড এবং ডেটা ব্যাকআপ করে রাখতে পারেন।"), /*#__PURE__*/React.createElement("button", {
     onClick: () => onClose(),
     className: "w-full h-9 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
   }, "বুঝেছি")));

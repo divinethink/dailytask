@@ -55,7 +55,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
   // আলাদা শর্তে(`suggestedFocusKey || selectedMember?.tomorrowFocus`) বসানো
   // ছিল, যা এই component-এর নিজস্ব `activeField` null-check-এর সাথে sync
   // ছিল না — stale `tomorrowFocus`(পুরনো targetDateKey) থাকলে বাইরের শর্ত
-  // true থাকত অথচ এই component null রিটার্ন করত, ফলে খালি সাদা কার্ড(border+
+  // true থাকত অথচ এই component null রিটার্ন করত, ফলে খালি সাদা কার্ড (border+
   // shadow-সহ) দেখা যেত। Fix: card-wrapper এখন এই component-এর ভিতরেই, তাই
   // একই null-check card-সহ পুরোটাই covers করে — কোনো blank-card সম্ভব না।
   return /*#__PURE__*/React.createElement("div", {

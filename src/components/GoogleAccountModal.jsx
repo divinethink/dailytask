@@ -59,7 +59,7 @@ export function GoogleAccountModal({
         if (!(recoverErr && recoverErr.code === "auth/popup-closed-by-user")) {
           setNotice({
             type: "error",
-            text: "সাইন ইন করতে সমস্যা হয়েছে: " + (recoverErr && (recoverErr.message || recoverErr.code))
+            text: "সাইন-ইন করতে সমস্যা হয়েছে: " + (recoverErr && (recoverErr.message || recoverErr.code))
           });
         }
       }
@@ -95,7 +95,7 @@ export function GoogleAccountModal({
         // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি (সম্ভবত আগের সাইন-আউট
         // হওয়া) সেশনের সাথে লিংক করা আছে — নতুন anonymous সেশনে আবার লিংক
         // করা যাবে না। এক্ষেত্রে লিংক না করে সরাসরি সেই পুরনো Google-লিংকড
-        // অ্যাকাউন্টেই সাইন ইন করাই সঠিক "রিকভারি" পদ্ধতি — err.credential-এ
+        // অ্যাকাউন্টেই সাইন-ইন করাই সঠিক "রিকভারি" পদ্ধতি — err.credential-এ
         // Firebase নিজেই সেই ক্রেডেনশিয়াল দিয়ে দেয়। এখানেই আগে ব্যর্থ প্রথম
         // popup-এর ধারাবাহিকতায় স্বয়ংক্রিয় দ্বিতীয় popup/sign-in চেষ্টা হতো —
         // এখন শুধু pendingRecovery set করে ব্যবহারকারীকে আবার ক্লিক করতে
@@ -106,7 +106,7 @@ export function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
+          text: `এই Google অ্যাকাউন্ট Daily Task অ্যাপে "${memberName || "একজন সদস্য"}" নামে সাইন-ইন করা আছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ট্যাপ করুন।`
         });
       } else if (err && err.code === "auth/email-already-in-use") {
         // এই Google অ্যাকাউন্ট আগে থেকেই অন্য একটি সেশনের সাথে লিংক করা
@@ -121,7 +121,7 @@ export function GoogleAccountModal({
         });
         setNotice({
           type: "error",
-          text: `এই Google অ্যাকাউন্ট Daily Task App-এ "${memberName || "একজন সদস্য"}" নামে সাইন ইন রয়েছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ক্লিক করুন।`
+          text: `এই Google অ্যাকাউন্ট Daily Task অ্যাপে "${memberName || "একজন সদস্য"}" নামে সাইন-ইন করা আছে। আপনি একই ব্যক্তি হলে নিচের বাটনে ট্যাপ করুন।`
         });
       } else {
         setNotice({
@@ -144,7 +144,7 @@ export function GoogleAccountModal({
   }, /*#__PURE__*/React.createElement(InfoIcon, {
     size: 16,
     color: "#C89B3C"
-  }), " Google অ্যাকাউন্ট (রিকমন্ডেড)"), /*#__PURE__*/React.createElement("button", {
+  }), " Google অ্যাকাউন্ট (প্রস্তাবিত)"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose
   }, /*#__PURE__*/React.createElement(X, {
     size: 18,
@@ -153,15 +153,15 @@ export function GoogleAccountModal({
     className: "text-xs mb-3 " + (notice.type === "ok" ? "text-emerald-700" : "text-red-600")
   }, notice.text), welcomeMode ? /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "আলহামদুলিল্লাহ! আপনি এখন এই পরিবারের একজন সদস্য। আপনার তথ্য Google Drive-এ নিরাপদে ব্যাকআপ রাখতে এবং গুগল দিয়ে লগিন করতে নিচের বাটনে ক্লিক করুন।") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+  }, "আলহামদুলিল্লাহ! আপনি এখন এই পরিবারের একজন সদস্য। আপনার তথ্য Google Drive-এ নিরাপদে ব্যাকআপ রাখতে এবং Google দিয়ে লগইন করতে নিচের বাটনে ট্যাপ করুন।") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-bold text-slate-800 mb-2"
-  }, "Google দিয়ে সাইন ইন করার সুবিধা:"), /*#__PURE__*/React.createElement("p", {
+  }, "Google দিয়ে সাইন-ইন করার সুবিধা:"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-3"
-  }, "Google দিয়ে সাইন ইন বাধ্যতামূলক নয়। তবে সাইন ইন করলে নিম্নোক্ত সুবিধা পাওয়া যাবে —"), /*#__PURE__*/React.createElement("p", {
+  }, "Google দিয়ে সাইন-ইন বাধ্যতামূলক নয়। তবে সাইন-ইন করলে নিম্নোক্ত সুবিধা পাওয়া যাবে —"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-2"
   }, "☁️ Google Drive-এ নিরাপদে ব্যাকআপ রাখা এবং প্রয়োজনে Restore করা যাবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-2"
-  }, "📱 ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন ইন করে সহজেই সব ডেটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"), /*#__PURE__*/React.createElement("p", {
+  }, "📱 ফোন পরিবর্তন, ডেটা মুছে যাওয়া বা অ্যাপ পুনরায় ইনস্টল করার পর একই Google অ্যাকাউন্টে সাইন-ইন করে সহজেই সব ডেটা, সদস্যপদ, দায়িত্ব (Claim) ও এডিট-অধিকার ফিরে পাওয়া যাবে।"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
   }, "💻 একই Google অ্যাকাউন্ট দিয়ে একাধিক ডিভাইস থেকে নিরাপদে অ্যাপ ব্যবহার করা যাবে।")), /*#__PURE__*/React.createElement("button", {
     onClick: handleLink,
@@ -170,9 +170,9 @@ export function GoogleAccountModal({
   }, busy ? /*#__PURE__*/React.createElement(Loader2, {
     className: "animate-spin",
     size: 14
-  }) : null, welcomeMode ? " Google-এর সঙ্গে যুক্ত হোন" : " Google দিয়ে সাইন ইন করুন"), welcomeMode && /*#__PURE__*/React.createElement("button", {
+  }) : null, welcomeMode ? " Google-এর সঙ্গে যুক্ত হোন" : " Google দিয়ে সাইন-ইন করুন"), welcomeMode && /*#__PURE__*/React.createElement("button", {
     onClick: onLater || onClose,
     disabled: busy,
     className: "w-full h-9 mt-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold disabled:opacity-60"
-  }, "পরে করবো")));
+  }, "পরে করব")));
 }

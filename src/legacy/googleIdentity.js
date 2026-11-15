@@ -1,8 +1,8 @@
 // googleIdentity.js — 2_4 Identity Simplification: Google-only helper module.
 // সম্পূর্ণ নতুন, additive ফাইল — কোনো existing file/flow এখনো এই ফাইল import
 // করে না, তাই বর্তমান app আচরণে কোনো পরিবর্তন নেই। Wiring হবে পরের
-// sub-phase-গুলোতে(Sign Up §২.১, Google Sign-in §২.২, Invite-Link §৫.২,
-// Profile Dropdown §৯.৪) — এখানে শুধু ভিত্তি(schema/helper) তৈরি হলো।
+// sub-phase-গুলোতে (Sign Up §২.১, Google Sign-in §২.২, Invite-Link §৫.২,
+// Profile Dropdown §৯.৪) — এখানে শুধু ভিত্তি (schema/helper) তৈরি হলো।
 // Firestore Rules(firestore.rules) ইতিমধ্যে এই schema সাপোর্ট করে — এই
 // module সেই একই shape/convention অনুসরণ করে(§৩ Data Schema, §১০.২ Email
 // Normalization)।
@@ -20,12 +20,12 @@ function normalizeEmail(email) {
 
 // users/{googleUid} → { familyId, memberId }(§৩ schema)। Rules-এ শুধু
 // নিজের uid নিজে read/write করতে পারে — তাই caller সবসময় নিজের
-// auth.currentUser.uid-ই পাঠাবে(অন্য uid দিয়ে call করলে permission-denied)।
+// auth.currentUser.uid-ই পাঠাবে (অন্য uid দিয়ে call করলে permission-denied)।
 async function writeUserMapping(googleUid, familyId, memberId) {
   // §fix(১১ সেপ্টেম্বর ২০২৬) — `users/{uid}` collection পুরনো ফিচারেও
-  // ব্যবহৃত(familyIdentity.js: saveUserFamilyCode(), schema
+  // ব্যবহৃত (familyIdentity.js: saveUserFamilyCode(), schema
   // {familyCode, updatedAt})। আগে এখানে plain .set() পুরনো doc সম্পূর্ণ
-  // overwrite করে ফেলত(অথবা উল্টো — পুরনো doc-এ familyId না থাকায়
+  // overwrite করে ফেলত (অথবা উল্টো — পুরনো doc-এ familyId না থাকায়
   // loadUserMapping() fast-path মিস করত)। merge:true দিয়ে দুই schema
   // নিরাপদে সহাবস্থান করবে, কোনো ডেটা হারাবে না।
   await setDoc(doc(db, "users", googleUid), { familyId, memberId }, { merge: true });
@@ -33,14 +33,14 @@ async function writeUserMapping(googleUid, familyId, memberId) {
 
 // --- Startup-race retry(নতুন, ১৩ সেপ্টেম্বর ২০২৬, owner-reported
 // ইনসিডেন্ট root-cause fix — কনসোল-লগ দিয়ে নিশ্চিত হওয়া গেছে) ---
-// Diagnostic থেকে প্রমাণিত: App Check নিজে ঠিকই ছিল(getToken(true) সফল),
+// Diagnostic থেকে প্রমাণিত: App Check নিজে ঠিকই ছিল (getToken(true) সফল),
 // কিন্তু signInExistingMemberByGoogle()/joinFamilyViaInviteLink()-এর
 // একেবারে প্রথম, unguarded Firestore read(loadUserMapping) মাঝেমাঝে
 // "permission-denied" দিয়ে ব্যর্থ হচ্ছিল — Google popup সফল হওয়ার ঠিক
 // পরপরই App Check token attach হওয়ার একটা ছোট startup-race(পরের request-
 // এই আবার সফল হয়)। ছোট delay দিয়ে একবার retry করলেই এই class-এর
 // transient সমস্যা resolve হয়ে যায় — শুধু permission-denied/unavailable
-// code-এ retry হয়(প্রকৃত authorization-denial retry করলেও একই থাকবে,
+// code-এ retry হয় (প্রকৃত authorization-denial retry করলেও একই থাকবে,
 // unnecessary delay এড়াতে immediate propagate)।
 async function withStartupRaceRetry(fn) {
   try {
@@ -62,7 +62,7 @@ async function loadUserMapping(googleUid) {
 }
 
 // familyMemberEmails/{normalizedEmail} → { familyId, memberId }(§৩,
-// uniqueness enforce)। Rules-এ create-এর জন্য দুই বৈধ পথ আছে(claimed-self
+// uniqueness enforce)। Rules-এ create-এর জন্য দুই বৈধ পথ আছে (claimed-self
 // token-email match, অথবা admin batch-এ member.email সেট করার সাথে) —
 // এই helper শুধু ref/read/delete shape দেয়, caller নিজে সঠিক context
 // নিশ্চিত করবে যেন Rules pass করে।
@@ -80,7 +80,7 @@ async function lookupFamilyByEmail(email) {
 
 // §Self-heal fix(owner-reported, ১৩ সেপ্টেম্বর ২০২৬): admin কর্তৃক
 // handleRemoveMember() member doc delete করে, কিন্তু users/{uid} ও
-// familyMemberEmails mapping cleanup করে না(Rules-restriction —
+// familyMemberEmails mapping cleanup করে না (Rules-restriction —
 // admin অন্যের users/{uid} touch করতে পারে না, এবং claim-মুহূর্তে
 // email field মুছে যাওয়ায় admin removed-member-এর email-ই জানে না)।
 // ফলে এই দুই mapping stale/dangling থেকে যেতে পারে। এই helper দিয়ে
@@ -93,17 +93,17 @@ async function fetchMemberData(familyId, memberId) {
 }
 
 // Admin-added Proxy Member (2_4 §৫.১): Dashboard-এর "Add Member" এই পথে চলে — email দিয়ে unclaimed
-// member তৈরি(googleUid:null), সদস্য পরে নিজে Google Sign-in করলে
+// member তৈরি (googleUid:null), সদস্য পরে নিজে Google Sign-in করলে
 // signInExistingMemberByGoogle()-এর email-match branch দিয়ে auto-claim হবে
 // (একই ফাইলের নিচে, existing flow — নতুন কিছু লাগেনি)।
-// memberId caller(app.js) আগে থেকে generate করে পাঠায়(optimistic local UI
+// memberId caller(app.js) আগে থেকে generate করে পাঠায় (optimistic local UI
 // update-এর জন্য, পুরনো handleAddMember()-এর প্যাটার্নের সাথে সামঞ্জস্যপূর্ণ)।
-// member doc + familyMemberEmails mapping একই batch-এ লেখা হয়(Rules-এর
+// member doc + familyMemberEmails mapping একই batch-এ লেখা হয় (Rules-এর
 // admin-create branch getAfter() দিয়ে member.email verify করে বলে batch/
 // transaction আবশ্যক, আলাদা sequential write permission-denied দেবে)।
-// email আগে থেকে অন্য কোনো(claimed/unclaimed) সদস্যের সাথে যুক্ত থাকলে —
+// email আগে থেকে অন্য কোনো (claimed/unclaimed) সদস্যের সাথে যুক্ত থাকলে —
 // প্রথমে friendly pre-check(lookupFamilyByEmail), তারপরও race হলে Rules
-// নিজেই reject করবে(familyMemberEmails doc already exists → update-branch,
+// নিজেই reject করবে (familyMemberEmails doc already exists → update-branch,
 // যা `allow update: if false`)।
 async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
   const normalizedEmail = normalizeEmail(email);
@@ -131,12 +131,12 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
     // পরিষ্কার করে reuse খোলা হবে।
     // §Cross-family fix(১৪ সেপ্টেম্বর ২০২৬, owner-reported): আগে এখানে শুধু
     // same-family(`existing.familyId === familyId`) স্টেল-mapping cleanup
-    // অনুমোদিত ছিল — cross-family stale হলে(অন্য family থেকে remove হওয়া
+    // অনুমোদিত ছিল — cross-family stale হলে (অন্য family থেকে remove হওয়া
     // সদস্যের email) এই admin-এর permission না থাকায় ব্লক-ই থেকে যেত।
-    // firestore.rules-এ orphaned-mapping delete guard যোগ হয়েছে(target
+    // firestore.rules-এ orphaned-mapping delete guard যোগ হয়েছে (target
     // member সত্যিই আর বিদ্যমান না থাকলে যেকোনো authenticated user delete
     // করতে পারবে, লাইভ mapping অস্পৃশ্য) — তাই এখন same/cross-family
-    // নির্বিশেষে(existingMemberData ইতিমধ্যে null যাচাই হয়ে গেছে উপরে)
+    // নির্বিশেষে (existingMemberData ইতিমধ্যে null যাচাই হয়ে গেছে উপরে)
     // একই delete-call নিরাপদে কাজ করবে।
     try {
       await deleteFamilyMemberEmail(normalizedEmail);
@@ -161,7 +161,7 @@ async function addProxyMemberByAdmin(familyId, memberId, name, gender, email) {
 
 // §৫.৩ — family ত্যাগ/remove-এর সময় mapping cleanup। Claimed member-এর
 // email field claim-মুহূর্তেই member-doc থেকে delete হয়ে যায়(§৪), তাই
-// normalizedEmail caller-কেই আলাদাভাবে জানা/পাস করা লাগবে(reverse-query
+// normalizedEmail caller-কেই আলাদাভাবে জানা/পাস করা লাগবে (reverse-query
 // পরের sub-phase-এ familyId+memberId দিয়ে করা হবে, এখানে শুধু delete-primitive)।
 async function deleteFamilyMemberEmail(normalizedEmail) {
   await deleteDoc(familyMemberEmailRef(normalizedEmail));
@@ -178,23 +178,23 @@ function currentGoogleEmail() {
   return auth.currentUser ? (auth.currentUser.email || null) : null;
 }
 
-// §২.৪ §২.২ — গুগল দিয়ে সাইন-ইন করুন(শুধু পুরনো সদস্যের জন্য)।
+// §২.৪ §২.২ — Google দিয়ে সাইন-ইন করুন (শুধু পুরনো সদস্যের জন্য)।
 // Precondition(caller, §১০.৩): Google Sign-in(signInWithPopup) আগেই সফল
 // হয়ে auth.currentUser এই ফাংশন কলের সময় সেই Google user।
 //
-// দুই ধাপে চেক(fastest-path আগে):
-//   ১) users/{uid} আগে থেকেই থাকলে(returning claimed member) — সরাসরি
+// দুই ধাপে চেক (fastest-path আগে):
+//   ১) users/{uid} আগে থেকেই থাকলে (returning claimed member) — সরাসরি
 //      familyId/memberId পাওয়া যায়, কোনো নতুন write লাগে না।
-//   ২) না থাকলে(প্রথমবার claim) — familyMemberEmails/{normalizedEmail}
+//   ২) না থাকলে (প্রথমবার claim) — familyMemberEmails/{normalizedEmail}
 //      lookup করে admin-added unclaimed member খুঁজে বের করা হয়, তারপর
 //      সেই member doc-এ googleUid সেট + email field remove(একই write,
 //      firestore.rules-এর নির্দিষ্ট claim-clause অনুযায়ী — email must
 //      still match request.auth.token.email, তাই client-side এই চেক
 //      করার দরকার নেই, Rules নিজেই server-verified email দিয়ে যাচাই
-//      করবে) + users/{uid} mapping তৈরি(পরের বার fast-path কাজ করতে)।
+//      করবে) + users/{uid} mapping তৈরি (পরের বার fast-path কাজ করতে)।
 //
 // কোনো mapping/lookup না মিললে { matched: false } — caller(UI) তখন
-// ২.৫ Screen C-এর "এই মেইল দিয়ে অদ্যাবধি সাইন ইন হয়নি..." বার্তা দেখাবে।
+// ২.৫ Screen C-এর "এই মেইল দিয়ে অদ্যাবধি সাইন-ইন হয়নি..." বার্তা দেখাবে।
 async function signInExistingMemberByGoogle() {
   if (!auth.currentUser) {
     return { matched: false, reason: "not-signed-in" };
@@ -218,12 +218,12 @@ async function signInExistingMemberByGoogle() {
         firstClaim: false
       };
     }
-    // Stale mapping(admin আগে remove করেছেন) — নিজের(self-owned, Rules-
+    // Stale mapping(admin আগে remove করেছেন) — নিজের (self-owned, Rules-
     // permitted) users/{uid} doc delete করে ধাপ ২-এ fresh চেষ্টা।
     try {
       await deleteDoc(doc(db, "users", uid));
     } catch (err) {
-      console.error("[Google Sign-in] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
+      console.error("[Google Sign-in] stale users mapping cleanup ব্যর্থ (non-fatal):", err.message);
     }
   }
 
@@ -244,7 +244,7 @@ async function signInExistingMemberByGoogle() {
   }
   if (!targetMemberData) {
     // Stale familyMemberEmails mapping(admin আগে remove করেছেন) — trust
-    // না করে নতুন-ইউজার flow-এ পড়ে যাওয়া(mapping doc নিজে delete করার
+    // না করে নতুন-ইউজার flow-এ পড়ে যাওয়া (mapping doc নিজে delete করার
     // permission caller-এর নেই বলে শুধু bypass করা হচ্ছে, harmless)।
     return { matched: false, reason: "no-match" };
   }
@@ -252,7 +252,7 @@ async function signInExistingMemberByGoogle() {
   try {
     // Rules(claim-clause) নিজেই নিশ্চিত করে যে request.auth.token.email
     // resource-এ সংরক্ষিত member.email-এর সাথে মেলে — client এখানে আলাদা
-    // pre-check করছে না(server-verified token-ই একমাত্র সত্যতা)।
+    // pre-check করছে না (server-verified token-ই একমাত্র সত্যতা)।
     await updateDoc(memberRef, {
       googleUid: uid,
       email: deleteField(),
@@ -296,7 +296,7 @@ async function rotateInviteLink(familyId) {
   return token;
 }
 
-// Admin — বর্তমান token পড়া(non-admin পারবে না, Rules-এ বন্ধ)। ব্যর্থ হলে null।
+// Admin — বর্তমান token পড়া (non-admin পারবে না, Rules-এ বন্ধ)। ব্যর্থ হলে null।
 async function loadActiveInviteToken(familyId) {
   try {
     const snap = await getDoc(inviteLinkRef(familyId));
@@ -307,7 +307,7 @@ async function loadActiveInviteToken(familyId) {
 }
 
 // পুরনো root-field(activeInviteToken) একবার মুছে ফেলা — শুধু admin-এর ডিভাইস
-// থেকে, best-effort। পুরনো token ইচ্ছাকৃতভাবে বাতিল(ফাঁসের সম্ভাবনা ছিল);
+// থেকে, best-effort। পুরনো token ইচ্ছাকৃতভাবে বাতিল (ফাঁসের সম্ভাবনা ছিল);
 // admin নতুন লিংক শেয়ার করলে নতুন token তৈরি হবে।
 let _legacyInviteCleanupTried = false;
 async function removeLegacyInviteToken(familyId) {
@@ -319,11 +319,11 @@ async function removeLegacyInviteToken(familyId) {
       updatedAt: Date.now()
     });
   } catch (err) {
-    console.error("[Invite-Link] legacy token cleanup ব্যর্থ(non-fatal):", err && err.message);
+    console.error("[Invite-Link] legacy token cleanup ব্যর্থ (non-fatal):", err && err.message);
   }
 }
 
-// Admin — revoke। caller বর্তমান activeInviteToken object পাঠাবে(token/
+// Admin — revoke। caller বর্তমান activeInviteToken object পাঠাবে (token/
 // createdAt অক্ষুণ্ণ রাখতে, শুধু revoked flip)।
 async function revokeInviteLink(familyId, activeInviteToken) {
   await setDoc(inviteLinkRef(familyId), {
@@ -334,9 +334,9 @@ async function revokeInviteLink(familyId, activeInviteToken) {
 }
 
 // §৫.২ — Invite-Link click করে join(non-admin self-serve)। Precondition:
-// Google Sign-in আগেই সফল(caller, §১০.৩)। এখানে token-validity pre-check
+// Google Sign-in আগেই সফল (caller, §১০.৩)। এখানে token-validity pre-check
 // শুধু দ্রুত friendly error দেখানোর জন্য — চূড়ান্ত সত্যতা সবসময়
-// firestore.rules-এর নিজস্ব server-side check থেকেই আসে(client bypass
+// firestore.rules-এর নিজস্ব server-side check থেকেই আসে (client bypass
 // করলেও Rules reject করবে)।
 async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   if (!auth.currentUser) {
@@ -353,12 +353,12 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   if (!familySnap.exists()) {
     return { aborted: true, reason: "family-not-found" };
   }
-  // token-যাচাই এখন শুধু firestore.rules-এ(token আর client পড়তে পারে না);
+  // token-যাচাই এখন শুধু firestore.rules-এ (token আর client পড়তে পারে না);
   // ভুল/revoked token হলে নিচের setDoc permission-denied পাবে → "invalid-token"।
 
   // §Bug-fix(owner-reported — "১ email = ১ member" invariant, 2_4 §১):
   // আগে এখানে কোনো users/{uid} mapping-check ছিল না বলে একই Google
-  // account বারবার(এমনকি একই invite-link repeat-click করেও) নতুন-নতুন
+  // account বারবার (এমনকি একই invite-link repeat-click করেও) নতুন-নতুন
   // duplicate member তৈরি করতে পারত — নিচের self-create branch কখনো
   // familyMemberEmails mapping লিখত না বলে পরের বার lookup কিছুই খুঁজে
   // পেত না। signInExistingMemberByGoogle()-এর fast-path-এর একই
@@ -376,7 +376,7 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     }
     if (existingMemberData) {
       if (existingMapping.familyId === familyId) {
-        // এই family-রই আগে থেকে সদস্য(পুরনো invite-link পুনরায় ব্যবহার) —
+        // এই family-রই আগে থেকে সদস্য (পুরনো invite-link পুনরায় ব্যবহার) —
         // duplicate না বানিয়ে বিদ্যমান profile-এ সরাসরি সফল ধরা হচ্ছে।
         return { success: true, familyId, memberId: existingMapping.memberId, bound: true, alreadyMember: true };
       }
@@ -386,12 +386,12 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
     try {
       await deleteDoc(doc(db, "users", uid));
     } catch (err) {
-      console.error("[Invite-Link] stale users mapping cleanup ব্যর্থ(non-fatal):", err.message);
+      console.error("[Invite-Link] stale users mapping cleanup ব্যর্থ (non-fatal):", err.message);
     }
   }
 
   // পূর্ব-নিবন্ধিত email(rare edge-case, §৫.২) — নতুন member তৈরি না করে
-  // বিদ্যমান(admin-added unclaimed) profile bind।
+  // বিদ্যমান (admin-added unclaimed) profile bind।
   const email = currentGoogleEmail();
   if (email) {
     const lookup = await lookupFamilyByEmail(email);
@@ -432,7 +432,7 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
       // §Bug-fix: এই email ইতিমধ্যে ভিন্ন family-তে নিবন্ধিত থাকলেই শুধু
       // block — কিন্তু সেই target সত্যিই এখনো বিদ্যমান কিনা যাচাই করে
       // (stale mapping হলে ভুলভাবে block করবে না)। error হলে fail-safe
-      // আগের(block) আচরণই বজায় থাকবে।
+      // আগের (block) আচরণই বজায় থাকবে।
       let otherMemberData;
       try {
         otherMemberData = await fetchMemberData(lookup.familyId, lookup.memberId);
@@ -459,17 +459,17 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
       updatedAt: Date.now()
     });
     await writeUserMapping(uid, familyId, memberId);
-    // §Bug-fix: familyMemberEmails mapping লেখা হচ্ছে(আগে হতো না) — যাতে
+    // §Bug-fix: familyMemberEmails mapping লেখা হচ্ছে (আগে হতো না) — যাতে
     // ভবিষ্যতে একই email দিয়ে আবার কোনো join চেষ্টা উপরের দুই check-এর
     // যেকোনো একটাতে ধরা পড়ে। isClaimedByGoogle() Rules-check ঠিক-উপরের
-    // await-এ committed member.googleUid পড়েই pass করবে(sequential
-    // read-after-write, transaction লাগে না)। ব্যর্থ হলেও(non-fatal) মূল
+    // await-এ committed member.googleUid পড়েই pass করবে (sequential
+    // read-after-write, transaction লাগে না)। ব্যর্থ হলেও (non-fatal) মূল
     // join সফলই থাকে — শুধু future-dedup convenience layer মিস হবে।
     if (email) {
       try {
         await setDoc(familyMemberEmailRef(normalizeEmail(email)), { familyId, memberId });
       } catch (err) {
-        console.error("[Invite-Link] email-mapping write ব্যর্থ(non-fatal):", err.message);
+        console.error("[Invite-Link] email-mapping write ব্যর্থ (non-fatal):", err.message);
       }
     }
     return { success: true, familyId, memberId, bound: false };
@@ -482,11 +482,11 @@ async function joinFamilyViaInviteLink(familyId, token, name, gender) {
   }
 }
 
-// §৫.৩ — Family ত্যাগ(self-leave, claimed member)। firstAdminUid client-side
+// §৫.৩ — Family ত্যাগ (self-leave, claimed member)। firstAdminUid client-side
 // pre-check(UX friendly-message) — চূড়ান্ত protection সবসময় firestore.rules-
 // এর member-delete clause-এই enforced। মেম্বার doc delete + সংশ্লিষ্ট
 // familyMemberEmails mapping(composite familyId+memberId reverse-query,
-// ২.৪ §৩-এ নোট করা index প্রয়োজন) — একই batch-এ(atomic)।
+// ২.৪ §৩-এ নোট করা index প্রয়োজন) — একই batch-এ (atomic)।
 async function leaveFamily(familyId, memberId) {
   if (!auth.currentUser) {
     return { aborted: true, reason: "not-signed-in" };
@@ -512,9 +512,9 @@ async function leaveFamily(familyId, memberId) {
     // আগেই leaveFamily() পুরোপুরি ব্যর্থ হতো। Fix: query-এর বদলে নিজের
     // (claimed) Google account email দিয়ে normalizeEmail()-ভিত্তিক doc-id
     // সরাসরি "get"(Rules-এ অনুমোদিত, list শুধু বন্ধ get না) — তারপর
-    // familyId/memberId মিলে কিনা cross-verify করে তবেই delete করা হয়(অন্য
+    // familyId/memberId মিলে কিনা cross-verify করে তবেই delete করা হয় (অন্য
     // family/member-এর mapping ভুলবশত মুছে ফেলা থেকে রক্ষা)। Invite-link
-    // দিয়ে join করা সদস্যদের(কখনো email-mapping তৈরিই হয়নি) জন্য
+    // দিয়ে join করা সদস্যদের (কখনো email-mapping তৈরিই হয়নি) জন্য
     // mapSnap.exists false হবে, স্বাভাবিকভাবে skip — আগের behavior অক্ষুণ্ণ।
     let mappingRef = null;
     try {
@@ -535,9 +535,9 @@ async function leaveFamily(familyId, memberId) {
     // §fix(১১ সেপ্টেম্বর ২০২৬, ProfileDropdownGoogle wiring-এর সময় ধরা
     // পড়েছে): আগে users/{uid} mapping এখানে delete হতো না — leave-এর পর
     // এই একই device পরের বার Google sign-in করলে loadUserMapping()
-    // fast-path(signInExistingMemberByGoogle()) পুরনো(এখন-deleted)
+    // fast-path(signInExistingMemberByGoogle()) পুরনো (এখন-deleted)
     // familyId/memberId-ই ফেরত দিত, dead-end/permission-denied তৈরি হতো।
-    // এটা নিজের(request.auth.uid==uid) doc, Rules ইতিমধ্যে self-delete
+    // এটা নিজের (request.auth.uid==uid) doc, Rules ইতিমধ্যে self-delete
     // অনুমোদিত — কোনো Rules change লাগেনি।
     batch.delete(doc(db, "users", uid));
     await batch.commit();
@@ -569,7 +569,7 @@ async function editOwnProfile(familyId, memberId, name, gender) {
 }
 
 // ---- Google অ্যাকাউন্ট (মেইল) বদলান ----
-// UID অপরিবর্তিত থাকে (unlink → link), তাই এডমিন-ভূমিকা/এন্ট্রি/মুহাসাবা যেমন ছিল তেমনই থাকে; rules/schema বদল নেই।
+// UID অপরিবর্তিত থাকে (unlink → link), তাই অ্যাডমিন-ভূমিকা/এন্ট্রি/মুহাসাবা যেমন ছিল তেমনই থাকে; rules/schema বদল নেই।
 // ধাপ ১ (startGoogleAccountChange): পুরনো Google ছাড়ানো + ফ্ল্যাগ রাখা। ধাপ ২ (linkGoogleAccountNow): আলাদা ট্যাপে
 // নতুন (বা পুরনো) অ্যাকাউন্ট যুক্ত — popup সবসময় সরাসরি ব্যবহারকারীর ট্যাপ থেকে, যাতে ব্রাউজার আটকে না দেয়।
 function relinkNotify() {
@@ -618,7 +618,7 @@ function linkGoogleAccountNow(familyId, memberId) {
         const snap = await getDoc(ref);
         if (snap.exists() && snap.data().familyId === familyId && snap.data().memberId === memberId) await deleteDoc(ref);
       } catch (e) {
-        console.error("[Google মেইল বদল] পুরনো mapping মোছা ব্যর্থ(non-fatal):", e && e.code);
+        console.error("[Google মেইল বদল] পুরনো mapping মোছা ব্যর্থ (non-fatal):", e && e.code);
       }
     }
     try { localStorage.removeItem(RELINK_FLAG); } catch {}

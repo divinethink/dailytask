@@ -1,5 +1,5 @@
 // editableContent.js — "আমল"/"সহায়িকা"-র App-Creator-editable static text/guide
-// কনটেন্ট(3_6_Editable_Content_Plan.md)। CRUD(get/set section-doc, Firestore) +
+// কনটেন্ট (3_6_Editable_Content_Plan.md)। CRUD(get/set section-doc, Firestore) +
 // accordion-item-id helper। single-owner(App-Creator-only, Rules-এ enforced),
 // top-level `publicToolsContent/{sectionId}` collection — family-Firestore/
 // V1-V2 structure থেকে সম্পূর্ণ independent(ব্লগ/কুইজের quizData.js pattern reuse)।
@@ -78,7 +78,7 @@ async function saveTable(sectionId, columns, rows) {
   );
 }
 
-// হোম-কার্ডের ক্রিয়েটর-সম্পাদিত বাড়তি বাক্য(যেমন "আগামীকাল" কার্ড) — নিজস্ব doc, তাই অন্য কনটেন্টে প্রভাব নেই।
+// হোম-কার্ডের ক্রিয়েটর-সম্পাদিত বাড়তি বাক্য (যেমন "আগামীকাল" কার্ড) — নিজস্ব doc, তাই অন্য কনটেন্টে প্রভাব নেই।
 // data = { items:[...], sleepText, overrides:{ b_<id>: {hidden}|{icon,title,text,src} } } — গঠন-যাচাই tomorrowExtras.js-এ; Rules-এ শুধু App Creator লিখতে পারে।
 async function saveHomeCardExtras(sectionId, data) {
   const user = requireCreator();
@@ -94,13 +94,13 @@ async function saveHomeCardExtras(sectionId, data) {
       updatedAt: serverTimestamp(),
       updatedBy: user.uid,
     },
-    // homeCardExtras সম্পূর্ণ প্রতিস্থাপিত(overrides map থেকে "মূল লেখায় ফেরান"-এ মোছা কী যাতে থেকে না যায়)
+    // homeCardExtras সম্পূর্ণ প্রতিস্থাপিত (overrides map থেকে "মূল লেখায় ফেরান"-এ মোছা কী যাতে থেকে না যায়)
     { mergeFields: ["format", "homeCardExtras", "updatedAt", "updatedBy"] }
   );
 }
 
-// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ডের সময়ভাগ-তালিকা(নিজস্ব doc; গঠন-যাচাই components/nabijiTimeline.js-এ; Rules-এ শুধু App Creator লিখতে পারে)।
-// slots সম্পূর্ণ প্রতিস্থাপিত(মোছা slot যাতে থেকে না যায়); [] = "মূল তালিকায় ফেরান"(কার্ড কোডের ডিফল্টে ফেরে)।
+// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ডের সময়ভাগ-তালিকা (নিজস্ব doc; গঠন-যাচাই components/nabijiTimeline.js-এ; Rules-এ শুধু App Creator লিখতে পারে)।
+// slots সম্পূর্ণ প্রতিস্থাপিত (মোছা slot যাতে থেকে না যায়); [] = "মূল তালিকায় ফেরান"(কার্ড কোডের ডিফল্টে ফেরে)।
 async function saveNabijiTimeline(sectionId, slots) {
   const user = requireCreator();
   await setDoc(
@@ -115,8 +115,8 @@ async function saveNabijiTimeline(sectionId, slots) {
   );
 }
 
-// পপআপ-বার্তা ওভাররাইড(App Creator-only, Rules-এ enforced)। mergeFields: popupMessages map সম্পূর্ণ
-// প্রতিস্থাপিত হয়(সাধারণ merge:true-তে মুছে ফেলা আইটেম পুরনো মান নিয়ে থেকে যেত)।
+// পপআপ-বার্তা ওভাররাইড (App Creator-only, Rules-এ enforced)। mergeFields: popupMessages map সম্পূর্ণ
+// প্রতিস্থাপিত হয় (সাধারণ merge:true-তে মুছে ফেলা আইটেম পুরনো মান নিয়ে থেকে যেত)।
 async function savePopupMessages(sectionId, data) {
   const user = requireCreator();
   await setDoc(

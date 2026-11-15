@@ -1,8 +1,8 @@
-// DuaFlashcards.jsx — "আমল" হাব, item ৩০(দু'আ ফ্ল্যাশকার্ড, 3_1 §"আমল হাব" item
+// DuaFlashcards.jsx — "আমল" হাব, item ৩০ (দোয়া ফ্ল্যাশকার্ড, 3_1 §"আমল হাব" item
 // ৫-এর অংশ, `3_6` §৪.২ নোট: "flip-card UI অপরিবর্তিত, শুধু content-source
 // Firestore/default")। এক-কার্ড-এক-সময় navigation + tap-to-flip — এই ভিজুয়াল
 // EditableSection-এর list-UI থেকে আলাদা বলে সরাসরি editableContent.js CRUD
-// ব্যবহার করে নিজস্ব admin-form বানানো হয়েছে(একই accordion data-model, format:
+// ব্যবহার করে নিজস্ব admin-form বানানো হয়েছে (একই accordion data-model, format:
 // "accordion", sectionId "dua_flashcards")।
 // React global(window.React, globals.js)।
 
@@ -34,13 +34,13 @@ function FlashcardForm({ initial, onCancel, onSave, busy, error }) {
     /*#__PURE__*/React.createElement("input", {
       value: title,
       onChange: (e) => setTitle(e.target.value),
-      placeholder: "সামনের পিঠ(শিরোনাম)",
+      placeholder: "সামনের পিঠ (শিরোনাম)",
       className: "w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none",
     }),
     /*#__PURE__*/React.createElement("textarea", {
       value: body,
       onChange: (e) => setBody(e.target.value),
-      placeholder: "পিছনের পিঠ(দোয়ার টেক্সট)",
+      placeholder: "পিছনের পিঠ (দোয়ার টেক্সট)",
       rows: 5,
       className: "w-full text-sm border border-slate-200 rounded-xl p-3 focus:outline-none",
     }),

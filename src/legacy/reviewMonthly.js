@@ -110,7 +110,7 @@ function buildMonthlyReport({ year, month0, now, curEntries, prevEntries, h }) {
     }
     const r = bestImprovementAndDrop(items);
     const withLabel = x => (x ? { ...x, label: labelOf(applicable.find(f => f.key === x.key)) } : null);
-    // ups/downs/same: জোড়া-বার কার্ডের জন্য সব তুলনা(সংযোজন; improvement/drop আগের মতোই)
+    // ups/downs/same: জোড়া-বার কার্ডের জন্য সব তুলনা (সংযোজন; improvement/drop আগের মতোই)
     const rk = rankMoves(items);
     moves = { improvement: withLabel(r.improvement), drop: withLabel(r.drop), ups: rk.ups.map(withLabel), downs: rk.downs.map(withLabel), same: rk.same.map(withLabel) };
   }

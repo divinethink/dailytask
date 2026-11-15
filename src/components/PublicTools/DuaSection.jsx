@@ -1,6 +1,6 @@
-// DuaSection.jsx — "আমল" হাব, item ৫("দু'আ")। PrayerAdhkar.jsx(item ৮, তালিকা)
-// ও DuaFlashcards.jsx(item ৩০, flip-card) — দুটোই একত্রে(3_1 §"আমল হাব"), tab
-// দিয়ে ভাগ(MorningEveningAzkar.jsx-এর একই local-tab pattern reuse)।
+// DuaSection.jsx — "আমল" হাব, item ৫("দোয়া")। PrayerAdhkar.jsx(item ৮, তালিকা)
+// ও DuaFlashcards.jsx(item ৩০, flip-card) — দুটোই একত্রে (3_1 §"আমল হাব"), tab
+// দিয়ে ভাগ (MorningEveningAzkar.jsx-এর একই local-tab pattern reuse)।
 // React global(window.React, globals.js)।
 
 import { SubScreenHeader } from "./SubScreenHeader.jsx";
@@ -15,7 +15,7 @@ export function DuaSection({ onBack }) {
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
-    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দু'আ" }),
+    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দোয়া" }),
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4 pb-3 flex gap-2" },

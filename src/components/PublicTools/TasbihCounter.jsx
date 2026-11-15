@@ -1,4 +1,4 @@
-// TasbihCounter.jsx — "আমল" hub(AmolHub.jsx)-এর ভিতরে, গ্রিডের নিচে(১৯ সেপ্টেম্বর
+// TasbihCounter.jsx — "আমল" hub(AmolHub.jsx)-এর ভিতরে, গ্রিডের নিচে (১৯ সেপ্টেম্বর
 // ২০২৬ owner-request, আধুনিক ring-counter ডিজাইন)। Pure counter-state
 // (editable/checklist না) — running count session-only(reload-এ ০), শুধু target
 // ঐচ্ছিকভাবে persist(3_2 §৩, data-layer publicToolsTasbih.js)।
@@ -56,7 +56,7 @@ export function TasbihCounter() {
         React.createElement(ToolIcon, { name: "beads", size: 16, color: PRIMARY }),
         "তাসবীহ"
       ),
-      // §রিসেট বাটন(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): আগে বৃত্তের নিচে
+      // §রিসেট বাটন (owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): আগে বৃত্তের নিচে
       // শুধু আইকন ছিল, এখন উপরে ডানপাশে লেবেল-সহ("রিসেট করুন" + আইকন)।
       React.createElement(
         "div",

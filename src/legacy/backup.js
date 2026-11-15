@@ -75,11 +75,11 @@ function requestDriveAccessToken(promptMode) {
 // param(default true, backward-compatible)। false দিলে silent(prompt:"")
 // ব্যর্থ হলে আর "consent" popup fallback হবে না — সরাসরি throw করবে। এটা
 // Firebase Auth-এর linkWithPopup()-এর থেকে সম্পূর্ণ আলাদা GIS OAuth popup —
-// Google sign-in সফল হওয়ার সাথে সাথেই(বা reload-পরবর্তী বুটে, কোনো fresh
+// Google sign-in সফল হওয়ার সাথে সাথেই (বা reload-পরবর্তী বুটে, কোনো fresh
 // click ছাড়া) এই দ্বিতীয় popup ট্রিগার হওয়াই "sign-in-এর পর popup আবার
-// খুলছে" সমস্যার root cause ছিল(static audit finding)। explicit ম্যানুয়াল
-// রিস্টোর ক্লিকে(handleManualDriveRestoreClick) আগের মতোই consent popup
-// পাওয়া যাবে(default true পাস হয়)।
+// খুলছে" সমস্যার root cause ছিল (static audit finding)। explicit ম্যানুয়াল
+// রিস্টোর ক্লিকে (handleManualDriveRestoreClick) আগের মতোই consent popup
+// পাওয়া যাবে (default true পাস হয়)।
 async function getDriveAccessToken(allowConsentPopup = true) {
   if (!isGoogleDriveConfigured()) {
     throw new Error("Google Drive ব্যাকআপ এখনো সেটআপ করা হয়নি।");
@@ -225,12 +225,12 @@ async function readAllFamilyDataForBackup(migrationState) {
     result[`weekly:${d.id.slice(0, idx)}:${d.id.slice(idx + 1)}`] = d.data();
   });
   // Fail-safe fix(২৫ আগস্ট ২০২৬): কিছু গ্রান্ডফাদার্ড family-র legacy
-  // collection-নাম(data_<familyCode>)-এ এমন ক্যারেক্টার(যেমন "@") থাকতে
+  // collection-নাম (data_<familyCode>)-এ এমন অক্ষর (যেমন "@") থাকতে
   // পারে যা বর্তমান English-only charset Rules regex(isAppCollection)-এর
   // সাথে মেলে না — ফলে এই read permission-denied হয়, যদিও family
   // ইতিমধ্যে সম্পূর্ণ v2। এই দুইটা key(custom_fields/meeting_rows_v2:)
   // optional/legacy-only বলে এই ব্যর্থতাকে fail-safe খালি ফলাফল হিসেবে
-  // ধরা হচ্ছে যাতে মূল member/entry/weekly backup আটকে না যায়(Root-cause
+  // ধরা হচ্ছে যাতে মূল member/entry/weekly backup আটকে না যায় (Root-cause
   // Learnings pattern reuse, V1 ফাইল ১.২ §১৭)।
   try {
     const legacySnap = await getDocs(collection(db, getCollectionName()));
@@ -288,7 +288,7 @@ async function writeParsedBackupToFamily(migrationState, items) {
   await commitInChunks(mainWrites);
   // Fail-safe fix(২৫ আগস্ট ২০২৬): legacy custom_fields/meeting_rows_v2
   // write আলাদা batch-এ সরানো হলো। কারণ — কিছু গ্রান্ডফাদার্ড family-র
-  // legacy collection-নামে(data_<familyCode>) এমন ক্যারেক্টার(যেমন "@")
+  // legacy collection-নামে (data_<familyCode>) এমন অক্ষর (যেমন "@")
   // থাকতে পারে যা বর্তমান English-only charset Rules regex-এর সাথে না
   // মিলে permission-denied দেয়; আগে এই write মূল member/entry/weekly
   // write-এর সাথে একই batch-এ থাকায় Firestore batch atomic হওয়ার কারণে
@@ -378,12 +378,12 @@ async function downloadDriveBackupContent(fileId) {
 // ফ্যামিলি কোড ভিন্ন হলে নীরবে ওভাররাইট না করে ব্যবহারকারীকে জিজ্ঞাসা করে,
 // তারপর Firestore থেকে বর্তমান স্ন্যাপশট নিয়ে Drive-এ আপলোড করে।
 // Switch prep fix: migrationState param buildDriveBackupPayload()-এ forward
-// করা হয় যাতে v2 family-তে সঠিক (live) ডাটা backup হয়।
+// করা হয় যাতে v2 family-তে সঠিক (live) ডেটা backup হয়।
 async function backupToGoogleDrive(migrationState) {
   const existing = await findDriveBackupFile();
   const currentFamilyCode = getFamilyCode();
   if (existing && existing.appProperties && existing.appProperties.familyCode && existing.appProperties.familyCode !== currentFamilyCode) {
-    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি ইউজারনেমের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডাটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
+    const proceed = window.confirm(`এই Google অ্যাকাউন্টে ইতিমধ্যে অন্য একটি ফ্যামিলি ইউজারনেমের (${existing.appProperties.familyCode}) ব্যাকআপ সংরক্ষিত আছে। এগিয়ে গেলে সেটি এই ফ্যামিলির (${currentFamilyCode}) ডেটা দিয়ে প্রতিস্থাপিত হয়ে যাবে এবং আগের ফ্যামিলির ব্যাকআপ আর পাওয়া যাবে না। আপনি কি নিশ্চিতভাবে এগিয়ে যেতে চান?`);
     if (!proceed) return { skipped: true };
   }
   const payload = await buildDriveBackupPayload(migrationState);

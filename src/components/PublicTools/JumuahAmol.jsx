@@ -1,4 +1,4 @@
-// JumuahAmol.jsx — "সহায়িকা"→"বিশেষ দিন ও উপলক্ষ", item ২৬(3_1)। কনটেন্ট
+// JumuahAmol.jsx — "সহায়িকা"→"বিশেষ দিন ও উপলক্ষ", item ২৬ (3_1)। কনটেন্ট
 // ✏️(accordion) — কিন্তু নিজস্ব date-keyed checklist-state আলাদা, local-ই থাকে
 // (3_1: "শুধু item-labels/content editable, tick-state local-ই থাকে")। তাই এখানে
 // custom checklist-display(checkbox, localStorage) + admin-only নিচে
@@ -15,12 +15,12 @@ const { useState, useEffect } = React;
 const SECTION_ID = "jumuah_amol";
 
 const JUMUAH_DEFAULT = [
-  { itemId: "ju_ghusl", title: "গোসল করা", body: "জুমার দিন গোসল করা প্রাপ্তবয়স্কদের জন্য সুন্নত মুআক্কাদা(বুখারি-মুসলিম)।" },
+  { itemId: "ju_ghusl", title: "গোসল করা", body: "জুমার দিন গোসল করা প্রাপ্তবয়স্কদের জন্য সুন্নত মুআক্কাদা (বুখারি-মুসলিম)।" },
   { itemId: "ju_clean_clothes", title: "পরিষ্কার/উত্তম পোশাক পরা", body: "সম্ভব হলে সাদা বা পরিষ্কার-উত্তম পোশাক পরে মসজিদে যাওয়া।" },
-  { itemId: "ju_perfume", title: "সুগন্ধি ব্যবহার করা(পুরুষদের জন্য)", body: "উপলব্ধ থাকলে সুগন্ধি ব্যবহার করা সুন্নত।" },
-  { itemId: "ju_early", title: "আগে-ভাগে মসজিদে যাওয়া", body: "যত আগে যাওয়া যায় তত বেশি ফজিলত(বুখারি-মুসলিম)।" },
+  { itemId: "ju_perfume", title: "সুগন্ধি ব্যবহার করা (পুরুষদের জন্য)", body: "উপলব্ধ থাকলে সুগন্ধি ব্যবহার করা সুন্নত।" },
+  { itemId: "ju_early", title: "আগে-ভাগে মসজিদে যাওয়া", body: "যত আগে যাওয়া যায় তত বেশি ফজিলত (বুখারি-মুসলিম)।" },
   { itemId: "ju_kahf", title: "সূরা কাহফ তেলাওয়াত করা", body: "জুমার দিনে সূরা কাহফ পড়ার বিশেষ ফজিলত হাদিসে এসেছে।" },
-  { itemId: "ju_durud", title: "বেশি বেশি দুরুদ পড়া", body: "জুমার দিনে/রাতে বেশি দুরুদ পড়ার নির্দেশ হাদিসে এসেছে(আবু দাউদ)।" },
+  { itemId: "ju_durud", title: "বেশি বেশি দুরুদ পড়া", body: "জুমার দিনে/রাতে বেশি দুরুদ পড়ার নির্দেশ হাদিসে এসেছে (আবু দাউদ)।" },
   { itemId: "ju_dua_last_hour", title: "আসর থেকে মাগরিবের মধ্যে দোয়া করা", body: "জুমার দিনের একটা নির্দিষ্ট মুহূর্তে দোয়া কবুল হয় — সাধারণত আসরের পর থেকে মাগরিবের আগ পর্যন্ত সময়টা অগ্রাধিকার দেওয়া হয়।" },
   { itemId: "ju_khutbah", title: "মনোযোগ দিয়ে খুতবা শোনা", body: "খুতবা চলাকালীন চুপ থেকে মনোযোগ দিয়ে শোনা, কথা না বলা।" },
   { itemId: "ju_sadaqa", title: "সদকা করা", body: "জুমার দিনে সদকা করার ফজিলতের কথা অনেক আলেম উল্লেখ করেছেন।" },
@@ -114,7 +114,7 @@ export function JumuahAmol() {
           onClick: () => setShowAdmin((s) => !s),
           className: "text-xs font-semibold text-slate-500 underline self-start px-1 mt-1",
         },
-        showAdmin ? "আমল-ব্যবস্থাপনা বন্ধ করুন" : "আমলের তালিকা ব্যবস্থাপনা(এডমিন)"
+        showAdmin ? "আমল-ব্যবস্থাপনা বন্ধ করুন" : "আমলের তালিকা ব্যবস্থাপনা (অ্যাডমিন)"
       ),
     isCreator &&
       showAdmin &&

@@ -118,8 +118,8 @@ async function saveCustomFields(fields) {
   await appStorage.set("custom_fields", JSON.stringify(fields), true);
 }
 
-// §লেবেল ম্যানেজ(ধাপ গ, owner-approved): family-স্তরের ঐচ্ছিক "field_overrides" doc —
-// custom_fields-এর হুবহু একই storage-পথ(appStorage shared), তাই নতুন Rules লাগে না।
+// §লেবেল ম্যানেজ (ধাপ গ, owner-approved): family-স্তরের ঐচ্ছিক "field_overrides" doc —
+// custom_fields-এর হুবহু একই storage-পথ (appStorage shared), তাই নতুন Rules লাগে না।
 async function loadFieldOverrides() {
   try {
     const res = await appStorage.get("field_overrides", true);
@@ -132,8 +132,8 @@ async function saveFieldOverrides(overrides) {
   await appStorage.set("field_overrides", JSON.stringify(overrides), true);
 }
 
-// §তাযকিরাহ ম্যানেজ(ধাপ খ, owner-approved): family-স্তরের ঐচ্ছিক "tazkirah_custom" doc —
-// custom_fields/field_overrides-এর হুবহু একই storage-পথ(appStorage shared), তাই নতুন Rules লাগে না।
+// §তাযকিরাহ ম্যানেজ (ধাপ খ, owner-approved): family-স্তরের ঐচ্ছিক "tazkirah_custom" doc —
+// custom_fields/field_overrides-এর হুবহু একই storage-পথ (appStorage shared), তাই নতুন Rules লাগে না।
 async function loadTazkirahCustom() {
   try {
     const res = await appStorage.get("tazkirah_custom", true);
@@ -168,7 +168,7 @@ async function saveEntry(migrationState, memberId, key, data, ownerUid) {
     updatedAt: Date.now(),
     ownerUid: ownerUid ?? null,
     // TTL dry-run audit(২৫ আগস্ট ২০২৬) finding fix: এতদিন entry doc-এ
-    // lastActiveAt কখনো stamp হতো না(শুধু family+member-এ হতো) — ফলে
+    // lastActiveAt কখনো stamp হতো না (শুধু family+member-এ হতো) — ফলে
     // Firestore TTL policy entry-তে কখনো trigger হতো না। existing
     // Timestamp.now() pattern(দ্রষ্টব্য লাইন ৪০৫৯/৪২২৭) reuse করে এখানে যোগ।
     lastActiveAt: Timestamp.now()
@@ -188,7 +188,7 @@ function entryDocId(memberId, key) {
 // একই "best-effort convenience layer" pattern(নিচে দেখুন) — saveEntry()/
 // stampLastActive()-এর মূল batch সম্পূর্ণ অপরিবর্তিত, ইচ্ছাকৃতভাবে সম্পূর্ণ
 // আলাদা, independent write। ব্যর্থ হলে মূল entry-save-কে প্রভাবিত করে না —
-// dailyInsight তখন শুধু "এই মাসে"-স্কোপ fallback-এ ফিরে যাবে(নিচে dailyInsight.js
+// dailyInsight তখন শুধু "এই মাসে"-স্কোপ fallback-এ ফিরে যাবে (নিচে dailyInsight.js
 // দ্রষ্টব্য)। Rules-এ monotonic guard(bestScoreEver কখনো কমতে পারবে না) থাকায়
 // দেরি-হওয়া/out-of-order কল থেকেও data-corruption ঝুঁকি নেই।
 async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) {
@@ -207,10 +207,10 @@ async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) 
 }
 
 // §Motivational Layer — Phase 2(owner-approved, নতুন): tomorrowFocus —
-// সদস্য নিজে(বা admin, unclaimed proxy member-এর জন্য) পরদিনের Focus বেছে
+// সদস্য নিজে (বা admin, unclaimed proxy member-এর জন্য) পরদিনের Focus বেছে
 // নেন/বদলান। saveEntry()-এর batch-এর অংশ না, সরাসরি explicit user-action-এ
 // (TomorrowFocusPicker.jsx) ট্রিগার হয় — তাই ব্যর্থ হলে caller নিজেই error
-// দেখাবে(entry-save flow-এর সাথে কোনো সম্পর্ক নেই)।
+// দেখাবে (entry-save flow-এর সাথে কোনো সম্পর্ক নেই)।
 async function saveTomorrowFocus(migrationState, memberId, focus) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
@@ -225,7 +225,7 @@ async function saveTomorrowFocus(migrationState, memberId, focus) {
   }, { merge: true });
 }
 
-// §কাস্টম টাস্ক(সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
+// §কাস্টম টাস্ক (সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
 // explicit user-action, saveEntry() batch-এর অংশ না।
 async function saveCustomTasks(migrationState, memberId, tasks) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());

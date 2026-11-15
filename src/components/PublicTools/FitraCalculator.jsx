@@ -1,4 +1,4 @@
-// FitraCalculator.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১২(3_1 Phase B)।
+// FitraCalculator.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১২ (3_1 Phase B)।
 // Pure calculator(কোনো storage/state persist না)। Calculation logic
 // publicToolsFitra.js(data/lib layer)-এ, এই ফাইলে শুধু UI।
 // React global(window.React, globals.js)।
@@ -73,7 +73,7 @@ export function FitraCalculator() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "flex flex-col gap-1" },
-        /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "কেজি-দর(৳)"),
+        /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "কেজি-দর (৳)"),
         /*#__PURE__*/React.createElement("input", {
           type: "number",
           min: "0",

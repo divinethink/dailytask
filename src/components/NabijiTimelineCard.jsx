@@ -1,9 +1,9 @@
-// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ড(হোম ট্যাবে, তাযকিরার নিচে, owner-approved ৭ নভেম্বর ২০২৬):
+// "এ সময়ে নবিজি ﷺ যা করতেন" কার্ড (হোম ট্যাবে, তাযকিরার নিচে, owner-approved ৭ নভেম্বর ২০২৬):
 // এখনকার সময়ের ভাগ অনুযায়ী ২-৩টি বুলেট + প্রতিটির সহিহ সূত্র; "আরও দেখুন"-এ বাকি বুলেট।
 // ওপরে সময়ের চিপ-স্ট্রিপ: যেকোনো চিপে ট্যাপ করলে সেই সময়ভাগ দেখা যায়; "পুরো দিনের তালিকা" বাদ (owner-approved), শুধু চিপ-স্ট্রিপ।
-// বুলেট বিষয়(ইবাদত/পরিবার…) ধরে গ্রুপ; সূত্র লেখার শেষে বন্ধনীতে। কার্ড নিজেই ভাঁজ(fold = open/closed/fixed) সামলায় — বাইরে আলাদা FoldWrap নেই, তাই একটাই কার্ড।
+// বুলেট বিষয় (ইবাদত/পরিবার…) ধরে গ্রুপ; সূত্র লেখার শেষে বন্ধনীতে। কার্ড নিজেই ভাঁজ (fold = open/closed/fixed) সামলায় — বাইরে আলাদা FoldWrap নেই, তাই একটাই কার্ড।
 // শুধু দেখায় — কোনো ডেটা লেখে না। তালিকা সম্পাদনা শুধু App Creator(isCreatorAuth + Firestore Rules-এ enforced)।
-// সময়ভাগ সেভ-করা লোকেশনের আসল ওয়াক্ত-সময়ে(ফজর, যোহর…) চলে — লোকেশন/নেটওয়ার্ক/ক্যাশ না থাকলে বা ক্রিয়েটর সময় বদলালে স্থির ঘণ্টা।
+// সময়ভাগ সেভ-করা লোকেশনের আসল ওয়াক্ত-সময়ে (ফজর, যোহর…) চলে — লোকেশন/নেটওয়ার্ক/ক্যাশ না থাকলে বা ক্রিয়েটর সময় বদলালে স্থির ঘণ্টা।
 // doc না থাকলে/পড়া ব্যর্থ হলে nabijiTimeline.js-এর ডিফল্ট তালিকা — কার্ড আগের মতোই চলে। React global(window.React, globals.js)।
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
@@ -43,7 +43,7 @@ function SlotIcon({ id, emoji, size, className }) {
   return React.createElement(Icon, { size, className }, draw());
 }
 const NEUTRAL = { txt: "text-slate-700", src: "text-slate-500", dot: "bg-slate-300" };
-// বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
+// বিষয় (cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে (শিরোনাম ছাড়া)
 function groupItems(items) {
   const groups = [];
   items.forEach((it) => {
@@ -55,7 +55,7 @@ function groupItems(items) {
   return groups;
 }
 
-// সূত্র লেখার শেষে ছোট ধূসর বন্ধনীতে(আলাদা লাইন নয়)
+// সূত্র লেখার শেষে ছোট ধূসর বন্ধনীতে (আলাদা লাইন নয়)
 function Src({ src, th }) {
   return src ? React.createElement("span", { className: "block text-[11px] mt-0.5 " + th.src }, src) : null;
 }
@@ -111,12 +111,12 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     fetchSection(NABIJI_SECTION_ID).then((d) => { if (alive) setSlots(normalizeSlots(d)); });
     return () => { alive = false; };
   }, []);
-  // ঘণ্টা বদলালে কার্ড নিজে বদলায়(অ্যাপ খোলা রেখে ঘুমালেও)
+  // ঘণ্টা বদলালে কার্ড নিজে বদলায় (অ্যাপ খোলা রেখে ঘুমালেও)
   React.useEffect(() => {
     const t = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 60000);
     return () => clearInterval(t);
   }, []);
-  // আজকের ওয়াক্ত-সময়: আগে ক্যাশ(নেটওয়ার্ক ছাড়া), পরে নতুন; লোকেশন সেভ না থাকলে কিছুই করে না
+  // আজকের ওয়াক্ত-সময়: আগে ক্যাশ (নেটওয়ার্ক ছাড়া), পরে নতুন; লোকেশন সেভ না থাকলে কিছুই করে না
   const dayStr = new Date().toDateString();
   React.useEffect(() => {
     let alive = true;
@@ -134,7 +134,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [dayStr]);
-  // দেখানোর slot-তালিকা(ওয়াক্ত প্রযোজ্য হলে fromM/toM সহ); সম্পাদকের কাছে যায় মূল slots
+  // দেখানোর slot-তালিকা (ওয়াক্ত প্রযোজ্য হলে fromM/toM সহ); সম্পাদকের কাছে যায় মূল slots
   const view = React.useMemo(() => applyWaqt(slots, timings), [slots, timings]);
 
   const hit = slotAtMin(view, nowMin);
@@ -148,7 +148,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const hasMore = slot.items.length > PREVIEW;
 
   const pick = (id) => { setSel(id === nowId ? null : id); setMore(false); };
-  // সময়ভাগ বদল: আগের/পরের(শেষে ঘুরে প্রথমে)। চিপ-স্ট্রিপ সরানো হয়েছে(১৫ নভেম্বর ২০২৬, owner-approved)
+  // সময়ভাগ বদল: আগের/পরের (শেষে ঘুরে প্রথমে)। চিপ-স্ট্রিপ সরানো হয়েছে (১৫ নভেম্বর ২০২৬, owner-approved)
   const idx = view.findIndex((x) => x.id === slot.id);
   const step = (d) => { const n = view.length; if (n > 1 && idx >= 0) pick(view[(idx + d + n) % n].id); };
   const navBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-xl text-slate-500 active:bg-black/5";
@@ -157,7 +157,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const rootCls = "rounded-2xl overflow-hidden p-4 " + th.card + " " + th.glow;
   const isOpen = !foldable || openCard;
   const bandCls = "relative overflow-hidden -mx-4 -mt-4 px-4 py-3 bg-gradient-to-r from-emerald-800 to-emerald-900 text-white " + (isOpen ? "mb-4" : "-mb-4");
-  // মসজিদে নববীর হালকা সিলুয়েট(গম্বুজ+মিনার) — শুধু সাজসজ্জা, লেখা/বাটনের নিচে, ক্লিক-অযোগ্য
+  // মসজিদে নববীর হালকা সিলুয়েট (গম্বুজ+মিনার) — শুধু সাজসজ্জা, লেখা/বাটনের নিচে, ক্লিক-অযোগ্য
   const mosqueEl = React.createElement(
     "svg",
     { viewBox: "0 0 120 48", "aria-hidden": true, focusable: "false", className: "pointer-events-none absolute bottom-0 right-10 h-[88%] w-auto", fill: "#E4D3A8", fillOpacity: "0.17" },
@@ -194,7 +194,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     { className: rootCls },
     titleEl,
     isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
-    // হেডার: ‹ [ওয়াক্ত-নাম + এখন / সময়] › — মাঝ-বরাবর, দুই পাশে তীর(১৫ নভেম্বর ২০২৬, owner-approved)
+    // হেডার: ‹ [ওয়াক্ত-নাম + এখন / সময়] › — মাঝ-বরাবর, দুই পাশে তীর (১৫ নভেম্বর ২০২৬, owner-approved)
     React.createElement(
       "div",
       { className: "flex items-center justify-between gap-1 mb-3" },

@@ -1,7 +1,7 @@
 // §Motivational Layer — Phase 1: "আজকের বিশেষ দিক" card
 // একটিমাত্র card, ভিতরের content selectDailyInsight()(../legacy/dailyInsight.js)
 // থেকে আসা `insight` prop অনুযায়ী বদলায় — আলাদা persistent card(Top3/Bottom3/
-// Streak ইত্যাদির) তৈরি করা হয়নি(owner-approved design principle)।
+// Streak ইত্যাদির) তৈরি করা হয়নি (owner-approved design principle)।
 // createElement-style(existing codebase convention, JSX syntax না)।
 
 function InsightBody({ insight, toBn }) {
@@ -58,8 +58,8 @@ function InsightBody({ insight, toBn }) {
 }
 
 // §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-approved): সব insight-type-এ
-// "অর্জন" বসালে ভুল বোঝাবে(bottom3/nearMilestone কোনো অর্জন না) — তাই শুধু
-// সত্যিকারের achievement-টাইপ-এ "🏆 আজকের অর্জন", বাকি(pending/neutral)-এ আগের
+// "অর্জন" বসালে ভুল বোঝাবে (bottom3/nearMilestone কোনো অর্জন না) — তাই শুধু
+// সত্যিকারের achievement-টাইপ-এ "🏆 আজকের অর্জন", বাকি (pending/neutral)-এ আগের
 // "⭐ আজকের বিশেষ দিক"-ই থাকছে। insight.type-ভ্যালু dailyInsight.js-এর
 // selectDailyInsight()-এর সাথে হুবহু sync(কোনো নতুন type যোগ হয়নি)।
 const ACHIEVEMENT_INSIGHT_TYPES = new Set(["milestoneHit", "bestDay", "mostImproved", "comeback", "top3"]);

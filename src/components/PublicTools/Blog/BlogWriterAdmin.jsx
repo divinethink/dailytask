@@ -1,4 +1,4 @@
-// BlogWriterAdmin.jsx — শুধু App Creator দেখেন(3_4 §৪/৩_৩ §৮.৪)। বিদ্যমান
+// BlogWriterAdmin.jsx — শুধু App Creator দেখেন (3_4 §৪/৩_৩ §৮.৪)। বিদ্যমান
 // writer-email লিস্ট + remove + নতুন email যোগ করার ছোট ফর্ম।
 // React global(window.React, globals.js)।
 

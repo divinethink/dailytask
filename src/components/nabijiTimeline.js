@@ -8,7 +8,7 @@ export const NABIJI_SECTION_ID = "homeCard_nabijiTimeline";
 export const MAX_SLOTS = 14;
 export const MAX_ITEMS = 12;
 export const LIMITS = { icon: 8, title: 60, text: 500, src: 120 };
-// বুলেটের ধরন(ঐচ্ছিক): কার্ডে ছোট লেবেল হয়ে দেখা যায়; অচেনা/খালি মান = লেবেল নেই।
+// বুলেটের ধরন (ঐচ্ছিক): কার্ডে ছোট লেবেল হয়ে দেখা যায়; অচেনা/খালি মান = লেবেল নেই।
 export const CATS = {
   ibadat: { label: "ইবাদত", cls: "bg-emerald-50 text-emerald-800" },
   family: { label: "পরিবার", cls: "bg-emerald-50 text-emerald-800" },
@@ -19,7 +19,7 @@ export const CATS = {
 
 export const DEFAULT_SLOTS = [
   { id: "s_lastNight", icon: "🌙", title: "শেষ রাত", from: 3, to: 5, items: [
-    { cat: "ibadat", text: "রাতের শেষ তৃতীয়াংশে আল্লাহ দুনিয়ার আসমানে নেমে এসে ডাকেন: কে দুআ করবে, কবুল করব; কে চাইবে, দেব; কে ক্ষমা চাইবে, ক্ষমা করব।", src: "সহিহ বুখারি ১১৪৫" },
+    { cat: "ibadat", text: "রাতের শেষ তৃতীয়াংশে আল্লাহ দুনিয়ার আসমানে নেমে এসে ডাকেন: কে দোয়া করবে, কবুল করব; কে চাইবে, দেব; কে ক্ষমা চাইবে, ক্ষমা করব।", src: "সহিহ বুখারি ১১৪৫" },
     { cat: "ibadat", text: "রাতের সালাত ছিল (সাধারণত) তের রাকাত।", src: "সহিহ বুখারি ১১৩৮" },
     { cat: "ibadat", text: "এত দীর্ঘ সালাত পড়তেন যে পা ফুলে যেত। কারণ জানতে চাইলে বলতেন: আমি কি কৃতজ্ঞ বান্দা হব না?", src: "সহিহ বুখারি ১১৩০" },
     { cat: "ibadat", text: "রাতে ঘুম থেকে উঠে মিসওয়াক করতেন।", src: "সহিহ বুখারি ২৪৫" },
@@ -44,7 +44,7 @@ export const DEFAULT_SLOTS = [
     { cat: "family", text: "নাতি হাসানকে চুমু দিয়ে বলেছেন: যে দয়া করে না, তাকে দয়া করা হয় না।", src: "সহিহ বুখারি ৫৯৯৭" },
     { cat: "family", text: "শিশুদের পাশ দিয়ে গেলে তাদের সালাম দিতেন।", src: "সহিহ বুখারি ৬২৪৭" },
     { cat: "work", text: "বলেছেন: নিজ হাতের উপার্জনের চেয়ে উত্তম খাবার কেউ খায়নি; দাউদ (আ.) নিজ হাতের কামাই খেতেন।", src: "সহিহ বুখারি ২০৭২" },
-    { cat: "work", text: "যে ক্রয়-বিক্রয় ও পাওনা আদায়ে নম্র ও সহজ, তার জন্য আল্লাহর রহমতের দুআ করেছেন।", src: "সহিহ বুখারি ২০৭৬" },
+    { cat: "work", text: "যে ক্রয়-বিক্রয় ও পাওনা আদায়ে নম্র ও সহজ, তার জন্য আল্লাহর রহমতের দোয়া করেছেন।", src: "সহিহ বুখারি ২০৭৬" },
     { cat: "work", text: "ক্রেতা-বিক্রেতা সত্য বললে ও দোষ-গুণ স্পষ্ট করলে লেনদেনে বরকত হয়; মিথ্যা বললে বা দোষ লুকালে বরকত চলে যায়।", src: "সহিহ বুখারি ২০৭৯" },
     { cat: "work", text: "খাদ্যশস্যের স্তূপের নিচে ভেজা শস্য দেখে বিক্রেতাকে তা ওপরে রাখতে বললেন, আর বললেন: যে ধোঁকা দেয় সে আমার দলের নয়।", src: "সহিহ মুসলিম ১০২" },
     { cat: "society", text: "আনাস (রা.) দশ বছর খেদমত করেছেন; নবিজি কখনো \"উফ\" বলেননি, \"কেন করলে/করোনি\"ও বলেননি।", src: "সহিহ মুসলিম ২৩০৯" },
@@ -78,7 +78,7 @@ export const DEFAULT_SLOTS = [
     { cat: "family", text: "নারীদের সাথে ভালো ব্যবহারের উপদেশ দিয়েছেন; বলেছেন, নারী পাঁজরের হাড়ের মতো, জোর করে সোজা করতে গেলে ভেঙে যাবে।", src: "সহিহ বুখারি ৫১৮৫-৫১৮৬" },
   ] },
   { id: "s_sleep", icon: "🛏️", title: "ঘুমের আগে", from: 22, to: 27, items: [
-    { cat: "ibadat", text: "ঘুমের আগে সালাতের মতো ওজু করে ডান কাতে শুয়ে দুআ পড়তে শিখিয়েছেন; এটাই যেন শেষ কথা হয়।", src: "সহিহ বুখারি ৬৩১১" },
+    { cat: "ibadat", text: "ঘুমের আগে সালাতের মতো ওজু করে ডান কাতে শুয়ে দোয়া পড়তে শিখিয়েছেন; এটাই যেন শেষ কথা হয়।", src: "সহিহ বুখারি ৬৩১১" },
     { cat: "ibadat", text: "প্রতি রাতে দুই হাতে সুরা ইখলাস, ফালাক ও নাস পড়ে ফুঁ দিয়ে মাথা-মুখ-শরীরে হাত বুলাতেন (তিনবার)।", src: "সহিহ বুখারি ৫০১৭" },
     { cat: "ibadat", text: "শোয়ার সময় আয়াতুল কুরসি পড়লে সকাল পর্যন্ত আল্লাহর পক্ষ থেকে হেফাযতকারী থাকে, শয়তান কাছে আসে না।", src: "সহিহ বুখারি ২৩১১" },
     { cat: "family", text: "মেয়ে-জামাই ফাতিমা-আলীকে ঘুমের আগে ৩৪ বার আল্লাহু আকবার, ৩৩ বার সুবহানাল্লাহ ও ৩৩ বার আলহামদুলিল্লাহ পড়তে শিখিয়েছেন; এটি খাদেমের চেয়ে উত্তম।", src: "সহিহ বুখারি ৩৭০৫" },
@@ -120,19 +120,19 @@ export function normalizeSlots(raw) {
   return slots.length ? slots : DEFAULT_SLOTS;
 }
 
-// ঘণ্টা h(০-২৩) slot-এ পড়ে কিনা(রাত-পেরোনো slot সহ)
+// ঘণ্টা h(০-২৩) slot-এ পড়ে কিনা (রাত-পেরোনো slot সহ)
 export function inSlot(h, slot) {
   return (((h - slot.from) % 24) + 24) % 24 < slot.to - slot.from;
 }
 
-// মিনিট-ভিত্তিক মিল(m = দিনের শুরু থেকে মিনিট ০-১৪৩৯)। slot-এ fromM/toM থাকলে সেটা, নইলে from/to ঘণ্টা×৬০।
+// মিনিট-ভিত্তিক মিল (m = দিনের শুরু থেকে মিনিট ০-১৪৩৯)। slot-এ fromM/toM থাকলে সেটা, নইলে from/to ঘণ্টা×৬০।
 export function inSlotM(m, slot) {
   const from = slot.fromM != null ? slot.fromM : slot.from * 60;
   const len = (slot.toM != null ? slot.toM : slot.to * 60) - from;
   return (((m - from) % 1440) + 1440) % 1440 < len;
 }
 
-// এখনকার মিনিটের slot। না মিললে(ক্রিয়েটর ফাঁক রাখলে) পরের আসন্ন slot, exact=false।
+// এখনকার মিনিটের slot। না মিললে (ক্রিয়েটর ফাঁক রাখলে) পরের আসন্ন slot, exact=false।
 export function slotAtMin(slots, minute) {
   const m = ((Math.floor(Number(minute)) % 1440) + 1440) % 1440;
   const hit = slots.find((s) => inSlotM(m, s));
@@ -153,8 +153,8 @@ export function slotAt(slots, hour) {
   return slotAtMin(slots, h * 60);
 }
 
-// ── আসল ওয়াক্ত-সময়(Aladhan timings, publicToolsPrayerApi.js-এর "HH:MM" মান) ──
-// শুধু যখন সব slot অপরিবর্তিত ডিফল্ট-সময়ের(ক্রিয়েটর সময় বদলাননি) তখনই প্রযোজ্য; নইলে slots যেমন ছিল তেমন(নিরাপদ ফলব্যাক)।
+// ── আসল ওয়াক্ত-সময় (Aladhan timings, publicToolsPrayerApi.js-এর "HH:MM" মান) ──
+// শুধু যখন সব slot অপরিবর্তিত ডিফল্ট-সময়ের (ক্রিয়েটর সময় বদলাননি) তখনই প্রযোজ্য; নইলে slots যেমন ছিল তেমন (নিরাপদ ফলব্যাক)।
 const DEFAULT_RANGE = {};
 DEFAULT_SLOTS.forEach((s) => { DEFAULT_RANGE[s.id] = s.from + "-" + s.to; });
 
@@ -167,7 +167,7 @@ function toMin(v) {
 }
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
-// সীমানা(ফজর থেকে পরের ফজর পর্যন্ত একটানা, কোনো ফাঁক/ওভারল্যাপ নেই); ক্রম ভাঙলে null।
+// সীমানা (ফজর থেকে পরের ফজর পর্যন্ত একটানা, কোনো ফাঁক/ওভারল্যাপ নেই); ক্রম ভাঙলে null।
 export function waqtBoundaries(timings) {
   if (!timings || typeof timings !== "object") return null;
   const fajr = toMin(timings.Fajr);
@@ -195,7 +195,7 @@ export function waqtBoundaries(timings) {
   };
 }
 
-// slots-এ আসল ওয়াক্ত-সময় বসায়(fromM/toM যোগ; from/to ঘণ্টা অপরিবর্তিত)। প্রযোজ্য না হলে একই slots ফেরত।
+// slots-এ আসল ওয়াক্ত-সময় বসায় (fromM/toM যোগ; from/to ঘণ্টা অপরিবর্তিত)। প্রযোজ্য না হলে একই slots ফেরত।
 export function applyWaqt(slots, timings) {
   const b = waqtBoundaries(timings);
   if (!b || !Array.isArray(slots) || !slots.length) return slots;
@@ -232,7 +232,7 @@ export function rangeLabel(slot, toBn) {
   return hourLabel(slot.from, toBn) + " – " + hourLabel(slot.to, toBn);
 }
 
-// ফর্ম থেকে আসা slot যাচাই; ভুল থাকলে বাংলা বার্তা, ঠিক থাকলে null। সূত্র বাধ্যতামূলক(সূত্রহীন সুন্নাহ-বুলেট নয়)।
+// ফর্ম থেকে আসা slot যাচাই; ভুল থাকলে বাংলা বার্তা, ঠিক থাকলে null। সূত্র বাধ্যতামূলক (সূত্রহীন সুন্নাহ-বুলেট নয়)।
 export function validateSlot(form) {
   if (!form || !str(form.title, LIMITS.title)) return "সময়ভাগের নাম লিখুন।";
   const from = Number(form.from);

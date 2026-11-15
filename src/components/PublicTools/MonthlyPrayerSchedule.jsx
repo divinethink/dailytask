@@ -1,4 +1,4 @@
-// MonthlyPrayerSchedule.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১০(3_1 Phase B)।
+// MonthlyPrayerSchedule.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ১০ (3_1 Phase B)।
 // একই publicToolsPrayerApi.js(data-layer, Dev Rule ২)-এর fetchMonthlyPrayerTimes()
 // reuse করে — নতুন API/fetch-লজিক নেই। Location/মাযহাব publicToolsSettings.js-এর
 // সাথে shared(সময়সূচি ট্যাবের সাথে একই localStorage key)।
@@ -149,7 +149,7 @@ export function MonthlyPrayerSchedule() {
     /*#__PURE__*/React.createElement(
       "div",
       { className: "text-xs text-slate-500 mb-2" },
-      "📍 " + (location.name || "GPS অবস্থান") + (approximate ? " · আনুমানিক(cache)" : "")
+      "📍 " + (location.name || "GPS অবস্থান") + (approximate ? " · আনুমানিক (cache)" : "")
     ),
     loading && /*#__PURE__*/React.createElement(
       "div",

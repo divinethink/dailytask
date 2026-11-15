@@ -19,7 +19,7 @@ export function ProfileDropdownGoogle({
   isAdmin,
   isFirstAdmin,
   streak,
-  onDemoteSelf,       // () => Promise — এডমিন হতে অব্যাহতি(এই সংস্করণে UI থেকে সরানো, prop রাখা হলো future-use-এর জন্য)
+  onDemoteSelf,       // () => Promise — অ্যাডমিন হতে অব্যাহতি (এই সংস্করণে UI থেকে সরানো, prop রাখা হলো future-use-এর জন্য)
   onEditProfile,      // (name, gender) => Promise<{success}>
   onLeaveFamily,       // () => Promise<{success, aborted, reason}>
   onChangeGoogleAccount, // () => Promise<{ok, message}> — জিমেইল অ্যাকাউন্ট (জিমেইল) বদলান
@@ -68,7 +68,7 @@ export function ProfileDropdownGoogle({
     const res = await onChangeGoogleAccount();
     setChangeBusy(false);
     if (res && res.ok) closeAndReset(); // এরপর পূর্ণ-পর্দা রিকভারি-গেট (GoogleRelinkGate) নিজে থেকে আসে
-    else setChangeError((res && res.message) || "ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
+    else setChangeError((res && res.message) || "কাজটি সম্পন্ন হয়নি, আবার চেষ্টা করুন।");
   }
 
   async function handleConfirmLeave() {
@@ -77,9 +77,9 @@ export function ProfileDropdownGoogle({
     if (res && res.success) {
       closeAndReset();
     } else if (res && res.reason === "first-admin-must-transfer") {
-      setLeaveError("প্রথম এডমিন পরিবার ত্যাগ করতে পারবেন না।");
+      setLeaveError("প্রথম অ্যাডমিন পরিবার ত্যাগ করতে পারবেন না।");
     } else {
-      setLeaveError("ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
+      setLeaveError("কাজটি সম্পন্ন হয়নি, আবার চেষ্টা করুন।");
     }
   }
 
@@ -90,9 +90,9 @@ export function ProfileDropdownGoogle({
     }),
     /*#__PURE__*/React.createElement("div", {
       // §fix(পজিশনিং, ১১ সেপ্টেম্বর ২০২৬): "Hasan" বাটনের wrapping div
-      // ছোট(শুধু বাটনের সমান প্রস্থ) ও স্ক্রিনের বাম দিকে অবস্থিত(existing
+      // ছোট (শুধু বাটনের সমান প্রস্থ) ও স্ক্রিনের বাম দিকে অবস্থিত (existing
       // পুরনো ProfileDropdown.jsx-এর মতোই) — তাই "right-0" ব্যবহার করলে
-      // dropdown উল্টো বাম দিকে(off-screen) চলে যায়। পুরনো কম্পোনেন্টের
+      // dropdown উল্টো বাম দিকে (off-screen) চলে যায়। পুরনো কম্পোনেন্টের
       // "left-0"-ই সঠিক pattern, এখানে reuse করা হলো।
       className: "absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800 text-xs"
     },
@@ -118,8 +118,8 @@ export function ProfileDropdownGoogle({
         }, userEmail),
         /*#__PURE__*/React.createElement("span", {
           className: `inline-block mt-1 text-[9px] font-bold px-1 py-[1px] rounded border bg-slate-100 ${isAdmin ? "text-[#8a6a1f] border-slate-200" : "text-slate-500 border-slate-200"}`
-        }, isAdmin ? (isFirstAdmin ? "এডমিন (প্রথম এডমিন)" : "এডমিন") : "সদস্য"),
-        // --- এই পরিবার ত্যাগ করুন(পূর্বের "এডমিন হতে অব্যাহতি নিন"-এর জায়গায়) ---
+        }, isAdmin ? (isFirstAdmin ? "অ্যাডমিন (প্রথম অ্যাডমিন)" : "অ্যাডমিন") : "সদস্য"),
+        // --- এই পরিবার ত্যাগ করুন (পূর্বের "অ্যাডমিন হতে অব্যাহতি নিন"-এর জায়গায়) ---
         !confirmLeave
           ? /*#__PURE__*/React.createElement("div", {
               className: "mt-1"
@@ -161,7 +161,7 @@ export function ProfileDropdownGoogle({
       }, /*#__PURE__*/React.createElement(CalIcon, { size: 12 }), "যোগ দিয়েছেন: ", /*#__PURE__*/React.createElement("span", {
         className: "text-slate-700 font-normal"
       }, sinceText))),
-      // --- প্রোফাইল এডিট ফর্ম(শুধু editing=true হলে দেখা যাবে — টগল এখন হেডারের আইকন থেকে) ---
+      // --- প্রোফাইল এডিট ফর্ম (শুধু editing=true হলে দেখা যাবে — টগল এখন হেডারের আইকন থেকে) ---
       editing && /*#__PURE__*/React.createElement("div", {
         className: "px-4 py-1.5 space-y-1.5 border-b border-slate-100"
       },

@@ -5,39 +5,39 @@
 // Structural-only (Owner Rule 2): no logic/condition change, only moved to its
 // own file + split into named exports.
 // [৮ সেপ্টেম্বর ২০২৬] Chart.js-ভিত্তিক ProgressChart(সাপ্তাহিক লাইন-গ্রাফ)
-// সরিয়ে StreakCard দিয়ে প্রতিস্থাপন করা হয়েছে(owner-approved, নিচে দ্রষ্টব্য)।
+// সরিয়ে StreakCard দিয়ে প্রতিস্থাপন করা হয়েছে (owner-approved, নিচে দ্রষ্টব্য)।
 import { InfoIcon, Loader2, Plus, Trash, RefreshIcon, CalIcon, ChevronLeft, ChevronRight, ChevronDown, Printer, MessageSquare, X } from "./icons.jsx";
 
 // React itself is a true runtime global (established pattern — no file in this
 // codebase imports it). app.js locally destructures hooks from it the same way.
 const { useState } = React;
 
-// StreakCard — ProgressChart(Chart.js লাইন-গ্রাফ)-এর প্রতিস্থাপন(৮ সেপ্টেম্বর
+// StreakCard — ProgressChart(Chart.js লাইন-গ্রাফ)-এর প্রতিস্থাপন (৮ সেপ্টেম্বর
 // ২০২৬, owner-approved: "গ্রাফ কাজে লাগছে না, আগ্রহ তৈরি হয় এমন কিছু আনা
 // হোক")। কোনো নতুন calculation লাগেনি — `calculateStreak()`(appHelpers.js)
 // আগে থেকেই তৈরি ও app.js-এ প্রতি রেন্ডারে গণনা হচ্ছিল, শুধু এতদিন কোথাও
-// প্রধানভাবে দেখানো হতো না(শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
+// প্রধানভাবে দেখানো হতো না (শুধু Profile-dropdown-এর ভিতরে ছিল)। Milestone
 // (৭/৩০/১০০/৩৬৫ দিন) toast system-ও আগে থেকেই আছে, অপরিবর্তিত।
 // §Dashboard redesign(১৭ সেপ্টেম্বর ২০২৬, owner-approved): streak-সংখ্যা এখন
-// DashboardHeader.jsx-এর compact chip-এ(bell-এর পাশে) দেখানো হয় — তাই এই
+// DashboardHeader.jsx-এর compact chip-এ (bell-এর পাশে) দেখানো হয় — তাই এই
 // component থেকে বড় streak-box সরিয়ে শুধু "আজকের অগ্রগতি" এক-লাইন compact
-// row রাখা হলো(component/prop-নাম অপরিবর্তিত রাখা হয়েছে, শুধু presentation)।
+// row রাখা হলো (component/prop-নাম অপরিবর্তিত রাখা হয়েছে, শুধু presentation)।
 // yesterdayPercent(নতুন, ঐচ্ছিক prop) দিলে গতকালের তুলনায় বৃদ্ধি/হ্রাস দেখাবে —
-// app.js-এর call-site-এ একই মাসের ভিতরে(cross-month fetch ছাড়াই) নিরাপদে
-// derive করা হয়েছে, না মিললে(যেমন মাসের ১ তারিখ) silently বাদ যায়।
+// app.js-এর call-site-এ একই মাসের ভিতরে (cross-month fetch ছাড়াই) নিরাপদে
+// derive করা হয়েছে, না মিললে (যেমন মাসের ১ তারিখ) silently বাদ যায়।
 export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPercent }) {
   if (primaryPercent === null || primaryPercent === undefined) return null;
   const hasDelta = comparisonPercent !== null && comparisonPercent !== undefined;
   const delta = hasDelta ? primaryPercent - comparisonPercent : null;
   // §Stable card(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): রাত ১২টার পর আজকের
   // এন্ট্রি এখনো না থাকলে card পুরোপুরি অদৃশ্য না হয়ে "গতকালের অগ্রগতি"-তে
-  // fallback করে(call-site/app.js-এ mode নির্ধারিত হয়) — লেবেল/তুলনা-টেক্সট
+  // fallback করে (call-site/app.js-এ mode নির্ধারিত হয়) — লেবেল/তুলনা-টেক্সট
   // mode অনুযায়ী বদলায়, বাকি presentation অপরিবর্তিত।
   const label = mode === "yesterday" ? "গতকালের অগ্রগতি:" : "আজকের অগ্রগতি:";
   const deltaPrefix = mode === "yesterday" ? "· আগের দিনের চেয়ে " : "· গতকালের চেয়ে ";
-  // §১-লাইন ফিক্স(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): "গতকালের অগ্রগতি:"
+  // §১-লাইন ফিক্স (১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড): "গতকালের অগ্রগতি:"
   // লেবেল "আজকের অগ্রগতি:"-এর চেয়ে লম্বা বলে ছোট স্ক্রিনে flex-wrap হয়ে ২য়
-  // লাইনে চলে যেত(device/font-scale-নির্ভর, unpredictable)। Fix: ফন্ট/গ্যাপ
+  // লাইনে চলে যেত (device/font-scale-নির্ভর, unpredictable)। Fix: ফন্ট/গ্যাপ
   // ছোট করে + flex-nowrap দিয়ে সবসময় ১-লাইনে রাখা হলো; overflow-x-auto শুধু
   // চরম extreme-zoom edge-case-এর জন্য safety-net(স্বাভাবিক অবস্থায় কখনো
   // scroll লাগবে না, clip/hidden-content-এর চেয়ে নিরাপদ ফলব্যাক)।
@@ -53,34 +53,34 @@ export function StreakCard({ streak, toBn, mode, primaryPercent, comparisonPerce
   }, deltaPrefix, toBn(Math.abs(delta)), "% ", delta >= 0 ? "বেশি ↑" : "কম ↓"));
 }
 
-// hex রঙ হালকা/গাঢ় করে(percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
+// hex রঙ হালকা/গাঢ় করে (percent: ধনাত্মক=হালকা, ঋণাত্মক=গাঢ়) — gradient/3D-bevel
 // effect তৈরির জন্য, কোনো নতুন color-library লাগেনি।
-// একটা donut(সেরা ৩ অথবা সর্বনিম্ন ৩ অ্যাক্টিভিটি) — সাধারণ, flat রঙ(কোনো
+// একটা donut(সেরা ৩ অথবা সর্বনিম্ন ৩ অ্যাক্টিভিটি) — সাধারণ, flat রঙ (কোনো
 // gradient/shadow/3D-effect নেই, existing dashboard-এর color-palette-এর সাথেই
-// সামঞ্জস্যপূর্ণ)। Chart.js-এর নিজস্ব legend ব্যবহার করা হয়েছে(নাম+% দুটোই
+// সামঞ্জস্যপূর্ণ)। Chart.js-এর নিজস্ব legend ব্যবহার করা হয়েছে (নাম+% দুটোই
 // legend-label-এর ভিতরে বেক করা), কারণ canvas slice-এর ভিতরে ছোট টেক্সট গোজার
 // চেয়ে regular legend-টেক্সট ছোট স্ক্রিনেও অনেক বেশি সহজে পড়া যায়।
 // পারফরম্যান্স-tier রঙ — শুধু এই র‍্যাঙ্কিং-সেকশনের জন্য, existing scoreColor()
 // থেকে আলাদা রাখা হয়েছে ইচ্ছাকৃতভাবে: এখানে ০% মানে "সত্যিকারের রেকর্ড করা
 // শূন্য পারফরম্যান্স"(fieldPercent() ইতিমধ্যে non-null মানেই ডেটা আছে ধরে
 // নেয়), "কোনো এন্ট্রি নেই" নয় — তাই ০%-কেও colorless(#E7EEE3, যেটা ক্যালেন্ডারে
-// "খালি দিন" বোঝায়) না দেখিয়ে বাকি লাল-tier-এর মতোই স্পষ্ট লাল দেখানো হয়(owner
+// "খালি দিন" বোঝায়) না দেখিয়ে বাকি লাল-tier-এর মতোই স্পষ্ট লাল দেখানো হয় (owner
 // অনুরোধ, ৬ সেপ্টেম্বর ২০২৬)। ৮৫/৬০/৩৫% থ্রেশহোল্ড ও রঙ scoreColor()-এর সাথেই
-// অভিন্ন রাখা হয়েছে(visual language consistency)।
+// অভিন্ন রাখা হয়েছে (visual language consistency)।
 function activityTierColor(pct) {
   // §Fix(১৯ সেপ্টেম্বর ২০২৬): scoreColor()-এর সাথে সামঞ্জস্যপূর্ণ fixed-green fix,
-  // একই কারণ(থিম-color-এর সাথে performance-semantics মিশে যাওয়া প্রতিরোধ)।
+  // একই কারণ (থিম-color-এর সাথে performance-semantics মিশে যাওয়া প্রতিরোধ)।
   if (pct >= 85) return "#0E4B43";
   if (pct >= 70) return "#2563A8";
   if (pct >= 40) return "#D6A400";
   return "#C1666B";
 }
 const ORDINAL_BN = ["১ম", "২য়", "৩য়"];
-// owner(৭ নভেম্বর ২০২৬): প্রতি শতাংশ-স্তরে শুধু ১টা আমলের নাম(আগে সর্বোচ্চ ৩টা ছিল)।
+// owner(৭ নভেম্বর ২০২৬): প্রতি শতাংশ-স্তরে শুধু ১টা আমলের নাম (আগে সর্বোচ্চ ৩টা ছিল)।
 const MAX_LABELS_PER_TIER = 1;
 const FARD_RANK_LABEL = "ফরজ আদায় (কাযা-মুক্ত)";
 
-// একটা tier-cell: র‍্যাঙ্ক-ব্যাজ + আমলের নাম(১টা), নিচে বার ও বড় শতাংশ।
+// একটা tier-cell: র‍্যাঙ্ক-ব্যাজ + আমলের নাম (১টা), নিচে বার ও বড় শতাংশ।
 function TierCell({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
   const color = activityTierColor(pct);
   const shown = shownPct === undefined ? pct : shownPct;
@@ -105,7 +105,7 @@ function TierCell({ rank, rankPrefix, pct, shownPct, labels, toBn }) {
   }, toBn(shown), "%")));
 }
 
-// দুই প্যানেল(সর্বোচ্চ | সর্বনিম্ন) একটাই grid-এ — প্রতি সারির উচ্চতা দুই পাশেই সমান হয়, তাই ১ম-১ম, ২য়-২য় সোজাসুজি মেলে।
+// দুই প্যানেল (সর্বোচ্চ | সর্বনিম্ন) একটাই grid-এ — প্রতি সারির উচ্চতা দুই পাশেই সমান হয়, তাই ১ম-১ম, ২য়-২য় সোজাসুজি মেলে।
 // প্যানেলের রঙিন ব্যাকগ্রাউন্ড/বর্ডার প্রতিটি cell-এ আলাদা বসানো, কোণ গোল শুধু উপরে-নিচে।
 function TierGrid({ left, right, toBn }) {
   const sides = [left, right].filter(x => x.tiers.length > 0);
@@ -168,25 +168,25 @@ function ratingTier(pct) {
 //
 // চলতি মাসের ১ তারিখ থেকে "যতদিন পূরণ হয়েছে" ততদিন পর্যন্ত (আজকের এন্ট্রি
 // সেভ হয়ে থাকলে আজও ধরা হয়, না থাকলে গতকাল পর্যন্ত — filled-status-ভিত্তিক,
-// rigid date-cutoff না) প্রতিটা আমলের গড় % হিসাব করে(fieldPercent() reuse)।
+// rigid date-cutoff না) প্রতিটা আমলের গড় % হিসাব করে (fieldPercent() reuse)।
 // অতীত মাস দেখলে পুরো মাস।
 //
-// Fard Gate: ফরজ কাযা(fardPrayers) ঠিক ১০০% না হলে "সর্বোচ্চ" তালিকায় আসবে
-// না(even ৯৯%) — "সর্বনিম্ন"-এ কোনো বাধা নেই। একই নিয়ম জামায়াতে সালাত(male-only
-// field)-এর জন্য ৭০% থ্রেশহোল্ডে। এই দুইটা field সবসময় Overall%-গড়ে যোগ হয়(gate
+// Fard Gate: ফরজ কাযা (fardPrayers) ঠিক ১০০% না হলে "সর্বোচ্চ" তালিকায় আসবে
+// না (even ৯৯%) — "সর্বনিম্ন"-এ কোনো বাধা নেই। একই নিয়ম জামায়াতে সালাত (male-only
+// field)-এর জন্য ৭০% থ্রেশহোল্ডে। এই দুইটা field সবসময় Overall%-গড়ে যোগ হয় (gate
 // শুধু তালিকা-প্রদর্শনে প্রভাব ফেলে, সংখ্যায় না)।
 //
 // Rating badge-এ আলাদা Fard Gate: Overall ৯০%+ হলেও fardPrayers ১০০% না হলে
-// "উৎকৃষ্ট" badge দেখানো হবে না(এক ধাপ নিচে নামবে, "খুব ভালো") — কিন্তু আসল
-// Overall% সংখ্যা অপরিবর্তিত থাকে(owner-চূড়ান্ত সিদ্ধান্ত)।
+// "উৎকৃষ্ট" badge দেখানো হবে না (এক ধাপ নিচে নামবে, "খুব ভালো") — কিন্তু আসল
+// Overall% সংখ্যা অপরিবর্তিত থাকে (owner-চূড়ান্ত সিদ্ধান্ত)।
 function computeActivityStats({ monthEntries, totalDays, member, allFields, fieldPercent, pad2, toBn, monthCursor }) {
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === monthCursor.year && now.getMonth() === monthCursor.month0;
   let cutoffDay = totalDays;
   if (isCurrentMonth) {
-    // শুধু "আজ" special-case করলে যথেষ্ট না — গতকাল(বা তার আগের দিন)ও যদি এখনো
-    // পূরণ না হয়ে থাকে(owner এখনো এন্ট্রি দেননি), সেটাও বাদ দিতে হবে। তাই আজ
-    // থেকে পিছনের দিকে হেঁটে সর্বশেষ প্রকৃত-পূরণ-করা দিন খুঁজে বের করা হয়(owner
+    // শুধু "আজ" special-case করলে যথেষ্ট না — গতকাল (বা তার আগের দিন)ও যদি এখনো
+    // পূরণ না হয়ে থাকে (owner এখনো এন্ট্রি দেননি), সেটাও বাদ দিতে হবে। তাই আজ
+    // থেকে পিছনের দিকে হেঁটে সর্বশেষ প্রকৃত-পূরণ-করা দিন খুঁজে বের করা হয় (owner
     // পর্যবেক্ষণ, ৭ সেপ্টেম্বর ২০২৬: "পূরণ না করা পর্যন্ত হিসাবে ধরা যাবে না")।
     let d = now.getDate();
     while (d >= 1 && !monthEntries[pad2(d)]) d--;
@@ -196,10 +196,10 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
   const results = [];
   for (const f of allFields) {
     const pct = fieldPercent(f, monthEntries, cutoffDay, member);
-    // "ফরজ কাযা" ফিল্ডের pct আসলে ইনভার্টেড(কাযা-মুক্ত/সময়মতো-আদায়ের হার,
+    // "ফরজ কাযা" ফিল্ডের pct আসলে ইনভার্টেড (কাযা-মুক্ত/সময়মতো-আদায়ের হার,
     // fieldPercent()-এর ডকুমেন্টেড কনভেনশন) — তালিকায় সরাসরি "ফরজ কাযা" নামে
-    // এই মান দেখালে নিচের কাযা-বার্তা(complementary %)-র সাথে বৈপরীত্য মনে
-    // হয়(owner পর্যবেক্ষণ, ৮ সেপ্টেম্বর ২০২৬)। তাই শুধু এই ranking-লেবেলে
+    // এই মান দেখালে নিচের কাযা-বার্তা (complementary %)-র সাথে বৈপরীত্য মনে
+    // হয় (owner পর্যবেক্ষণ, ৮ সেপ্টেম্বর ২০২৬)। তাই শুধু এই ranking-লেবেলে
     // স্পষ্ট নাম ব্যবহার করা হলো — সংখ্যা/hisab অপরিবর্তিত।
     const label = f.key === "fardPrayers" ? FARD_RANK_LABEL : f.shortLabel || f.label;
     if (pct !== null) results.push({ key: f.key, label, pct });
@@ -217,8 +217,8 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
   const labelsForTop = pct => results.filter(r => r.pct === pct && topEligible(r)).map(r => r.label);
   const labelsForAny = pct => results.filter(r => r.pct === pct).map(r => r.label);
   const topTiers = topPercents.map(pct => ({ pct, labels: labelsForTop(pct) }));
-  // "আরও মনোযোগ" তালিকায় ফরজ আলাদা সারিতে "ফরজ (কাযা)" নামে আসল কাযা-হার(১০০−কাযা-মুক্ত%) দেখায়;
-  // র‍্যাঙ্কিং/রঙ আগের মতোই কাযা-মুক্ত স্কোর অনুযায়ী(owner, ৫ নভেম্বর ২০২৬)। অন্য আমলের সারি অপরিবর্তিত।
+  // "আরও মনোযোগ" তালিকায় ফরজ আলাদা সারিতে "ফরজ (কাযা)" নামে আসল কাযা-হার (১০০−কাযা-মুক্ত%) দেখায়;
+  // র‍্যাঙ্কিং/রঙ আগের মতোই কাযা-মুক্ত স্কোর অনুযায়ী (owner, ৫ নভেম্বর ২০২৬)। অন্য আমলের সারি অপরিবর্তিত।
   const bottomTiers = [];
   for (const pct of bottomPercents) {
     const normal = labelsForAny(pct).filter(l => l !== FARD_RANK_LABEL);
@@ -239,7 +239,7 @@ function computeActivityStats({ monthEntries, totalDays, member, allFields, fiel
     const qazaPct = 100 - fardResult.pct;
     const jamaatResult = results.find(r => r.key === "jamaat");
     const goalMet = qazaPct === 0;
-    // টেক্সট আপডেট(৮ সেপ্টেম্বর ২০২৬, owner-চূড়ান্ত ওয়র্ডিং)।
+    // টেক্সট আপডেট (৮ সেপ্টেম্বর ২০২৬, owner-চূড়ান্ত ওয়র্ডিং)।
     const infoText = jamaatResult ? `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}% এবং জামায়াতে আদায়ের হার ${toBn(jamaatResult.pct)}%।` : `চলতি মাসে এ পর্যন্ত আপনার কাযা সালাতের হার ${toBn(qazaPct)}%।`;
     const goalText = jamaatResult ? "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা এবং যথাসম্ভব জামায়াতে আদায়ের চেষ্টা করা।" : "🎯 লক্ষ্য: সালাত কোনোভাবেই কাযা না করা।";
     qazaJamaatBlock = { infoText, goalText, goalMet };
@@ -367,13 +367,13 @@ export function MonthlyOverviewSection({
   toBn,
   streak,
   // §Layout reposition(১৭ সেপ্টেম্বর ২০২৬, owner-অনুরোধ): TopBottomActivityRanking-
-  // এর already-rendered element এখানে prop হিসেবে আসে(component নিজে অপরিবর্তিত,
+  // এর already-rendered element এখানে prop হিসেবে আসে (component নিজে অপরিবর্তিত,
   // শুধু render-tree-এর অবস্থান বদলেছে — app.js দ্রষ্টব্য)।
   rankingSlot
 }) {
   // §Heatmap legend day-count(১৭ সেপ্টেম্বর ২০২৬, owner-approved): scoreColor()
   // -এর হুবহু একই ৪-threshold branching reuse করে প্রতিটা tier-এ কতদিন পড়ে তার
-  // tally — নতুন calculation/read নয়, existing dailyScore()-ই আলাদাভাবে(calendar
+  // tally — নতুন calculation/read নয়, existing dailyScore()-ই আলাদাভাবে (calendar
   // -cell render loop থেকে independent) আরেকবার লুপ করা হচ্ছে।
   const tierCounts = { excellent: 0, good: 0, medium: 0, low: 0, empty: 0 };
   for (let d = 1; d <= total; d++) {
@@ -473,7 +473,7 @@ export function MonthlyOverviewSection({
         boxShadow: isToday ? "0 0 0 2px var(--theme-primary), 0 2px 5px -1px rgba(0,0,0,0.15)" : "0 1px 2px rgba(0,0,0,0.06)"
       }
     }, toBn(d));
-  }))), /* §Part B Phase ৫(heatmap legend, 2_5 Part B §B৩.৪, ১৫ সেপ্টেম্বর ২০২৬):
+  }))), /* §Part B Phase ৫ (heatmap legend, 2_5 Part B §B৩.৪, ১৫ সেপ্টেম্বর ২০২৬):
        কম্প্যাক্ট রঙ-legend, existing scoreColor()(appHelpers.js) ৫-tier scheme
        ও InfoModals.jsx-এর ইতিমধ্যে-বিদ্যমান ক্যালেন্ডার-রঙ legend-এর সাথে
        হুবহু sync(কোনো নতুন formula/threshold না, শুধু presentation) — পূর্ণ
@@ -521,7 +521,7 @@ export function MeetingMinutesSection({
 }) {
   // §Section-level accordion(১৬ সেপ্টেম্বর ২০২৬, owner-approved): Weekly
   // Reflection-এর মতোই, পুরো সেকশন ডিফল্টে বন্ধ। ভিতরের প্রতিটা row-এর
-  // আলাদা accordion(openRows) owner-অনুরোধে(১৬ সেপ্টেম্বর, দ্বিতীয় দফা)
+  // আলাদা accordion(openRows) owner-অনুরোধে (১৬ সেপ্টেম্বর, দ্বিতীয় দফা)
   // সরানো হয়েছে — সেকশন খোলা থাকলে প্রতিটা row এখন সবসময় দেখা যাবে।
   const [sectionOpen, setSectionOpen] = useState(fold === "open" || fold === "fixed");
   const rows = meetingState.rows && meetingState.rows.length > 0 ? meetingState.rows : [];
@@ -639,9 +639,9 @@ export function DeleteAccountWarningModal({
     className: "text-2xl"
   }, "⚠️"), /*#__PURE__*/React.createElement("h3", {
     className: "font-bold text-sm text-slate-800"
-  }, "গুগল একাউন্ট ডিলিট নিশ্চিত করুন")), /*#__PURE__*/React.createElement("p", {
+  }, "Google অ্যাকাউন্ট ডিলিট নিশ্চিত করুন")), /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-600 leading-relaxed mb-4"
-  }, "এটি আপনার ডিভাইস থেকে গুগল অ্যাকাউন্ট সরিয়ে ফেলবে এবং সাইন আউট করে দেবে। তবে এতে আপনার অ্যাপের মূল ডেটার কোনো ক্ষতি হবে না — আপনার সম্পূর্ণ ডেটা নিরাপদে আপনার ফ্যামিলি কাস্টম কোডের সাথে সংরক্ষিত থাকবে।"), /*#__PURE__*/React.createElement("div", {
+  }, "এতে এই ডিভাইস থেকে Google অ্যাকাউন্ট সরে যাবে এবং আপনি সাইন-আউট হয়ে যাবেন। তবে অ্যাপের মূল ডেটার কোনো ক্ষতি হবে না — আপনার সম্পূর্ণ ডেটা ফ্যামিলি ইউজারনেমের সাথে নিরাপদে সংরক্ষিত থাকবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDeleteAccountWarning(false),

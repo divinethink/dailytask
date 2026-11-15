@@ -4,12 +4,12 @@
 // data-driven smart-selection দিয়ে একটি insight দেখাবে। এই ফাইল pure logic —
 // কোনো React/JSX/Firestore-write নেই, শুধু আগে থেকেই Dashboard-এ loaded
 // monthEntries(চলতি মাস, day-of-month keyed)/selectedMember/allFields/streak
-// ব্যবহার করে — তাই নতুন কোনো Firestore read/listener/schema লাগেনি(Phase 1
+// ব্যবহার করে — তাই নতুন কোনো Firestore read/listener/schema লাগেনি (Phase 1
 // scope, "Family Highlight" ও "Weekly Story" ইচ্ছাকৃতভাবে এই ধাপে বাদ — যথাক্রমে
 // নতুন cross-member read ও month-boundary জটিলতা লাগে, পরের ছোট increment)।
 //
-// দুই দিন পরপর একই ধরনের insight দেখানো এড়াতে(spec §৫) sessionStorage-এর বদলে
-// localStorage ব্যবহার হয়েছে(পরদিন পর্যন্ত মনে রাখতে হবে) — শুধু UX-polish,
+// দুই দিন পরপর একই ধরনের insight দেখানো এড়াতে (spec §৫) sessionStorage-এর বদলে
+// localStorage ব্যবহার হয়েছে (পরদিন পর্যন্ত মনে রাখতে হবে) — শুধু UX-polish,
 // কোনো authorization/security-critical data না, তাই sync/Firestore লাগেনি।
 
 import { fieldApplies, isExcused, isFieldExcusable, dailyScore, pad2 } from "./appHelpers.js";
@@ -17,7 +17,7 @@ import { fieldApplies, isExcused, isFieldExcusable, dailyScore, pad2 } from "./a
 const MILESTONES = [7, 30, 100, 365];
 
 // dailyScore()(appHelpers.js)-এর ভেতরের per-field math-ই হুবহু, কিন্তু এখানে
-// single-field ratio(0..1) দরকার(dailyScore() পুরো aggregate করে দেয়) — তাই
+// single-field ratio(0..1) দরকার (dailyScore() পুরো aggregate করে দেয়) — তাই
 // existing tested dailyScore() স্পর্শ না করে ছোট, independent helper রাখা হলো
 // (Owner Rule 1: existing/প্রমাণিত ফাংশন অপরিবর্তিত রাখা)।
 export function fieldRatioToday(field, entry) {
@@ -52,7 +52,7 @@ function candidateNearMilestone(streak) {
 
 // ২) সেরা দিন। Phase 1.5(bestScoreEver denormalized field, memberData.js:
 // updateBestScoreIfNeeded())-এর পরে member.bestScoreEver থাকলে "সর্বকালের
-// সেরা" বলা যায়(field না থাকলে — পুরনো/not-yet-synced member — আগের মতোই
+// সেরা" বলা যায় (field না থাকলে — পুরনো/not-yet-synced member — আগের মতোই
 // শুধু চলতি মাস-স্কোপে fallback, কোনো regression না)।
 function candidateBestDaySoFar(monthEntries, member, allFields, todayNum) {
   const todayEntry = monthEntries[pad2(todayNum)];
@@ -61,9 +61,9 @@ function candidateBestDaySoFar(monthEntries, member, allFields, todayNum) {
   const todayPct = Math.round(todayScore * 100);
 
   if (member && typeof member.bestScoreEver === "number") {
-    // bestScoreEver ইতিমধ্যে আজকের score include করেই থাকতে পারে(handleSave()-এর
+    // bestScoreEver ইতিমধ্যে আজকের score include করেই থাকতে পারে (handleSave()-এর
     // পরে best-effort আপডেট হয়) — তাই "আজই নতুন সর্বোচ্চ" বলতে হলে todayPct
-    // ঠিক bestScoreEver-এর সমান হতে হবে(আজই সেট হয়েছে, ০ বাদ দিয়ে)।
+    // ঠিক bestScoreEver-এর সমান হতে হবে (আজই সেট হয়েছে, ০ বাদ দিয়ে)।
     if (todayPct > 0 && todayPct === member.bestScoreEver) {
       return { type: "bestDay", todayPct, prevPct: null, allTime: true };
     }
@@ -83,7 +83,7 @@ function candidateBestDaySoFar(monthEntries, member, allFields, todayNum) {
   return { type: "bestDay", todayPct, prevPct: Math.round(prevBest * 100), allTime: false };
 }
 
-// ৩) সবচেয়ে বেশি উন্নতি(আজ vs এই মাসে এখন পর্যন্ত সেই field-এর গড়, অন্তত ৩
+// ৩) সবচেয়ে বেশি উন্নতি (আজ vs এই মাসে এখন পর্যন্ত সেই field-এর গড়, অন্তত ৩
 // দিনের history থাকলেই তুলনা অর্থবহ ধরা হয়েছে, +৩০ পার্সেন্টেজ-পয়েন্ট threshold)
 function candidateMostImproved(monthEntries, member, allFields, todayNum) {
   const todayEntry = monthEntries[pad2(todayNum)];
@@ -133,7 +133,7 @@ function candidateComeback(monthEntries, member, allFields, todayNum) {
   return null;
 }
 
-// ৫) আজকের সেরা ৩(অন্তত ১টা fully-done না থাকলে "সেরা" অর্থহীন)
+// ৫) আজকের সেরা ৩ (অন্তত ১টা fully-done না থাকলে "সেরা" অর্থহীন)
 function candidateTop3(list) {
   if (list.length < 3) return null;
   const sorted = [...list].sort((a, b) => b.ratio - a.ratio);
@@ -144,7 +144,7 @@ function candidateTop3(list) {
   };
 }
 
-// ৬) আজকের ৩টি দুর্বল জায়গা(fallback — সবকিছু মোটামুটি ভালো হলে দেখানো হবে না)
+// ৬) আজকের ৩টি দুর্বল জায়গা (fallback — সবকিছু মোটামুটি ভালো হলে দেখানো হবে না)
 function candidateBottom3(list) {
   if (list.length < 3) return null;
   const sorted = [...list].sort((a, b) => a.ratio - b.ratio);
@@ -155,9 +155,9 @@ function candidateBottom3(list) {
   };
 }
 
-// পরপর দুইদিন হুবহু একই variant-type এড়ানো(spec §৫) + একই দিনের ভিতরে
-// re-render-এ flip-flop না করা(একবার সিলেক্ট হলে সেই দিনের জন্য স্থির থাকে,
-// শুধু ভিতরের সংখ্যা fresh data দিয়ে আপডেট হয়)। localStorage না থাকলে(private
+// পরপর দুইদিন হুবহু একই variant-type এড়ানো (spec §৫) + একই দিনের ভিতরে
+// re-render-এ flip-flop না করা (একবার সিলেক্ট হলে সেই দিনের জন্য স্থির থাকে,
+// শুধু ভিতরের সংখ্যা fresh data দিয়ে আপডেট হয়)। localStorage না থাকলে (private
 // browsing ইত্যাদি) silently fallback করে প্রথম candidate-ই দেখাবে।
 function pickWithAntiRepeat(candidates, memberId, todayKey) {
   const storageKey = `dt_daily_insight_last_${memberId}`;
@@ -181,7 +181,7 @@ function pickWithAntiRepeat(candidates, memberId, todayKey) {
   return chosen;
 }
 
-// §Motivational Layer — Phase 2: "আগামীকালের Focus" অটো-সাজেশন(আজকের
+// §Motivational Layer — Phase 2: "আগামীকালের Focus" অটো-সাজেশন (আজকের
 // সবচেয়ে দুর্বল applicable field) — TomorrowFocusPicker.jsx-এ ব্যবহৃত,
 // শুধু তখনই যখন সদস্য নিজে এখনো manually override করেননি।
 export function suggestTomorrowFocus(monthEntries, member, allFields, todayNum) {
@@ -194,7 +194,7 @@ export function suggestTomorrowFocus(monthEntries, member, allFields, todayNum) 
 }
 
 // প্রধান entry-point। App()-এ StreakCard-এর ঠিক পরে, TopBottomActivityRanking-এর
-// আগে বসানোর জন্য ডিজাইন করা(spec §২-এর "আজকের অবস্থান → আজকের বিশেষ দিক" ক্রম,
+// আগে বসানোর জন্য ডিজাইন করা (spec §২-এর "আজকের অবস্থান → আজকের বিশেষ দিক" ক্রম,
 // StreakCard-ই বর্তমান app-এ "আজকের অবস্থান"-এর সমতুল্য)।
 export function selectDailyInsight({ monthEntries, member, allFields, cursorYear, cursorMonth0, streak }) {
   if (!member) return null;

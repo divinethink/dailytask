@@ -12,7 +12,7 @@ export async function exportBackupToDevice(migrationState) {
     // প্রথম await হিসেবে) করা হচ্ছে।
     const fsaBaseDir = await getOrRequestFsaBaseDir();
     // Switch prep fix: আগে এখানে সরাসরি db.collection(getCollectionName())
-    // (legacy) থেকে পড়া হতো — v2 family-তে এটি ভুল (stale) ডাটা export
+    // (legacy) থেকে পড়া হতো — v2 family-তে এটি ভুল (stale) ডেটা export
     // করত। এখন readAllFamilyDataForBackup() ব্যবহার করা হচ্ছে, যা
     // migrationState অনুযায়ী সঠিক (live) জায়গা থেকে পড়ে এবং legacy-style
     // key ফরম্যাটেই রিটার্ন করে — legacy family-তে আউটপুট অপরিবর্তিত।

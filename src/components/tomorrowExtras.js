@@ -1,4 +1,4 @@
-// "আগামীকাল" কার্ডের ক্রিয়েটর-সম্পাদিত বাড়তি বাক্য(pure ফাংশন — React/DB/network কিছুই ছোঁয় না)।
+// "আগামীকাল" কার্ডের ক্রিয়েটর-সম্পাদিত বাড়তি বাক্য (pure ফাংশন — React/DB/network কিছুই ছোঁয় না)।
 // Firestore doc: publicToolsContent/homeCard_tomorrow → { homeCardExtras: { items:[...], sleepText } }(additive, নতুন doc)।
 // প্রতিটা item: { id, w(-১ = প্রতিদিন, ০=রবি … ৬=শনি = কালকের বার), icon, title, text, src }।
 // Defensive read: doc না থাকলে/ভুল গঠনে খালি ফল — কার্ড আগের মতোই চলে।
@@ -31,7 +31,7 @@ function hash(s) {
   return h;
 }
 
-// অন্তর্নির্মিত(কোডে লেখা) বার্তার স্থির আইডি: মূল শিরোনাম থেকে। শিরোনাম না বদলালে আইডি একই থাকে।
+// অন্তর্নির্মিত (কোডে লেখা) বার্তার স্থির আইডি: মূল শিরোনাম থেকে। শিরোনাম না বদলালে আইডি একই থাকে।
 export function builtinId(title) {
   return "b_" + Math.abs(hash(String(title || "")));
 }
@@ -62,13 +62,13 @@ export function normalizeExtras(raw) {
   return { items, sleepText: str(src.sleepText, LIMITS.sleep), overrides };
 }
 
-// ফর্ম থেকে অন্তর্নির্মিত বার্তার বদল তৈরি(যাচাইসহ)
+// ফর্ম থেকে অন্তর্নির্মিত বার্তার বদল তৈরি (যাচাইসহ)
 export function makeOverride(form) {
   return normalizeOverride({ hidden: false, icon: form && form.icon, title: form && form.title, text: form && form.text, src: form && form.src });
 }
 
 // কার্ডের note-তালিকায় বদল প্রয়োগ: লুকানো বাদ, বদলানো লেখা বসে। id-হীন note(রোজার সময় ইত্যাদি) অপরিবর্তিত।
-// textFn: আজ-মোডে "কাল"→"আজ" রূপান্তরের জন্য(ঐচ্ছিক)
+// textFn: আজ-মোডে "কাল"→"আজ" রূপান্তরের জন্য (ঐচ্ছিক)
 export function applyOverrides(notes, overrides, textFn) {
   const ov = overrides || {};
   const f = typeof textFn === "function" ? textFn : (x) => x;
@@ -85,11 +85,11 @@ export function applyOverrides(notes, overrides, textFn) {
 // ফর্ম থেকে আসা item যাচাই; ভুল থাকলে বাংলা বার্তা, ঠিক থাকলে null
 export function validateItem(item) {
   if (!item || !str(item.text, LIMITS.text)) return "বাক্য লিখুন।";
-  if (String(item.text).trim().length > LIMITS.text) return "বাক্য অনেক বড়(সর্বোচ্চ " + LIMITS.text + " অক্ষর)।";
+  if (String(item.text).trim().length > LIMITS.text) return "বাক্য অনেক বড় (সর্বোচ্চ " + LIMITS.text + " অক্ষর)।";
   return null;
 }
 
-// কালকের বারের জন্য কার্ডে দেখানোর note-তালিকা(প্রতিদিনের আগে, তারপর নির্দিষ্ট বারের)
+// কালকের বারের জন্য কার্ডে দেখানোর note-তালিকা (প্রতিদিনের আগে, তারপর নির্দিষ্ট বারের)
 export function extrasFor(extras, weekday) {
   return extras.items
     .filter((it) => it.w === -1 || it.w === weekday)
@@ -107,7 +107,7 @@ export function splitBullets(text) {
   return parts.length >= 2 ? parts : [];
 }
 
-// প্রতিদিনের আমল(সব দিনে দেখায়, "ঘুমের আগে"-র ওপরে) ও ঘুমের আগের বাড়তি আমল।
+// প্রতিদিনের আমল (সব দিনে দেখায়, "ঘুমের আগে"-র ওপরে) ও ঘুমের আগের বাড়তি আমল।
 export const DAILY_AMOL = [
   "প্রতি ওয়াক্ত ফরজ সালাতের পর আয়াতুল কুরসি ও তাসবীহ পাঠ করা।",
   "ইস্তেগফার ও মাসনূন যিকিরে মত্ত থাকা।",

@@ -2,13 +2,13 @@
 // create/update/delete, Firestore) + category-তালিকা constant + client-side
 // shuffle utility + personal-best(localStorage)। 3_5_Quiz_Feature_Plan.md
 // §২/§৩/§৫-এর সাথে সামঞ্জস্যপূর্ণ — top-level `quizQuestions` collection,
-// single-owner(App-Creator-only), ব্লগের চেয়ে সরল(কোনো writer-allowlist না)।
+// single-owner(App-Creator-only), ব্লগের চেয়ে সরল (কোনো writer-allowlist না)।
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
 import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
 
-// §১.১(সংশোধিত, ১৮ সেপ্টেম্বর ২০২৬, owner-approved) — কুইজের category-list এখন
+// §১.১ (সংশোধিত, ১৮ সেপ্টেম্বর ২০২৬, owner-approved) — কুইজের category-list এখন
 // ব্লগের ১৮-ক্যাটাগরি তালিকা থেকে ইচ্ছাকৃতভাবে বিচ্ছিন্ন, কুইজ-নির্দিষ্ট সরলীকৃত
-// ৫-বিষয়(3_5_Quiz_Feature_Plan.md §১.১-এর সাথে সামঞ্জস্যপূর্ণ)।
+// ৫-বিষয় (3_5_Quiz_Feature_Plan.md §১.১-এর সাথে সামঞ্জস্যপূর্ণ)।
 const QUIZ_CATEGORIES = [
   "কুরআন",
   "সিরাত",
@@ -18,8 +18,8 @@ const QUIZ_CATEGORIES = [
 ];
 
 // UI-level virtual অপশন(§১.১) — প্রশ্নের নিজস্ব field না, category-filter ছাড়া
-// পুরো bank থেকে pool করতে ব্যবহৃত হয়(fetchAllQuestions())।
-const ALL_TOPICS = "★ সকল বিষয়(মিক্স কুইজ)";
+// পুরো bank থেকে pool করতে ব্যবহৃত হয় (fetchAllQuestions())।
+const ALL_TOPICS = "★ সকল বিষয় (মিক্স কুইজ)";
 
 // §৬ Non-Goals — fixed default, v1-এ configurable না।
 const QUESTIONS_PER_SESSION = 10;
@@ -76,8 +76,8 @@ async function deleteQuestion(questionId) {
   await deleteDoc(doc(questionsRef(), questionId));
 }
 
-// --- ডিফল্ট প্রশ্ন-ব্যাংক ইম্পোর্ট(App Creator-only, Rules-এ create শুধু creator-এর) ---
-// Idempotent: স্থির doc-id(seed_<বিষয়>_<নং>) — আগে থেকে থাকা(এডিট-করা সহ) প্রশ্ন skip
+// --- ডিফল্ট প্রশ্ন-ব্যাংক ইম্পোর্ট (App Creator-only, Rules-এ create শুধু creator-এর) ---
+// Idempotent: স্থির doc-id(seed_<বিষয়>_<নং>) — আগে থেকে থাকা (এডিট-করা সহ) প্রশ্ন skip
 // হয়, overwrite হয় না। seed ফাইল dynamic import — main bundle-এ যায় না।
 async function importSeedQuestions() {
   const user = auth.currentUser;

@@ -1,5 +1,5 @@
-// হোম কার্ড ভাঁজ(ধাপ ক): যে কার্ডের নিজস্ব accordion নেই(তাযকিরাহ/স্ট্রিক/অন্তর্দৃষ্টি/ফোকাস/মাসিক ওভারভিউ),
-// তাকে fold = open/closed হলে শিরোনামসহ ভাঁজযোগ্য কার্ডে মোড়ায়। fold = fixed হলে কিছুই মোড়ায় না(আগের আচরণ হুবহু)।
+// হোম কার্ড ভাঁজ (ধাপ ক): যে কার্ডের নিজস্ব accordion নেই (তাযকিরাহ/স্ট্রিক/অন্তর্দৃষ্টি/ফোকাস/মাসিক ওভারভিউ),
+// তাকে fold = open/closed হলে শিরোনামসহ ভাঁজযোগ্য কার্ডে মোড়ায়। fold = fixed হলে কিছুই মোড়ায় না (আগের আচরণ হুবহু)।
 import { ChevronDown } from "./icons.jsx";
 
 export function FoldWrap({ fold, title, children }) {
@@ -28,14 +28,14 @@ export function FoldWrap({ fold, title, children }) {
 
 import { sanitizeLayout, cardTitle } from "../legacy/homeLayout.js";
 
-// হোম/ট্যাব কাস্টমাইজ শুধু App Creator করেন; তাঁর সেভ-করা লেআউট(গ্লোবাল অ্যাপ ডিজাইন) সবার জন্য এক।
+// হোম/ট্যাব কাস্টমাইজ শুধু App Creator করেন; তাঁর সেভ-করা লেআউট (গ্লোবাল অ্যাপ ডিজাইন) সবার জন্য এক।
 // `member` হিসেবে এখানে app.js-এর designSrc আসে(.homeLayout); না থাকলে ডিফল্ট।
 function effectiveHomeLayout(member) {
   return member && member.homeLayout;
 }
 
 // দৈনিক-এন্ট্রি অংশ: তাযকিরাহ + ক্যাটেগরি-কার্ড + অন্যান্য, সেভ-করা ক্রম/দৃশ্যমানতা/fold অনুযায়ী।
-// nodes[id](fold) → element। কীতে fold যুক্ত, তাই fold বদলালে কার্ড নতুন করে mount হয়(নতুন ডিফল্ট প্রযোজ্য)।
+// nodes[id](fold) → element। কীতে fold যুক্ত, তাই fold বদলালে কার্ড নতুন করে mount হয় (নতুন ডিফল্ট প্রযোজ্য)।
 export function homeEntryCards(member, nodes) {
   const out = [];
   sanitizeLayout(effectiveHomeLayout(member)).entry.forEach(c => {
@@ -54,9 +54,9 @@ export function homeEntryCards(member, nodes) {
   return out;
 }
 
-// সেভ-বাটনের নিচের সেকশন। weekly/meeting/monthlyReport/trend-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
+// সেভ-বাটনের নিচের সেকশন। weekly/meeting/monthlyReport/trend-এর নিজস্ব accordion আছে (fold prop নেয়); বাকিগুলো FoldWrap-এ।
 const PX_WRAPPED = { streak: true, insight: true, tomorrow: true, weekPulse: true };
-// order(ঐচ্ছিক): id-এর তালিকা — দিলে সেভ-করা ক্রম বদলে এই ক্রমে বসে(মুহাসাবা-ট্যাবের স্থির ক্রম); সেভ-করা দৃশ্যমানতা/fold অক্ষত থাকে।
+// order(ঐচ্ছিক): id-এর তালিকা — দিলে সেভ-করা ক্রম বদলে এই ক্রমে বসে (মুহাসাবা-ট্যাবের স্থির ক্রম); সেভ-করা দৃশ্যমানতা/fold অক্ষত থাকে।
 export function renderHomeBelow(member, nodes, order) {
   const out = [];
   let cards = sanitizeLayout(effectiveHomeLayout(member)).below;

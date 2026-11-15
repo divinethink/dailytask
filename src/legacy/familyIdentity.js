@@ -6,7 +6,7 @@ import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
 import { collection, doc, getDoc, getDocs, query, where, documentId, setDoc, updateDoc, deleteDoc, runTransaction } from "firebase/firestore";
 import { generateSecureCode } from "./appHelpers.js";
 // §২.৪ Identity Simplification — Sign Up(§২.১) নতুন Google-only family
-// creation path-এর জন্য(নিচে createNewFamilyGoogleOnly)। শুধু এই একটা
+// creation path-এর জন্য (নিচে createNewFamilyGoogleOnly)। শুধু এই একটা
 // helper import করা হচ্ছে, পুরনো createNewFamily()/কোনো existing flow
 // touch হয়নি।
 import { writeUserMapping } from "./googleIdentity.js";
@@ -57,7 +57,7 @@ if (typeof window !== "undefined") {
 function getFamilyCode() {
   let code = localStorage.getItem("family_code");
   if (!code) {
-    // ৬ থেকে বাড়িয়ে ৯ ক্যারেক্টার করা হয়েছে — brute-force আরও কঠিন করতে
+    // ৬ থেকে বাড়িয়ে ৯ অক্ষর করা হয়েছে — brute-force আরও কঠিন করতে
     code = "FAM-" + generateSecureCode(9);
     localStorage.setItem("family_code", code);
   }
@@ -84,11 +84,11 @@ function setFamilyCode(code) {
   if (!code || !code.trim()) return;
   const normalized = code.trim();
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    alert(`ফ্যামিলি ইউজারনেম ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    alert(`ফ্যামিলি ইউজারনেম ${FAMILY_CODE_MIN_LENGTH} থেকে ${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`);
     return;
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    alert("অনুগ্রহ করে শুধু English Alphabet, সংখ্যা, _ বা - ব্যবহার করুন।");
+    alert("অনুগ্রহ করে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন।");
     return;
   }
   localStorage.setItem("family_code", normalized);
@@ -100,17 +100,17 @@ async function changeFamilyCodeForExistingFamily(newCode) {
   const normalized = (newCode || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    console.error(`[Family Code change] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    console.error(`[Family Code change] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`);
     return { aborted: true, reason: "length" };
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    console.error("[Family Code change] অবৈধ ক্যারেক্টার।");
+    console.error("[Family Code change] অবৈধ অক্ষর।");
     return { aborted: true, reason: "charset" };
   }
   const familyId = getFamilyId();
   const uid = auth.currentUser ? auth.currentUser.uid : null;
   if (!uid) {
-    console.error("[Family Code change] সাইন ইন করা নেই।");
+    console.error("[Family Code change] সাইন-ইন করা নেই।");
     return { aborted: true, reason: "no-auth" };
   }
   try {
@@ -121,20 +121,20 @@ async function changeFamilyCodeForExistingFamily(newCode) {
       if (!snap.exists()) throw new Error("families ডকুমেন্ট পাওয়া যায়নি।");
       const fam = snap.data();
       if (!Array.isArray(fam.adminUids) || !fam.adminUids.includes(uid)) {
-        throw new Error("শুধুমাত্র এই family-এর Admin কোড পরিবর্তন করতে পারবেন।");
+        throw new Error("শুধু এই পরিবারের অ্যাডমিন কোড পরিবর্তন করতে পারবেন।");
       }
       oldCode = fam.familyCode || null;
       const newKey = normalizeFamilyKey(normalized);
       const newCodeRef = doc(db, "familyCodes", newKey);
       const newCodeSnap = await tx.get(newCodeRef);
       if (newCodeSnap.exists() && newCodeSnap.data().familyId !== familyId) {
-        throw new Error("এই কোড ইতিমধ্যে অন্য একটি family ব্যবহার করছে।");
+        throw new Error("এই কোড ইতিমধ্যে অন্য একটি পরিবার ব্যবহার করছে।");
       }
       tx.set(newCodeRef, { familyId, createdAt: Date.now() });
       tx.update(familyRef, { familyCode: normalized, updatedAt: Date.now() });
       // পুরনো familyCodes/<oldCode> mapping delete করা হচ্ছে (owner
-      // নিশ্চিত করেছেন এই ছোট family-তে ডাটা-হারানোর ঝুঁকি নেই) —
-      // dataCollectionName অপরিবর্তিত থাকায় আসল ডাটা কোনোভাবেই touched
+      // নিশ্চিত করেছেন এই ছোট family-তে ডেটা-হারানোর ঝুঁকি নেই) —
+      // dataCollectionName অপরিবর্তিত থাকায় আসল ডেটা কোনোভাবেই touched
       // হয় না, শুধু code→familyId lookup-এর পুরনো এন্ট্রি সরানো হচ্ছে।
       // §Case-insensitive fix — পুরনো কোড normalize করার আগের scheme-এ
       // raw(uppercase) doc-id হিসেবে সেভ থাকতে পারে, তাই normalized-key ও
@@ -150,7 +150,7 @@ async function changeFamilyCodeForExistingFamily(newCode) {
         }
       }
     });
-    console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডাটা একই কালেকশনে)। রিলোড হচ্ছে...`);
+    console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডেটা একই কালেকশনে)। রিলোড হচ্ছে...`);
     // §৫ fix — Google-linked হলে account-এর সাথে সংরক্ষিত familyCode-ও
     // (users/{uid}.familyCode) আপডেট করা হচ্ছে, নইলে পরের বুটে
     // syncFamilyCodeWithAccount() পুরনো account-linked কোড দেখে এই
@@ -179,11 +179,11 @@ async function createNewFamily(newCode) {
   const normalized = (newCode || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    console.error(`[New Family] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    console.error(`[New Family] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`);
     return { aborted: true, reason: "length" };
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    console.error("[New Family] অবৈধ ক্যারেক্টার।");
+    console.error("[New Family] অবৈধ অক্ষর।");
     return { aborted: true, reason: "charset" };
   }
   const newFamilyId = generateSecureCode(20);
@@ -207,7 +207,7 @@ async function createNewFamily(newCode) {
       familyCode: normalized,
       isCustomCode: true,
       dataCollectionName: `data_${normalized}`,
-      // বাগ-ফিক্স(২৭.৩): migrationState explicit "v2" — নইলে field-না-থাকা
+      // বাগ-ফিক্স (২৭.৩): migrationState explicit "v2" — নইলে field-না-থাকা
       // অবস্থায় joinExistingFamily() ডিফল্ট "legacy" ধরে ব্লক করে দিত
       // ("এই ফ্যামিলি এখনো এই ফিচারের জন্য প্রস্তুত নয়" ভুল মেসেজ)।
       migrationState: "v2",
@@ -262,7 +262,7 @@ if (typeof window !== "undefined") {
 //
 // Precondition(caller-এর দায়িত্ব, §১০.৩ single-popup pattern অনুযায়ী):
 // Google Sign-in(signInWithPopup) ইতিমধ্যে সফল হয়ে auth.currentUser এখন
-// সেই Google user — এই ফাংশন নিজে popup ট্রিগার করে না(UI button-এর
+// সেই Google user — এই ফাংশন নিজে popup ট্রিগার করে না (UI button-এর
 // onClick-এর সবচেয়ে প্রথম synchronous statement হিসেবে popup থাকতে হবে,
 // এই ফাংশন সেই .then()-এর ভিতর থেকে call হবে)।
 //
@@ -275,11 +275,11 @@ async function createNewFamilyGoogleOnly(newCode, name, gender) {
   const normalized = (newCode || "").trim();
   if (!normalized) return { aborted: true, reason: "empty" };
   if (normalized.length < FAMILY_CODE_MIN_LENGTH || normalized.length > FAMILY_CODE_MAX_LENGTH) {
-    console.error(`[New Family/Google] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} ক্যারেক্টারের মধ্যে হতে হবে।`);
+    console.error(`[New Family/Google] কোড ${FAMILY_CODE_MIN_LENGTH}-${FAMILY_CODE_MAX_LENGTH} অক্ষরের মধ্যে হতে হবে।`);
     return { aborted: true, reason: "length" };
   }
   if (!isFamilyCodeCharsetValid(normalized)) {
-    console.error("[New Family/Google] অবৈধ ক্যারেক্টার।");
+    console.error("[New Family/Google] অবৈধ অক্ষর।");
     return { aborted: true, reason: "charset" };
   }
   if (!name || !name.trim()) {
@@ -319,11 +319,11 @@ async function createNewFamilyGoogleOnly(newCode, name, gender) {
       firstAdminUid: uid,
       updatedAt: Date.now()
     });
-    // identityModel — দুই-ধাপ(Rules-gated), উপরের কমেন্ট দ্রষ্টব্য।
+    // identityModel — দুই-ধাপ (Rules-gated), উপরের কমেন্ট দ্রষ্টব্য।
     await updateDoc(familyRef, { identityModel: "transitioning", updatedAt: Date.now() });
     await updateDoc(familyRef, { identityModel: "google-only", updatedAt: Date.now() });
-    // First-admin member — claimed অবস্থাতেই তৈরি(googleUid=uid), কখনো
-    // email field বসে না(unclaimed-proxy পথ ভিন্ন, §৫.১)।
+    // First-admin member — claimed অবস্থাতেই তৈরি (googleUid=uid), কখনো
+    // email field বসে না (unclaimed-proxy পথ ভিন্ন, §৫.১)।
     const memberId = generateSecureCode(16);
     await setDoc(doc(familyRef, "members", memberId), {
       name: name.trim(),
@@ -487,7 +487,7 @@ function familyDocRef() {
 // parameter না দিলে (standalone caller, যেমন custom-code-set/Google-link
 // trigger) আগের মতোই নিজের `.get()` করে — backward-compatible।
 // রিটার্ন: হালনাগাদ {exists, data} state(পরের ধাপে thread করার জন্য) —
-// caller চাইলে ignore করতে পারে(আগের void-return caller-দের কোনো ক্ষতি নেই)।
+// caller চাইলে ignore করতে পারে (আগের void-return caller-দের কোনো ক্ষতি নেই)।
 async function ensureFamilyMeta(preloaded) {
   try {
     const ref = familyDocRef();
@@ -497,7 +497,7 @@ async function ensureFamilyMeta(preloaded) {
       // তৈরির মুহূর্তে একবার স্থায়ীভাবে সেট হয় — এটাই সেই আসল Firestore
       // কালেকশনের নাম যেখানে entries/members/weekly সবসময় থাকবে।
       // familyCode ভবিষ্যতে যতবারই বদলাক (changeFamilyCodeForExistingFamily),
-      // dataCollectionName কখনো বদলাবে না — তাই আসল ডাটা কালেকশন কখনো
+      // dataCollectionName কখনো বদলাবে না — তাই আসল ডেটা কালেকশন কখনো
       // "হারিয়ে যাবে না" বা code-change-এর সাথে ভেঙে পড়বে না।
       const payload = {
         familyId: getFamilyId(),
@@ -523,7 +523,7 @@ async function ensureFamilyMeta(preloaded) {
 let cachedDataCollectionName = null;
 // §Performance Fix(২২ আগস্ট ২০২৬, Finding #2 ধাপ ১) — ensureFamilyMeta()-এর
 // মতোই optional `preloaded`({exists, data}) parameter; না দিলে আগের মতোই
-// নিজের `.get()` করে(backward-compatible)। রিটার্ন: হালনাগাদ state।
+// নিজের `.get()` করে (backward-compatible)। রিটার্ন: হালনাগাদ state।
 async function ensureDataCollectionName(preloaded) {
   try {
     const ref = familyDocRef();

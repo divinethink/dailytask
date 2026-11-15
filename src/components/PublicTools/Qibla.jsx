@@ -2,13 +2,13 @@
 // Location(GPS/manual) publicToolsSettings.js-এর সাথে shared(PrayerTimes.jsx-এর
 // একই key, dt_pt_location) — সময়সূচি ট্যাবে location সেট থাকলে এখানে আলাদা করে
 // আবার সেট করতে হয় না।
-// §লাইভ কম্পাস(নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction — "স্ট্যান্ডার্ড কিবলা
+// §লাইভ কম্পাস (নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction — "স্ট্যান্ডার্ড কিবলা
 // কম্পাস দেখানো সম্ভব?")। standard browser `DeviceOrientationEvent` API ব্যবহার
-// করা হয়েছে(কোনো নতুন external service/dependency না — pure on-device sensor,
+// করা হয়েছে (কোনো নতুন external service/dependency না — pure on-device sensor,
 // Dev Rule ২-এর "external service" concern এখানে প্রযোজ্য না)। iOS 13+-এ
-// `requestPermission()` user-gesture(বাটন-ক্লিক) থেকেই কল করা আবশ্যক(browser
+// `requestPermission()` user-gesture(বাটন-ক্লিক) থেকেই কল করা আবশ্যক (browser
 // restriction) — তাই বাটন-চাপার আগে auto-start করা হয়নি। সেন্সর/permission না
-// পেলে আগের static bearing-arrow-এ gracefully fallback করে(heading=null হলে
+// পেলে আগের static bearing-arrow-এ gracefully fallback করে (heading=null হলে
 // dial rotation=0, ঠিক আগের আচরণের সমান)।
 // React global(window.React, globals.js)।
 
@@ -25,8 +25,8 @@ import { Loader2 } from "../icons.jsx";
 
 const { useState, useMemo, useEffect } = React;
 
-// ১২টা টিক-মার্ক(৩০° পরপর) + N/E/S/W লেবেলের position — pure-trig, static-icon
-// pattern থেকে আলাদা(এখানে component render-এর ভিতরেই সরল হিসাব, নতুন কোনো
+// ১২টা টিক-মার্ক (৩০° পরপর) + N/E/S/W লেবেলের position — pure-trig, static-icon
+// pattern থেকে আলাদা (এখানে component render-এর ভিতরেই সরল হিসাব, নতুন কোনো
 // dependency লাগে না)।
 const TICKS = Array.from({ length: 12 }, (_, i) => {
   const angle = i * 30;
@@ -61,7 +61,7 @@ export function Qibla() {
     return calculateQiblaBearing(location.lat, location.lon);
   }, [location]);
 
-  // লাইভ heading listener — শুধু compassActive true হলেই সংযুক্ত হয়(permission
+  // লাইভ heading listener — শুধু compassActive true হলেই সংযুক্ত হয় (permission
   // দেওয়ার পরে)। iOS Safari: event.webkitCompassHeading(০=উত্তর, clockwise,
   // সরাসরি ব্যবহারযোগ্য)। Android Chrome: event.alpha(০=উত্তর, counter-clockwise)
   // — তাই 360-alpha দিয়ে clockwise-এ convert করা হয়েছে।
@@ -81,10 +81,10 @@ export function Qibla() {
     return () => window.removeEventListener(eventName, handleOrientation, true);
   }, [compassActive]);
 
-  // সরাসরি লাইভ কিবলা (owner-request ১৫ নভেম্বর ২০২৬): যেসব ডিভাইসে অনুমতির ধাপ নেই(Android Chrome ইত্যাদি)
-  // সেখানে পাতা খুললেই কম্পাস চালু। iOS 13+-এ requestPermission বাটন-ট্যাপ ছাড়া চলে না(ব্রাউজারের
+  // সরাসরি লাইভ কিবলা (owner-request ১৫ নভেম্বর ২০২৬): যেসব ডিভাইসে অনুমতির ধাপ নেই (Android Chrome ইত্যাদি)
+  // সেখানে পাতা খুললেই কম্পাস চালু। iOS 13+-এ requestPermission বাটন-ট্যাপ ছাড়া চলে না (ব্রাউজারের
   // নিয়ম), তাই শুধু সেখানে বাটন থাকে। সেন্সর সাড়া না দিলে ৪ সেকেন্ড পরে স্থির কোণে ফেরে।
-  // নতুন ব্রাউজারে(Chrome সহ) requestPermission থাকতে পারে, তাই আর "আছে কি নেই" দেখে বাদ দেওয়া হয় না:
+  // নতুন ব্রাউজারে (Chrome সহ) requestPermission থাকতে পারে, তাই আর "আছে কি নেই" দেখে বাদ দেওয়া হয় না:
   // সবসময় আগে নিজে থেকে চালু চেষ্টা। অনুমতির ফাংশন থাকলে চুপচাপ একবার চাওয়া হয়
   // (iOS-এ ট্যাপ ছাড়া ব্যর্থ হলে কিছু হয় না) — না পেলে শুধু বাটন থাকে, ভুল-বার্তা নয়।
   const [needsTap, setNeedsTap] = useState(false);
@@ -116,11 +116,11 @@ export function Qibla() {
       return;
     }
     if (typeof DOE.requestPermission === "function") {
-      // iOS 13+ — user-gesture-এর ভিতর থেকেই কল হতে হবে(এই ফাংশন বাটন onClick-এই কল হয়)
+      // iOS 13+ — user-gesture-এর ভিতর থেকেই কল হতে হবে (এই ফাংশন বাটন onClick-এই কল হয়)
       DOE.requestPermission()
         .then((state) => {
           if (state === "granted") setCompassActive(true);
-          else setCompassError("কম্পাস ব্যবহারের অনুমতি দেওয়া হয়নি(ব্রাউজার সেটিংস থেকে অনুমতি দিন)");
+          else setCompassError("কম্পাস ব্যবহারের অনুমতি দেওয়া হয়নি (ব্রাউজার সেটিংস থেকে অনুমতি দিন)");
         })
         .catch(() => setCompassError("কম্পাস চালু করা যায়নি"));
     } else {
@@ -229,7 +229,7 @@ export function Qibla() {
           cx: 100, cy: 100, r: 96, fill: "#FFFFFF", stroke: "#E4E7E2", strokeWidth: 2,
         }),
         // লাইভ heading অনুযায়ী পুরো dial(tick+N/E/S/W+needle) ঘোরে — heading
-        // না থাকলে(fallback) rotation=0, আগের static আচরণের সাথে হুবহু মেলে।
+        // না থাকলে (fallback) rotation=0, আগের static আচরণের সাথে হুবহু মেলে।
         /*#__PURE__*/React.createElement(
           "g",
           { transform: `rotate(${dialRotation} 100 100)`, style: { transition: "transform 0.15s linear" } },

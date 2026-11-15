@@ -1,4 +1,4 @@
-// publicToolsSettings.js — Public Tools, Phase A item ১(Foundation): location+
+// publicToolsSettings.js — Public Tools, Phase A item ১ (Foundation): location+
 // মাযহাব settings module(3_1_Public_Tools_Roadmap.md Phase A / 3_2 §৩/§৪.১)।
 // Pure per-device localStorage — কোনো Firestore/family-data touch করে না।
 // data/ layer convention(Dev Rule ২): এই ফাইল শুধু settings read/write করে,
@@ -62,10 +62,10 @@ function saveMadhab(madhab) {
   } catch {}
 }
 
-// GPS দিয়ে বর্তমান lat/lon বের করে — কোনো reverse-geocode call না(উপরের নোট
+// GPS দিয়ে বর্তমান lat/lon বের করে — কোনো reverse-geocode call না (উপরের নোট
 // দ্রষ্টব্য), তাই label সবসময় জেনেরিক "GPS অবস্থান"।
 // {fresh:true}(ইউজার নিজে বাটন চাপলে): সর্বশেষ ১০ মিনিটের cached পজিশন নয়, নতুন পড়া;
-// timeout ১৫ সেকেন্ড। ডিফল্ট(অন্য কলার)অপরিবর্তিত।
+// timeout ১৫ সেকেন্ড। ডিফল্ট (অন্য কলার)অপরিবর্তিত।
 function detectGpsLocation(opts) {
   const fresh = !!(opts && opts.fresh);
   return new Promise((resolve, reject) => {
@@ -88,7 +88,7 @@ function detectGpsLocation(opts) {
   });
 }
 
-// লোকেশন-অনুমতির বর্তমান অবস্থা(Permissions API): "granted" | "prompt" | "denied" | "unknown"।
+// লোকেশন-অনুমতির বর্তমান অবস্থা (Permissions API): "granted" | "prompt" | "denied" | "unknown"।
 // "denied" হলে ব্রাউজার আর প্রশ্ন করে না — ইউজারকে সেটিংসে গিয়ে নিজে অনুমতি দিতে হয়।
 function getGeoPermissionState() {
   try {
@@ -102,7 +102,7 @@ function getGeoPermissionState() {
   }
 }
 
-// GPS ব্যর্থতার বাংলা বার্তা(inline-error ব্যবহারকারী স্ক্রিনের জন্য) — ব্রাউজারের ইংরেজি message নয়
+// GPS ব্যর্থতার বাংলা বার্তা (inline-error ব্যবহারকারী স্ক্রিনের জন্য) — ব্রাউজারের ইংরেজি message নয়
 function gpsErrorMessage(err) {
   const code = err && err.code;
   if (code === 1) return "লোকেশনের অনুমতি নেই — ব্রাউজার/অ্যাপ সেটিংসে লোকেশন \"অনুমতি দিন\", তারপর আবার চেষ্টা করুন।";

@@ -1,6 +1,6 @@
 // dragReorder.js — App-Creator-এর drag-handle দিয়ে list-item position বদলানোর
 // shared hook(EditableSection.jsx accordion)। Pointer Events ভিত্তিক — মোবাইল
-// touch ও mouse দুটোতেই কাজ করে(HTML5 drag-and-drop touch-এ চলে না)। কোনো
+// touch ও mouse দুটোতেই কাজ করে (HTML5 drag-and-drop touch-এ চলে না)। কোনো
 // নতুন library/dependency নেই। শুধু handle-এ pointerdown হলে drag শুরু হয়, তাই
 // item-এ সাধারণ tap/scroll প্রভাবিত হয় না।
 // React global(window.React, globals.js)।

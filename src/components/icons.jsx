@@ -554,9 +554,9 @@ export function ClockIcon({
 }
 // §Bottom Nav icon-set upgrade(2_4_Identity_Simplification_Plan.md §৯.০, ১৫ সেপ্টেম্বর
 // ২০২৬)। এই ৩টা icon(HomeIcon/TasbihIcon/CompassIcon) ইচ্ছাকৃতভাবে উপরের shared
-// Icon() wrapper ব্যবহার করেনি(সেটা fill:"none" hardcoded, ২৬টা বিদ্যমান call-site
+// Icon() wrapper ব্যবহার করেনি (সেটা fill:"none" hardcoded, ২৬টা বিদ্যমান call-site
 // জুড়ে ব্যবহৃত) — বরং standalone, নিজস্ব "filled" prop-সহ, যাতে shared wrapper-এ কোনো
-// পরিবর্তন না লাগে(zero regression-risk to existing icons)। active/inactive filled
+// পরিবর্তন না লাগে (zero regression-risk to existing icons)। active/inactive filled
 // আচরণ শুধু এই bottom-nav icon-গুলোর জন্যই প্রযোজ্য।
 export function HomeIcon({
   size = 18,
@@ -606,13 +606,13 @@ export function TasbihIcon({
     /*#__PURE__*/React.createElement("line", { x1: 11.3, y1: 20, x2: 11.3, y2: 23 })
   );
 }
-// §Amol tab icon — পরিবর্তিত(১৮ সেপ্টেম্বর ২০২৬, owner-feedback, 2_4 §৯.০-এর
-// পূর্ববর্তী decision-এর উপর)। আগের "দু'হাত-তোলা দোয়ার ভঙ্গি" ডিজাইন ছোট সাইজে(১৮px
-// bottom-nav) অস্পষ্ট/torso-র মতো দেখাচ্ছিল(owner-reported, ছবি-verified) — তাই
+// §Amol tab icon — পরিবর্তিত (১৮ সেপ্টেম্বর ২০২৬, owner-feedback, 2_4 §৯.০-এর
+// পূর্ববর্তী decision-এর উপর)। আগের "দু'হাত-তোলা দোয়ার ভঙ্গি" ডিজাইন ছোট সাইজে (১৮px
+// bottom-nav) অস্পষ্ট/torso-র মতো দেখাচ্ছিল (owner-reported, ছবি-verified) — তাই
 // owner-এর সুপারিশ অনুযায়ী তাসবীহ/গোল-পুঁতির loop-এ পরিবর্তন করা হলো। ছোট সাইজেও
-// clearly পড়া যায় বলে(dot-ring pattern) এবং আগে থেকেই TasbihIcon(নিচে/উপরে)-এ
-// প্রমাণিত+ব্যবহৃত ডিজাইন বলে সেই একই bead-loop pattern এখানে reuse করা হলো(নতুন
-// অপরীক্ষিত SVG path রিস্ক এড়াতে)। TasbihIcon নিজে অপরিবর্তিত(আলাদা export, কোথাও
+// clearly পড়া যায় বলে (dot-ring pattern) এবং আগে থেকেই TasbihIcon(নিচে/উপরে)-এ
+// প্রমাণিত+ব্যবহৃত ডিজাইন বলে সেই একই bead-loop pattern এখানে reuse করা হলো (নতুন
+// অপরীক্ষিত SVG path রিস্ক এড়াতে)। TasbihIcon নিজে অপরিবর্তিত (আলাদা export, কোথাও
 // touch হয়নি) — শুধু AmolIcon-এর ভিতরের shape বদলেছে, নাম/export/import signature
 // একই থাকায় BottomNav.jsx-এ কোনো change লাগেনি।
 export function AmolIcon({
@@ -669,7 +669,7 @@ export function CompassIcon({
 }
 // §B৭ Empty-state illustration(2_5 Part B §B৭, ১৫ সেপ্টেম্বর ২০২৬, owner-approved):
 // কাস্টম-টাস্ক empty-state-এ ব্যবহারের জন্য নতুন icon — existing Icon()
-// wrapper-এর stroke-based convention অনুসরণ করে(নতুন কোনো asset/library না)।
+// wrapper-এর stroke-based convention অনুসরণ করে (নতুন কোনো asset/library না)।
 export function ClipboardListIcon({
   size,
   color,
@@ -787,11 +787,11 @@ export function SparkleIcon({
 }
 // §B৭ ব্যক্তিগত ও পারিবারিক অভ্যাস-header icon(2_5 Part B §B৭, ১৫ সেপ্টেম্বর
 // ২০২৬, owner-approved — UsersIcon("দুই মানুষ", human-silhouette outline)-এর
-// বদলে ৩ সদস্যের(মা-বাবা-সন্তান) পরিবার বোঝায় এমন abstract mark চাওয়া হয়েছিল,
+// বদলে ৩ সদস্যের (মা-বাবা-সন্তান) পরিবার বোঝায় এমন abstract mark চাওয়া হয়েছিল,
 // শর্ত: প্রিমিয়াম দেখাবে এবং ধর্মীয় sensitivity-এর কারণে মানব-অবয়ব/জেন্ডার-
 // নির্দিষ্ট আকৃতি স্পষ্ট থাকবে না): তাই এখানে কোনো head-and-shoulders silhouette
-// নেই — শুধু ৩টা বিমূর্ত বৃত্ত(দুটো বড়=বাবা-মা, একটা ছোট=সন্তান) আর নিচে একটা
-// নরম আলিঙ্গন-আর্ক(নীড়/ছাতার মতো) দিয়ে "family unit" বোঝানো হয়েছে — কোনো মুখ,
+// নেই — শুধু ৩টা বিমূর্ত বৃত্ত (দুটো বড়=বাবা-মা, একটা ছোট=সন্তান) আর নিচে একটা
+// নরম আলিঙ্গন-আর্ক (নীড়/ছাতার মতো) দিয়ে "family unit" বোঝানো হয়েছে — কোনো মুখ,
 // শরীর বা লিঙ্গ-নির্দেশক অংশ নেই, সম্পূর্ণ geometric/logo-mark স্টাইল।
 export function FamilyIcon({
   size = 18,
@@ -858,7 +858,7 @@ export function GoogleGIcon({ size = 20 }) {
   );
 }
 
-// মুহাসাবা নেভ-আইকন: তিনটা বার(stroke-based; active হলে ঘন রঙ, অন্য আইকনের মতো)।
+// মুহাসাবা নেভ-আইকন: তিনটা বার (stroke-based; active হলে ঘন রঙ, অন্য আইকনের মতো)।
 export function ChartBarIcon({
   size = 18,
   color = "currentColor",

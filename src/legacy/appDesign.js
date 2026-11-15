@@ -1,5 +1,5 @@
-// appDesign.js — গ্লোবাল অ্যাপ ডিজাইন(ক্রিয়েটরের সাজানো, সবার জন্য এক)। পড়া: যে-কেউ(read fail → null);
-// লেখা: শুধু App Creator(Rules-এ enforced)। শুধু যে অংশ বদলেছে সেটাই লেখা হয়(mergeFields), অন্য অংশ অক্ষুণ্ণ।
+// appDesign.js — গ্লোবাল অ্যাপ ডিজাইন (ক্রিয়েটরের সাজানো, সবার জন্য এক)। পড়া: যে-কেউ (read fail → null);
+// লেখা: শুধু App Creator(Rules-এ enforced)। শুধু যে অংশ বদলেছে সেটাই লেখা হয় (mergeFields), অন্য অংশ অক্ষুণ্ণ।
 import { authModular as auth, dbModular as db } from "./firebaseConfig.js";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { fetchSection } from "./editableContent.js";

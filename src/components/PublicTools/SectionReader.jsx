@@ -131,7 +131,7 @@ export function SectionReader({ title, text, storeKey, badge, sourceNote, onClos
     const prev = marks;
     setMarks(next); setErr(null);
     try { await saveMarks(uid, storeKey, next); }
-    catch (e) { setMarks(prev); setErr("সেভ হয়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+    catch (e) { setMarks(prev); setErr("সেভ হয়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"); }
   }
   function addMark(kind, color) {
     if (!pending) return;

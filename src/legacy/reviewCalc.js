@@ -41,7 +41,7 @@ function bestImprovementAndDrop(items) {
   return { improvement: ups[0] || null, drop: downs[0] || null };
 }
 
-// ধাপ ৩(জোড়া বার): সব আমলের তুলনা এক তালিকায়। ups = উন্নতি(বেশি আগে), downs = অবনতি(বেশি কমা আগে), same = অপরিবর্তিত।
+// ধাপ ৩ (জোড়া বার): সব আমলের তুলনা এক তালিকায়। ups = উন্নতি (বেশি আগে), downs = অবনতি (বেশি কমা আগে), same = অপরিবর্তিত।
 // delta সমান হলে key বর্ণানুক্রমে আগে। bestImprovementAndDrop-এর মতোই একই নিয়ম; সেটা অপরিবর্তিত।
 function rankMoves(items) {
   const rows = (items || [])

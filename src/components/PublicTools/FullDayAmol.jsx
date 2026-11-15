@@ -1,5 +1,5 @@
-// FullDayAmol.jsx — "আমল" হাব, item ৪ক(3_1 §"আমল হাব")। সারাদিনের আমল, pure
-// reference। ✏️(accordion)। নোট(3_1 §চ): এই আইটেমের পূর্ণাঙ্গ কনটেন্ট-লিস্ট
+// FullDayAmol.jsx — "আমল" হাব, item ৪ক (3_1 §"আমল হাব")। সারাদিনের আমল, pure
+// reference। ✏️(accordion)। নোট (3_1 §চ): এই আইটেমের পূর্ণাঙ্গ কনটেন্ট-লিস্ট
 // owner পরবর্তীতে সরবরাহ করবেন — তাই নিচের default একটা সাধারণ/সংক্ষিপ্ত সেট,
 // App Creator নিজে UI থেকে পুরোপুরি প্রতিস্থাপন করতে পারবেন(§২ Fallback নীতি)।
 // React global(window.React, globals.js)।

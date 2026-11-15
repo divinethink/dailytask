@@ -2,7 +2,7 @@
 // compat সম্পূর্ণ অপসারণ): সব consumer file(familyIdentity.js, memberData.js,
 // backup.js, googleIdentity.js, blogData.js, quizData.js,
 // legacyMigrationTools.js, editableContent.js, app.js) ইতিমধ্যে modular
-// syntax-এ convert হয়ে গেছে(node --check + leftover-pattern sweep verified,
+// syntax-এ convert হয়ে গেছে (node --check + leftover-pattern sweep verified,
 // প্রতিটা ধাপে)। এই ফাইলই ছিল compat-এর একমাত্র উৎস — global `firebase`
 // bridge(globals.js)-এর উপর নির্ভরতা এখানেই শেষবারের মতো সরানো হলো।
 import { initializeApp } from "firebase/app";
@@ -28,14 +28,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // --- Firestore + অফলাইন persistence(একই সাথে, একবারই) ---
-// §অফলাইন ফিক্স(১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড "অ্যাপ অফলাইনে চলে না")-এর
-// মূলনীতি অপরিবর্তিত(multi-tab-safe persistence) — শুধু API আধুনিক।
+// §অফলাইন ফিক্স (১৯ সেপ্টেম্বর ২০২৬, owner-রিপোর্টেড "অ্যাপ অফলাইনে চলে না")-এর
+// মূলনীতি অপরিবর্তিত (multi-tab-safe persistence) — শুধু API আধুনিক।
 // compat-এ আগে `getFirestore()`(default settings)-এর পরে আলাদা
-// `enablePersistence()` কল করতে হতো(এবং প্রথম operation-এর আগেই করতে হতো,
+// `enablePersistence()` কল করতে হতো (এবং প্রথম operation-এর আগেই করতে হতো,
 // নাহলে fail করত)। Modular v9-এ `initializeFirestore()`-এর একটাই কলে
 // cache-strategy সেট করা যায় — এটাই এখন সেই *প্রথম ও একমাত্র*
 // Firestore-instantiation, তাই persistence-timing-ঝুঁকি structurally দূর
-// হয়ে গেছে(আগে যেটা comment করে সতর্ক করা হতো, Phase 1-এর নোট দ্রষ্টব্য)।
+// হয়ে গেছে (আগে যেটা comment করে সতর্ক করা হতো, Phase 1-এর নোট দ্রষ্টব্য)।
 // `enableIndexedDbPersistence()`(deprecated) ব্যবহার করা হয়নি ইচ্ছাকৃতভাবে।
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
@@ -76,10 +76,10 @@ const appCheckInstance = initializeAppCheck(app, {
 // Sign-in/Add-Member ব্যর্থতা ইনসিডেন্ট-এর পরে) ---
 // Firestore-এর "Missing or insufficient permissions" ও Google Sign-in
 // popup-এর generic ব্যর্থতা — দুটোই App Check(reCAPTCHA v3) token mint
-// ব্যর্থ হলে ঠিক একই রকম দেখায়(Firebase-এর পরিচিত confusing আচরণ — App
+// ব্যর্থ হলে ঠিক একই রকম দেখায় (Firebase-এর পরিচিত confusing আচরণ — App
 // Check reject করলে আলাদা কোনো distinguishing error code দেয় না, Rules-
 // denial-এর মতোই দেখায়)। এই helper কোনো existing flow/logic পরিবর্তন করে
-// না(pure-additive, fire-and-forget) — শুধু catch-block থেকে ডাকা হয়,
+// না (pure-additive, fire-and-forget) — শুধু catch-block থেকে ডাকা হয়,
 // console-এ প্রকৃত error.code/message + App Check স্বাস্থ্য log করে, যাতে
 // পরের বার এই সমস্যা হলে browser console(বা remote-debug/screen-record)
 // দেখে দ্রুত root-cause(App Check/network vs প্রকৃত Rules-denial) ধরা যায়।
@@ -94,5 +94,5 @@ function logAuthDiagnostics(context, err) {
 
 // dbModular/authModular/analyticsModular — একই instance-এর alias-নাম,
 // migration-এর সময় ধাপে-ধাপে convert হওয়া consumer file-গুলো এই নামেই
-// import করেছিল(backward-compat, কোনো নতুন file-touch লাগবে না)।
+// import করেছিল (backward-compat, কোনো নতুন file-touch লাগবে না)।
 export { db, auth, analytics, logAnalyticsEvent, logAuthDiagnostics, db as dbModular, auth as authModular, analytics as analyticsModular };

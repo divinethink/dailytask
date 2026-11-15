@@ -2,8 +2,8 @@
 // ৭/৮)-এর জন্য শেয়ার্ড component। দুটোই একই pattern: date-based deterministic
 // rotate(`3_2` লাইন ২০৪ — `Math.floor(Date.now()/86400000) % array.length`,
 // কোনো persisted state না) থেকে আজকের একটা মাত্র বার্তা দেখায়। Content-pool
-// নিজে accordion format-এই Firestore-এ থাকে(editableContent.js reuse) — App
-// Creator পুরো pool এডিট করেন EditableSection-এর accordion UI দিয়েই(নিচে
+// নিজে accordion format-এই Firestore-এ থাকে (editableContent.js reuse) — App
+// Creator পুরো pool এডিট করেন EditableSection-এর accordion UI দিয়েই (নিচে
 // admin-only toggle-panel), সাধারণ ইউজার শুধু আজকের ঘূর্ণায়মান কার্ডটা দেখেন।
 // React global(window.React, globals.js)।
 
@@ -63,7 +63,7 @@ export function RotatingCard({ sectionId, defaultContent, cardIcon }) {
           onClick: () => setShowAdmin((s) => !s),
           className: "text-xs font-semibold text-slate-500 underline self-start px-1",
         },
-        showAdmin ? "বার্তা-ব্যবস্থাপনা বন্ধ করুন" : "সব বার্তা ব্যবস্থাপনা(এডমিন)"
+        showAdmin ? "বার্তা-ব্যবস্থাপনা বন্ধ করুন" : "সব বার্তা ব্যবস্থাপনা (অ্যাডমিন)"
       ),
     isCreator &&
       showAdmin &&

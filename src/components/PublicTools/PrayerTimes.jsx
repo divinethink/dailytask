@@ -1,4 +1,4 @@
-// PrayerTimes.jsx — "সময়সূচি" bottom-nav ট্যাব(Public Tools Phase A, item ২)।
+// PrayerTimes.jsx — "সময়সূচি" bottom-nav ট্যাব (Public Tools Phase A, item ২)।
 // UI layout 3_2_Public_Tools_Architecture_Plan.md §৪.২ ও visual reference
 // 3_3_Public_Tools_Final_Mockup.md §৫ ভিত্তিতে, ১৮ সেপ্টেম্বর ২০২৬-এ owner-feedback
 // অনুযায়ী premium-redesign + accuracy fix। data/lib separation(Dev Rule ২): এই
@@ -27,7 +27,7 @@ import { GPS_MESSAGES, usePopupMessages } from "../../legacy/popupMessages.js";
 
 const { useState, useEffect, useMemo, useRef } = React;
 
-// §GPS-বন্ধ নোটিশ(owner-approved): লোকেশন বন্ধ/অনুমতি-নেই ধরা পড়লে সময় ও ধরন localStorage-এ থাকে;
+// §GPS-বন্ধ নোটিশ (owner-approved): লোকেশন বন্ধ/অনুমতি-নেই ধরা পড়লে সময় ও ধরন localStorage-এ থাকে;
 // ✕ চাপলে ব্যানার লুকায়, পরের ব্যর্থতায় আবার আসে। শুধু per-device UI-flag, কোনো ডেটা/Rules নেই।
 const GPS_FLAG_KEY = "dt_pt_gps_issue";
 const GPS_DISMISS_KEY = "dt_pt_gps_issue_dismissed";
@@ -54,7 +54,7 @@ function dismissGpsIssue() {
     localStorage.setItem(GPS_DISMISS_KEY, String(Date.now()));
   } catch {}
 }
-// ওয়েব-পেজ ফোনের/ব্রাউজারের সেটিংস নিজে খুলতে পারে না(কোনো API নেই) — স্ট্যান্ডার্ড হলো:
+// ওয়েব-পেজ ফোনের/ব্রাউজারের সেটিংস নিজে খুলতে পারে না (কোনো API নেই) — স্ট্যান্ডার্ড হলো:
 // কারণ ধরে পরিষ্কার ধাপ দেখানো + "আবার চেষ্টা করুন" বাটন + সেটিংস থেকে ফিরলে নিজে আবার চেষ্টা।
 // কারণ: denied=ব্লক করা, prompt=প্রশ্নটি এড়ানো/বাতিল, off=ফোনের লোকেশন বন্ধ, timeout=সময় শেষ
 const GPS_TEXT = GPS_MESSAGES;
@@ -73,7 +73,7 @@ function addMinutes(date, mins) {
   return date ? new Date(date.getTime() + mins * 60000) : null;
 }
 
-// ১২-ঘণ্টা ফরম্যাট, AM/PM ছাড়া(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬ — দ্বিতীয়
+// ১২-ঘণ্টা ফরম্যাট, AM/PM ছাড়া (owner-instruction, ১৮ সেপ্টেম্বর ২০২৬ — দ্বিতীয়
 // রাউন্ড: "am/pm তুলে দিলে ফন্ট বাড়বে, সুন্দর লাগবে")। সেহরি/ইফতার footer-এ
 // আলাদাভাবে বাংলা দিনাংশ-শব্দ("ভোর"/"সন্ধ্যা") জোড়া হয়, নিচে দ্রষ্টব্য।
 function formatHHMM(date) {
@@ -94,8 +94,8 @@ function formatCountdown(ms) {
   return toBn(`${h}:${m}:${s}`);
 }
 
-// §মসজিদ-কার্ড(owner-approved ডিজাইন "ঘ", ১ নভেম্বর ২০২৬): কাউন্টডাউন + সালাতের
-// সময়সূচি এক কার্ডে — উপরে খিলান+দুই মিনার আকৃতির হেডার(inline SVG, কোনো asset নেই),
+// §মসজিদ-কার্ড (owner-approved ডিজাইন "ঘ", ১ নভেম্বর ২০২৬): কাউন্টডাউন + সালাতের
+// সময়সূচি এক কার্ডে — উপরে খিলান+দুই মিনার আকৃতির হেডার (inline SVG, কোনো asset নেই),
 // নিচে সময়সূচি। শুধু উপস্থাপনা; ওয়াক্ত/টিক-লজিক অপরিবর্তিত।
 function WaqtHero({ waqtInfo, now, waqtProgress }) {
   const h = React.createElement;
@@ -108,7 +108,7 @@ function WaqtHero({ waqtInfo, now, waqtProgress }) {
   ];
   const hasBar = waqtProgress !== null;
   const pct = hasBar ? Math.round(waqtProgress * 100) : 0;
-  const H = hasBar ? 224 : 194; // viewBox-উচ্চতা = আসল px-উচ্চতা, তাই আকৃতি লম্বায় বিকৃত হয় না(শুধু প্রস্থে scale)
+  const H = hasBar ? 224 : 194; // viewBox-উচ্চতা = আসল px-উচ্চতা, তাই আকৃতি লম্বায় বিকৃত হয় না (শুধু প্রস্থে scale)
   const stroke = { stroke: GOLD, strokeOpacity: 0.6, strokeWidth: 1.5, vectorEffect: "non-scaling-stroke" };
   const dot = (left, top) => h("span", { "aria-hidden": true, className: "absolute rounded-full", style: { left, top, width: 7, height: 7, background: GOLD, transform: "translateX(-50%)" } });
   const minaretDecor = (x) => [
@@ -208,7 +208,7 @@ function GpsIcon({ size = 12, className }) {
   );
 }
 
-// §রেখা-আইকন(নিচের নেভ বারের ধাঁচ: stroke, currentColor)
+// §রেখা-আইকন (নিচের নেভ বারের ধাঁচ: stroke, currentColor)
 function LineSvg({ size, className, style, children }) {
   return /*#__PURE__*/React.createElement(
     "svg",
@@ -293,7 +293,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [now, setNow] = useState(() => new Date());
-  // তারিখ বদলালে(মধ্যরাত পার হলে) সময়সূচি নতুন করে আনতে/হিসাব করতে
+  // তারিখ বদলালে (মধ্যরাত পার হলে) সময়সূচি নতুন করে আনতে/হিসাব করতে
   const todayKey = dayKey(now);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [madhabPanelOpen, setMadhabPanelOpen] = useState(false);
@@ -304,14 +304,14 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
-  // §জেলা/উপজেলা ফিল্টার(নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction) — bangladeshGeoData.js
-  // lazy-load হয়(শুধু panel খোলার পরে, ৪১KB dataset PrayerTimes-এর মূল chunk-কে ভারী না করতে)।
+  // §জেলা/উপজেলা ফিল্টার (নতুন, ১৮ সেপ্টেম্বর ২০২৬, owner-instruction) — bangladeshGeoData.js
+  // lazy-load হয় (শুধু panel খোলার পরে, ৪১KB dataset PrayerTimes-এর মূল chunk-কে ভারী না করতে)।
   const [geoData, setGeoData] = useState(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [filterDistrictId, setFilterDistrictId] = useState("");
   const [filterUpazilaId, setFilterUpazilaId] = useState("");
   const [filterBusy, setFilterBusy] = useState(false);
-  // §জেলা-সার্চ(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): native <select>-এ সার্চ
+  // §জেলা-সার্চ (owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): native <select>-এ সার্চ
   // করা যায় না, তাই জেলা তালিকার উপরে আলাদা সার্চ-বক্স সহ custom dropdown।
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
   const [districtSearchQuery, setDistrictSearchQuery] = useState("");
@@ -321,7 +321,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   const [sub, setSub] = useState(null);
   const searchReqIdRef = useRef(0);
 
-  // প্রতি সেকেন্ডে countdown আপডেট(existing timer-pattern reuse, 3_2 §৪.২ item ৩)
+  // প্রতি সেকেন্ডে countdown আপডেট (existing timer-pattern reuse, 3_2 §৪.২ item ৩)
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
@@ -354,7 +354,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       });
   }, [location, madhab, todayKey]);
 
-  // §এলাকা-সার্চ(debounced, ৫০০ms) — Nominatim usage-policy-সৌজন্যে অকারণ
+  // §এলাকা-সার্চ (debounced, ৫০০ms) — Nominatim usage-policy-সৌজন্যে অকারণ
   // request এড়াতে ২ অক্ষরের কম হলে বা typing চলাকালীন call হয় না।
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
@@ -384,7 +384,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   }, [searchQuery]);
 
   // §জেলা/উপজেলা geo-dataset lazy-load — panel প্রথমবার খোলার সময়ে, অথবা
-  // location এখনো সেট-না-থাকা প্রথমবার(initial no-location screen-ও একই
+  // location এখনো সেট-না-থাকা প্রথমবার (initial no-location screen-ও একই
   // renderLocationPicker() ব্যবহার করে) — দুই ক্ষেত্রেই একবার fetch, cache(state)।
   useEffect(() => {
     if ((!locationPanelOpen && location) || geoData || geoLoading) return;
@@ -406,9 +406,9 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   }
 
   // §GPS reverse-geocode(owner-instruction, ১৮ সেপ্টেম্বর ২০২৬): শুধু lat/lon
-  // পাওয়ার পর Nominatim reverse দিয়ে "এলাকা, জেলা" নাম বের করা হয়(উদাহরণ:
+  // পাওয়ার পর Nominatim reverse দিয়ে "এলাকা, জেলা" নাম বের করা হয় (উদাহরণ:
   // "গুলশান, ঢাকা") — জেনেরিক "GPS অবস্থান" লেবেলের বদলে। reverse-geocode fail
-  // করলেও lat/lon সঠিক থাকে বলে generic label-এ gracefully fallback করে(সময়সূচি
+  // করলেও lat/lon সঠিক থাকে বলে generic label-এ gracefully fallback করে (সময়সূচি
   // ভুল হয় না, শুধু লেবেল কম-informative থাকে)।
   // নাম বের করা: Nominatim → ব্যর্থ হলে নিকটতম জেলা → শেষে জেনেরিক।
   function resolveGpsName(loc) {
@@ -418,8 +418,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       .catch(() => "GPS অবস্থান");
   }
 
-  // §ট্যাব খুললে আর স্বয়ংক্রিয় GPS চাওয়া হয় না(owner-approved: পুরো-পেজ লোকেশন-ডায়ালগ বিরক্তিকর ছিল)।
-  // শুধু সংরক্ষিত GPS-লোকেশনের নাম জেনেরিক থাকলে নীরবে নাম বের করা হয়(এতে GPS লাগে না, শুধু নেটওয়ার্ক)।
+  // §ট্যাব খুললে আর স্বয়ংক্রিয় GPS চাওয়া হয় না (owner-approved: পুরো-পেজ লোকেশন-ডায়ালগ বিরক্তিকর ছিল)।
+  // শুধু সংরক্ষিত GPS-লোকেশনের নাম জেনেরিক থাকলে নীরবে নাম বের করা হয় (এতে GPS লাগে না, শুধু নেটওয়ার্ক)।
   // নতুন GPS পড়া হয় কেবল "রিফ্রেশ" বা "GPS দিয়ে সঠিক অবস্থান নিন" বাটনে।
   useEffect(() => {
     const saved = getSavedLocation();
@@ -447,7 +447,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   function handleGpsFailure(err) {
     const code = err && err.code;
     if (code === 1) {
-      // অনুমতি নেই: ব্লক(denied) নাকি শুধু প্রশ্ন এড়ানো(prompt) — আলাদা নির্দেশ
+      // অনুমতি নেই: ব্লক (denied) নাকি শুধু প্রশ্ন এড়ানো (prompt) — আলাদা নির্দেশ
       return getGeoPermissionState().then((st) => showGpsIssue(st === "denied" ? "denied" : "prompt"));
     }
     if (code === 2) {
@@ -475,7 +475,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       .finally(() => setGpsBusy(false));
   }
 
-  // §রিফ্রেশ: GPS-অবস্থান হলে নতুন করে GPS চায়(বন্ধ থাকলে পপআপ); ম্যানুয়াল অবস্থান হলে শুধু সময় নতুন করে আনে।
+  // §রিফ্রেশ: GPS-অবস্থান হলে নতুন করে GPS চায় (বন্ধ থাকলে পপআপ); ম্যানুয়াল অবস্থান হলে শুধু সময় নতুন করে আনে।
   function handleRefresh() {
     if (gpsBusy || loading) return;
     if (!location || location.source !== "gps") {
@@ -500,8 +500,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       .finally(() => setGpsBusy(false));
   }
 
-  // ব্যানার(দুই লাইন, ✕ সহ) ও পপআপ — বন্ধ/অনুমতি-নেই অবস্থায়
-  // লেখা App Creator সম্পাদনা করতে পারেন(মেনু → পপআপ বার্তা সম্পাদনা); না থাকলে কোড-ডিফল্ট
+  // ব্যানার (দুই লাইন, ✕ সহ) ও পপআপ — বন্ধ/অনুমতি-নেই অবস্থায়
+  // লেখা App Creator সম্পাদনা করতে পারেন (মেনু → পপআপ বার্তা সম্পাদনা); না থাকলে কোড-ডিফল্ট
   const gpsMsgs = usePopupMessages(!!(gpsPopup || gpsIssue), GPS_KINDS.map((k) => "gps_" + k));
   const gpsMsg = (k) => gpsMsgs[GPS_KINDS.indexOf(k)];
   const gpsBanner = gpsIssue
@@ -570,7 +570,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       )
     : null;
 
-  // সেটিংস থেকে অ্যাপে ফিরলে: পপআপ খোলা ও অনুমতি এখন "granted" হলে নিজে আবার চেষ্টা(প্রশ্ন আসে না)
+  // সেটিংস থেকে অ্যাপে ফিরলে: পপআপ খোলা ও অনুমতি এখন "granted" হলে নিজে আবার চেষ্টা (প্রশ্ন আসে না)
   useEffect(() => {
     if (!gpsPopup) return;
     function onVisible() {
@@ -592,10 +592,10 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     setMadhabPanelOpen(false);
   }
 
-  // §জেলা/উপজেলা ফিল্টার প্রয়োগ(নতুন, owner-instruction) — জেলা-শুধু বাছাই হলে
-  // সরকারি DC-office lat/lon(bangladeshGeoData.js) সরাসরি ব্যবহার হয়(কোনো extra
+  // §জেলা/উপজেলা ফিল্টার প্রয়োগ (নতুন, owner-instruction) — জেলা-শুধু বাছাই হলে
+  // সরকারি DC-office lat/lon(bangladeshGeoData.js) সরাসরি ব্যবহার হয় (কোনো extra
   // API-call লাগে না); উপজেলা-সহ বাছাই হলে Nominatim দিয়ে সেই নির্দিষ্ট উপজেলার
-  // সঠিক lat/lon আনা হয়(fail করলে জেলা-কেন্দ্রের coordinate-এ gracefully fallback,
+  // সঠিক lat/lon আনা হয় (fail করলে জেলা-কেন্দ্রের coordinate-এ gracefully fallback,
   // ইউজার কখনো আটকে যাবে না)।
   function applyFilterSelection() {
     if (!geoData || !filterDistrictId) return;
@@ -632,12 +632,12 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     const isha = get("Isha");
     if (!fajr || !sunrise || !dhuhr || !asr || !maghrib || !isha) return null;
     // পরদিনের ফজর — নতুন API-call এড়াতে আজকের ফজর-সময়ই পরদিনের জন্য approximate
-    // হিসেবে ব্যবহৃত(কয়েক মিনিটের farok থাকতে পারে, "আনুমানিক" স্পিরিট)।
+    // হিসেবে ব্যবহৃত (কয়েক মিনিটের farok থাকতে পারে, "আনুমানিক" স্পিরিট)।
     const nextFajr = addMinutes(fajr, 24 * 60);
     return { fajr, sunrise, dhuhr, asr, sunset, maghrib, isha, nextFajr };
   }, [timings, todayKey]);
 
-  // বর্তমান/পরবর্তী ওয়াক্ত(countdown banner) + list-highlight
+  // বর্তমান/পরবর্তী ওয়াক্ত (countdown banner) + list-highlight
   const waqtInfo = useMemo(() => {
     if (!schedule) return null;
     const { fajr, sunrise, dhuhr, asr, maghrib, isha, nextFajr } = schedule;
@@ -662,9 +662,9 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   // সেপ্টেম্বর ২০২৬): "রমজান মাস আসলে এই পেজেই ইফতার ও সেহরি কাউন্টডাউন দেখানোর
   // অপশন রাখতে হবে, পর্যাপ্ত data layer/schema রাখবেন"। হিজরি মাস "রমজান"(existing
   // getHijriDate()/HIJRI_MONTHS_BN reuse, appHelpers.js) হলেই স্বয়ংক্রিয়ভাবে সক্রিয়
-  // হবে — কোনো manual toggle/flag লাগে না, এখন(hijri মাস রমজান না) কিছুই render
-  // করবে না(null), তাই বর্তমান UI অপরিবর্তিত থাকে। রমজান মাস এলে schedule.fajr/
-  // schedule.maghrib থেকেই সরাসরি derive হবে(নতুন API/storage লাগবে না)।
+  // হবে — কোনো manual toggle/flag লাগে না, এখন (hijri মাস রমজান না) কিছুই render
+  // করবে না (null), তাই বর্তমান UI অপরিবর্তিত থাকে। রমজান মাস এলে schedule.fajr/
+  // schedule.maghrib থেকেই সরাসরি derive হবে (নতুন API/storage লাগবে না)।
   const hijriNow = useMemo(() => getHijriDate(now), [now]);
   const isRamadan = hijriNow.month === "রমজান";
   const ramadanCountdown = useMemo(() => {
@@ -687,8 +687,8 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
   }, [schedule]);
 
   // §Owner-instruction(১৮ সেপ্টেম্বর): তাহাজ্জুদ+ইশরাক+চাশত+আওয়াবিন — কলাপসিবল
-  // বাদ, সবসময় visible। ইশরাক(সূর্যোদয়ের অল্প পরে, ছোট window) ও চাশত(তার পরে
-  // যোহরের আগ পর্যন্ত) আলাদা করে দেখানো হচ্ছে(আগে একত্রে "দুহা" ছিল)।
+  // বাদ, সবসময় visible। ইশরাক (সূর্যোদয়ের অল্প পরে, ছোট window) ও চাশত (তার পরে
+  // যোহরের আগ পর্যন্ত) আলাদা করে দেখানো হচ্ছে (আগে একত্রে "দুহা" ছিল)।
   const otherTimes = useMemo(() => {
     if (!schedule) return null;
     const { sunrise, dhuhr, maghrib, isha, nextFajr } = schedule;
@@ -727,7 +727,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     } catch {}
     setDone(next);
   }
-  // দিন বদলালে(মধ্যরাত) ✓ রিসেট
+  // দিন বদলালে (মধ্যরাত) ✓ রিসেট
   useEffect(() => {
     setDone(readDone(new Date()));
   }, [dk]);
@@ -758,7 +758,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         gpsBusy && /*#__PURE__*/React.createElement(Loader2, { size: 15, className: "animate-spin" }),
         "📍 GPS দিয়ে সঠিক অবস্থান নিন"
       ),
-      // §জেলা/উপজেলা ফিল্টার(নতুন) — cascading dropdown, geoData lazy-loaded
+      // §জেলা/উপজেলা ফিল্টার (নতুন) — cascading dropdown, geoData lazy-loaded
       /*#__PURE__*/React.createElement(
         "div",
         { className: "border-t border-slate-100 pt-2 flex flex-col gap-1.5" },
@@ -840,7 +840,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
                 onChange: (e) => setFilterUpazilaId(e.target.value),
                 className: "flex-1 h-9 px-2 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white disabled:opacity-50",
               },
-              /*#__PURE__*/React.createElement("option", { value: "" }, "উপজেলা(ঐচ্ছিক)"),
+              /*#__PURE__*/React.createElement("option", { value: "" }, "উপজেলা (ঐচ্ছিক)"),
               geoData.upazilas
                 .filter((u) => u.districtId === filterDistrictId)
                 .map((u) => /*#__PURE__*/React.createElement("option", { key: u.id, value: u.id }, u.name))
@@ -929,7 +929,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     );
   }
 
-  // ---- Location সেটআপ এখনো করা হয়নি(প্রথমবার) ----
+  // ---- Location সেটআপ এখনো করা হয়নি (প্রথমবার) ----
   if (!location) {
     return /*#__PURE__*/React.createElement(
       "div",
@@ -944,7 +944,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
     );
   }
 
-  // §সময়সূচি-কার্ডের ক্রম(owner-approved): layout = member.prayerLayout(শুধু মালিকের জন্য আসে); না থাকলে ডিফল্ট ক্রম।
+  // §সময়সূচি-কার্ডের ক্রম (owner-approved): layout = member.prayerLayout(শুধু মালিকের জন্য আসে); না থাকলে ডিফল্ট ক্রম।
   const sectionEls = {
     schedule: (
     // §Owner-instruction(৩১ অক্টোবর ২০২৬): কম্প্যাক্ট লেআউট — সালাতের সময়সূচি পূর্ণ-প্রস্থ,
@@ -1016,10 +1016,10 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       )
       )
     ),
-    // §মসজিদের জামায়াত(owner-request ৩ নভেম্বর ২০২৬): per-device, ওয়াক্ত-হিসাবের উপর নির্ভর, নিজের এডিট-সুবিধা সহ।
+    // §মসজিদের জামায়াত (owner-request ৩ নভেম্বর ২০২৬): per-device, ওয়াক্ত-হিসাবের উপর নির্ভর, নিজের এডিট-সুবিধা সহ।
     jamaat: schedule && /*#__PURE__*/React.createElement(JamaatCard, { schedule, now }),
     forbidden: (
-    // §নিষিদ্ধ সময়(owner-instruction): লাল রঙে, একটাই লাইনে — ছোট ফোনে লাইন না ভেঙে পাশে স্ক্রল হয়।
+    // §নিষিদ্ধ সময় (owner-instruction): লাল রঙে, একটাই লাইনে — ছোট ফোনে লাইন না ভেঙে পাশে স্ক্রল হয়।
     schedule &&
       /*#__PURE__*/React.createElement(
         "div",
@@ -1050,9 +1050,9 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
           "div",
           { className: "px-4 pb-3 grid grid-cols-2 gap-x-4 gap-y-2" },
           OTHER_ITEMS.map((it) => {
-            // §চলমান নফল সালাত হাইলাইট(১ নভেম্বর ২০২৬, owner-requested): ফরজ সারির মতোই
+            // §চলমান নফল সালাত হাইলাইট (১ নভেম্বর ২০২৬, owner-requested): ফরজ সারির মতোই
             // হালকা সোনালি ব্যাকগ্রাউন্ড+বাম-বার+গাঢ় নাম, শুধু `now` ও otherTimes-এর window থেকে
-            // নির্ধারিত(কোনো নতুন state/data নয়)। তাহাজ্জুদ রাত পেরিয়ে ফজরে শেষ হয় — তাই
+            // নির্ধারিত (কোনো নতুন state/data নয়)। তাহাজ্জুদ রাত পেরিয়ে ফজরে শেষ হয় — তাই
             // গতকালের window(-২৪ঘ)-ও যাচাই হয়, যাতে মধ্যরাতের পরেও হাইলাইট থাকে।
             const w = otherTimes[it.k];
             const DAY = 86400000;
@@ -1112,7 +1112,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
         )
       )
     ),
-    // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড হোম থেকে এখানে; ডিফল্টে সবার নিচে, কাস্টমাইজে সরানো/লুকানো যায়।
+    // ২ নভেম্বর ২০২৬ (owner): "চলমান সালাত" কার্ড হোম থেকে এখানে; ডিফল্টে সবার নিচে, কাস্টমাইজে সরানো/লুকানো যায়।
     waqt: /*#__PURE__*/React.createElement(
       "div",
       { key: "waqt-amal", className: "mx-4 mb-3 bg-white rounded-2xl p-4 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]" },
@@ -1137,7 +1137,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "flex flex-row gap-1.5 items-center shrink-0" },
-        // §GPS পিল — এখন ফিল্টার/সার্চ-সহ একই panel খোলে(owner-instruction: "জিপিএস
+        // §GPS পিল — এখন ফিল্টার/সার্চ-সহ একই panel খোলে (owner-instruction: "জিপিএস
         // চিহ্নেই ফিল্টার অপশন যুক্ত করা হোক", আগে এটা সরাসরি GPS-detect ট্রিগার
         // করত, লোকেশন-রো থেকে আলাদা ছিল — এখন দুটোই একই একক panel-এ consolidate)।
         /*#__PURE__*/React.createElement(
@@ -1184,19 +1184,19 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
               /*#__PURE__*/React.createElement(
                 "button",
                 { type: "button", onClick: () => handleMadhabChange(0), className: "w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50" },
-                "অন্যান্য(শাফি/মালিকি/হাম্বলি)"
+                "অন্যান্য (শাফি/মালিকি/হাম্বলি)"
               )
             )
         )
       )
     ),
     // §Location row(owner-instruction, ১৯ সেপ্টেম্বর ২০২৬): এখন শুধু GPS-পিলে
-    // ক্লিক করলেই panel খোলে(consolidated ট্রিগার একটাই); এই row এখন শুধু
+    // ক্লিক করলেই panel খোলে (consolidated ট্রিগার একটাই); এই row এখন শুধু
     // নির্বাচিত এলাকার নাম দেখায়, ক্লিক-non-interactive(আগে দুই জায়গাতেই একই
     // panel খুলত যা বিভ্রান্তিকর ছিল)।
-    // ২-লাইন প্রদর্শন(owner-instruction): নাম কমা দিয়ে split করে প্রথম অংশ(এলাকা)
-    // বড়+বোল্ড লাইনে, বাকি অংশ(উপজেলা/জেলা) ছোট ধূসর লাইনে — যেমন "গুলশান" /
-    // "ঢাকা"। কমা না থাকলে(যেমন quick-shortcut শহরের নাম) স্বাভাবিকভাবে এক-লাইনই থাকে।
+    // ২-লাইন প্রদর্শন (owner-instruction): নাম কমা দিয়ে split করে প্রথম অংশ (এলাকা)
+    // বড়+বোল্ড লাইনে, বাকি অংশ (উপজেলা/জেলা) ছোট ধূসর লাইনে — যেমন "গুলশান" /
+    // "ঢাকা"। কমা না থাকলে (যেমন quick-shortcut শহরের নাম) স্বাভাবিকভাবে এক-লাইনই থাকে।
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4 pb-1.5 relative" },
@@ -1266,7 +1266,7 @@ export function PrayerTimes({ layout, tabLayout } = {}) {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "mx-4 mb-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5" },
-        "⚠️ ইন্টারনেট সমস্যার কারণে আনুমানিক(পুরনো cache) সময় দেখানো হচ্ছে"
+        "⚠️ ইন্টারনেট সমস্যার কারণে আনুমানিক (পুরনো cache) সময় দেখানো হচ্ছে"
       ),
     error &&
       !timings &&

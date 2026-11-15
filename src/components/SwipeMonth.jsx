@@ -22,7 +22,7 @@ export function SwipeMonth({ onShift, monthCursor, label, children }) {
   const [toast, setToast] = React.useState(null);
   const cy = monthCursor && monthCursor.year;
   const cm = monthCursor && monthCursor.month0;
-  // সোয়াইপে মাস বদলালে ১.৫ সেকেন্ডের ছোট টোস্ট(নতুন মাসের নাম) — গেস্টার কাজ করছে বোঝার জন্য।
+  // সোয়াইপে মাস বদলালে ১.৫ সেকেন্ডের ছোট টোস্ট (নতুন মাসের নাম) — গেস্টার কাজ করছে বোঝার জন্য।
   React.useEffect(() => {
     if (!swiped.current || !label || cy == null) return;
     swiped.current = false;

@@ -189,7 +189,7 @@ export function TrendReviewSection({ fold, onShiftMonth, migrationState, memberI
   const otherSections = trend && trend.ok
     ? trend.sections.map(sec => ({ ...sec, rows: sec.rows.filter(r => !KEY_ORDER.includes(r.key)) })).filter(sec => sec.rows.length)
     : [];
-  // কুরআন সবার আগে: কুরআনের সারি-সহ সেকশন প্রথমে, সেকশনের ভিতরেও কুরআন প্রথমে(বাকি ক্রম অপরিবর্তিত)।
+  // কুরআন সবার আগে: কুরআনের সারি-সহ সেকশন প্রথমে, সেকশনের ভিতরেও কুরআন প্রথমে (বাকি ক্রম অপরিবর্তিত)।
   const quranSecIdx = otherSections.findIndex(sec => sec.rows.some(r => r.key === "quranPages"));
   if (quranSecIdx >= 0) {
     const qs = otherSections[quranSecIdx];

@@ -17,10 +17,10 @@ export function createAdminActions(c) {
   async function handleMakeAdmin(m) {
     const mUids = memberOwnerUids(m);
     if (!mUids.length) {
-      alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর এডমিন করা যাবে।");
+      alert("এই সদস্যের দায়িত্ব এখনো কেউ নেয়নি — আগে দায়িত্ব নেওয়া প্রয়োজন, তারপর অ্যাডমিন করা যাবে।");
       return;
     }
-    const ok = window.confirm(`"${m.name}"-কে এডমিন করতে চান? এডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
+    const ok = window.confirm(`"${m.name}"-কে অ্যাডমিন করতে চান? অ্যাডমিন সদস্য ব্যবস্থাপনা ও প্রবেশাধিকার অনুমোদন করতে পারবেন।`);
     if (!ok) return;
     try {
       // §Hybrid Admin Role Model — role(authoritative) ও adminUids(derived
@@ -44,39 +44,39 @@ export function createAdminActions(c) {
         await Promise.all(mUids.map(uid => addDoc(collection(famRef, "notifications"), {
             targetUid: uid,
             type: "admin_assigned",
-            message: "আপনাকে এই পরিবারের এডমিন করা হয়েছে।",
+            message: "আপনাকে এই পরিবারের অ্যাডমিন করা হয়েছে।",
             createdAt: Date.now(),
             read: false
           })));
       } catch {}
     } catch (err) {
-      alert("এডমিন করতে সমস্যা হয়েছে: " + err.message);
+      alert("অ্যাডমিন করতে সমস্যা হয়েছে: " + err.message);
     }
   }
   // অন্য একজন Admin-কে পদ থেকে বাদ দেওয়া (নিজেকে নয় — self-demote আলাদা,
   // profile dropdown থেকে, যাতে ভুলবশত lockout না হয়)। ক্লায়েন্ট-সাইডেও
-  // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ(size>=1)।
+  // last-admin চেক করা হচ্ছে, তবে আসল সুরক্ষা Rules-এ (size>=1)।
   async function handleRemoveAdmin(m) {
     const mUids = memberOwnerUids(m);
     if (!mUids.length) return;
     // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "সর্বশেষ admin" এখন
-    // distinct ব্যক্তি(role==="admin" member সংখ্যা) দিয়ে গণনা, adminUids
-    // UID-count দিয়ে না(একই ব্যক্তির multi-device একাধিক UID থাকলে আগে এই
+    // distinct ব্যক্তি (role==="admin" member সংখ্যা) দিয়ে গণনা, adminUids
+    // UID-count দিয়ে না (একই ব্যক্তির multi-device একাধিক UID থাকলে আগে এই
     // guard ভুলভাবে bypass হতো)।
     const adminPersonCount = (members || []).filter(x => x.role === "admin").length;
     if (adminPersonCount <= 1) {
-      alert("সর্বশেষ এডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন এডমিন থাকা আবশ্যক।");
+      alert("সর্বশেষ অ্যাডমিনকে বাদ দেওয়া যাবে না — পরিবারে অন্তত একজন অ্যাডমিন থাকা আবশ্যক।");
       return;
     }
     // §First Admin Protection — client-side pre-check(UX-এর জন্য, আসল
     // সুরক্ষা Rules-এ)। প্রথম Admin-কে শুধু তিনি নিজেই পদ থেকে সরাতে
-    // পারবেন(profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
+    // পারবেন (profile dropdown-এর self-demote দিয়ে), অন্য কোনো admin না।
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     if (firstAdminUid && mUids.includes(firstAdminUid) && myUid !== firstAdminUid) {
-      alert("প্রথম এডমিনকে অন্য কোনো এডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
+      alert("প্রথম অ্যাডমিনকে অন্য কোনো অ্যাডমিন পদ থেকে সরাতে পারবেন না — শুধু তিনি নিজেই নিজের পদ ছাড়তে পারেন।");
       return;
     }
-    const ok = window.confirm(`"${m.name}"-কে এডমিন পদ থেকে বাদ দিতে চান?`);
+    const ok = window.confirm(`"${m.name}"-কে অ্যাডমিন পদ থেকে বাদ দিতে চান?`);
     if (!ok) return;
     try {
       // §Hybrid Admin Role Model — role ও adminUids একই atomic batch-এ sync।
@@ -94,37 +94,37 @@ export function createAdminActions(c) {
       await batch.commit();
       setAdminUidsList(prev => prev.filter(u => !mUids.includes(u)));
     } catch (err) {
-      alert("এডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
+      alert("অ্যাডমিন বাদ দিতে সমস্যা হয়েছে: " + err.message);
     }
   }
-  // নিজের এডমিন পদ ছাড়া (self-demote) — profile dropdown থেকে, ইচ্ছাকৃতভাবে
+  // নিজের অ্যাডমিন পদ ছাড়া (self-demote) — profile dropdown থেকে, ইচ্ছাকৃতভাবে
   // member-list বাটন থেকে আলাদা রাখা হয়েছে যাতে ভুল ক্লিকে নিজে lock-out
   // না হয়ে যান।
   async function handleSelfDemote() {
     const myUid = auth.currentUser ? auth.currentUser.uid : null;
     if (!myUid) return;
     // §Hybrid Admin Role Model bugfix(১৬ আগস্ট ২০২৬) — "একমাত্র admin" এখন
-    // distinct ব্যক্তি(role==="admin") দিয়ে গণনা, UID-count দিয়ে না।
+    // distinct ব্যক্তি (role==="admin") দিয়ে গণনা, UID-count দিয়ে না।
     const adminPersonCount = (members || []).filter(x => x.role === "admin").length;
     if (adminPersonCount <= 1) {
-      alert("আপনিই একমাত্র এডমিন — এই মুহূর্তে নিজের এডমিন পদ ছাড়তে পারবেন না। আগে অন্য কাউকে এডমিন করুন।");
+      alert("আপনিই একমাত্র অ্যাডমিন — এই মুহূর্তে নিজের অ্যাডমিন পদ ছাড়তে পারবেন না। আগে অন্য কাউকে অ্যাডমিন করুন।");
       return;
     }
-    const ok = window.confirm("আপনি কি নিশ্চিত নিজের এডমিন পদ ছাড়তে চান?");
+    const ok = window.confirm("আপনি কি নিশ্চিত নিজের অ্যাডমিন পদ ছাড়তে চান?");
     if (!ok) return;
     try {
       // §Hybrid Admin Role Model — role ও adminUids একই atomic batch-এ sync।
-      // নিজের ownerUids-এ myUid থাকা member খুঁজে বের করা হচ্ছে(role
+      // নিজের ownerUids-এ myUid থাকা member খুঁজে বের করা হচ্ছে (role
       // authoritative source, না মিললে role sync বাদ যায় — adminUids
       // sync তবুও হবে, যাতে lockout না হয়)।
       const myMember = (members || []).find(x => memberOwnerUids(x).includes(myUid));
       // বাগফিক্স — শুধু current-session myUid না, এই ব্যক্তির নিজের সব
       // UID(multi-device claim থেকে) যেগুলো adminUids-এ আছে, একসাথে সরানো
-      // হচ্ছে(নাহলে role="member" হওয়ার পরও অন্য নিজস্ব UID adminUids-এ
+      // হচ্ছে (নাহলে role="member" হওয়ার পরও অন্য নিজস্ব UID adminUids-এ
       // থেকে যেত — inconsistency)। ব্যতিক্রম: firstAdminUid-marked UID তখনই
       // bundle-এ যাবে যখন caller ঠিক সেই UID দিয়ে authenticated — নাহলে
       // rules-এর First Admin Protection পুরো write block করে দিত; তাই সেই
-      // UID বাদ রেখে বাকিগুলো সরানো হয়(protection invariant অক্ষুণ্ণ)।
+      // UID বাদ রেখে বাকিগুলো সরানো হয় (protection invariant অক্ষুণ্ণ)।
       const myOwnAdminUids = myMember
         ? memberOwnerUids(myMember).filter(u =>
             adminUidsList.includes(u) && (u !== firstAdminUid || myUid === firstAdminUid)
@@ -147,7 +147,7 @@ export function createAdminActions(c) {
       setIsAdmin(false);
       setShowProfileDropdown(false);
     } catch (err) {
-      alert("এডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
+      alert("অ্যাডমিন পদ ছাড়তে সমস্যা হয়েছে: " + err.message);
     }
   }
   return { handleMakeAdmin, handleRemoveAdmin, handleSelfDemote };

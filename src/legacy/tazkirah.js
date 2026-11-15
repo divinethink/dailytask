@@ -1,7 +1,7 @@
 // তাযকিরাহ ম্যানেজ (ধাপ খ, owner-approved) — pure logic, React/DB নেই।
 // family-স্তরের ঐচ্ছিক doc "tazkirah_custom": { items: [{id,type,text,ref}], hidden: [বিল্ট-ইন id] }।
-// বিল্ট-ইন বাণী কখনো মোছা/বদলানো হয় না — শুধু লুকানো যায়(ফিরিয়ে আনা যায়)।
-// না থাকলে/অবৈধ হলে ডিফল্ট = আগের আচরণ হুবহু(pickInspiration == getDailyInspiration)।
+// বিল্ট-ইন বাণী কখনো মোছা/বদলানো হয় না — শুধু লুকানো যায় (ফিরিয়ে আনা যায়)।
+// না থাকলে/অবৈধ হলে ডিফল্ট = আগের আচরণ হুবহু (pickInspiration == getDailyInspiration)।
 
 export const TYPES = ["ayat", "hadith", "quote"];
 export const TYPE_LABEL = { ayat: "আয়াত", hadith: "হাদীস", quote: "উক্তি" };
@@ -12,7 +12,7 @@ export const MAX_HIDDEN = 300;
 
 const isObj = v => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** বিল্ট-ইন বাণীর স্থির id — টেক্সটের hash থেকে(তালিকার ক্রম বদলালেও "লুকানো" ঠিক থাকে)। */
+/** বিল্ট-ইন বাণীর স্থির id — টেক্সটের hash থেকে (তালিকার ক্রম বদলালেও "লুকানো" ঠিক থাকে)। */
 export function builtinId(item) {
   const s = String((item && item.text) || "");
   let h = 5381;

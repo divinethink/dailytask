@@ -1,7 +1,7 @@
 // কাস্টম টাস্ক (সদস্যভিত্তিক) — pure logic, React/DB নেই। owner-approved।
 // member-ডকের ঐচ্ছিক ফিল্ড customTasks: [{ id, label, archived?: true }]।
-// না থাকলে/অবৈধ হলে = কোনো টাস্ক নেই(আগের আচরণ)। "ডিলিট" = আর্কাইভ: এন্ট্রির পুরনো ডেটা কখনো মোছা হয় না,
-// যেকোনো সময় ফিরিয়ে আনা যায়। আর্কাইভ হলে ফর্ম ও হিসাব(শতকরাসহ) থেকে বাদ যায়।
+// না থাকলে/অবৈধ হলে = কোনো টাস্ক নেই (আগের আচরণ)। "ডিলিট" = আর্কাইভ: এন্ট্রির পুরনো ডেটা কখনো মোছা হয় না,
+// যেকোনো সময় ফিরিয়ে আনা যায়। আর্কাইভ হলে ফর্ম ও হিসাব (শতকরাসহ) থেকে বাদ যায়।
 
 export const MAX_ACTIVE = 20;
 export const MAX_TOTAL = 40; // সক্রিয় + আর্কাইভ; Rules-এর সীমার সাথে মেলে
@@ -34,7 +34,7 @@ export function newTaskId() {
 
 const clean = label => String(label || "").trim().slice(0, MAX_LABEL);
 
-/** নতুন টাস্ক। খালি/ডুপ্লিকেট নাম বা সীমা পার হলে একই তালিকা(একই reference) ফেরত। */
+/** নতুন টাস্ক। খালি/ডুপ্লিকেট নাম বা সীমা পার হলে একই তালিকা (একই reference) ফেরত। */
 export function addTask(tasks, label, id) {
   const l = clean(label);
   if (!l || tasks.length >= MAX_TOTAL || activeTasks(tasks).length >= MAX_ACTIVE) return tasks;
@@ -61,7 +61,7 @@ export function setArchived(tasks, id, archived) {
   });
 }
 
-/** হিসাবের জন্য ফিল্ড-তালিকা(শুধু সক্রিয়)। বাকি ফিল্ডের মতোই bool; কী = ctask_<id>। */
+/** হিসাবের জন্য ফিল্ড-তালিকা (শুধু সক্রিয়)। বাকি ফিল্ডের মতোই bool; কী = ctask_<id>। */
 export function taskFields(rawTasks) {
   return activeTasks(sanitizeTasks(rawTasks)).map(t => ({
     key: TASK_KEY_PREFIX + t.id,

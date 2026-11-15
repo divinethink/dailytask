@@ -1,11 +1,11 @@
-// ২.৪ §২(owner-simplified, ১১ সেপ্টেম্বর ২০২৬ সিদ্ধান্ত অনুযায়ী মূল
+// ২.৪ §২ (owner-simplified, ১১ সেপ্টেম্বর ২০২৬ সিদ্ধান্ত অনুযায়ী মূল
 // প্ল্যানের ২-বাটন Screen A/B/C একত্রিত করা হয়েছে একটাই ফ্লো-তে):
 //
 //   ১) একটাই "Google দিয়ে সাইন-ইন করুন" বাটন — ক্লিকেই popup ট্রিগার(§১০.৩,
 //      সরাসরি synchronous onClick, .then()-এর ভিতরে না)।
-//   ২) Popup সফল হলে email-match চেক(googleIdentity.signInExistingMemberByGoogle) —
-//      মিলে গেলে সরাসরি প্রোফাইল/পরিবারে(onSuccess কল, parent redirect করবে)।
-//   ৩) না মিললে(নতুন ইউজার) — নাম+জেন্ডার+Family Code ফর্ম দেখাবে(আগে থেকেই
+//   ২) Popup সফল হলে email-match চেক (googleIdentity.signInExistingMemberByGoogle) —
+//      মিলে গেলে সরাসরি প্রোফাইল/পরিবারে (onSuccess কল, parent redirect করবে)।
+//   ৩) না মিললে (নতুন ইউজার) — নাম+জেন্ডার+Family Code ফর্ম দেখাবে (আগে থেকেই
 //      Google Sign-in সম্পন্ন, দ্বিতীয়বার popup লাগবে না)। এই ফর্ম submit
 //      না করা পর্যন্ত কোনো family/account তৈরি হয় না।
 //
@@ -30,7 +30,7 @@ export function GoogleSignInGate({ onSuccess }) {
   const [gender, setGender] = useState("");
 
   function handleSignInClick() {
-    // §১০.৩ — popup সরাসরি synchronous statement হিসেবে(কোনো await/.then()
+    // §১০.৩ — popup সরাসরি synchronous statement হিসেবে (কোনো await/.then()
     // এর ভিতরে না)।
     setErrorMsg(null);
     setStage("checking");
@@ -46,14 +46,14 @@ export function GoogleSignInGate({ onSuccess }) {
       })
       .catch(err => {
         logAuthDiagnostics("Google Sign-in(GoogleSignInGate)", err);
-        setErrorMsg(`সাইন-ইন ব্যর্থ হয়েছে, আবার চেষ্টা করুন।${err && err.code ? ` [কোড: ${err.code}]` : ""}`);
+        setErrorMsg(`সাইন-ইন করা যায়নি, আবার চেষ্টা করুন।${err && err.code ? ` [কোড: ${err.code}]` : ""}`);
         setStage("idle");
       });
   }
 
   function handleCreateAccount() {
     if (!familyCode.trim() || !name.trim()) {
-      setErrorMsg("Family Code ও নাম আবশ্যক।");
+      setErrorMsg("ফ্যামিলি ইউজারনেম ও নাম লিখুন।");
       return;
     }
     setErrorMsg(null);
@@ -64,12 +64,12 @@ export function GoogleSignInGate({ onSuccess }) {
       .then(res => {
         if (res && res.aborted) {
           const msgMap = {
-            "code-taken": "এই Family Code ইতিমধ্যে ব্যবহৃত, অন্য একটা দিন।",
-            "length": "Family Code ৬-৩০ ক্যারেক্টারের মধ্যে হতে হবে।",
-            "charset": "Family Code-এ শুধু ইংরেজি অক্ষর/সংখ্যা/আন্ডারস্কোর/হাইফেন ব্যবহার করুন।",
-            "name-required": "নাম আবশ্যক।"
+            "code-taken": "এই ফ্যামিলি ইউজারনেম আগেই ব্যবহৃত হয়েছে। অন্য একটি দিন।",
+            "length": "ফ্যামিলি ইউজারনেম ৬-৩০ অক্ষরের মধ্যে হতে হবে।",
+            "charset": "ফ্যামিলি ইউজারনেমে শুধু ইংরেজি অক্ষর/সংখ্যা/আন্ডারস্কোর/হাইফেন ব্যবহার করুন।",
+            "name-required": "নাম লিখুন।"
           };
-          setErrorMsg(msgMap[res.reason] || "তৈরি করতে ব্যর্থ হয়েছে, আবার চেষ্টা করুন।");
+          setErrorMsg(msgMap[res.reason] || "তৈরি করা যায়নি, আবার চেষ্টা করুন।");
           setStage("new-user-form");
         }
         // success হলে createNewFamilyGoogleOnly() নিজেই window.location.reload()
@@ -84,7 +84,7 @@ export function GoogleSignInGate({ onSuccess }) {
       /*#__PURE__*/React.createElement("div", {
         className: "text-xs text-slate-500"
       }, currentGoogleEmail()
-          ? `${currentGoogleEmail()} — এই মেইল দিয়ে আগে কোনো পরিবার পাওয়া যায়নি। নতুন পরিবার তৈরি করতে নিচের তথ্য দিন।`
+          ? `${currentGoogleEmail()} — এই ইমেইল দিয়ে কোনো পরিবার পাওয়া যায়নি। নতুন পরিবার তৈরি করতে নিচের তথ্য দিন।`
           : "নতুন পরিবার তৈরি করতে নিচের তথ্য দিন।"),
       /*#__PURE__*/React.createElement("div", {
         className: "relative w-full"
@@ -93,13 +93,13 @@ export function GoogleSignInGate({ onSuccess }) {
           type: "text",
           value: familyCode,
           onChange: e => setFamilyCode(e.target.value),
-          placeholder: "পরিবারের নাম (Family Code)",
+          placeholder: "পরিবারের নাম (ফ্যামিলি ইউজারনেম)",
           className: "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm pr-24"
         }),
         !familyCode && /*#__PURE__*/React.createElement("span", {
           className: "absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none",
           "aria-hidden": "true"
-        }, "যেমনঃ Hasan-Family")
+        }, "যেমন: Hasan-Family")
       ),
       /*#__PURE__*/React.createElement("input", {
         type: "text",
@@ -125,7 +125,7 @@ export function GoogleSignInGate({ onSuccess }) {
         disabled: stage === "creating" || !familyCode.trim() || !name.trim(),
         onClick: handleCreateAccount,
         className: "w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-50"
-      }, stage === "creating" ? "তৈরি হচ্ছে..." : "একাউন্ট তৈরি করুন")
+      }, stage === "creating" ? "তৈরি হচ্ছে..." : "অ্যাকাউন্ট তৈরি করুন")
     );
   }
 

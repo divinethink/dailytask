@@ -1,8 +1,8 @@
 // হোম কার্ড কাস্টমাইজ (ধাপ ক, owner-approved) — pure logic, React/DB নেই।
 // member.homeLayout ঐচ্ছিক: না থাকলে/অবৈধ হলে ডিফল্ট = আগের আচরণ হুবহু।
-// দুটো অঞ্চল(zone): entry = দৈনিক-এন্ট্রি অংশের কার্ড; below = সেভ-বাটনের নিচের সেকশন।
-// অচেনা বা ডুপ্লিকেট id বাদ; নতুন কার্ড(সেভ-করা তালিকায় নেই) ডিফল্ট ক্রমে শেষে যোগ হয়।
-// fold: fixed = সবসময় খোলা(ভাঁজ হয় না); open/closed = ভাঁজযোগ্য, শুরুতে খোলা/বন্ধ।
+// দুটো অঞ্চল (zone): entry = দৈনিক-এন্ট্রি অংশের কার্ড; below = সেভ-বাটনের নিচের সেকশন।
+// অচেনা বা ডুপ্লিকেট id বাদ; নতুন কার্ড (সেভ-করা তালিকায় নেই) ডিফল্ট ক্রমে শেষে যোগ হয়।
+// fold: fixed = সবসময় খোলা (ভাঁজ হয় না); open/closed = ভাঁজযোগ্য, শুরুতে খোলা/বন্ধ।
 
 export const ZONES = ["entry", "below"];
 export const ZONE_LABEL = {
@@ -56,7 +56,7 @@ export function defaultLayout() {
 
 const isObj = v => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** সেভ-করা তালিকা → বৈধ তালিকা। একটা কার্ডের মান ভুল হলে শুধু সেটা বাদ যায়(ডিফল্টে ফেরে); বাকি অক্ষত। */
+/** সেভ-করা তালিকা → বৈধ তালিকা। একটা কার্ডের মান ভুল হলে শুধু সেটা বাদ যায় (ডিফল্টে ফেরে); বাকি অক্ষত। */
 export function sanitizeCards(zone, raw) {
   const known = new Set(CARD_DEFS[zone].map(x => x.id));
   const seen = new Set();
@@ -71,7 +71,7 @@ export function sanitizeCards(zone, raw) {
       out.push({ id, visible, fold });
     }
   }
-  // নতুন কার্ড(সেভ-করা তালিকায় নেই): ডিফল্ট ক্রমে ঠিক আগের পরিচিত কার্ডের পরে বসে(না পেলে শেষে)।
+  // নতুন কার্ড (সেভ-করা তালিকায় নেই): ডিফল্ট ক্রমে ঠিক আগের পরিচিত কার্ডের পরে বসে (না পেলে শেষে)।
   // এতে পুরনো সেভ-করা লেআউটেও নতুন কার্ড যথাস্থানে আসে; সদস্য চাইলে সরাতে/লুকাতে পারবেন।
   const defs = CARD_DEFS[zone];
   defs.forEach((x, i) => {
@@ -115,7 +115,7 @@ export function sameLayout(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-// ---- সময়সূচি-পেজের কার্ড সাজানো(owner-approved): শুধু ক্রম; member.prayerLayout = id-এর তালিকা ----
+// ---- সময়সূচি-পেজের কার্ড সাজানো (owner-approved): শুধু ক্রম; member.prayerLayout = id-এর তালিকা ----
 // না থাকলে/অবৈধ হলে ডিফল্ট ক্রম = আগের আচরণ হুবহু। অচেনা/ডুপ্লিকেট id বাদ, বাদ-পড়া কার্ড ডিফল্ট ক্রমে শেষে।
 export const PRAYER_CARD_DEFS = [
   { id: "schedule", title: "সালাতের সময়সূচি" },

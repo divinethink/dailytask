@@ -1,7 +1,7 @@
-// নেভ-ট্যাব কাস্টমাইজ(সময়সূচি/আমল/সহায়িকা, owner-approved ২ নভেম্বর ২০২৬) — pure logic, React/DB নেই।
+// নেভ-ট্যাব কাস্টমাইজ (সময়সূচি/আমল/সহায়িকা, owner-approved ২ নভেম্বর ২০২৬) — pure logic, React/DB নেই।
 // member.tabLayout ঐচ্ছিক: { prayerOrder, prayerHidden, amolOrder, amolHidden, toolsOrder, toolsHidden } (সব id-এর তালিকা)।
 // না থাকলে/অবৈধ হলে ডিফল্ট = আগের আচরণ হুবহু। অচেনা/ডুপ্লিকেট id বাদ; নতুন কার্ড ডিফল্ট ক্রমে শেষে যুক্ত।
-// সব কার্ড লুকানো হলে লুকানো তালিকা উপেক্ষা করে সবকটা দেখানো হয়(খালি পেজ কখনো নয়)।
+// সব কার্ড লুকানো হলে লুকানো তালিকা উপেক্ষা করে সবকটা দেখানো হয় (খালি পেজ কখনো নয়)।
 import { PRAYER_CARD_DEFS } from "./homeLayout.js";
 
 export const MAX_IDS = 20;
@@ -15,7 +15,7 @@ export const TAB_DEFS = {
       { id: "fullDayAmol", title: "সারাদিনের আমল" },
       { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "dhikr", title: "যিকির" },
-      { id: "dua", title: "দু'আ" },
+      { id: "dua", title: "দোয়া" },
       { id: "duaAcceptance", title: "দোয়া কবুলের সময়" },
       { id: "deathReminder", title: "মৃত্যুর স্মরণ" }
     ]
@@ -25,7 +25,7 @@ export const TAB_DEFS = {
     defs: [
       { id: "quran", title: "কুরআন" },
       { id: "salah", title: "সালাত ও পবিত্রতা" },
-      { id: "amol", title: "সকল আমল ও দু'আ" },
+      { id: "amol", title: "সকল আমল ও দোয়া" },
       { id: "specialDays", title: "বিশেষ দিন ও উপলক্ষ" },
       { id: "blog", title: "ডিভাইন ব্লগ" },
       { id: "quiz", title: "ইসলামি কুইজ" },
@@ -70,7 +70,7 @@ export function sanitizeHidden(tab, raw) {
   return out.length >= known.size ? [] : out;
 }
 
-// tabLayout(member.tabLayout) → { order, hidden }; সময়সূচির পুরনো ক্রম(member.prayerLayout) fallback।
+// tabLayout(member.tabLayout) → { order, hidden }; সময়সূচির পুরনো ক্রম (member.prayerLayout) fallback।
 export function resolveTab(tab, tabLayout, legacyPrayerOrder) {
   const t = tabLayout && typeof tabLayout === "object" && !Array.isArray(tabLayout) ? tabLayout : {};
   const rawOrder = t[tab + "Order"] !== undefined ? t[tab + "Order"] : tab === "prayer" ? legacyPrayerOrder : undefined;

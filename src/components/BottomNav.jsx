@@ -1,14 +1,14 @@
 // §Bottom Navigation shell(2_4_Identity_Simplification_Plan.md §৯.১-৯.৩)।
 // Pure presentational — activeTab+onChange props নেয়, নিজে কোনো business-logic/data-fetch
 // রাখে না। ভবিষ্যতে 3_1/3_2/3_3(Public Tools)-এর নতুন tab-content যোগ হলেও এই ফাইল আর টাচ
-// করার দরকার নেই(শুধু routing-switch-এ import বদলাবে, App()-এর scope)।
+// করার দরকার নেই (শুধু routing-switch-এ import বদলাবে, App()-এর scope)।
 //
 // §Icon-set upgrade(২.৪ §৯.০, ১৫ সেপ্টেম্বর ২০২৬, owner-approved): emoji→stroke-based
 // SVG icon। ClockIcon/MenuIcon বিদ্যমান shared Icon()-wrapper(icons.jsx) থেকে reuse
 // (pure-stroke, filled-toggle নেই — shared wrapper touch করা হয়নি, ২৬টা বিদ্যমান
 // call-site-এর zero-regression-risk বজায় রাখতে) — এই দুই ট্যাবের active-state শুধু
-// রঙ বদলায়(brand-green), filled-shape না। HomeIcon/TasbihIcon/CompassIcon নতুন,
-// standalone, নিজস্ব `filled` prop-সহ(active=filled+brand-green, inactive=outline+muted)।
+// রঙ বদলায় (brand-green), filled-shape না। HomeIcon/TasbihIcon/CompassIcon নতুন,
+// standalone, নিজস্ব `filled` prop-সহ (active=filled+brand-green, inactive=outline+muted)।
 import { TAB_FAMILY, TAB_MUHASABA, TAB_PRAYER_TIMES, TAB_TOOLS, TAB_SETTINGS } from "../legacy/tabs.js";
 import { ClockIcon, MenuIcon, HomeIcon, CompassIcon, ChartBarIcon } from "./icons.jsx";
 

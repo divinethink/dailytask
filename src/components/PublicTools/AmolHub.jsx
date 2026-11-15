@@ -1,10 +1,10 @@
-// AmolHub.jsx — "আমল" bottom-nav ট্যাব(পূর্বে "তাসবীহ" ট্যাব সরাসরি TasbihCounter.jsx
+// AmolHub.jsx — "আমল" bottom-nav ট্যাব (পূর্বে "তাসবীহ" ট্যাব সরাসরি TasbihCounter.jsx
 // render করত, ১৬ সেপ্টেম্বর ২০২৬-এ hub-এ পুনর্গঠিত)। তাসবীহ(§Phase A item ৩) এই hub-এর
-// ভিতরে প্রথম prominent item হিসেবে সরাসরি inline render হয়(3_3 §৬ mockup অনুযায়ী)।
+// ভিতরে প্রথম prominent item হিসেবে সরাসরি inline render হয় (3_3 §৬ mockup অনুযায়ী)।
 // বাকি ৬টা item — সব কয়টাই এখন নিজস্ব component-এ wire করা(✏️-ট্যাগড item-গুলো
 // EditableSection.jsx/RotatingCard.jsx reuse করে)। "দৈনিক আমল-চ্যালেঞ্জ" টাইল গ্রিড থেকে সরানো
-// হয়েছে(১৯ সেপ্টেম্বর ২০২৬, owner-decision, ৩+৩ ব্যালেন্সের জন্য)। কোনো checklist/completion-state
-// এই ফাইলে নেই(3_1-এর Core Decision)।
+// হয়েছে (১৯ সেপ্টেম্বর ২০২৬, owner-decision, ৩+৩ ব্যালেন্সের জন্য)। কোনো checklist/completion-state
+// এই ফাইলে নেই (3_1-এর Core Decision)।
 // React global(window.React, globals.js)।
 
 import { ToolGridSection, PageHeader, VerseCard } from "./ToolGrid.jsx";
@@ -37,7 +37,7 @@ const HUB_ITEMS = [
   { key: "azkar", icon: "sun", label: "সকাল-সন্ধ্যার আমল", Component: MorningEveningAzkar },
   { key: "fullDayAmol", icon: "dayNight", label: "সারাদিনের আমল", Component: FullDayAmol },
   { key: "dhikr", icon: "tasbih", label: "যিকির", Component: DhikrCountGuide },
-  { key: "dua", icon: "dua", label: "দু'আ", Component: DuaSection },
+  { key: "dua", icon: "dua", label: "দোয়া", Component: DuaSection },
   { key: "duaAcceptance", icon: "alarm", label: "দোয়া কবুলের সময়", Component: DuaAcceptanceCard },
   { key: "deathReminder", icon: "hourglass", label: "মৃত্যুর স্মরণ", Component: DeathReminderCard },
   { key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল", Component: JumuahAmolScreen },
@@ -57,7 +57,7 @@ export function AmolHub({ tabLayout, onBack } = {}) {
     );
   }
 
-  // ক্রম+লুকানো(member/app_design tabLayout): সব টাইল একটা গ্রিডে। তাসবীহ এখান থেকে সহায়িকার সামনের পাতায় গেছে।
+  // ক্রম+লুকানো (member/app_design tabLayout): সব টাইল একটা গ্রিডে। তাসবীহ এখান থেকে সহায়িকার সামনের পাতায় গেছে।
   const items = visibleIds("amol", tabLayout).map((id) => HUB_ITEMS.find((i) => i.key === id)).filter(Boolean);
   const blocks = [
     /*#__PURE__*/React.createElement(ToolGridSection, {
@@ -78,7 +78,7 @@ export function AmolHub({ tabLayout, onBack } = {}) {
       /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
       "সহায়িকা"
     ),
-    /*#__PURE__*/React.createElement(PageHeader, { title: "সকল আমল ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
+    /*#__PURE__*/React.createElement(PageHeader, { title: "সকল আমল ও দোয়া", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
     ...blocks
   );
 }

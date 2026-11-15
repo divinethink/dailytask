@@ -1,6 +1,6 @@
-// "আগামীকাল" কার্ডের সম্পাদনা-প্যানেল — শুধু App Creator-এর জন্য(কার্ড নিজেই isCreatorAuth() দেখে দেখায়; লেখার অনুমতি Firestore Rules-এ enforced)।
-// নতুন বাক্য যোগ/সম্পাদনা/মোছা + "ঘুমের আগে"-র লেখা বদল। লজিক(কোন দিনে কী আসে) বদলায় না — শুধু বাড়তি বাক্য যোগ হয়।
-// প্রতিটা বদল সাথে সাথে সেভ(পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
+// "আগামীকাল" কার্ডের সম্পাদনা-প্যানেল — শুধু App Creator-এর জন্য (কার্ড নিজেই isCreatorAuth() দেখে দেখায়; লেখার অনুমতি Firestore Rules-এ enforced)।
+// নতুন বাক্য যোগ/সম্পাদনা/মোছা + "ঘুমের আগে"-র লেখা বদল। লজিক (কোন দিনে কী আসে) বদলায় না — শুধু বাড়তি বাক্য যোগ হয়।
+// প্রতিটা বদল সাথে সাথে সেভ (পুরো তালিকা একসাথে লেখা, তাই retry/double-tap-এ duplicate হয় না)। ব্যর্থ হলে আগের অবস্থা অক্ষত।
 // React global(window.React, globals.js)।
 import { saveHomeCardExtras } from "../legacy/editableContent.js";
 import { EXTRAS_SECTION_ID, MAX_ITEMS, LIMITS, validateItem, normalizeItem, makeItemId, makeOverride } from "./tomorrowExtras.js";

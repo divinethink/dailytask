@@ -1,6 +1,6 @@
-// SadaqaLog.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ২৮(3_1 Phase D)।
+// SadaqaLog.jsx — "সহায়িকা"→"ইসলামি টুলস ও ট্র্যাকিং", item ২৮ (3_1 Phase D)।
 // Personal per-device log(localStorage, publicToolsSadaqa.js data-layer) — কোনো
-// checklist/family-Firestore না(3_1 Core Decision-এর বাইরে, কারণ এটা Home
+// checklist/family-Firestore না (3_1 Core Decision-এর বাইরে, কারণ এটা Home
 // Dashboard-এর কোনো ফিল্ডের সাথে duplicate না)।
 // React global(window.React, globals.js)।
 
@@ -57,7 +57,7 @@ export function SadaqaLog() {
         /*#__PURE__*/React.createElement(
           "div",
           { className: "flex flex-col gap-1" },
-          /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "পরিমাণ(৳)"),
+          /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "পরিমাণ (৳)"),
           /*#__PURE__*/React.createElement("input", {
             type: "number",
             min: "0",
@@ -82,7 +82,7 @@ export function SadaqaLog() {
       /*#__PURE__*/React.createElement(
         "div",
         { className: "flex flex-col gap-1" },
-        /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "নোট(ঐচ্ছিক)"),
+        /*#__PURE__*/React.createElement("label", { className: "text-xs text-slate-600" }, "নোট (ঐচ্ছিক)"),
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           value: note,

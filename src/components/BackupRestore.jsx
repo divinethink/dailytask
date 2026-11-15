@@ -93,7 +93,7 @@ export function BackupOptionsModal({
     size: 14
   }) : /*#__PURE__*/React.createElement(UploadIcon, {
     size: 14
-  }), isGoogleLinked() ? "Google Drive-এ ব্যাকআপ রাখুন" : "Google Drive-এ ব্যাকআপ রাখুন (আগে সাইন ইন করতে হবে)"), /*#__PURE__*/React.createElement("button", {
+  }), isGoogleLinked() ? "Google Drive-এ ব্যাকআপ রাখুন" : "Google Drive-এ ব্যাকআপ রাখুন (আগে সাইন-ইন করতে হবে)"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       handleExportData();
       onClose();
@@ -149,7 +149,7 @@ export function ImportOptionsModal({
     size: 14
   }) : /*#__PURE__*/React.createElement(DownloadIcon, {
     size: 14
-  }), "Google Drive থেকে Restore করুন"), /*#__PURE__*/React.createElement("button", {
+  }), "Google Drive থেকে রিস্টোর করুন"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       onClose();
       importFileInputRef.current && importFileInputRef.current.click();
@@ -184,7 +184,7 @@ export function DriveRestoreModal({
     className: "text-xs text-slate-600 leading-relaxed mb-2"
   }, "ফ্যামিলি ইউজারনেম: ", /*#__PURE__*/React.createElement("b", null, (candidate.appProperties && candidate.appProperties.familyCode) || "অজানা"), candidate.modifiedTime ? " · সর্বশেষ পরিবর্তন: " + new Date(candidate.modifiedTime).toLocaleString("bn-BD") : ""), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-600 leading-relaxed mb-4"
-  }, "এই ব্যাকআপ থেকে ডেটা রিস্টোর (মার্জ) করবেন? বর্তমান ডিভাইসের ডেটার সাথে merge হবে — কোনো ডেটা হারাবে না; দুই জায়গায় একই এন্ট্রি থাকলে যেটি বেশি সাম্প্রতিক (updatedAt) সেটি রাখা হবে।"), /*#__PURE__*/React.createElement("div", {
+  }, "এই ব্যাকআপ থেকে ডেটা রিস্টোর (মার্জ) করবেন? বর্তমান ডিভাইসের ডেটার সাথে মার্জ হবে — কোনো ডেটা হারাবে না; দুই জায়গায় একই এন্ট্রি থাকলে যেটি বেশি সাম্প্রতিক (updatedAt) সেটি রাখা হবে।"), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onClose(),

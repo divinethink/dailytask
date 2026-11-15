@@ -1,8 +1,8 @@
-// হোম-ট্যাবের উপরের কার্ড: চলতি ওয়াক্তের আমল(WaqtAmalCard) + "গতকাল ভরা হয়নি" ব্যানার ও কপি-বোতাম। শুধু দেখায় — কোনো ডেটা লেখে না।
-// "যোগ হয়েছে" = কার্ডে অন্তত একটি প্রযোজ্য ফিল্ডে টিক/সংখ্যা আছে(কাযা-কাউন্ট ০ ভালো, তাই তা গণ্য নয়)।
+// হোম-ট্যাবের উপরের কার্ড: চলতি ওয়াক্তের আমল (WaqtAmalCard) + "গতকাল ভরা হয়নি" ব্যানার ও কপি-বোতাম। শুধু দেখায় — কোনো ডেটা লেখে না।
+// "যোগ হয়েছে" = কার্ডে অন্তত একটি প্রযোজ্য ফিল্ডে টিক/সংখ্যা আছে (কাযা-কাউন্ট ০ ভালো, তাই তা গণ্য নয়)।
 // React global(window.React, globals.js)।
 import { getHijriDate } from "../legacy/appHelpers.js";
-// ১ নভেম্বর ২০২৬(owner): "আজকের মুহাসাবা" সারাংশ(স্ট্রিক/অগ্রগতি-বার/সেভ-ব্যাজ) সরানো; জায়গায় WaqtAmalCard(চলতি ওয়াক্তের আমল)।
+// ১ নভেম্বর ২০২৬ (owner): "আজকের মুহাসাবা" সারাংশ (স্ট্রিক/অগ্রগতি-বার/সেভ-ব্যাজ) সরানো; জায়গায় WaqtAmalCard(চলতি ওয়াক্তের আমল)।
 // গতকাল-ব্যানার, নতুন-হিজরি-মাস নোট ও "গতকালের মতো বসান" বোতাম আগের মতোই আছে।
 
 const DISMISS_PREFIX = "yb_dismissed_";
@@ -12,7 +12,7 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
     try { return !!localStorage.getItem(DISMISS_PREFIX + todayKey); } catch { return false; }
   });
   const showYb = yesterdayMissing && !hideYb;
-  // নতুন হিজরি মাসের প্রথম ২ দিনে একটা ছোট নিয়ত-স্মরণ(প্রতি মাসে একবার বন্ধ করা যায়)। তারিখ ≈±১ দিন, তাই "সম্ভাব্য"।
+  // নতুন হিজরি মাসের প্রথম ২ দিনে একটা ছোট নিয়ত-স্মরণ (প্রতি মাসে একবার বন্ধ করা যায়)। তারিখ ≈±১ দিন, তাই "সম্ভাব্য"।
   const hj = getHijriDate(new Date());
   const hmKey = "hm_dismissed_" + hj.year + "_" + hj.month;
   const [hideHm, setHideHm] = React.useState(() => {
@@ -20,7 +20,7 @@ export function MuhasabaStrip({ cats, entry, member, fieldApplies, streak, dirty
   });
   const showHm = hj.day <= 2 && !hideHm;
 
-  // ২ নভেম্বর ২০২৬(owner): "চলমান সালাত" কার্ড সময়সূচি-ট্যাবে সরানো, "গতকালের মতো বসান" বোতাম বাদ — শুধু ব্যানার থাকলে কার্ড দেখায়।
+  // ২ নভেম্বর ২০২৬ (owner): "চলমান সালাত" কার্ড সময়সূচি-ট্যাবে সরানো, "গতকালের মতো বসান" বোতাম বাদ — শুধু ব্যানার থাকলে কার্ড দেখায়।
   if (!showHm && !showYb) return null;
 
   return React.createElement(

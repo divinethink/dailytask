@@ -1,4 +1,4 @@
-// লেবেল ম্যানেজ পেজ(ধাপ গ, শুধু Admin): নাম বদল, লুকান/ফিরিয়ে আনুন(archive), ক্যাটেগরিতে নতুন লেবেল।
+// লেবেল ম্যানেজ পেজ (ধাপ গ, শুধু Admin): নাম বদল, লুকান/ফিরিয়ে আনুন (archive), ক্যাটেগরিতে নতুন লেবেল।
 // "লুকানো" মানে ডিলিট নয় — পুরনো এন্ট্রির ডেটা অক্ষত থাকে। খসড়া লোকাল state-এ; "সেভ করুন" চাপলে তবেই সেভ হয়।
 import { DEEN_CATEGORY_GROUPS } from "../legacy/appHelpers.js";
 import { sanitizeOverrides, setLabel, setHidden, sameOverrides, MAX_LABEL_LENGTH } from "../legacy/fieldOverrides.js";
@@ -20,7 +20,7 @@ export function FieldManagerScreen({ deenFields, duniyaFields, customFields, ove
   const [error, setError] = React.useState(false);
   const dirty = !sameOverrides(ov, initial.current.ov) || JSON.stringify(cf) !== JSON.stringify(initial.current.cf);
 
-  // ক্যাটেগরি → মূল ফিল্ড-তালিকা(লুকানোগুলোসহ, কারণ ফিরিয়ে আনতে দেখাতে হবে)
+  // ক্যাটেগরি → মূল ফিল্ড-তালিকা (লুকানোগুলোসহ, কারণ ফিরিয়ে আনতে দেখাতে হবে)
   const groups = [
     ...DEEN_CATEGORY_GROUPS.map(g => ({ id: g.id, title: GROUP_TITLES[g.id] || g.label, base: deenFields.filter(f => g.keys.includes(f.key)) })),
     { id: "duniya", title: GROUP_TITLES.duniya, base: duniyaFields }

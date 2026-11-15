@@ -1,9 +1,9 @@
-// publicToolsFitra.js — ফিতরা(সদকাতুল ফিতর) ক্যালকুলেটর লজিক(3_1 Phase B item ১২)।
-// Pure math, কোনো UI/SDK না(Dev Rule ২: lib/data layer)। শস্য-ভিত্তিক নির্ধারিত
-// ওজন(fiqh-standard) × ইউজার-ইনপুট কেজি-দর — কোনো live grain-price API নেই(Zakat-এর
+// publicToolsFitra.js — ফিতরা (সদকাতুল ফিতর) ক্যালকুলেটর লজিক (3_1 Phase B item ১২)।
+// Pure math, কোনো UI/SDK না (Dev Rule ২: lib/data layer)। শস্য-ভিত্তিক নির্ধারিত
+// ওজন (fiqh-standard) × ইউজার-ইনপুট কেজি-দর — কোনো live grain-price API নেই (Zakat-এর
 // একই owner-approved manual-input সিদ্ধান্ত, নতুন external service নয়)।
 
-// Hanafi fiqh-এ প্রচলিত আনুমানিক ওজন(১ সা'-ভিত্তিক হিসাব)।
+// Hanafi fiqh-এ প্রচলিত আনুমানিক ওজন (১ সা'-ভিত্তিক হিসাব)।
 const FITRA_GRAIN_WEIGHT_KG = {
   wheat: 1.75, // গম/আটা — অর্ধ সা'
   barley: 3.5, // যব — ১ সা'

@@ -1,9 +1,9 @@
 // ToolGrid.jsx — আমল hub ও সহায়িকা shell-এর shared icon-grid section।
-// গোল আইকন + নিচে লেবেল(রেফারেন্স-অ্যাপের প্যাটার্ন)। শুধু presentation-layer।
-// ১৯ সেপ্টেম্বর ২০২৬(premium-grid, owner-approved mockup): ঐচ্ছিক `variant` prop যোগ হয়েছে —
-//   "default"(বাদ দিলে) = আগের ৪-কলাম আচরণ হুবহু অপরিবর্তিত(সহায়িকার ভিতরের ক্যাটাগরি-গ্রিড এটাই)
+// গোল আইকন + নিচে লেবেল (রেফারেন্স-অ্যাপের প্যাটার্ন)। শুধু presentation-layer।
+// ১৯ সেপ্টেম্বর ২০২৬ (premium-grid, owner-approved mockup): ঐচ্ছিক `variant` prop যোগ হয়েছে —
+//   "default"(বাদ দিলে) = আগের ৪-কলাম আচরণ হুবহু অপরিবর্তিত (সহায়িকার ভিতরের ক্যাটাগরি-গ্রিড এটাই)
 //   "compact3" = আমল hub — ৩-কলাম কার্ড-টাইল
-//   "hero"     = সহায়িকা front — ২-কলাম বড় কার্ড, আইকন+লেখা মাঝ-বরাবর(center)
+//   "hero"     = সহায়িকা front — ২-কলাম বড় কার্ড, আইকন+লেখা মাঝ-বরাবর (center)
 // সাথে PageHeader ও VerseCard(দুটোই pure-presentational, কোনো data/Firestore নেই)।
 // React global(window.React, globals.js)।
 
@@ -159,7 +159,7 @@ export function ToolGridSection({ title, icon, items, onSelect, variant }) {
         })
       )
     );
-    // hero: টাইলই নিজে কার্ড(বাইরে wrapper নেই); compact3: একটা সাদা কার্ডের ভিতরে
+    // hero: টাইলই নিজে কার্ড (বাইরে wrapper নেই); compact3: একটা সাদা কার্ডের ভিতরে
     if (variant === "hero") {
       return React.createElement("section", { className: "mb-3" }, grid);
     }
@@ -202,7 +202,7 @@ export function ToolGridSection({ title, icon, items, onSelect, variant }) {
   );
 }
 
-// স্ক্রিন-হেডার(আমল/সহায়িকা উভয়ে) — নরম সবুজ ব্যান্ড, শিরোনাম+উপ-শিরোনাম।
+// স্ক্রিন-হেডার (আমল/সহায়িকা উভয়ে) — নরম সবুজ ব্যান্ড, শিরোনাম+উপ-শিরোনাম।
 export function PageHeader({ title, subtitle }) {
   return React.createElement(
     "header",
@@ -215,7 +215,7 @@ export function PageHeader({ title, subtitle }) {
   );
 }
 
-// আইটেম/টুল-ডিটেইল পেজের হেডার(owner-request, ১৯ সেপ্টেম্বর ২০২৬: "ভিতরের পেজ
+// আইটেম/টুল-ডিটেইল পেজের হেডার (owner-request, ১৯ সেপ্টেম্বর ২০২৬: "ভিতরের পেজ
 // প্রিমিয়াম লাগে না") — আগে শুধু plain bold টেক্সট ছিল, এখন hero-টাইলের মতো
 // আইকন-ডিস্ক + gradient ব্যান্ড, cat.label ব্রেডক্রাম্ব হিসেবে সাবটাইটেলে।
 export function DetailHeader({ icon, title, subtitle }) {
@@ -250,7 +250,7 @@ export function DetailHeader({ icon, title, subtitle }) {
   );
 }
 
-// কুরআনের বাণী-কার্ড — লেখা অনুভূমিক ও উল্লম্ব, দুই দিকেই মাঝ-বরাবর(center)।
+// কুরআনের বাণী-কার্ড — লেখা অনুভূমিক ও উল্লম্ব, দুই দিকেই মাঝ-বরাবর (center)।
 export function VerseCard({ text, source }) {
   return React.createElement(
     "div",

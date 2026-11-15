@@ -1,6 +1,6 @@
-// JamaatCard.jsx — "সময়সূচি" ট্যাবের "মসজিদের জামায়াত" কার্ড(owner-request ৩ নভেম্বর ২০২৬)।
-// শুধু এই ডিভাইসের localStorage(legacy/jamaatTimes.js); Firestore/Rules কিছু নেই। ওয়াক্ত-হিসাব(schedule) বাইরে থেকে আসে।
-// জামায়াতের সময় অটো(সূর্যোদয়/সূর্যাস্ত/ওয়াক্ত-শুরু ± মিনিট) বা হাতে-বসানো(fixed); মিলে না গেলে Owner ঠিক করতে পারেন।
+// JamaatCard.jsx — "সময়সূচি" ট্যাবের "মসজিদের জামায়াত" কার্ড (owner-request ৩ নভেম্বর ২০২৬)।
+// শুধু এই ডিভাইসের localStorage(legacy/jamaatTimes.js); Firestore/Rules কিছু নেই। ওয়াক্ত-হিসাব (schedule) বাইরে থেকে আসে।
+// জামায়াতের সময় অটো (সূর্যোদয়/সূর্যাস্ত/ওয়াক্ত-শুরু ± মিনিট) বা হাতে-বসানো (fixed); মিলে না গেলে Owner ঠিক করতে পারেন।
 // React global(window.React, globals.js)।
 import { toBn } from "../../legacy/appHelpers.js";
 import { MosqueIcon, EditIcon } from "../icons.jsx";
@@ -46,7 +46,7 @@ const BTN = "rounded-xl px-4 min-h-[44px] text-sm font-bold";
 const TIME_COLOR = { fajr: "#185FA5", dhuhr: "#0E4B43", asr: "#B3610E", maghrib: "#B23A25", isha: "#4B4FA8" };
 const SOFT = { background: "var(--theme-soft, #E8F0EE)", color: "var(--theme-primary, #0E4B43)" };
 
-// হোম/মেনুর ধাঁচের আইকন-চিপ: বামে মসজিদ, ডানে এডিট(MenuPage-এর w-10 h-10 rounded-xl)
+// হোম/মেনুর ধাঁচের আইকন-চিপ: বামে মসজিদ, ডানে এডিট (MenuPage-এর w-10 h-10 rounded-xl)
 function Header({ title, sub, onEdit }) {
   return h(
     "div",
@@ -102,7 +102,7 @@ export function JamaatCard({ schedule, now }) {
 
   if (!schedule) return null;
 
-  // ---- এডিট মোড(কম্প্যাক্ট) ----
+  // ---- এডিট মোড (কম্প্যাক্ট) ----
   if (draft) {
     return shell(
       h(

@@ -1,4 +1,4 @@
-// হোম কাস্টমাইজ পেজ(ধাপ ক): প্রতিটা কার্ডের ওপরে/নিচে, স্থির/খোলা/বন্ধ, দেখান/লুকান।
+// হোম কাস্টমাইজ পেজ (ধাপ ক): প্রতিটা কার্ডের ওপরে/নিচে, স্থির/খোলা/বন্ধ, দেখান/লুকান।
 // খসড়া লোকাল state-এ থাকে; "সেভ করুন" চাপলে তবেই member-ডকে লেখা হয়। Reset-ও শুধু খসড়ায়।
 import { ZONES, ZONE_LABEL, FOLDS, FOLD_LABEL, cardTitle, defaultLayout, moveCard, updateCard, sameLayout, sanitizeLayout } from "../legacy/homeLayout.js";
 

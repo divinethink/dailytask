@@ -1,5 +1,5 @@
 // SubScreenHeader.jsx — AmolHub-এর প্রতিটা sub-screen(সকাল-সন্ধ্যা/সারাদিনের
-// আমল, যিকির, দু'আ ইত্যাদি)-এ পুনরাবৃত্ত "← আমল  [শিরোনাম]" header — DRY(existing
+// আমল, যিকির, দোয়া ইত্যাদি)-এ পুনরাবৃত্ত "← আমল  [শিরোনাম]" header — DRY(existing
 // app-এর MonthNavControl/FieldGroup-এর মতো shared-component-reuse pattern,
 // V1 ফাইল ১.২ §১৬)। কোনো নতুন behavior না, শুধু existing repeated JSX বের করা।
 // React global(window.React, globals.js)।
