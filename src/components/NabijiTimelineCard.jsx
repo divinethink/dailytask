@@ -18,7 +18,7 @@ const PREVIEW = 3;
 // কার্ডে পাতলা টিন্ট-ভরাট + বর্ডারের চারপাশে হালকা আভা (ring); আইকন নেভ-বারের মতো আউটলাইন SVG, থিম-অ্যাকসেন্ট রঙে।
 // ডিফল্ট সময়ভাগের আইকন SVG; ক্রিয়েটরের নতুন/অচেনা সময়ভাগ = তার emoji (হালকা)।
 const CALM = {
-  card: "bg-gradient-to-b from-white to-[#FFFBF3] border-[#E4D3A8]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
+  card: "bg-gradient-to-b from-emerald-50 to-white border-0 border-t-[3px] border-t-[#C89B3C]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
   chipOn: "from-emerald-50 to-emerald-100 !border-emerald-300 !text-emerald-900", chipOff: "bg-white border-emerald-200 text-emerald-900",
   txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-400", title: "text-slate-900",
   time: "bg-white text-emerald-800", icon: "bg-emerald-100 text-emerald-800", link: "text-emerald-800", edit: "text-emerald-800"
@@ -163,15 +163,21 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const pick = (id) => { setSel(id === nowId ? null : id); setMore(false); };
 
   const foldable = fold === "open" || fold === "closed";
-  const rootCls = "rounded-2xl p-4 border " + th.card + " " + th.glow;
-  const titleEl = foldable
-    ? React.createElement(
-        "button",
-        { type: "button", onClick: () => setOpenCard(!openCard), "aria-expanded": openCard, className: "w-full flex items-center justify-between gap-2 min-h-[28px]" + (openCard ? " mb-3" : "") },
-        React.createElement("h3", { className: "text-sm font-bold text-emerald-950 text-left" }, "এ সময়ে নবিজি ﷺ যা করতেন"),
-        React.createElement(ChevronDown, { size: 15, color: "#8A9A8F", className: "transition-transform" + (openCard ? " rotate-180" : "") })
-      )
-    : React.createElement("h3", { className: "text-sm font-bold text-emerald-950 mb-3" }, "এ সময়ে নবিজি ﷺ যা করতেন");
+  const rootCls = "rounded-2xl overflow-hidden p-4 " + th.card + " " + th.glow;
+  const isOpen = !foldable || openCard;
+  const bandCls = "-mx-4 -mt-4 px-4 py-3 bg-gradient-to-r from-emerald-800 to-emerald-900 text-white " + (isOpen ? "mb-4" : "-mb-4");
+  const titleEl = React.createElement(
+    "div",
+    { className: bandCls },
+    foldable
+      ? React.createElement(
+          "button",
+          { type: "button", onClick: () => setOpenCard(!openCard), "aria-expanded": openCard, className: "w-full flex items-center justify-between gap-2 min-h-[28px]" },
+          React.createElement("h3", { className: "text-sm font-bold text-white text-left" }, "এ সময়ে নবিজি ﷺ যা করতেন"),
+          React.createElement(ChevronDown, { size: 15, color: "#E4D3A8", className: "transition-transform" + (openCard ? " rotate-180" : "") })
+        )
+      : React.createElement("h3", { className: "text-sm font-bold text-white" }, "এ সময়ে নবিজি ﷺ যা করতেন")
+  );
   if (foldable && !openCard) return React.createElement("div", { className: rootCls }, titleEl);
 
   return React.createElement(
