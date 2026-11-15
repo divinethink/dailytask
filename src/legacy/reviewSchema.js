@@ -63,6 +63,19 @@ function prevChunk(year, month0, week) {
   return { year: y, month0: m, week: chunkCount(y, m) };
 }
 
+// ধাপ ৪(লক): সপ্তাহের ফর্ম খোলে সপ্তাহের শেষ দিন(বৃহস্পতিবার) রাত ৮টায়(Owner-অনুমোদিত); শেষ হওয়া সপ্তাহ সবসময় খোলা।
+const UNLOCK_HOUR = 20;
+function weekUnlockAt(year, month0, week) {
+  return new Date(year, month0, chunkRange(year, month0, week).end, UNLOCK_HOUR, 0, 0);
+}
+// এখনো লক থাকলে { days, hours, mins } (পূর্ণসংখ্যা, নিচের দিকে কাটা), খোলা থাকলে null।
+function unlockCountdown(unlockAt, now) {
+  const ms = unlockAt.getTime() - now.getTime();
+  if (!(ms > 0)) return null;
+  const mins = Math.floor(ms / 60000);
+  return { days: Math.floor(mins / 1440), hours: Math.floor((mins % 1440) / 60), mins: mins % 60 };
+}
+
 function reviewDocId(memberId, weekKey) {
   return `${memberId}_${weekKey}`;
 }
@@ -104,4 +117,4 @@ function validateReview(input) {
   return { ok: true, value: out };
 }
 
-export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, dayRelToday, prevChunk, reviewDocId, validateReview };
+export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, dayRelToday, prevChunk, weekUnlockAt, unlockCountdown, UNLOCK_HOUR, reviewDocId, validateReview };

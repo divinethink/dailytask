@@ -1,7 +1,7 @@
 // চালান: node --test tests/   (কোনো dependency লাগে না)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, weekUnlockAt, unlockCountdown, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
 import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, rankMoves, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
@@ -88,6 +88,20 @@ test("bestImprovementAndDrop", () => {
   assert.equal(none.improvement, null); assert.equal(none.drop, null);
   const tie = bestImprovementAndDrop([{ key: "b", prev: 0, cur: 2 }, { key: "a", prev: 0, cur: 2 }]);
   assert.equal(tie.improvement.key, "a");
+});
+test("লক: সপ্তাহ খোলে বৃহস্পতিবার রাত ৮টায়; শেষ হওয়া সপ্তাহ খোলা", () => {
+  const at = weekUnlockAt(2026, 10, 3); // ১৩–১৯ নভেম্বর ⇒ ১৯ নভেম্বর (বৃহস্পতি) রাত ৮টা
+  assert.equal(at.getDay(), 4);
+  assert.deepEqual([at.getMonth(), at.getDate(), at.getHours(), at.getMinutes()], [10, 19, 20, 0]);
+  // রবিবার ১৫ নভেম্বর দুপুর ১টা ⇒ ৪ দিন ৭ ঘণ্টা
+  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 15, 13, 0)), { days: 4, hours: 7, mins: 0 });
+  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 19, 19, 30)), { days: 0, hours: 0, mins: 30 });
+  assert.equal(unlockCountdown(at, new Date(2026, 10, 19, 20, 0)), null);   // ঠিক সময়ে খোলা
+  assert.equal(unlockCountdown(at, new Date(2026, 10, 20, 9, 0)), null);    // শুক্রবার: খোলা
+  assert.equal(unlockCountdown(weekUnlockAt(2026, 10, 2), new Date(2026, 10, 15)), null); // আগের সপ্তাহ খোলা
+  // মাস-পেরোনো সপ্তাহ: ১ম সপ্তাহ শেষ ৫ নভেম্বর
+  const w1 = weekUnlockAt(2026, 10, 1);
+  assert.deepEqual([w1.getMonth(), w1.getDate()], [10, 5]);
 });
 test("rankMoves: উন্নতি/অবনতি/অপরিবর্তিত আলাদা ও ক্রমে", () => {
   const r = rankMoves([

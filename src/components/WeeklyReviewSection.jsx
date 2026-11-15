@@ -3,12 +3,13 @@
 // কোথাও সেভ/লগ হয় না; সপ্তাহ বদলালে বা পাতা ছাড়লে মুছে যায়।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
-import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, dayRelToday, prevChunk } from "../legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, dayRelToday, prevChunk, weekUnlockAt, unlockCountdown } from "../legacy/reviewSchema.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { weeklyGap, countFieldTotal, weekGlance, weekFieldExtremes, weekFieldMoves } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
 import { fieldRatioToday } from "../legacy/dailyInsight.js";
 import { pad2 } from "../legacy/appHelpers.js";
+import { fill } from "../legacy/reviewMonthly.js";
 import { MonthPillNav } from "./MonthPillNav.jsx";
 import { ChevronDown } from "./icons.jsx";
 
@@ -35,6 +36,8 @@ function GlanceDay({ tone, label, dayName, pctText, fieldLabel, fieldName, field
     </div>
   );
 }
+const L = T.lock;
+const CEL = T.celebrate;
 const toggle = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
 export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS }) {
@@ -56,6 +59,11 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const [closed, setClosed] = useState([]); // বদ্ধ ঘর — কখনো সেভ হয় না
   const isProxy = !!(member && "googleUid" in member && member.googleUid === null);
   const weekKey = chunkWeekKey(year, month0, week);
+  // ধাপ ৪: সপ্তাহের শেষ দিন রাত ৮টার আগে ফর্ম লক(শেষ হওয়া সপ্তাহ খোলা); মিনিটে একবার হালনাগাদ।
+  const [, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 60000); return () => clearInterval(t); }, []);
+  const lock = unlockCountdown(weekUnlockAt(year, month0, week), new Date());
+  const isThisWeek = isCurMonth && week === (trailing ? maxWeek : curWeek.week);
   const range = chunkRange(year, month0, week);
   const sd = new Date(year, month0, range.start), ed = new Date(year, month0, range.end);
   const rangeLabel = sd.getMonth() === ed.getMonth()
@@ -202,6 +210,21 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     fold === "fixed" ? null : <ChevronDown size={18} className={"shrink-0 text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
   );
 
+  let glanceEl = null;
+    glanceEl = glance.logged > 0 ? (
+      <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-sm font-bold">{G.titleWeek.replace("{w}", G.weekOrd[(week > chunkCount(year, month0) ? 1 : week) - 1] || toBn(week) + "ম")}</div>
+          {glance.delta !== null && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{G.vsPrev} {glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"}</span>}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <GlanceDay tone="good" label={"🌟 " + G.best} dayName={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : ""} pctText={glance.best ? toBn(glance.best.pct) + "%" : ""} fieldLabel={moves.improvement ? G.improved : G.bestField} fieldName={moves.improvement ? fieldName(moves.improvement.key) : extremes.best ? fieldName(extremes.best.key) : ""} fieldDelta={moves.improvement ? "▲ " + toBn(moves.improvement.delta) + "%" : ""} />
+          <GlanceDay tone="warn" label={"🌧 " + G.worst} dayName={glance.worst ? G.weekdays[new Date(year, month0, glance.worst.day).getDay()] : ""} pctText={glance.worst ? toBn(glance.worst.pct) + "%" : ""} fieldLabel={moves.drop ? G.dropped : G.worstField} fieldName={moves.drop ? fieldName(moves.drop.key) : extremes.worst ? fieldName(extremes.worst.key) : ""} fieldDelta={moves.drop ? "▼ " + toBn(Math.abs(moves.drop.delta)) + "%" : ""} />
+        </div>
+        {!glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
+      </div>
+    ) : null;
+
   let body = null;
   if (open) {
     if (locked) body = <p className="text-sm text-slate-500 mt-3">{T.lockedNote}</p>;
@@ -216,6 +239,16 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           ))}
         </div>
         <div className="text-xs text-slate-500 mb-2">{rangeLabel} <span title={T.privateTag}>🔒</span></div>
+        {glanceEl && (lock || step === 1) && glanceEl}
+        {lock ? (
+          <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#FFFBF0", border: "1px solid #EADFBE" }}>
+            <span className="text-3xl" aria-hidden>🔒</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-800">{L.title}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{fill(L.left, { t: lock.days > 0 ? fill(L.dayHour, { d: toBn(lock.days), h: toBn(lock.hours) }) : lock.hours > 0 ? fill(L.hourMin, { h: toBn(lock.hours), m: toBn(lock.mins) }) : fill(L.minOnly, { m: toBn(lock.mins) }) })} · {L.hint}</div>
+            </div>
+          </div>
+        ) : (<>
         <div className="flex items-center mb-2">
           {T.steps.map((_, i) => {
             const n = i + 1, done = n < step, cur = n === step;
@@ -253,19 +286,6 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
                 {form.goalResult === "partial" && <p className="text-xs rounded-lg bg-emerald-50 p-2 text-emerald-900">💚 {T.goal.partialNote}</p>}
               </>}
             </> : <>
-              {glance.logged > 0 && (
-                <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-sm font-bold">{G.titleWeek.replace("{w}", G.weekOrd[(week > chunkCount(year, month0) ? 1 : week) - 1] || toBn(week) + "ম")}</div>
-                    {glance.delta !== null && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }}>{G.vsPrev} {glance.delta === 0 ? "=" : (glance.delta > 0 ? "▲ " : "▼ ") + toBn(Math.abs(glance.delta)) + "%"}</span>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <GlanceDay tone="good" label={"🌟 " + G.best} dayName={glance.best ? G.weekdays[new Date(year, month0, glance.best.day).getDay()] : ""} pctText={glance.best ? toBn(glance.best.pct) + "%" : ""} fieldLabel={moves.improvement ? G.improved : G.bestField} fieldName={moves.improvement ? fieldName(moves.improvement.key) : extremes.best ? fieldName(extremes.best.key) : ""} fieldDelta={moves.improvement ? "▲ " + toBn(moves.improvement.delta) + "%" : ""} />
-                    <GlanceDay tone="warn" label={"🌧 " + G.worst} dayName={glance.worst ? G.weekdays[new Date(year, month0, glance.worst.day).getDay()] : ""} pctText={glance.worst ? toBn(glance.worst.pct) + "%" : ""} fieldLabel={moves.drop ? G.dropped : G.worstField} fieldName={moves.drop ? fieldName(moves.drop.key) : extremes.worst ? fieldName(extremes.worst.key) : ""} fieldDelta={moves.drop ? "▼ " + toBn(Math.abs(moves.drop.delta)) + "%" : ""} />
-                  </div>
-                  {!glance.enough && <p className="text-[11px] opacity-90 mt-2">{G.needMore}</p>}
-                </div>
-              )}
               <p className="text-sm text-slate-600">{T.goal.noPrev}</p>
             </>}
           </div>
@@ -344,7 +364,19 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
             <p className="font-bold text-sm mb-1">{T.next.gratitudeTitle}</p>
             <input maxLength={300} value={form.gratitude || ""} onChange={e => set("gratitude", e.target.value)} className={box + " mb-3"} />
             <button type="button" disabled={saveState === "saving"} onClick={onSave} className="w-full py-3 rounded-2xl bg-emerald-900 text-white font-bold disabled:opacity-60">✔ {T.next.save}</button>
-            {saveState === "saved" && <p className="text-sm text-emerald-800 text-center mt-2">{T.saved}</p>}
+            {saveState === "saved" && (
+              <div className="rounded-2xl p-4 mt-3 text-center" style={{ background: "#EAF5EE", border: "1px solid #CFE6D6" }}>
+                <div className="text-3xl" aria-hidden>🎉</div>
+                <div className="text-sm font-bold text-slate-800 mt-1">{CEL.title}</div>
+                {form.nextGoal ? (
+                  <div className="rounded-xl bg-white p-3 mt-3 text-sm text-slate-700 text-left">
+                    {CEL.goalLead} <b>“{form.nextGoal}”</b>
+                    {isThisWeek && <div className="text-xs font-semibold text-emerald-800 mt-1.5">→ {CEL.toHome}</div>}
+                  </div>
+                ) : null}
+                <p className="text-[11px] text-slate-500 mt-2">{T.saved}</p>
+              </div>
+            )}
             {saveState === "error" && <p className="text-sm text-red-700 text-center mt-2">{errCode === "permission-denied" ? T.errors.denied : T.errors.saveFailed}</p>}
             <p className="text-[11px] text-slate-500 text-center mt-2">🔒 {T.next.privacy}</p>
             <p className="text-xs text-slate-500 mt-2">🔁 {T.next.loop}</p>
@@ -355,6 +387,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           {step > 1 && <button type="button" onClick={() => goStep(step - 1)} className="px-4 py-2.5 rounded-2xl border border-slate-300 text-sm font-bold">‹ আগের ধাপ</button>}
           {step < 5 && <button type="button" onClick={() => goStep(step + 1)} className="flex-1 py-2.5 rounded-2xl bg-emerald-900 text-white font-bold">পরের ধাপ ›</button>}
         </div>
+        </>)}
       </div>
     );
   }
