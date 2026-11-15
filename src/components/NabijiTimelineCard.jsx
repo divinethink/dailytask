@@ -18,8 +18,8 @@ const PREVIEW = 3;
 // কার্ডে পাতলা টিন্ট-ভরাট + বর্ডারের চারপাশে হালকা আভা (ring); আইকন নেভ-বারের মতো আউটলাইন SVG, থিম-অ্যাকসেন্ট রঙে।
 // ডিফল্ট সময়ভাগের আইকন SVG; ক্রিয়েটরের নতুন/অচেনা সময়ভাগ = তার emoji (হালকা)।
 const CALM = {
-  card: "bg-white border-[#E4D3A8]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
-  chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-emerald-200 text-emerald-900",
+  card: "bg-gradient-to-b from-white to-[#FFFBF3] border-[#E4D3A8]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
+  chipOn: "from-emerald-50 to-emerald-100 !border-emerald-300 !text-emerald-900", chipOff: "bg-white border-emerald-200 text-emerald-900",
   txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-400", title: "text-slate-900",
   time: "bg-white text-emerald-800", icon: "bg-emerald-100 text-emerald-800", link: "text-emerald-800", edit: "text-emerald-800"
 };
@@ -57,39 +57,32 @@ function groupItems(items) {
 
 // সূত্র লেখার শেষে ছোট ধূসর বন্ধনীতে(আলাদা লাইন নয়)
 function Src({ src, th }) {
-  return src ? React.createElement("span", { className: "inline-block text-[11px] ml-1 " + th.src }, "(" + src + ")") : null;
+  return src ? React.createElement("span", { className: "block text-[11px] mt-0.5 " + th.src }, src) : null;
 }
 
 function Bullets({ items, th = NEUTRAL }) {
   return React.createElement(
     "div",
-    { className: "space-y-3" },
+    { className: "space-y-3.5" },
     groupItems(items).map((g) => {
       const cat = g.key ? CATS[g.key] : null;
-      const pill = cat && React.createElement("span", { className: "inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md " + cat.cls }, cat.label);
-      const single = g.items.length === 1;
+      const pill = cat && React.createElement("div", { className: "mb-1.5" }, React.createElement("span", { className: "inline-block text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-[#F7EEDB] text-[#8A6A1F]" }, cat.label));
       return React.createElement(
         "div",
         { key: g.key || "_" },
-        single
-          ? React.createElement("p", { className: "text-sm leading-relaxed " + th.txt }, pill, pill && " ", g.items[0].text, React.createElement(Src, { src: g.items[0].src, th }))
-          : React.createElement(
-              React.Fragment,
-              null,
-              pill && React.createElement("div", { className: "mb-1" }, pill),
-              React.createElement(
-                "ul",
-                { className: "space-y-1.5" },
-                g.items.map((it, i) =>
-                  React.createElement(
-                    "li",
-                    { key: i, className: "flex gap-2 text-sm leading-relaxed " + th.txt },
-                    React.createElement("span", { className: "mt-2 w-1.5 h-1.5 rounded-full shrink-0 " + th.dot, "aria-hidden": true }),
-                    React.createElement("span", null, it.text, React.createElement(Src, { src: it.src, th }))
-                  )
-                )
-              )
+        pill,
+        React.createElement(
+          "div",
+          { className: "space-y-2" },
+          g.items.map((it, i) =>
+            React.createElement(
+              "div",
+              { key: i, className: "pl-3 py-0.5 border-l-2 border-[#E4D3A8] text-sm leading-relaxed " + th.txt },
+              it.text,
+              React.createElement(Src, { src: it.src, th })
             )
+          )
+        )
       );
     })
   );
@@ -98,7 +91,7 @@ function Bullets({ items, th = NEUTRAL }) {
 function NowBadge({ exact }) {
   return React.createElement(
     "span",
-    { className: "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap " + (exact ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600") },
+    { className: "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap " + (exact ? "bg-[#F7EEDB] text-[#8A6A1F] border border-[#E4D3A8]" : "bg-slate-100 text-slate-500") },
     exact ? "এখন" : "পরের সময়"
   );
 }
@@ -204,11 +197,11 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
               onClick: () => pick(s.id),
               "aria-pressed": active,
               "data-sel": active ? "1" : undefined,
-              className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all duration-200 " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff + (reveal ? "" : " opacity-0")),
+              className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all duration-200 " + (active ? "font-bold shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff + (reveal ? "" : " opacity-0")),
             },
-            React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: active ? "text-white" : "text-emerald-700" }),
+            React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: "text-emerald-700" }),
             s.title,
-            now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
+            now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + "bg-emerald-600", "aria-label": "এখনকার সময়" })
           );
         }),
         React.createElement("span", { className: "shrink-0 w-[38%]", "aria-hidden": true })
@@ -225,27 +218,27 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
       React.createElement(
         "div",
         { className: "flex items-center gap-2.5 min-w-0" },
-        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, React.createElement(SlotIcon, { id: slot.id, emoji: slot.icon, size: 22 })),
+        React.createElement("span", { className: "w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, React.createElement(SlotIcon, { id: slot.id, emoji: slot.icon, size: 20 })),
         React.createElement(
           "div",
           { className: "min-w-0" },
           React.createElement(
             "div",
             { className: "flex items-center gap-1.5 flex-wrap" },
-            React.createElement("span", { className: "text-base font-bold " + th.title }, slot.title),
+            React.createElement("span", { className: "text-[15px] font-bold " + th.title }, slot.title),
             isNowSlot && React.createElement(NowBadge, { exact })
           ),
-          React.createElement("span", { className: "inline-block mt-0.5 text-[11px] font-semibold rounded-full px-2 py-0.5 whitespace-nowrap " + th.time }, rangeLabel(slot, toBn))
+          React.createElement("span", { className: "block mt-0.5 text-[11px] font-medium text-slate-500 whitespace-nowrap" }, rangeLabel(slot, toBn))
         )
       ),
       isCreator && !editing && React.createElement("button", { type: "button", onClick: () => setEditing(true), "aria-label": "সম্পাদনা", className: "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 " + th.edit }, React.createElement(EditIcon, { size: 16 }))
     ),
     React.createElement(Bullets, { items: shown, th }),
-    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-1 min-h-[44px] inline-flex items-center text-xs font-semibold underline " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)"),
+    hasMore && React.createElement("button", { type: "button", onClick: () => setMore(!more), "aria-expanded": more, className: "mt-3 min-h-[44px] inline-flex items-center px-4 rounded-full border border-emerald-200 bg-white/70 text-xs font-semibold " + th.link }, more ? "কম দেখুন" : "আরও দেখুন (" + toBn(slot.items.length - PREVIEW) + "টি)"),
     React.createElement(
       "div",
-      { className: "mt-2 pt-1 border-t border-slate-100" },
-      React.createElement("p", { className: "mt-2 text-[11px] text-slate-400" }, (waqtOn ? "সময়ভাগ আপনার সেভ-করা লোকেশনের নামাজের ওয়াক্ত অনুযায়ী। " : "") + "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
+      { className: "mt-3 pt-1 border-t border-[#EFE3C4]" },
+      React.createElement("p", { className: "mt-2 text-[10px] leading-snug text-slate-400/80" }, (waqtOn ? "সময়ভাগ আপনার সেভ-করা লোকেশনের নামাজের ওয়াক্ত অনুযায়ী। " : "") + "সূত্র সহিহ হাদিসগ্রন্থ থেকে; আমলের মাসআলায় প্রশ্ন থাকলে আলেমের পরামর্শ নিন।")
     )
   );
 }
