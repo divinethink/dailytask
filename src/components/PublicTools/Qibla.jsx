@@ -84,18 +84,29 @@ export function Qibla() {
   // সরাসরি লাইভ কিবলা (owner-request ১৫ নভেম্বর ২০২৬): যেসব ডিভাইসে অনুমতির ধাপ নেই(Android Chrome ইত্যাদি)
   // সেখানে পাতা খুললেই কম্পাস চালু। iOS 13+-এ requestPermission বাটন-ট্যাপ ছাড়া চলে না(ব্রাউজারের
   // নিয়ম), তাই শুধু সেখানে বাটন থাকে। সেন্সর সাড়া না দিলে ৪ সেকেন্ড পরে স্থির কোণে ফেরে।
+  // নতুন ব্রাউজারে(Chrome সহ) requestPermission থাকতে পারে, তাই আর "আছে কি নেই" দেখে বাদ দেওয়া হয় না:
+  // সবসময় আগে নিজে থেকে চালু চেষ্টা। অনুমতির ফাংশন থাকলে চুপচাপ একবার চাওয়া হয়
+  // (iOS-এ ট্যাপ ছাড়া ব্যর্থ হলে কিছু হয় না) — না পেলে শুধু বাটন থাকে, ভুল-বার্তা নয়।
+  const [needsTap, setNeedsTap] = useState(false);
   useEffect(() => {
     const DOE = window.DeviceOrientationEvent;
-    if (DOE && typeof DOE.requestPermission !== "function") setCompassActive(true);
+    if (!DOE) return;
+    setCompassActive(true);
+    if (typeof DOE.requestPermission === "function") {
+      setNeedsTap(true);
+      try {
+        DOE.requestPermission().then(() => {}).catch(() => {});
+      } catch (e) { /* best-effort */ }
+    }
   }, []);
   useEffect(() => {
     if (!compassActive || heading != null) return undefined;
     const tm = setTimeout(() => {
       setCompassActive(false);
-      setCompassError("সেন্সর থেকে দিক পাওয়া যায়নি — নিচের স্থির কোণ ব্যবহার করুন");
+      if (!needsTap) setCompassError("সেন্সর থেকে দিক পাওয়া যায়নি — নিচের স্থির কোণ ব্যবহার করুন");
     }, 4000);
     return () => clearTimeout(tm);
-  }, [compassActive, heading]);
+  }, [compassActive, heading, needsTap]);
 
   function requestCompassAccess() {
     setCompassError(null);

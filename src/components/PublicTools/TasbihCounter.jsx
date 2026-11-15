@@ -87,7 +87,7 @@ export function TasbihCounter() {
         onClick: handleTap,
         "aria-label": "তাসবীহ গণনা করুন",
         className: "relative rounded-full flex items-center justify-center active:scale-[0.97] transition-transform select-none",
-        style: { width: "clamp(104px, 14vh, 132px)", height: "clamp(104px, 14vh, 132px)", background: "#F4F7F1", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" },
+        style: { width: "clamp(112px, 17vh, 140px)", height: "clamp(112px, 17vh, 140px)", background: "#F4F7F1", WebkitTapHighlightColor: "transparent", touchAction: "manipulation" },
       },
       React.createElement(
         "svg",
