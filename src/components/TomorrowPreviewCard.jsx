@@ -104,7 +104,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
   const [extras, setExtras] = React.useState({ items: [], sleepText: "", overrides: {} });
   const [editing, setEditing] = React.useState(false);
-  const [showRoutine, setShowRoutine] = React.useState(false); // সাধারণ(রোজকার) তথ্য ডিফল্টে ভাঁজ করা
+  const [showRoutine, setShowRoutine] = React.useState(true); // সাধারণ(রোজকার) তথ্য ডিফল্টে খোলা(১৫ নভেম্বর ২০২৬, owner-requested); ভাঁজ করা যায়
   React.useEffect(() => {
     let alive = true;
     fetchSection(EXTRAS_SECTION_ID).then((d) => { if (alive) setExtras(normalizeExtras(d)); });
