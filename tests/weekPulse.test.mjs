@@ -103,3 +103,9 @@ test("ঘাটতি কার্ড মোছা: পুরনো সেভ-�
   assert.ok(!out.some(c => c.id === "weeklyGaps"));
   assert.equal(out.find(c => c.id === "trend").visible, false);
 });
+
+test("আজকের ফোকাস কার্ড মোছা: সেভ-করা লেআউটে 'focus' থাকলে বাদ, 'weekPulse' ও বাকি অক্ষত", () => {
+  const saved = [{ id: "streak", visible: true, fold: "fixed" }, { id: "focus", visible: true, fold: "fixed" }, { id: "weekPulse", visible: true, fold: "fixed" }];
+  const out = sanitizeCards("below", saved).map(c => c.id);
+  assert.ok(!out.includes("focus")); assert.ok(out.includes("weekPulse")); assert.ok(out.includes("streak"));
+});

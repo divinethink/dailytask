@@ -127,7 +127,6 @@ import { selectDailyInsight, suggestTomorrowFocus } from "./dailyInsight.js";
 import { DailyInsightCard } from "../components/DailyInsightCard.jsx";
 // §Motivational Layer — Phase 2(নতুন, owner-approved): "আগামীকালের Focus"
 // — DailyInsightCard থেকে ইচ্ছাকৃতভাবে আলাদা component(isolated rollback)।
-import { TomorrowFocusPicker } from "../components/TomorrowFocusPicker.jsx";
 import { TomorrowPreviewCard } from "../components/TomorrowPreviewCard.jsx";
 import { GoogleAccountModal } from "../components/GoogleAccountModal.jsx";
 // §Guest-mode Sign-in popover(2_4 §২)ও Invite-Link Join(§৫.২)-এ reuse হয়।
@@ -1777,15 +1776,6 @@ function App() {
     tomorrow: () => /*#__PURE__*/React.createElement(TomorrowPreviewCard, {
     toBn: toBn,
     todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })()
-  }),
-    focus: () => /*#__PURE__*/React.createElement(TomorrowFocusPicker, {
-    member: selectedMember,
-    allFields: allFields,
-    tomorrowKey: tomorrowKey,
-    suggestedFieldKey: suggestedFocusKey,
-    suggestedTodayKey: suggestedTodayFocusKey,
-    todaySaved: (() => { const n = new Date(); return n.getFullYear() === monthCursor.year && n.getMonth() === monthCursor.month0 ? !!(monthEntries && monthEntries[pad2(n.getDate())]) : true; })(),
-    onSave: (focus) => saveTomorrowFocus(migrationState, selectedId, focus)
   }),
     monthly: () => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: swipeShiftMonth, monthCursor: monthCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(MonthlyOverviewSection, {
     allFields: allFields,

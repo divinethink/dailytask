@@ -55,7 +55,7 @@ export function homeEntryCards(member, nodes) {
 }
 
 // সেভ-বাটনের নিচের সেকশন। weekly/meeting/monthlyReport/trend-এর নিজস্ব accordion আছে(fold prop নেয়); বাকিগুলো FoldWrap-এ।
-const PX_WRAPPED = { streak: true, insight: true, focus: true, tomorrow: true, weekPulse: true };
+const PX_WRAPPED = { streak: true, insight: true, tomorrow: true, weekPulse: true };
 export function renderHomeBelow(member, nodes) {
   const out = [];
   sanitizeLayout(effectiveHomeLayout(member)).below.forEach(c => {

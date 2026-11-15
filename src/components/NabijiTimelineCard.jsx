@@ -11,19 +11,37 @@ import { NABIJI_SECTION_ID, DEFAULT_SLOTS, normalizeSlots, slotAtMin, applyWaqt,
 import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
 import { fetchDailyPrayerTimes, peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
 import { NabijiTimelineEditor } from "./NabijiTimelineEditor.jsx";
-import { EditIcon, ChevronDown } from "./icons.jsx";
+import { EditIcon, ChevronDown, Icon } from "./icons.jsx";
 
 const PREVIEW = 3;
-// শান্ত একরঙা থিম (owner-approved ১৫ নভেম্বর ২০২৬): সব সময়ভাগে একই হালকা রং — অ্যাপের থিম-কালারের emerald স্কেল অনুসারে বদলায়।
-// আইকন (emoji) হালকা/ধূসরাভ করা (grayscale+opacity), যাতে কার্ড চোখে না লাগে। অচেনা/ক্রিয়েটরের নতুন সময়ভাগও একই।
+// হালকা একরঙা থিম (owner-approved ১৫ নভেম্বর ২০২৬): সব সময়ভাগে একই — অ্যাপের থিম-কালারের emerald স্কেল অনুসারে বদলায়।
+// কার্ডে পাতলা টিন্ট-ভরাট + বর্ডারের চারপাশে হালকা আভা (ring); আইকন নেভ-বারের মতো আউটলাইন SVG, থিম-অ্যাকসেন্ট রঙে।
+// ডিফল্ট সময়ভাগের আইকন SVG; ক্রিয়েটরের নতুন/অচেনা সময়ভাগ = তার emoji (হালকা)।
 const CALM = {
-  card: "from-emerald-50/50 to-white border-emerald-100", glow: "shadow-sm",
-  chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-slate-200 text-slate-600",
-  txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-300", title: "text-slate-900",
-  time: "bg-emerald-50 text-emerald-800", icon: "bg-emerald-50", link: "text-emerald-800", edit: "text-slate-600"
+  card: "from-emerald-50 to-emerald-50 border-emerald-200 ring-4 ring-emerald-100", glow: "shadow-sm",
+  chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-emerald-200 text-emerald-900",
+  txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-400", title: "text-slate-900",
+  time: "bg-white text-emerald-800", icon: "bg-emerald-100 text-emerald-800", link: "text-emerald-800", edit: "text-emerald-800"
 };
 const ICON_SOFT = " grayscale opacity-70";
 const themeOf = () => CALM;
+const P = (d, k) => React.createElement("path", { d, key: k });
+const SVG_ICONS = {
+  s_lastNight: () => [P("M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z", 1)],
+  s_fajr: () => ["M12 2v8", "m4.93 10.93 1.41 1.41", "M2 18h2", "M20 18h2", "m19.07 10.93-1.41 1.41", "M22 22H2", "m8 6 4-4 4 4", "M16 18a4 4 0 0 0-8 0"].map(P),
+  s_duha: () => [React.createElement("circle", { cx: 12, cy: 12, r: 4, key: "c" }), ...["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41"].map(P)],
+  s_work: () => [React.createElement("rect", { x: 2, y: 7, width: 20, height: 14, rx: 2, key: "r" }), P("M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16", 2)],
+  s_afternoon: () => [P("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", 1), React.createElement("circle", { cx: 9, cy: 7, r: 4, key: "c" }), P("M22 21v-2a4 4 0 0 0-3-3.87", 3), P("M16 3.13a4 4 0 0 1 0 7.75", 4)],
+  s_asr: () => [React.createElement("circle", { cx: 12, cy: 12, r: 3, key: "c" }), ...["M12 3v2", "M12 19v2", "M3 12h2", "M19 12h2", "m5.6 5.6 1.4 1.4", "m17 17 1.4 1.4", "m5.6 18.4 1.4-1.4", "m17 7 1.4-1.4"].map(P)],
+  s_maghrib: () => ["M12 10V2", "m4.93 10.93 1.41 1.41", "M2 18h2", "M20 18h2", "m19.07 10.93-1.41 1.41", "M22 22H2", "m16 6-4 4-4-4", "M16 18a4 4 0 0 0-8 0"].map(P),
+  s_isha: () => ["M18 5h4", "M20 3v4", "M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"].map(P),
+  s_sleep: () => ["M2 4v16", "M2 8h18a2 2 0 0 1 2 2v10", "M2 17h20", "M6 8v9"].map(P)
+};
+function SlotIcon({ id, emoji, size, className }) {
+  const draw = SVG_ICONS[id];
+  if (!draw) return React.createElement("span", { "aria-hidden": true, className: ICON_SOFT.trim() }, emoji);
+  return React.createElement(Icon, { size, className }, draw());
+}
 const NEUTRAL = { txt: "text-slate-700", src: "text-slate-500", dot: "bg-slate-300" };
 // বিষয়(cat) ধরে গ্রুপ: প্রথম দেখা-ক্রমে; বিষয়হীন বুলেট আলাদা গ্রুপে(শিরোনাম ছাড়া)
 function groupItems(items) {
@@ -179,7 +197,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
             "data-sel": active ? "1" : undefined,
             className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff),
           },
-          React.createElement("span", { "aria-hidden": true, className: active ? "" : ICON_SOFT.trim() }, s.icon),
+          React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: active ? "text-white" : "text-emerald-700" }),
           s.title,
           now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
         );
@@ -193,7 +211,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
       React.createElement(
         "div",
         { className: "flex items-center gap-2.5 min-w-0" },
-        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon + ICON_SOFT, "aria-hidden": true }, slot.icon),
+        React.createElement("span", { className: "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xl " + th.icon, "aria-hidden": true }, React.createElement(SlotIcon, { id: slot.id, emoji: slot.icon, size: 22 })),
         React.createElement(
           "div",
           { className: "min-w-0" },

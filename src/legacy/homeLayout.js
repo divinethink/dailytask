@@ -31,7 +31,6 @@ export const CARD_DEFS = {
   below: [
     d("streak", "স্ট্রিক ও আজকের অগ্রগতি", "fixed"),
     d("insight", "দৈনিক অন্তর্দৃষ্টি", "fixed"),
-    d("focus", "আগামীকালের ফোকাস", "fixed"),
     d("monthly", "মাসিক ওভারভিউ", "fixed"),
     d("tomorrow", "আগামীকাল", "fixed"),
     d("weekPulse", "এ সপ্তাহের ফোকাস", "fixed"),
