@@ -10,6 +10,7 @@
 import { ChevronLeft } from "../icons.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
 import { useBackLayer } from "../../legacy/backNav.js";
+import { ReaderTitleContext } from "./readerContext.js";
 import { ToolGridSection, PageHeader, VerseCard, DetailHeader } from "./ToolGrid.jsx";
 import { Qibla } from "./Qibla.jsx";
 import { MonthlyPrayerSchedule } from "./MonthlyPrayerSchedule.jsx";
@@ -182,7 +183,7 @@ export function PublicToolsShell({ tabLayout } = {}) {
         { className: "px-4 pb-4" },
         /*#__PURE__*/React.createElement(DetailHeader, { icon: view.tool.icon, title: view.tool.label }),
         ActiveComponent
-          ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+          ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.tool.label }, /*#__PURE__*/React.createElement(ActiveComponent, null))
           : /*#__PURE__*/React.createElement(
               "div",
               { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },
@@ -215,7 +216,7 @@ export function PublicToolsShell({ tabLayout } = {}) {
           { className: "px-4 pb-4" },
           /*#__PURE__*/React.createElement(DetailHeader, { icon: view.item.icon, title: view.item.label, subtitle: cat.label }),
           ActiveComponent
-            ? /*#__PURE__*/React.createElement(ActiveComponent, null)
+            ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.item.label }, /*#__PURE__*/React.createElement(ActiveComponent, null))
             : /*#__PURE__*/React.createElement(
                 "div",
                 { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },

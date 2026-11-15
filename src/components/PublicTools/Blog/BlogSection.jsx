@@ -15,6 +15,8 @@ import {
 } from "../../../legacy/blogData.js";
 import { MenuIcon, X, EditIcon, Trash, ChevronLeft, Loader2 } from "../../icons.jsx";
 import { BlogForm } from "./BlogForm.jsx";
+import { SectionReader } from "../SectionReader.jsx";
+import { postText, readerKey } from "../../../legacy/readerCore.js";
 import { BlogWriterAdmin } from "./BlogWriterAdmin.jsx";
 
 const { useState, useEffect } = React;
@@ -101,82 +103,23 @@ export function BlogSection({ onBack }) {
     });
   }
 
+  // পোস্ট খুললে সরাসরি রিডিং মোড (আলাদা বোতাম নেই)। এডিট/মুছুন ⋮ মেনুতে (শুধু অনুমোদিত লেখক/Creator)।
   if (view === "detail" && selectedPost) {
     const canEdit = canEditPost(selectedPost);
-    const { preview, rest, hasMore } = splitByMoreMarker(selectedPost.body);
-    const expanded = !!expandedPost[selectedPost.id];
-    return /*#__PURE__*/React.createElement(
-      "div",
-      { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "flex items-center justify-between px-4 pt-4 pb-2" },
-        /*#__PURE__*/React.createElement(
-          "button",
-          { type: "button", onClick: backToList, className: "flex items-center gap-1 text-sm font-semibold text-emerald-950" },
-          /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
-          "ব্লগ"
-        ),
-        canEdit &&
-          /*#__PURE__*/React.createElement(
-            "div",
-            { className: "flex items-center gap-3" },
-            /*#__PURE__*/React.createElement(
-              "button",
-              {
-                type: "button",
-                onClick: () => {
-                  setEditingPost(selectedPost);
-                  setView("form");
-                },
-              },
-              /*#__PURE__*/React.createElement(EditIcon, { size: 16, color: "#8A9A8F" })
-            ),
-            /*#__PURE__*/React.createElement(
-              "button",
-              { type: "button", onClick: () => handleDelete(selectedPost) },
-              /*#__PURE__*/React.createElement(Trash, { size: 16, color: "#D64545" })
-            )
-          )
-      ),
-      /*#__PURE__*/React.createElement(
-        "div",
-        { className: "mx-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4" },
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "text-xs font-semibold mb-1", style: { color: "var(--theme-accent, #C89B3C)" } },
-          "#" + selectedPost.category
-        ),
-        /*#__PURE__*/React.createElement(
-          "h2",
-          { className: "text-lg font-bold text-emerald-950 mb-2", style: { fontFamily: "'Noto Serif Bengali', serif" } },
-          selectedPost.title
-        ),
-        /*#__PURE__*/React.createElement(
-          "div",
-          { className: "text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" },
-          hasMore && !expanded ? preview : hasMore ? preview + "\n\n" + rest : preview
-        ),
-        hasMore &&
-          !expanded &&
-          /*#__PURE__*/React.createElement(
-            "button",
-            {
-              type: "button",
-              onClick: () => setExpandedPost((s) => ({ ...s, [selectedPost.id]: true })),
-              className: "mt-2 text-sm font-semibold",
-              style: { color: "var(--theme-primary, #0E4B43)" },
-            },
-            "আরো পড়ুন"
-          ),
-        selectedPost.sourceNote &&
-          /*#__PURE__*/React.createElement(
-            "div",
-            { className: "mt-4 text-xs text-slate-500" },
-            "সূত্র: " + selectedPost.sourceNote
-          )
-      )
-    );
+    return /*#__PURE__*/React.createElement(SectionReader, {
+      title: selectedPost.title,
+      text: postText(selectedPost),
+      storeKey: readerKey("blog_" + selectedPost.id),
+      badge: "#" + selectedPost.category,
+      sourceNote: selectedPost.sourceNote,
+      onClose: backToList,
+      canManage: canEdit,
+      onEdit: () => {
+        setEditingPost(selectedPost);
+        setView("form");
+      },
+      onTrash: () => handleDelete(selectedPost),
+    });
   }
 
   // --- list view ---

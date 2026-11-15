@@ -141,6 +141,20 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // --- রিডিং-মোডের হাইলাইট/আন্ডারলাইন (ব্যক্তিগত): users/{uid}/readerMarks/{key} ---
+    // শুধু নিজ uid। Rules-এ list-iteration নেই, তাই প্রতিটা মার্কের ভেতরটা client sanitize করে
+    // (readerCore.sanitizeMarks); Rules শুধু ফিল্ড-সীমা ও তালিকার আকার (≤৩০০) বাঁধে।
+    match /users/{uid}/readerMarks/{key} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['v', 'marks', 'updatedAt'])
+        && request.resource.data.v == 1
+        && request.resource.data.marks is list
+        && request.resource.data.marks.size() <= 300
+        && request.resource.data.updatedAt is number
+        && key.size() <= 100;
+    }
+
     // --- §Google-Login Identity Migration(2_4 §3/§10.2): familyMemberEmails ---
     // Uniqueness-enforcing collection: doc-id = normalizeEmail(email)(trim+
     // lowercase, 2_4 §১০.২ — client এই একই normalization প্রয়োগ করেই doc-id

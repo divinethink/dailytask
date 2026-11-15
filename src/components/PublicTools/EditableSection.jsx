@@ -12,6 +12,9 @@
 import { isCreatorAuth } from "../../legacy/familyIdentity.js";
 import { EditIcon, Trash } from "../icons.jsx";
 import { GripIcon } from "./ToolIcons.jsx";
+import { SectionReader } from "./SectionReader.jsx";
+import { ReaderTitleContext } from "./readerContext.js";
+import { flattenAccordion, flattenRichtext, flattenTable, itemsHashKey, readerKey } from "../../legacy/readerCore.js";
 import { useDragReorder } from "./dragReorder.js";
 import {
   fetchSection,
@@ -69,11 +72,26 @@ function SaveCancelRow({ onSave, onCancel, busy }) {
   );
 }
 
-export function EditableSection({ sectionId, format, defaultContent, filterItems }) {
-  const isCreator = isCreatorAuth();
+// রিডিং-মোড: প্রতিটা সেকশনের ওপরে "📖 পড়ুন" — বর্তমান কনটেন্ট (ডিফল্ট বা App Creator-এর এডিট করা)
+// একটা টেক্সটে সাজিয়ে SectionReader-এ খোলে। কনটেন্ট/ডেটা বদলায় না।
+function readerSource(sectionId, format, defaultContent, filterItems, doc) {
+  if (format === "richtext") {
+    const body = doc && doc.richtext && typeof doc.richtext.body === "string" ? doc.richtext.body : defaultContent || "";
+    return { text: flattenRichtext(body), key: sectionId };
+  }
+  if (format === "table") {
+    const t = doc && doc.table && Array.isArray(doc.table.columns) && Array.isArray(doc.table.rows) ? doc.table : defaultContent || { columns: [], rows: [] };
+    return { text: flattenTable(t), key: sectionId };
+  }
+  const items = doc && doc.accordion && Array.isArray(doc.accordion.items) ? doc.accordion.items : defaultContent || [];
+  const shown = filterItems ? filterItems(items) : items;
+  return { text: flattenAccordion(shown), key: filterItems ? sectionId + "_" + itemsHashKey(shown) : sectionId };
+}
+
+export function EditableSection({ sectionId, format, defaultContent, filterItems, readerTitle }) {
   const [doc, setDoc] = useState(null); // fetched raw Firestore data, null = none/not-yet
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
+  const ctxTitle = React.useContext(ReaderTitleContext);
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +102,41 @@ export function EditableSection({ sectionId, format, defaultContent, filterItems
       alive = false;
     };
   }, [sectionId]);
+
+  const src = readerSource(sectionId, format, defaultContent, filterItems, doc);
+  return /*#__PURE__*/React.createElement(
+    React.Fragment,
+    null,
+    src.text.trim() &&
+      /*#__PURE__*/React.createElement(
+        "div",
+        { className: "flex justify-end mb-2" },
+        /*#__PURE__*/React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => setReading(true),
+            className: "px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white",
+            style: { color: PRIMARY },
+          },
+          "📖 পড়ুন"
+        )
+      ),
+    /*#__PURE__*/React.createElement(EditableSectionBody, { sectionId, format, defaultContent, filterItems, doc, setDoc }),
+    reading &&
+      /*#__PURE__*/React.createElement(SectionReader, {
+        title: readerTitle || ctxTitle || "পড়ার মোড",
+        text: src.text,
+        storeKey: readerKey(src.key),
+        onClose: () => setReading(false),
+      })
+  );
+}
+
+function EditableSectionBody({ sectionId, format, defaultContent, filterItems, doc, setDoc }) {
+  const isCreator = isCreatorAuth();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function withBusy(fn) {
     setBusy(true);
