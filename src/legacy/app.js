@@ -111,6 +111,7 @@ import { GoogleRelinkGate } from "../components/GoogleRelinkGate.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
 import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
 import { WeeklyGapOverview } from "../components/WeeklyGapOverview.jsx";
+import { WeeklyPulseCard } from "../components/WeeklyPulseCard.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
 import { useCursorEntries } from "./useCursorEntries.js";
@@ -1876,6 +1877,19 @@ function App() {
     BN_MONTHS: BN_MONTHS,
     onSendToMeeting: handleSendToMeeting
   })),
+    weekPulse: () => /*#__PURE__*/React.createElement(WeeklyPulseCard, {
+    migrationState: migrationState,
+    memberId: selectedId,
+    member: selectedMember,
+    locked: isLockedForThisDevice,
+    liveMonth: monthCursor,
+    liveEntries: monthEntries,
+    allFields: allFields,
+    fieldApplies: fieldApplies,
+    isExcused: isExcused,
+    isFieldExcusable: isFieldExcusable,
+    toBn: toBn
+  }),
     weekly: fold => /*#__PURE__*/React.createElement(SwipeMonth, { onShift: reviewShiftMonth, monthCursor: reviewCursor, label: swipeMonthLabel }, /*#__PURE__*/React.createElement(WeeklyReviewSection, {
     fold: fold,
     onShiftMonth: reviewShiftMonth,
