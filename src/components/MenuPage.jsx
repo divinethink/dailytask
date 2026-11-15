@@ -10,6 +10,7 @@
 // বাটন — বাকি সব content(family username/সদস্য/ডেটা ম্যানেজমেন্ট ইত্যাদি) hidden।
 import { BookIcon, CalIcon, ChevronRight, ClockIcon, CopyIcon, DownloadIcon, EditIcon, HomeIcon, MenuIcon, MessageSquare, ShareIcon, UploadIcon, GoogleGIcon } from "./icons.jsx";
 import { MemberListSection } from "./MemberListSection.jsx";
+import { NotificationSettingsCard } from "./NotificationSettingsCard.jsx";
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection, saveRichtext } from "../legacy/editableContent.js";
 
@@ -308,6 +309,8 @@ export function MenuPage({
               onClick: async () => { try { await handleShareInviteLink(); } catch {} }
             })
           ),
+          // ২.৫) নোটিফিকেশন সেটিং(১৫ নভেম্বর ২০২৬, প্রতি-ডিভাইস; নতুন Firestore লেখা নেই)
+          h(NotificationSettingsCard, { uid: auth && auth.currentUser ? auth.currentUser.uid : null }),
           // ৩) ডেটা ম্যানেজমেন্ট(৩-কলাম টাইল-গ্রিড)
           h(SectionLabel, null, "ডেটা ম্যানেজমেন্ট"),
           h(
