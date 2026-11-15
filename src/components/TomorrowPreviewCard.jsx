@@ -11,7 +11,7 @@ import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
 import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor, builtinId, applyOverrides, splitBullets, DAILY_AMOL, SLEEP_EXTRA } from "./tomorrowExtras.js";
 import { TomorrowExtrasEditor } from "./TomorrowExtrasEditor.jsx";
-import { EditIcon } from "./icons.jsx";
+import { EditIcon, ChevronDown } from "./icons.jsx";
 
 const DEFAULT_SLEEP = "ওজু করে আয়াতুল কুরসি, তিন কুল ও তাসবিহে ফাতিমা (৩৩-৩৩-৩৪) পড়ে নিন।";
 
@@ -104,6 +104,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
   const [extras, setExtras] = React.useState({ items: [], sleepText: "", overrides: {} });
   const [editing, setEditing] = React.useState(false);
+  const [showRoutine, setShowRoutine] = React.useState(false); // সাধারণ(রোজকার) তথ্য ডিফল্টে ভাঁজ করা
   React.useEffect(() => {
     let alive = true;
     fetchSection(EXTRAS_SECTION_ID).then((d) => { if (alive) setExtras(normalizeExtras(d)); });
@@ -120,12 +121,12 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
     if (fl) notes.push({ tone: "time", icon: "⏱️", title: isTomorrow ? "কালকের রোজার সময়" : "আজকের রোজার সময়", text: fl });
   }
   extrasFor(extras, date.getDay()).forEach((n) => notes.push(n));
-  notes.push({ tone: "ibadat", icon: "🌿", title: "প্রতিদিনের আমল", bullets: DAILY_AMOL });
-  history.forEach((t) => notes.push({ tone: "history", icon: "📜", title: isTomorrow ? "ইতিহাসের পাতায় কাল" : "ইতিহাসের পাতায় আজ", text: t }));
+  // সাধারণ তথ্য(প্রতিদিনের আমল, ইতিহাস, ঘুমের আগে) আলাদা ভাঁজযোগ্য অংশে; বিশেষ দিনের তথ্য(notes) সবসময় খোলা।
+  const routine = [{ tone: "ibadat", icon: "🌿", title: "প্রতিদিনের আমল", bullets: DAILY_AMOL }];
+  history.forEach((t) => routine.push({ tone: "history", icon: "📜", title: isTomorrow ? "ইতিহাসের পাতায় কাল" : "ইতিহাসের পাতায় আজ", text: t }));
   const ms = nextMilestone(date);
-  const hasMore = notes.length > 0;
   const sleepBase = splitBullets(extras.sleepText || DEFAULT_SLEEP);
-  const sleep = { tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", bullets: [...(sleepBase.length ? sleepBase : [extras.sleepText || DEFAULT_SLEEP]), SLEEP_EXTRA] };
+  routine.push({ tone: "sleep", icon: "🛏️", title: "ঘুমের আগে", bullets: [...(sleepBase.length ? sleepBase : [extras.sleepText || DEFAULT_SLEEP]), SLEEP_EXTRA] });
 
   return React.createElement(
     "div",
@@ -150,9 +151,15 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
     React.createElement(
       "ul",
       { className: "space-y-2" },
-      notes.map((n, i) => React.createElement(Row, { key: i, n })),
-      React.createElement(Row, { key: "sleep", n: sleep, muted: hasMore })
+      notes.map((n, i) => React.createElement(Row, { key: i, n }))
     ),
+    React.createElement(
+      "button",
+      { type: "button", onClick: () => setShowRoutine((v) => !v), "aria-expanded": showRoutine, className: "w-full min-h-[44px] flex items-center justify-between gap-2 rounded-xl border border-[#EBD9A8] bg-[#FFFBF0] px-3 text-xs font-semibold text-[#8A6A1C]" + (notes.length ? " mt-2" : "") },
+      React.createElement("span", null, "🌿 প্রতিদিনের আমল, ইতিহাস ও ঘুমের আগে (" + toBn(routine.length) + ")"),
+      React.createElement(ChevronDown, { size: 15, color: "#8A6A1C", className: "transition-transform" + (showRoutine ? " rotate-180" : "") })
+    ),
+    showRoutine && React.createElement("ul", { className: "space-y-2 mt-2" }, routine.map((n, i) => React.createElement(Row, { key: "r" + i, n, muted: n.tone === "sleep" }))),
     ms && React.createElement(
       "div",
       { className: "mt-3 flex items-center justify-center" },

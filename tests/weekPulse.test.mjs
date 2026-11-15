@@ -78,10 +78,12 @@ test("weekPulse: clip", () => {
   assert.equal(clip("abcdefghij", 5).length, 5);
 });
 
-test("weekPulse কার্ড: পুরনো সেভ-করা লেআউটে 'weekly'-র ঠিক আগে বসে; ডিফল্টে স্থির", () => {
+test("weekPulse কার্ড: পুরনো সেভ-করা লেআউটে 'monthly'-র ঠিক পরে বসে(ডিফল্ট ক্রম: মাসিক ওভারভিউ → সপ্তাহের ফোকাস → আজ/আগামীকাল → সাপ্তাহিক); ডিফল্টে স্থির", () => {
   const saved = defaultCards("below").filter(c => c.id !== "weekPulse");
   const out = sanitizeCards("below", saved).map(c => c.id);
-  assert.equal(out.indexOf("weekPulse") + 1, out.indexOf("weekly"));
+  assert.equal(out.indexOf("weekPulse"), out.indexOf("monthly") + 1);
+  const dflt = defaultCards("below").map(c => c.id);
+  assert.deepEqual(dflt.slice(dflt.indexOf("monthly"), dflt.indexOf("weekly") + 1), ["monthly", "weekPulse", "tomorrow", "weekly"]);
   assert.equal(defaultCards("below").find(c => c.id === "weekPulse").fold, "fixed");
 });
 

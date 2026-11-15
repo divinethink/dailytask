@@ -18,7 +18,7 @@ const PREVIEW = 3;
 // কার্ডে পাতলা টিন্ট-ভরাট + বর্ডারের চারপাশে হালকা আভা (ring); আইকন নেভ-বারের মতো আউটলাইন SVG, থিম-অ্যাকসেন্ট রঙে।
 // ডিফল্ট সময়ভাগের আইকন SVG; ক্রিয়েটরের নতুন/অচেনা সময়ভাগ = তার emoji (হালকা)।
 const CALM = {
-  card: "from-emerald-50 to-emerald-50 border-emerald-200 ring-4 ring-emerald-100", glow: "shadow-sm",
+  card: "bg-white border-[#E4D3A8] ring-4 ring-[#F7EEDB]", glow: "shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)]",
   chipOn: "from-emerald-700 to-emerald-800", chipOff: "bg-white border-emerald-200 text-emerald-900",
   txt: "text-slate-800", src: "text-slate-500", dot: "bg-emerald-400", title: "text-slate-900",
   time: "bg-white text-emerald-800", icon: "bg-emerald-100 text-emerald-800", link: "text-emerald-800", edit: "text-emerald-800"
@@ -109,6 +109,8 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const [openCard, setOpenCard] = React.useState(fold === "open");
   const [more, setMore] = React.useState(false);
   const [sel, setSel] = React.useState(null); // null = এখনকার সময়ভাগ অনুসরণ
+  const [reveal, setReveal] = React.useState(false); // সোয়াইপ/ফোকাসে পাশের চিপ দেখায়; ২.৫ সেকেন্ড পর আবার লুকায়
+  const revealT = React.useRef(null);
   const [nowMin, setNowMin] = React.useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   const [timings, setTimings] = React.useState(null);
   const stripRef = React.useRef(null);
@@ -152,6 +154,9 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     if (box && el) box.scrollLeft = el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2;
   }, [sel, nowMin, view]);
 
+  React.useEffect(() => () => clearTimeout(revealT.current), []);
+  const peek = () => { setReveal(true); clearTimeout(revealT.current); revealT.current = setTimeout(() => setReveal(false), 2500); };
+
   const hit = slotAtMin(view, nowMin);
   if (!hit) return null;
   const { exact } = hit;
@@ -165,7 +170,7 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
   const pick = (id) => { setSel(id === nowId ? null : id); setMore(false); };
 
   const foldable = fold === "open" || fold === "closed";
-  const rootCls = "rounded-2xl p-4 border bg-gradient-to-b " + th.card + " " + th.glow;
+  const rootCls = "rounded-2xl p-4 border " + th.card + " " + th.glow;
   const titleEl = foldable
     ? React.createElement(
         "button",
@@ -180,28 +185,37 @@ export function NabijiTimelineCard({ toBn, fold = "fixed" }) {
     "div",
     { className: rootCls },
     titleEl,
-    // সময়ের চিপ-স্ট্রিপ
+    // সময়ের চিপ-স্ট্রিপ: শুধু নির্বাচিত চিপ দেখা যায়, পাশেরগুলো অদৃশ্য — সোয়াইপ/ফোকাস করলে দেখা যায়(২.৫ সেকেন্ড পর আবার লুকায়)
     React.createElement(
       "div",
-      { ref: stripRef, className: "relative flex gap-2 overflow-x-auto -mx-1 px-1 pb-2 mb-3", style: { scrollbarWidth: "none" } },
-      view.map((s) => {
-        const active = s.id === slot.id;
-        const now = exact && s.id === nowId;
-        return React.createElement(
-          "button",
-          {
-            key: s.id,
-            type: "button",
-            onClick: () => pick(s.id),
-            "aria-pressed": active,
-            "data-sel": active ? "1" : undefined,
-            className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff),
-          },
-          React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: active ? "text-white" : "text-emerald-700" }),
-          s.title,
-          now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
-        );
-      })
+      { className: "relative mb-3" },
+      React.createElement(
+        "div",
+        { ref: stripRef, onTouchStart: peek, onPointerDown: peek, onWheel: peek, onFocus: peek, className: "relative flex gap-2 overflow-x-auto -mx-4 pb-2", style: { scrollbarWidth: "none" } },
+        React.createElement("span", { className: "shrink-0 w-[38%]", "aria-hidden": true }),
+        view.map((s) => {
+          const active = s.id === slot.id;
+          const now = exact && s.id === nowId;
+          return React.createElement(
+            "button",
+            {
+              key: s.id,
+              type: "button",
+              onClick: () => pick(s.id),
+              "aria-pressed": active,
+              "data-sel": active ? "1" : undefined,
+              className: "shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all duration-200 " + (active ? "text-white border-transparent shadow-sm bg-gradient-to-r " + themeOf(s.id).chipOn : themeOf(s.id).chipOff + (reveal ? "" : " opacity-0")),
+            },
+            React.createElement(SlotIcon, { id: s.id, emoji: s.icon, size: 16, className: active ? "text-white" : "text-emerald-700" }),
+            s.title,
+            now && React.createElement("span", { className: "w-1.5 h-1.5 rounded-full " + (active ? "bg-white" : "bg-emerald-600"), "aria-label": "এখনকার সময়" })
+          );
+        }),
+        React.createElement("span", { className: "shrink-0 w-[38%]", "aria-hidden": true })
+      ),
+      // সোয়াইপের ইঙ্গিত: পাশের চিপ লুকানো থাকলে দুই কিনারায় হালকা তীর
+      React.createElement("span", { "aria-hidden": true, className: "pointer-events-none absolute left-1 top-1/2 -translate-y-[60%] text-lg text-emerald-300 transition-opacity " + (reveal ? "opacity-0" : "opacity-100") }, "‹"),
+      React.createElement("span", { "aria-hidden": true, className: "pointer-events-none absolute right-1 top-1/2 -translate-y-[60%] text-lg text-emerald-300 transition-opacity " + (reveal ? "opacity-0" : "opacity-100") }, "›")
     ),
     isCreator && editing && React.createElement(NabijiTimelineEditor, { slots, onSaved: setSlots, onClose: () => setEditing(false) }),
     // হেডার
