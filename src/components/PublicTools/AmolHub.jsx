@@ -17,6 +17,7 @@ import { DuaAcceptanceCard } from "./DuaAcceptanceCard.jsx";
 import { DeathReminderCard } from "./DeathReminderCard.jsx";
 import { visibleIds } from "../../legacy/tabLayout.js";
 import { useBackLayer } from "../../legacy/backNav.js";
+import { ChevronLeft } from "../icons.jsx";
 
 const { useState } = React;
 
@@ -29,7 +30,8 @@ const HUB_ITEMS = [
   { key: "deathReminder", icon: "hourglass", label: "মৃত্যুর স্মরণ", Component: DeathReminderCard },
 ];
 
-export function AmolHub({ tabLayout } = {}) {
+// onBack(ঐচ্ছিক, ধাপ ২): সহায়িকার ভেতর থেকে খুললে ওপরে "‹ সহায়িকা" ফেরার বোতাম দেখায়।
+export function AmolHub({ tabLayout, onBack } = {}) {
   const [activeItem, setActiveItem] = useState(null);
   useBackLayer(!!activeItem, () => setActiveItem(null));
 
@@ -66,6 +68,12 @@ export function AmolHub({ tabLayout } = {}) {
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
+    onBack && /*#__PURE__*/React.createElement(
+      "button",
+      { type: "button", onClick: onBack, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" },
+      /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
+      "সহায়িকা"
+    ),
     /*#__PURE__*/React.createElement(PageHeader, { title: "আমল ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
     ...blocks
   );

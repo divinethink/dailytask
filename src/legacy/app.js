@@ -168,7 +168,6 @@ const PrayerTimes = React.lazy(() => import("../components/PublicTools/PrayerTim
 // §Public Tools Phase A, item ৩/৫ক(3_1 §"আমল হাব", ১৮ সেপ্টেম্বর ২০২৬): "আমল" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual hub component(তাসবীহ inline + বাকি
 // ৭ item "শীঘ্রই আসছে" sub-screen, content pending) বসানো হলো, একই lazy pattern।
-const AmolHub = React.lazy(() => import("../components/PublicTools/AmolHub.jsx").then(m => ({ default: m.AmolHub })));
 // §Public Tools Phase A, item ৫(3_1/3_2 §২.২, ১৮ সেপ্টেম্বর ২০২৬): "সহায়িকা" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে ৬-ক্যাটাগরি shell বসানো হলো, একই lazy pattern।
 const PublicToolsShell = React.lazy(() => import("../components/PublicTools/PublicToolsShell.jsx").then(m => ({ default: m.PublicToolsShell })));
@@ -211,7 +210,7 @@ function App() {
   // §Bottom Navigation(2_4 §৯.২) — App()-এর নতুন top-level routing state।
   // sessionStorage-persisted(browser-session বন্ধ হলে ডিফল্ট "family"-এ ফিরবে)।
   const [activeTab, setActiveTab] = useState(() => {
-    try { return sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || TAB_FAMILY; } catch { return TAB_FAMILY; }
+    try { const t = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || TAB_FAMILY; return t === TAB_AMOL ? TAB_TOOLS : t; } catch { return TAB_FAMILY; }
   });
   useEffect(() => {
     try { sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab); } catch {}
@@ -225,7 +224,6 @@ function App() {
     const run = () => {
       [
         () => import("../components/PublicTools/PrayerTimes.jsx"),
-        () => import("../components/PublicTools/AmolHub.jsx"),
         () => import("../components/PublicTools/PublicToolsShell.jsx"),
         () => import("../components/MenuPage.jsx")
       ].forEach(load => { try { load().catch(() => {}); } catch {} });
@@ -1727,19 +1725,11 @@ function App() {
     // §Public Tools Phase A, item ২: TAB_PRAYER_TIMES এখন actual PrayerTimes.jsx
     // render করে(lazy+Suspense, উপরের import-নোট দ্রষ্টব্য) — PublicToolsPlaceholder
     // fallback শুধু Suspense-loading window-এ দেখায়(chunk লোড হওয়া পর্যন্ত), তারপর
-    // actual UI বসে। TAB_AMOL এখন AmolHub, TAB_TOOLS এখন PublicToolsShell(দুটোই নিচে)।
+    // actual UI বসে। TAB_TOOLS এখন PublicToolsShell(নিচে; "আমল ও দু'আ" তার ভেতরে)।
     if (activeTab === TAB_PRAYER_TIMES) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সময়সূচি" }) },
           React.createElement(PrayerTimes, { onOpenHome: () => setActiveTab(TAB_FAMILY), layout: designSrc.prayerLayout || null, tabLayout: designSrc.tabLayout || null })
-        ),
-        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
-      );
-    }
-    if (activeTab === TAB_AMOL) {
-      return /*#__PURE__*/React.createElement(React.Fragment, null,
-        React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "আমল" }) },
-          React.createElement(AmolHub, { tabLayout: designSrc.tabLayout || null })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
