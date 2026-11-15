@@ -59,7 +59,7 @@ export function TomorrowFocusPicker({ member, allFields, tomorrowKey: tomorrowKe
   // shadow-সহ) দেখা যেত। Fix: card-wrapper এখন এই component-এর ভিতরেই, তাই
   // একই null-check card-সহ পুরোটাই covers করে — কোনো blank-card সম্ভব না।
   return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl px-4 py-3 border border-[#E4D3A8] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-3"
+    className: "bg-white rounded-2xl px-4 py-3 border border-[#E4D3A8] ring-4 ring-[#F7EEDB] shadow-[0_3px_12px_-3px_rgba(160,120,40,0.25)] mt-3"
   },
     editing && /*#__PURE__*/React.createElement("h3", { className: "font-bold text-sm text-slate-800 mb-1.5 text-center" }, isToday ? "🎯 আজকের ফোকাস" : "🎯 আগামীকালের ফোকাস"),
     editing

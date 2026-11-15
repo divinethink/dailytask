@@ -698,7 +698,9 @@ export function DailyEntrySection({
     style: {
       fontFamily: "'IBM Plex Mono', 'Hind Siliguri', monospace"
     }
-  }, toBn(getHijriDate(viewDate).year)), " হিজরি")), /*#__PURE__*/React.createElement("button", {
+  }, toBn(getHijriDate(viewDate).year)), " হিজরি", /*#__PURE__*/React.createElement("span", {
+    className: "ml-1.5 inline-block rounded-full bg-orange-50 text-orange-700 px-2 py-0.5 text-[11px] font-bold align-middle"
+  }, "সম্ভাব্য"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (entryDirtyRef.current && !window.confirm("এই দিনের এন্ট্রিতে সেভ না করা পরিবর্তন আছে। এগিয়ে গেলে তা হারিয়ে যাবে। আপনি কি নিশ্চিত?")) return;
       setViewDate(d => {
