@@ -77,7 +77,7 @@ function Bullets({ items, th = NEUTRAL }) {
           g.items.map((it, i) =>
             React.createElement(
               "div",
-              { key: i, className: "pl-3 py-0.5 border-l-2 border-[#E4D3A8] text-sm leading-relaxed " + th.txt },
+              { key: i, className: "pl-3 py-0.5 border-l-2 border-[#E4D3A8] text-sm font-medium " + th.txt },
               it.text,
               React.createElement(Src, { src: it.src, th })
             )
