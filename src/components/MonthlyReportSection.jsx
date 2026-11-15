@@ -69,6 +69,24 @@ function TrendChart({ weeks, toBn }) {
   );
 }
 
+// জোড়া বার(ধাপ ৩): প্রতি আমলে গত মাস(ধূসর) ও এ মাস(সবুজ; অবনতিতে কমলা)। বারের মাপ = তুলনার জানালার দিন-সংখ্যা(cmp) অনুপাতে, তাই সব সারি একই স্কেলে।
+function MoveRow({ m, cmp, toBn }) {
+  const down = m.delta < 0;
+  const w = n => Math.max(n > 0 ? 3 : 0, Math.min(100, Math.round((n / Math.max(1, cmp)) * 100)));
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <div className="text-sm font-bold text-slate-800 min-w-0 break-words">{m.label}</div>
+        <div className="text-xs font-bold shrink-0" style={{ color: down ? "#C2410C" : "#15803D" }}>{down ? "▼" : "▲"} {fill(down ? T.movesLess : T.movesMore, { n: toBn(Math.abs(m.delta)) })}</div>
+      </div>
+      <div className="h-2.5 rounded-full" style={{ width: w(m.prev) + "%", minWidth: 6, background: "#D5D9DE" }} />
+      <div className="text-[11px] text-slate-500 mb-1">{fill(T.movesPrevDays, { n: toBn(m.prev) })}</div>
+      <div className="h-2.5 rounded-full" style={{ width: w(m.cur) + "%", minWidth: 6, background: down ? "#D9822B" : "#2D6A5C" }} />
+      <div className="text-[11px] text-slate-500">{fill(T.movesCurDays, { n: toBn(m.cur) })}</div>
+    </div>
+  );
+}
+
 const GOAL_ICON = { done: "✅", partial: "🟡", none: "❌" };
 
 export function MonthlyReportSection({ fold, onShiftMonth, migrationState, memberId, member, locked, monthCursor, monthEntries, allFields, fieldApplies, isExcused, isFieldExcusable, dailyScore, toBn, BN_MONTHS, BN_WEEKDAYS, onSendToMeeting }) {
@@ -81,6 +99,7 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   const [sent, setSent] = useState(false);
   const [pickErr, setPickErr] = useState(false);
   const [decOpen, setDecOpen] = useState(false); // আগামী মাসের সিদ্ধান্ত: ডিফল্ট বন্ধ
+  const [allOpen, setAllOpen] = useState(false); // "সব আমল দেখুন": ডিফল্ট বন্ধ
 
   // আগের মাসের এন্ট্রি: কার্ড খুললে (বা সদস্য/মাস বদলালে) একবার। ব্যর্থ হলে তুলনা ছাড়াই রিপোর্ট চলে।
   useEffect(() => {
@@ -144,6 +163,9 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     } else {
       const r = report;
       const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
+      const mv = r.moves;
+      const totalCount = mv.ups.length + mv.downs.length + mv.same.length;
+      const moreCount = totalCount - Math.min(2, mv.ups.length) - Math.min(1, mv.downs.length);
       const goalParts = [];
       if (goals.counts.done) goalParts.push(fill(T.goalDone, { n: toBn(goals.counts.done) }));
       if (goals.counts.partial) goalParts.push(fill(T.goalPartial, { n: toBn(goals.counts.partial) }));
@@ -154,22 +176,18 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
             <div className="mb-1">
               <h3 className="font-bold text-[15px]">{T.movesTitle}</h3>
             </div>
-            <p className="text-[11px] opacity-85 leading-snug mb-3">{T.movesSub}</p>
+            <p className="text-[11px] opacity-85 leading-snug mb-3">{T.movesSub} · <span style={{ color: "#D5D9DE" }}>■</span> {T.movesLegendPrev} <span style={{ color: "#7FD1A5" }}>■</span> {T.movesLegendCur}</p>
             {r.prev && (r.moves.improvement || r.moves.drop) ? (
               <>
-                <div className="grid grid-cols-2 gap-2">
-                  {[["up", r.moves.improvement, T.movesUp, "▲", "#BFF0D2", "rgba(46,160,100,0.28)"], ["down", r.moves.drop, T.movesDown, "▼", "#FFD2A8", "rgba(217,130,43,0.30)"]].map(([k, m, lbl, ar, fg, bg]) => (
-                    <div key={k} className="rounded-xl p-2.5 min-w-0" style={{ background: bg }}>
-                      <div className="text-[11px] font-bold mb-1" style={{ color: fg }}>{ar} {lbl}</div>
-                      {m ? (
-                        <>
-                          <div className="text-[15px] font-bold leading-snug break-words">{m.label}</div>
-                          <div className="text-[11px] opacity-90 mt-1">{fill(T.movesDays, { prev: toBn(m.prev), cur: toBn(m.cur) })}</div>
-                          <div className="text-base font-bold leading-snug mt-1" style={{ color: fg }}>{fill(m.delta > 0 ? T.movesMore : T.movesLess, { n: toBn(Math.abs(m.delta)) })}</div>
-                        </>
-                      ) : <div className="text-xs leading-relaxed opacity-95">{k === "up" ? T.movesUpNone : T.movesDownNone}</div>}
-                    </div>
-                  ))}
+                <div className="rounded-xl bg-white p-3 text-slate-800">
+                  {[...r.moves.ups.slice(0, 2), ...r.moves.downs.slice(0, 1)].map(m => <MoveRow key={m.key} m={m} cmp={r.cmp} toBn={toBn} />)}
+                  {allOpen && [...r.moves.ups.slice(2), ...r.moves.downs.slice(1), ...r.moves.same].map(m => <MoveRow key={m.key} m={m} cmp={r.cmp} toBn={toBn} />)}
+                  {moreCount > 0 && (
+                    <button type="button" onClick={() => setAllOpen(o => !o)} aria-expanded={allOpen} className="w-full mt-2 pt-2 border-t border-slate-100 flex items-center justify-center gap-1 text-sm font-bold text-emerald-900 min-h-11">
+                      {allOpen ? T.movesHideAll : fill(T.movesSeeAll, { n: toBn(totalCount) })}
+                      <ChevronDown size={15} className={"transition-transform" + (allOpen ? " rotate-180" : "")} />
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs mt-3 leading-relaxed rounded-lg p-2" style={{ background: "rgba(255,255,255,0.12)" }}>
                   💭 {r.moves.drop ? fill(T.movesThinkDown, { label: r.moves.drop.label }) : fill(T.movesThinkUp, { label: r.moves.improvement.label })}
@@ -180,6 +198,16 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
               <div className="text-xs opacity-90 leading-relaxed">{r.prev ? T.movesAllNone : prev.status === "loading" ? T.prevLoading : prev.status === "error" ? T.prevFail : T.noPrev}</div>
             )}
           </div>
+
+          {r.prev && (mv.improvement || mv.same.length > 0) && mv.downs.length === 0 && (
+            <div className="rounded-2xl px-3.5 py-3 mb-3 flex items-center gap-3" style={{ background: "#EAF5EE", border: "1px solid #CFE6D6" }}>
+              <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white shrink-0" style={{ background: "#2D6A5C" }}>✓</span>
+              <div>
+                <div className="text-sm font-bold text-slate-800">{T.movesNoDrop}</div>
+                <div className="text-xs text-slate-500">{T.movesNoDropSub}</div>
+              </div>
+            </div>
+          )}
 
           {r.weekdayValid < 3 ? (
             <div className="rounded-2xl px-3.5 py-3 mb-3 flex items-center gap-2.5" style={{ background: "#F6F8F5", border: "1px dashed #D5E3D8" }}>

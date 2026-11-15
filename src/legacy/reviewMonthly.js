@@ -2,7 +2,7 @@
 // অ্যাপের হিসাব-ফাংশনগুলো h (helpers) হিসেবে ঢোকানো হয়, তাই Node-এ সরাসরি টেস্ট করা যায়।
 // সব সংখ্যা পূর্ণসংখ্যা; কোনো .limit() নেই। চলতি মাস চলমান হলে আগের মাসের সাথে একই দিন-সংখ্যার তুলনা হয়।
 import { chunkCount, chunkRange } from "./reviewSchema.js";
-import { weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta, weeklyGap } from "./reviewCalc.js";
+import { weekdayAverages, weakestWeekdays, bestImprovementAndDrop, rankMoves, goalSuccess, monthDelta, weeklyGap } from "./reviewCalc.js";
 
 const MIN_DAYS = 3; // এর কম দিনের ডেটায় কোনো সিদ্ধান্তমূলক হিসাব দেখানো হয় না
 const SLEEP_KEY = "phoneOffBy11";
@@ -99,7 +99,7 @@ function buildMonthlyReport({ year, month0, now, curEntries, prevEntries, h }) {
   const weakest = weekdayValid >= 3 ? weakestWeekdays(weekdays, 2) : [];
 
   // উন্নতি/পতন: দুই মাসের "পুরো সম্পন্ন" দিন। ওজর থাকলে বা ডেটা কম হলে সেই ফিল্ড বাদ (অন্যায্য তুলনা এড়াতে)।
-  let moves = { improvement: null, drop: null };
+  let moves = { improvement: null, drop: null, ups: [], downs: [], same: [] };
   if (prevEntries) {
     const items = [];
     for (const f of applicable) {
@@ -110,7 +110,9 @@ function buildMonthlyReport({ year, month0, now, curEntries, prevEntries, h }) {
     }
     const r = bestImprovementAndDrop(items);
     const withLabel = x => (x ? { ...x, label: labelOf(applicable.find(f => f.key === x.key)) } : null);
-    moves = { improvement: withLabel(r.improvement), drop: withLabel(r.drop) };
+    // ups/downs/same: জোড়া-বার কার্ডের জন্য সব তুলনা(সংযোজন; improvement/drop আগের মতোই)
+    const rk = rankMoves(items);
+    moves = { improvement: withLabel(r.improvement), drop: withLabel(r.drop), ups: rk.ups.map(withLabel), downs: rk.downs.map(withLabel), same: rk.same.map(withLabel) };
   }
 
   // "কখন ভালো থাকেন": কোন আমল পূর্ণ করা দিনগুলোতে বাকি আমলের স্কোর সবচেয়ে বেশি থাকে।

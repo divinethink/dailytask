@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
-import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
+import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, rankMoves, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
 
@@ -88,6 +88,33 @@ test("bestImprovementAndDrop", () => {
   assert.equal(none.improvement, null); assert.equal(none.drop, null);
   const tie = bestImprovementAndDrop([{ key: "b", prev: 0, cur: 2 }, { key: "a", prev: 0, cur: 2 }]);
   assert.equal(tie.improvement.key, "a");
+});
+test("rankMoves: উন্নতি/অবনতি/অপরিবর্তিত আলাদা ও ক্রমে", () => {
+  const r = rankMoves([
+    { key: "c", prev: 1, cur: 4 }, { key: "a", prev: 0, cur: 3 }, { key: "b", prev: 2, cur: 9 },
+    { key: "d", prev: 5, cur: 4 }, { key: "e", prev: 9, cur: 2 }, { key: "f", prev: 3, cur: 3 }, null, { key: "x" },
+  ]);
+  assert.deepEqual(r.ups.map(x => x.key), ["b", "a", "c"]); // ৭, ৩(a<c বর্ণানুক্রমে), ৩
+  assert.deepEqual(r.downs.map(x => x.key), ["e", "d"]);
+  assert.deepEqual(r.same.map(x => x.key), ["f"]);
+  assert.deepEqual(rankMoves(undefined), { ups: [], downs: [], same: [] });
+  // আগের ফাংশনের সাথে সামঞ্জস্য
+  const old = bestImprovementAndDrop([{ key: "c", prev: 1, cur: 4 }, { key: "a", prev: 0, cur: 3 }, { key: "e", prev: 9, cur: 2 }]);
+  assert.equal(old.improvement.key, "a"); assert.equal(old.drop.key, "e");
+});
+test("report: moves.ups/downs/same লেবেল-সহ, improvement/drop অপরিবর্তিত", () => {
+  const cur = {}, prv = {};
+  for (let d = 1; d <= 30; d++) {
+    cur[d] = { a: 1, b: d <= 10 ? 1 : 0, phoneOffBy11: 1 };
+    prv[d] = { a: 1, b: 1, phoneOffBy11: 1 };
+  }
+  const r = buildMonthlyReport({ year: 2026, month0: 10, now: NOW_LATE, curEntries: mk(cur), prevEntries: mk(prv), h: H });
+  assert.deepEqual(r.moves.downs.map(x => x.key), ["b"]);
+  assert.equal(r.moves.downs[0].label, "বি-শর্ট");
+  assert.equal(r.moves.drop.key, "b");
+  assert.ok(Array.isArray(r.moves.ups) && Array.isArray(r.moves.same));
+  const noPrev = buildMonthlyReport({ year: 2026, month0: 10, now: NOW_LATE, curEntries: mk(cur), prevEntries: null, h: H });
+  assert.deepEqual(noPrev.moves, { improvement: null, drop: null, ups: [], downs: [], same: [] });
 });
 test("goalSuccess: null/অজানা গোনা হয় না", () => {
   assert.deepEqual(goalSuccess(["done", "done", "partial", "done", null, "x"]), { done: 3, partial: 1, none: 0, total: 4 });

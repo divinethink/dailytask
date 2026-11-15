@@ -41,6 +41,20 @@ function bestImprovementAndDrop(items) {
   return { improvement: ups[0] || null, drop: downs[0] || null };
 }
 
+// ধাপ ৩(জোড়া বার): সব আমলের তুলনা এক তালিকায়। ups = উন্নতি(বেশি আগে), downs = অবনতি(বেশি কমা আগে), same = অপরিবর্তিত।
+// delta সমান হলে key বর্ণানুক্রমে আগে। bestImprovementAndDrop-এর মতোই একই নিয়ম; সেটা অপরিবর্তিত।
+function rankMoves(items) {
+  const rows = (items || [])
+    .filter(i => i && typeof i.prev === "number" && typeof i.cur === "number")
+    .map(i => ({ key: i.key, prev: i.prev, cur: i.cur, delta: i.cur - i.prev }));
+  const cmpKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  return {
+    ups: rows.filter(r => r.delta > 0).sort((a, b) => b.delta - a.delta || cmpKey(a, b)),
+    downs: rows.filter(r => r.delta < 0).sort((a, b) => a.delta - b.delta || cmpKey(a, b)),
+    same: rows.filter(r => r.delta === 0).sort(cmpKey)
+  };
+}
+
 // results: ['done'|'partial'|'none'|null...] — অজানা/null গোনা হয় না।
 function goalSuccess(results) {
   const c = { done: 0, partial: 0, none: 0, total: 0 };
@@ -172,4 +186,4 @@ function weekFieldMoves({ days, prevDays, fields, ratioOf, applies, excused }) {
   return { improvement: up, drop: down };
 }
 
-export { weekFieldMoves, weekFieldExtremes, weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, goalSuccess, monthDelta };
+export { weekFieldMoves, weekFieldExtremes, weekGlance, GLANCE_MIN, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, rankMoves, goalSuccess, monthDelta };
