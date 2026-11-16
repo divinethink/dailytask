@@ -9,15 +9,15 @@
 // call-site-এর zero-regression-risk বজায় রাখতে) — এই দুই ট্যাবের active-state শুধু
 // রঙ বদলায় (brand-green), filled-shape না। HomeIcon/TasbihIcon/CompassIcon নতুন,
 // standalone, নিজস্ব `filled` prop-সহ (active=filled+brand-green, inactive=outline+muted)।
-import { TAB_FAMILY, TAB_MUHASABA, TAB_PRAYER_TIMES, TAB_TOOLS, TAB_SETTINGS } from "../legacy/tabs.js";
-import { ClockIcon, MenuIcon, HomeIcon, CompassIcon, ChartBarIcon } from "./icons.jsx";
+import { TAB_FAMILY, TAB_MUHASABA, TAB_QURAN, TAB_PRAYER_TIMES, TAB_TOOLS, TAB_SETTINGS } from "../legacy/tabs.js";
+import { ClockIcon, MenuIcon, HomeIcon, CompassIcon, BookIcon } from "./icons.jsx";
 
 const ACTIVE_COLOR = "var(--theme-primary, #0E4B43)";
 const INACTIVE_COLOR = "#8A9A8F";
 
 const NAV_ITEMS = [
   { id: TAB_FAMILY, label: "হোম", Icon: HomeIcon, supportsFilled: true },
-  { id: TAB_MUHASABA, label: "মুহাসাবা", Icon: ChartBarIcon, supportsFilled: false },
+  { id: TAB_QURAN, label: "কুরআন", Icon: BookIcon, supportsFilled: false },
   { id: TAB_PRAYER_TIMES, label: "সময়সূচি", Icon: ClockIcon, supportsFilled: false },
   { id: TAB_TOOLS, label: "সহায়িকা", Icon: CompassIcon, supportsFilled: true },
   { id: TAB_SETTINGS, label: "মেনু", Icon: MenuIcon, supportsFilled: false }
@@ -31,7 +31,8 @@ export function BottomNav({ activeTab, onChange }) {
       style: { borderColor: "#E7EEE3" }
     },
     NAV_ITEMS.map(item => {
-      const isActive = activeTab === item.id;
+      // মুহাসাবা-পাতা হোম থেকে খোলে, তাই তখন "হোম" জ্বলে থাকে।
+      const isActive = activeTab === item.id || (item.id === TAB_FAMILY && activeTab === TAB_MUHASABA);
       const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
       const iconProps = { size: 22, color };
       if (item.supportsFilled) iconProps.filled = isActive;

@@ -1,4 +1,4 @@
-// হোমের শেষের ছোট লিংক-কার্ড (ধাপ ১): ট্যাপে "মুহাসাবা" ট্যাবে যায়। শুধু দেখায় — কোনো ডেটা লেখে না, নিজে কিছু হিসাব করে না।
+// হোমের শেষের ছোট লিংক-কার্ড (ধাপ ১): ট্যাপে মুহাসাবা-পাতা খোলে। শুধু দেখায় — কোনো ডেটা লেখে না, নিজে কিছু হিসাব করে না।
 // avgPct: চলতি মাসের গড় স্কোর (App-এর monthStats থেকে, নতুন হিসাব নেই); null হলে শুধু শিরোনাম।
 // React global(window.React, globals.js)।
 import { ChevronRight } from "./icons.jsx";
@@ -20,7 +20,7 @@ export function MuhasabaLinkCard({ avgPct, toBn, onOpen }) {
         "div",
         { className: "min-w-0" },
         React.createElement("div", { className: "text-sm font-bold leading-snug" }, hasPct ? "এ মাস " + toBn(avgPct) + "%" : "মুহাসাবা"),
-        React.createElement("div", { className: "mt-0.5 text-xs opacity-80" }, "মুহাসাবা ট্যাবে বিস্তারিত")
+        React.createElement("div", { className: "mt-0.5 text-xs opacity-80" }, "বিস্তারিত দেখুন")
       ),
       React.createElement(ChevronRight, { size: 18, color: "#E4D3A8" })
     )

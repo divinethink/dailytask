@@ -140,6 +140,7 @@ import { InviteJoinGate } from "../components/InviteJoinGate.jsx";
 // §Bottom Navigation(2_4 §৯) — routing shell, additive, existing gate-logic অপরিবর্তিত।
 import { BottomNav } from "../components/BottomNav.jsx";
 import { MuhasabaTab } from "../components/MuhasabaTab.jsx";
+import { QuranTab } from "../components/QuranTab.jsx";
 import { MuhasabaLinkCard } from "../components/MuhasabaLinkCard.jsx";
 import { PublicToolsPlaceholder } from "../components/PublicToolsPlaceholder.jsx";
 // §Menu full-page tab(2_4 §৯.৫/2_5 Screen E.1, ১৫ সেপ্টেম্বর ২০২৬): আগে
@@ -158,7 +159,7 @@ const TabLayoutScreen = React.lazy(() => import("../components/TabLayoutScreen.j
 const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
 const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
-import { TAB_FAMILY, TAB_MUHASABA, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
+import { TAB_FAMILY, TAB_MUHASABA, TAB_QURAN, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 import { useBackLayer } from "./backNav.js";
 // §Public Tools Phase A, item ২ (3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো (3_2 §১-এর নীতি
@@ -1563,9 +1564,16 @@ function App() {
   if (activeTab !== TAB_FAMILY && !(activeTab === TAB_MUHASABA && (accessPending || printMode))) {
     if (activeTab === TAB_MUHASABA) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        React.createElement(MuhasabaTab, null, ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, MUHASABA_IDS), MUHASABA_IDS)),
+        React.createElement(MuhasabaTab, { onBack: () => setActiveTab(TAB_FAMILY) }, ...renderHomeBelow(designSrc, pickNodes(homeBelowNodes, MUHASABA_IDS), MUHASABA_IDS)),
         React.createElement(MonthlyOverviewInfoModal, { show: showMonthlyInfoModal, onClose: () => setShowMonthlyInfoModal(false) }),
         React.createElement(MeetingInfoModal, { show: showMeetingInfoModal, onClose: () => setShowMeetingInfoModal(false) }),
+        React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
+      );
+    }
+    // "কুরআন" নেভ-ট্যাব (লগইন/অনুমোদন-নিরপেক্ষ, সহায়িকার মতোই সবসময় accessible)।
+    if (activeTab === TAB_QURAN) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        React.createElement(QuranTab, null),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );
     }

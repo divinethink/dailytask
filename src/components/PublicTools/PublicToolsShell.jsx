@@ -38,16 +38,6 @@ import { HijriImportantDays } from "./HijriImportantDays.jsx";
 import { AmolHub } from "./AmolHub.jsx";
 import { TasbihCounter } from "./TasbihCounter.jsx";
 
-// পূর্ণাঙ্গ কুরআন: আলাদা chunk — সহায়িকা খুললেই নয়, এই আইটেমে ঢুকলে তবেই লোড হয়।
-const QuranScreenLazy = React.lazy(() => import("./Quran/QuranScreen.jsx").then((m) => ({ default: m.QuranScreen })));
-function QuranLazy() {
-  return React.createElement(
-    React.Suspense,
-    { fallback: React.createElement("p", { className: "text-center text-sm text-gray-500 py-16" }, "লোড হচ্ছে…") },
-    React.createElement(QuranScreenLazy, null)
-  );
-}
-
 const { useState } = React;
 
 // "ইসলামি টুলস ও ট্র্যাকিং" ক্যাটাগরির যে ৫টা item এখন actual component পেয়েছে
@@ -69,7 +59,6 @@ const ACTIVE_ITEM_COMPONENTS = {
   tayammum: TayammumGuide,
   istikhara: IstikharaGuide,
   paraIndex: ParaIndex,
-  quranReader: QuranLazy,
   jumuahAmol: JumuahAmol,
   ramadanPrep: RamadanPrep,
   eidPrayer: EidPrayerGuide,
@@ -109,7 +98,6 @@ const CATEGORIES = [
     icon: "quran",
     label: "কুরআন",
     items: [
-      { key: "quranReader", icon: "quran", label: "পূর্ণাঙ্গ কুরআন" },
       { key: "paraIndex", icon: "list", label: "৩০ পারার সূচি" },
       { key: "khatmTracker", icon: "bookmarkCheck", label: "কুরআন খতম ট্র্যাকিং" },
     ],
