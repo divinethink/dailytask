@@ -126,3 +126,32 @@ test("@font-face: file-ওয়ালা প্রতিটা ফন্টে�
     assert.ok(css.includes(f.file), f.id + ": ফাইলের পথ মেলেনি");
   }
 });
+
+// ───────── অডিট-সংশোধন ─────────
+test("প্রতিটা ফন্টের নিজের ফাইল আছে ও tailwind.css-এ @font-face আছে (সব ফন্ট অফলাইনে চলে; Google-নির্ভর নয়)", () => {
+  const css = fs.readFileSync(path.join(root, "src", "tailwind.css"), "utf8");
+  const notice = fs.readFileSync(path.join(root, "public", "quran", "v1", "fonts", "NOTICE-fonts.txt"), "utf8");
+  for (const f of QURAN_FONTS) {
+    assert.ok(f.file, f.id + ": নিজের ফাইল নেই");
+    assert.equal(f.google, null, f.id + ": বাইরের উৎস");
+    const disk = path.join(root, "public", f.file);
+    assert.ok(fs.existsSync(disk) && fs.statSync(disk).size > 10000, f.id + ": ফাইল নেই/ছোট");
+    assert.ok(css.includes("font-family: '" + f.family + "'") && css.includes(f.file), f.id + ": @font-face নেই");
+    assert.ok(notice.includes(path.basename(f.file)), f.id + ": NOTICE-fonts.txt-এ উল্লেখ নেই");
+  }
+});
+
+test("উসমানি ও IndoPak: প্রতিটা সূরা-ফাইলের SHA-256 integrity-uthmani/integrity-indopak.json-এর সাথে মেলে", async () => {
+  const { createHash } = await import("node:crypto");
+  for (const [name, dir] of [["integrity-uthmani.json", "ar-uthmani"], ["integrity-indopak.json", "ar-indopak"]]) {
+    const integ = JSON.parse(fs.readFileSync(path.join(root, "tools", "quran", name), "utf8"));
+    const rels = Object.keys(integ.files);
+    assert.equal(rels.length, 114, name);
+    for (const rel of rels) {
+      assert.ok(rel.startsWith(dir + "/"), rel);
+      const buf = fs.readFileSync(path.join(root, "public", "quran", "v1", rel));
+      assert.equal(createHash("sha256").update(buf).digest("hex"), integ.files[rel].sha256, rel);
+      assert.equal(buf.length, integ.files[rel].bytes, rel);
+    }
+  }
+});

@@ -11,6 +11,22 @@
   font-display: swap;
 }
 
+/* Simple লেখার বাড়তি ফন্ট (SIL OFL 1.1; আরবি-subset, @fontsource থেকে অপরিবর্তিত)। নিজের সার্ভারে, তাই অফলাইনেও চলে। */
+@font-face {
+  font-family: 'Noto Naskh Arabic';
+  src: url('/quran/v1/fonts/noto-naskh-arabic-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Scheherazade New';
+  src: url('/quran/v1/fonts/scheherazade-new-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* উসমানি লেখার ফন্ট (ধাপ ৬গ-২)। ফাইল অপরিবর্তিত (লাইসেন্স-শর্ত: /quran/v1/fonts/NOTICE-fonts.txt); শুধু ওই ফন্টে লেখা দেখানোর সময়ই নামে। */
 @font-face {
   font-family: 'KFGQPC Uthmanic Script HAFS';

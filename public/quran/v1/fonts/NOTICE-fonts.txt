@@ -10,3 +10,6 @@ alquran-indopak-quranwbw.ttf   — "AlQuran IndoPak by QuranWBW", নির্�
                                   ফন্টের শর্ত: বিক্রি/পরিবর্তন/বিতরণ/ডেভেলপমেন্ট QuranWBW-এর লিখিত অনুমতি ছাড়া নয়।
                                   অনুমতি: অ্যাপ-মালিক ইমেইলে QuranWBW-এর কাছ থেকে অ-বাণিজ্যিক ব্যবহারের অনুমতি পেয়েছেন। Daily Task অ-বাণিজ্যিক (সাদাকায়ে জারিয়া) অ্যাপ — বিজ্ঞাপন/বিক্রি নেই। ফাইল অপরিবর্তিত।
                                   এই অনুমতি শুধু অ-বাণিজ্যিক ব্যবহারে; অ্যাপ বাণিজ্যিক হলে আবার অনুমতি লাগবে।
+noto-naskh-arabic-400.woff2    — Noto Naskh Arabic (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/noto-naskh-arabic; ফাইল অপরিবর্তিত।
+scheherazade-new-400.woff2     — Scheherazade New (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/scheherazade-new; ফাইল অপরিবর্তিত।
+                                  (OFL-এর পূর্ণ পাঠ: LICENSE-OFL.txt)

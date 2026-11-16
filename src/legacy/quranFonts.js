@@ -1,7 +1,7 @@
 // quranFonts.js — আরবি লেখার ধরন ও ফন্টের তালিকা (pure, node --test-যোগ্য)। ধাপ ৬গ-১/৬গ-২/৬গ-৩।
 // scripts: কোন লেখার ধরনের সাথে ফন্টটা মানানসই। ফন্ট শুধু তার নিজের লেখার সাথেই দেখানো হয় (জোড়া ভুল হলে অক্ষর ভাঙে)।
 //   "simple" = Tanzil Simple (/quran/v1/ar), "uthmani" = Tanzil Uthmani (/quran/v1/ar-uthmani); "indopak" = IndoPak/নাস্তালিক (/quran/v1/ar-indopak, QuranWBW)।
-// file: নিজেদের সার্ভারের ফাইল (অফলাইনেও চলে); google: ফাইল না থাকলে বাছার পরে Google Fonts থেকে নামে।
+// file: নিজেদের সার্ভারের ফাইল (অফলাইনেও চলে); google: (এখন সব ফন্টেরই নিজের ফাইল আছে; এই ক্ষেত্র ভবিষ্যতের জন্য, বর্তমানে null)।
 // লাইসেন্স: Amiri/Noto/Scheherazade = SIL OFL 1.1; KFGQPC/Me Quran = অপরিবর্তিত রাখার শর্তে; AlQuran IndoPak = QuranWBW-এর অ-বাণিজ্যিক অনুমতি, অপরিবর্তিত (NOTICE-fonts.txt)।
 
 export const DEFAULT_FONT = "amiri-quran";
@@ -18,8 +18,8 @@ export const isValidScript = (id) => !!scriptById(id);
 
 export const QURAN_FONTS = [
   { id: "amiri-quran", name: "আমিরি কুরআন", family: "Amiri Quran", scripts: ["simple", "uthmani"], file: "/quran/v1/fonts/amiri-quran-arabic-400.woff2", google: null, license: "SIL OFL 1.1" },
-  { id: "noto-naskh", name: "নোটো নাসখ", family: "Noto Naskh Arabic", scripts: ["simple"], file: null, google: "Noto+Naskh+Arabic:wght@400", license: "SIL OFL 1.1" },
-  { id: "scheherazade", name: "শেহেরাজাদে নিউ", family: "Scheherazade New", scripts: ["simple"], file: null, google: "Scheherazade+New:wght@400", license: "SIL OFL 1.1" },
+  { id: "noto-naskh", name: "নোটো নাসখ", family: "Noto Naskh Arabic", scripts: ["simple"], file: "/quran/v1/fonts/noto-naskh-arabic-400.woff2", google: null, license: "SIL OFL 1.1" },
+  { id: "scheherazade", name: "শেহেরাজাদে নিউ", family: "Scheherazade New", scripts: ["simple"], file: "/quran/v1/fonts/scheherazade-new-400.woff2", google: null, license: "SIL OFL 1.1" },
   { id: "kfgqpc-hafs", name: "কেএফজিকিউপিসি হাফস", family: "KFGQPC Uthmanic Script HAFS", scripts: ["uthmani"], file: "/quran/v1/fonts/kfgqpc-hafs-regular.otf", google: null, license: "KFGQPC (অপরিবর্তিত রাখার শর্তে)" },
   { id: "me-quran", name: "মি কুরআন", family: "Me Quran", scripts: ["uthmani"], file: "/quran/v1/fonts/me-quran-regular.ttf", google: null, license: "Tanzil me_quran (অপরিবর্তিত)" },
   { id: "alquran-indopak", name: "আলকুরআন ইন্দো-পাক", family: "AlQuran IndoPak QuranWBW", scripts: ["indopak"], file: "/quran/v1/fonts/alquran-indopak-quranwbw.ttf", google: null, license: "QuranWBW (অ-বাণিজ্যিক অনুমতি, অপরিবর্তিত)" },
