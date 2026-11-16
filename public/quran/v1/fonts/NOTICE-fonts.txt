@@ -6,3 +6,7 @@ kfgqpc-hafs-regular.otf        — "KFGQPC Uthmanic Script HAFS Regular", King F
                                   শর্তের পাতা: https://fonts.qurancomplex.gov.sa/wp02/en/?p=19
 me-quran-regular.ttf           — "me_quran Regular", Tanzil Project।
                                   উৎস-পাতা: https://tanzil.net/docs/me_quran_font — একই কারণে অপরিবর্তিত।
+alquran-indopak-quranwbw.ttf   — "AlQuran IndoPak by QuranWBW", নির্মাতা Ayman Siddiqui (QuranWBW.com; উৎস-ফন্ট Al Qalam Quran Majeed, আয়াত-নম্বরের গ্লিফ KFGQPC-র)।
+                                  ফন্টের শর্ত: বিক্রি/পরিবর্তন/বিতরণ/ডেভেলপমেন্ট QuranWBW-এর লিখিত অনুমতি ছাড়া নয়।
+                                  অনুমতি: অ্যাপ-মালিক ইমেইলে QuranWBW-এর কাছ থেকে অ-বাণিজ্যিক ব্যবহারের অনুমতি পেয়েছেন। Daily Task অ-বাণিজ্যিক (সাদাকায়ে জারিয়া) অ্যাপ — বিজ্ঞাপন/বিক্রি নেই। ফাইল অপরিবর্তিত।
+                                  এই অনুমতি শুধু অ-বাণিজ্যিক ব্যবহারে; অ্যাপ বাণিজ্যিক হলে আবার অনুমতি লাগবে।

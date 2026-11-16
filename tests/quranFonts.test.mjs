@@ -16,7 +16,7 @@ test("ফন্ট-তালিকা: id অনন্য, ডিফল্ট �
   for (const f of QURAN_FONTS) {
     assert.ok(f.file || f.google, f.id + ": উৎস নেই");
     assert.ok(f.scripts.length > 0 && f.family && f.name);
-    assert.match(f.license, /OFL|KFGQPC|Tanzil/);
+    assert.match(f.license, /OFL|KFGQPC|Tanzil|QuranWBW/);
   }
 });
 
@@ -54,7 +54,7 @@ test("৬গ-২: লেখার ধরন — ডিফল্ট simple, অ�
   assert.deepEqual([u.arScript, u.arFont], ["uthmani", "kfgqpc-hafs"]);
   assert.equal(switchScript({ ...DEFAULT_PREFS, arFont: "amiri-quran" }, "uthmani").arFont, "amiri-quran"); // মানানসই হলে থাকে
   assert.equal(switchScript(DEFAULT_PREFS, "bogus"), DEFAULT_PREFS);
-  for (const sc of SCRIPTS) { assert.ok(fontFitsScript(sc.defaultFont, sc.id)); assert.ok(fontsForScript(sc.id).length >= 2); }
+  for (const sc of SCRIPTS) { assert.ok(fontFitsScript(sc.defaultFont, sc.id)); assert.ok(fontsForScript(sc.id).length >= (sc.id === "indopak" ? 1 : 2)); }
   assert.equal(fontsForScript("uthmani").some((f) => f.id === "kfgqpc-hafs") && fontsForScript("uthmani").some((f) => f.id === "me-quran"), true);
 });
 
@@ -79,4 +79,34 @@ test("উসমানি ডেটা: ১১৪ ফাইল, আয়াত-�
   assert.ok(!all[7].startsWith(man.arabicUthmani.bismillah)); // ২:১
   // ফন্ট-ফাইল সত্যিই আছে এবং খালি নয়
   for (const f of QURAN_FONTS.filter((x) => x.file)) assert.ok(fs.statSync(path.join(root, "public", f.file)).size > 10000, f.file);
+});
+
+test("৬গ-৩ IndoPak ডেটা: ১১৪ ফাইল, আয়াত-সংখ্যা meta-র সাথে মিল, মোট ৬২৩৬, sha256 ও বিসমিল্লাহ manifest-এর সাথে মিল, নম্বর-শব্দ নেই", async () => {
+  const { createHash } = await import("node:crypto");
+  const base = path.join(root, "public/quran/v1");
+  const meta = JSON.parse(fs.readFileSync(path.join(base, "meta.json"), "utf8"));
+  const man = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
+  const all = [];
+  for (const su of meta.surahs) {
+    const j = JSON.parse(fs.readFileSync(path.join(base, "ar-indopak", String(su.n).padStart(3, "0") + ".json"), "utf8"));
+    assert.equal(j.s, su.n);
+    assert.equal(j.a.length, su.ayahs);
+    assert.ok(j.a.every((t) => typeof t === "string" && t.trim() && !/[\u0660-\u0669]\s*$/.test(t.replace(/[\u200b\u200f\u2002\ufeff]/g, ""))), "সূরা " + su.n);
+    all.push(...j.a);
+  }
+  assert.equal(all.length, 6236);
+  assert.equal(createHash("sha256").update(all.join("\n")).digest("hex"), man.arabicIndopak.sha256);
+  assert.equal(scriptById("indopak").bismillah, man.arabicIndopak.bismillah);
+  assert.equal(all[0].replace(/[\u200b\u200f\u2002\ufeff]/g, "").trim(), man.arabicIndopak.bismillah); // ১:১ নিজেই বিসমিল্লাহ
+  assert.ok(!all[7].includes(man.arabicIndopak.bismillah)); // ২:১-এ জোড়া নেই
+});
+
+test("৬গ-৩ পছন্দ: IndoPak বাছলে মানানসই ফন্ট; বেমানান ফন্ট → ডিফল্ট; পুরনো লেখা-ধরন অক্ষত", () => {
+  assert.equal(sanitizePrefs({ arScript: "indopak" }).arFont, "alquran-indopak");
+  assert.equal(sanitizePrefs({ arScript: "indopak", arFont: "kfgqpc-hafs" }).arFont, "alquran-indopak");
+  assert.equal(sanitizePrefs({ arScript: "uthmani", arFont: "alquran-indopak" }).arFont, "kfgqpc-hafs");
+  assert.equal(sanitizePrefs({ arScript: "simple", arFont: "alquran-indopak" }).arFont, "amiri-quran");
+  assert.equal(switchScript({ ...DEFAULT_PREFS, arFont: "noto-naskh" }, "indopak").arFont, "alquran-indopak");
+  assert.equal(switchScript({ ...DEFAULT_PREFS, arScript: "indopak", arFont: "alquran-indopak" }, "simple").arFont, "amiri-quran");
+  assert.equal(sanitizePrefs({ arScript: "uthmani", arFont: "me-quran" }).arFont, "me-quran");
 });
