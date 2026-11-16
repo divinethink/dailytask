@@ -10,6 +10,7 @@
 
 import { ChevronLeft } from "../icons.jsx";
 import { EditableSection } from "./EditableSection.jsx";
+import { HisnMorningEvening } from "./HisnMorningEvening.jsx";
 
 // Default content(§২ Fallback নীতি) — App Creator এখনো এডিট না করলে এটাই
 // দেখাবে। প্রতিটা itemId fixed(edit করলে এই ডিফল্ট আর ব্যবহার হবে না, Firestore
@@ -82,7 +83,8 @@ export function MorningEveningAzkar({ onBack }) {
         sectionId: "morning_azkar",
         format: "accordion",
         defaultContent: MORNING_DEFAULT,
-      })
+      }),
+      /*#__PURE__*/React.createElement(HisnMorningEvening, null)
     )
   );
 }
