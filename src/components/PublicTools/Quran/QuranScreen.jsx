@@ -13,6 +13,7 @@ import {
   searchSurahNames, searchIndex, SEARCH_MIN, SEARCH_LIMIT,
 } from "../../../legacy/quranCore.js";
 import { QuranReader } from "./QuranReader.jsx";
+import { QuranMushaf } from "./QuranMushaf.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const h = React.createElement;
@@ -108,13 +109,13 @@ function ParaList({ meta, onOpen }) {
   );
 }
 
-function PageGrid({ meta, onOpen }) {
+function PageGrid({ meta, onPage }) {
   return h("div", null,
-    h("p", { className: "text-xs text-gray-500 px-1 mb-2" }, "মাদানী মুসহাফের ৬০৪ পৃষ্ঠা। পৃষ্ঠার প্রথম আয়াত থেকে পড়া শুরু হবে।"),
+    h("p", { className: "text-xs text-gray-500 px-1 mb-2" }, "মাদানী মুসহাফের ৬০৪ পৃষ্ঠা। পৃষ্ঠা খুলে সোয়াইপ করলে পাতা উল্টাবে, সূরা পেরিয়েও পড়া যাবে।"),
     h("div", { className: "grid grid-cols-5 gap-2" },
-      meta.pages.map(([s, a], i) =>
+      meta.pages.map((_pg, i) =>
         h("button", {
-          key: i, type: "button", onClick: () => onOpen(s, a),
+          key: i, type: "button", onClick: () => onPage(i + 1),
           className: "rounded-xl border bg-white text-sm font-semibold",
           style: { minHeight: 44, borderColor: "#D7DFD9", color: PRIMARY },
           "aria-label": "পৃষ্ঠা " + toBnDigits(i + 1),
@@ -248,6 +249,7 @@ export function QuranScreen() {
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [open, setOpen] = useState(null); // { s, a }
+  const [mushaf, setMushaf] = useState(null); // পৃষ্ঠা-নম্বর
   const [tab, setTab] = useState("surah");
   const [last, setLast] = useState(() => readLastRead());
   const [prefs, setPrefsState] = useState(() => readPrefs());
@@ -372,6 +374,14 @@ export function QuranScreen() {
   const markedSet = new Set(marks.map((x) => markKey(x.s, x.a, x.k)));
   const lastList = sanitizeLastRead(last, surahs);
   const openAt = (s, a) => setOpen({ s, a: a || 1 });
+  // রিডার বন্ধ হওয়ার "back" শেষ হলে তবেই মুসহাফ খোলা; নইলে সেই back নতুন মুসহাফকেও বন্ধ করে দেয়।
+  const openMushafFromReader = (p) => {
+    setOpen(null);
+    let done = false;
+    const go = () => { if (done) return; done = true; window.removeEventListener("popstate", go); setMushaf(p); };
+    window.addEventListener("popstate", go);
+    setTimeout(go, 400);
+  };
 
   return h("div", null,
     lastList.length > 0 && h("div", null,
@@ -382,6 +392,7 @@ export function QuranScreen() {
     ),
     h(Heading, null, "দ্রুত লিংক"),
     h("div", { className: "flex gap-2 overflow-x-auto pb-1" },
+      h(Chip, { key: "mushaf", label: "পৃষ্ঠা-মুসহাফ", onClick: () => setMushaf(lastList.length ? locateAyah(meta, lastList[0].s, lastList[0].a).page : 1) }),
       QUICK_SURAHS.map((n) => h(Chip, { key: n, label: surahs[n - 1].bn, onClick: () => openAt(n, 1) }))
     ),
     h(Heading, null, "সরাসরি আয়াতে যান"),
@@ -389,7 +400,7 @@ export function QuranScreen() {
     h(Tabs, { tab, onTab: setTab }),
     tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
     tab === "para" && h(ParaList, { meta, onOpen: openAt }),
-    tab === "page" && h(PageGrid, { meta, onOpen: openAt }),
+    tab === "page" && h(PageGrid, { meta, onPage: setMushaf }),
     tab === "search" && h(SearchPanel, { meta, onOpen: openAt }),
     tab === "saved" && h(SavedList, {
       meta, marks, sync, onOpen: openAt,
@@ -408,6 +419,16 @@ export function QuranScreen() {
       onClose: () => setOpen(null),
       onPosition: savePos,
       onNavigate: (n) => openAt(n, 1),
+      marked: markedSet,
+      onMark,
+      onOpenMushaf: openMushafFromReader,
+    }),
+    mushaf && h(QuranMushaf, {
+      key: "mushaf",
+      meta, markers, prefs, onPrefs: setPrefs,
+      startPage: mushaf,
+      onClose: () => setMushaf(null),
+      onPosition: savePos,
       marked: markedSet,
       onMark,
     })

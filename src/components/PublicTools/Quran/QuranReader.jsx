@@ -1,9 +1,10 @@
 // QuranReader.jsx — একটা সূরার পূর্ণ-স্ক্রিন পাঠ: বিসমিল্লাহ-শিরোনাম, আরবি + বাংলা অনুবাদ।
 // ৩০ আয়াত করে রেন্ডার (লম্বা সূরায় ধীর হয় না); পাঠের অবস্থান থেমে থেমে onPosition-এ জানায়।
 // ধাপ ৩: পাঠ-সেটিংস (ফন্ট-সাইজ, থিম, আরবি/অনুবাদ সুইচ, আয়াতে যান), পারা/পৃষ্ঠা/সিজদার দাগ, কপি ও শেয়ার।
+// ধাপ ৬খ: "তালিকা / রিডিং" সুইচ — রিডিং মোডে অনুবাদ ছাড়া অবিচ্ছিন্ন আরবি (আয়াতে ট্যাপ করলে শিট)।
 // React global(window.React, globals.js)।
 
-import { ChevronLeft, CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
+import { ChevronLeft, CopyIcon, ShareIcon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
@@ -11,36 +12,10 @@ import {
   PAGE_SIZE, AR_SIZE, TR_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
   locateAyah, ayahShareText, markKey, MARKS_MAX,
 } from "../../../legacy/quranCore.js";
+import { PRIMARY, AR_FONT, TRANSLATOR, LINE, copyText, BookmarkSvg, HeartSvg, actBtn, Stepper, AyahFlow, AyahSheet } from "./quranUi.jsx";
 
-const { useState, useEffect, useRef, useCallback, memo } = React;
+const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
-
-const PRIMARY = "var(--theme-primary, #0E4B43)";
-const AR_FONT = "'Amiri Quran', 'Noto Naskh Arabic', serif";
-const TRANSLATOR = "মুহিউদ্দীন খান";
-const LINE = "rgba(128,128,128,0.28)";
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (e) {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-      document.body.appendChild(ta); ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch (e2) { return false; }
-  }
-}
-
-// বুকমার্ক ও পছন্দের আইকন: সংরক্ষিত থাকলে ভরাট।
-const BookmarkSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M6 3h12v18l-6-4-6 4z", fill: on ? "currentColor" : "none" }));
-const HeartSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z", fill: on ? "currentColor" : "none" }));
-
-const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
 const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, sajda, flash, bm, fav, onCopy, onShare, onMark }) {
@@ -70,21 +45,6 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, saj
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
-
-function Stepper({ label, value, lim, th, onChange }) {
-  const btn = (txt, delta, dis) => h("button", {
-    type: "button", disabled: dis, onClick: () => onChange(value + delta),
-    style: { width: 44, height: 44, borderRadius: 12, border: "1px solid " + LINE, background: "transparent", color: th.fg, fontSize: 20, opacity: dis ? 0.35 : 1 },
-    "aria-label": label + (delta > 0 ? " বাড়ান" : " কমান"),
-  }, txt);
-  return h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" } },
-    h("span", { style: { fontSize: 14 } }, label),
-    h("span", { style: { display: "flex", alignItems: "center", gap: 10 } },
-      btn("−", -lim.step, value <= lim.min),
-      h("span", { style: { minWidth: 28, textAlign: "center", fontWeight: 600 } }, toBnDigits(value)),
-      btn("+", lim.step, value >= lim.max))
-  );
-}
 
 function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onClose }) {
   const [jumpVal, setJumpVal] = useState("");
@@ -119,9 +79,9 @@ function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onC
       ),
       h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
       h(Stepper, { label: "অনুবাদের আকার", value: prefs.trSize, lim: TR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, trSize: v }) }),
-      h("div", { style: { borderTop: "1px solid " + LINE, marginTop: 6 } }),
-      toggle("showAr", "showTr", "আরবি দেখান"),
-      toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
+      prefs.mode !== "read" && h("div", { style: { borderTop: "1px solid " + LINE, marginTop: 6 } }),
+      prefs.mode !== "read" && toggle("showAr", "showTr", "আরবি দেখান"),
+      prefs.mode !== "read" && toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "6px 0 10px" } }),
       h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
       h("div", { style: { display: "flex", gap: 8 } }, themeBtn(0, "সাদা"), themeBtn(1, "সেপিয়া"), themeBtn(2, "ডার্ক")),
@@ -141,7 +101,7 @@ function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onC
   );
 }
 
-export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate, marked, onMark }) {
+export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate, marked, onMark, onOpenMushaf }) {
   const start = startAyah > 1 ? startAyah : 1;
   const [state, setState] = useState({ status: "loading", ayahs: null });
   const [shown, setShown] = useState(Math.max(PAGE_SIZE, start + 10));
@@ -150,6 +110,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   const [jump, setJump] = useState(null);
   const [cur, setCur] = useState(start);
   const [flash, setFlash] = useState({ n: 0, kind: "" });
+  const [sel, setSel] = useState(null); // রিডিং মোডে ট্যাপ করা আয়াত
   const bodyRef = useRef(null);
   const sentinelRef = useRef(null);
   const posRef = useRef(0);
@@ -190,6 +151,19 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     }
   }, [ready]);
 
+  // মোড বদলালে বর্তমান আয়াতে ফিরে যাওয়া (লেআউট বদলে স্ক্রল হারিয়ে যায়)।
+  const firstMode = useRef(true);
+  useEffect(() => {
+    if (firstMode.current) { firstMode.current = false; return undefined; }
+    setSel(null);
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById("q-a-" + (posRef.current || 1));
+      if ((posRef.current || 1) <= 1 && bodyRef.current) bodyRef.current.scrollTop = 0; // শুরুতে থাকলে বিসমিল্লাহসহ ওপরে
+      else if (el) el.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [prefs.mode]);
+
   // "আয়াতে যান": আয়াত এখনো রেন্ডার না হলে আগে তালিকা বাড়ানো, তারপর স্ক্রল।
   useEffect(() => {
     if (!jump || !ready) return;
@@ -227,7 +201,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     }, { root, rootMargin: "0px 0px -75% 0px" });
     root.querySelectorAll("[data-a]").forEach((el) => io.observe(el));
     return () => { io.disconnect(); clearTimeout(timer); };
-  }, [ready, shown]);
+  }, [ready, shown, prefs.mode]);
 
   // বন্ধ করার সময় শেষ অবস্থান নিশ্চিত সংরক্ষণ।
   useEffect(() => () => {
@@ -241,13 +215,15 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     flashTimer.current = setTimeout(() => setFlash({ n: 0, kind: "" }), 1500);
   }, []);
 
+  // রিডিং মোডের শিটে আরবি + অনুবাদ দুটোই দেখানো হয়, তাই কপি/শেয়ারেও দুটোই।
+  const textPrefs = () => (prefsRef.current.mode === "read" ? { ...prefsRef.current, showAr: true, showTr: true } : prefsRef.current);
   const onCopy = useCallback(async (a) => {
-    const ok = await copyText(ayahShareText(surah, a, prefsRef.current, TRANSLATOR));
+    const ok = await copyText(ayahShareText(surah, a, textPrefs(), TRANSLATOR));
     flashFor(a.n, ok ? "copy" : "fail");
   }, [surah, flashFor]);
 
   const onShare = useCallback(async (a) => {
-    const text = ayahShareText(surah, a, prefsRef.current, TRANSLATOR);
+    const text = ayahShareText(surah, a, textPrefs(), TRANSLATOR);
     if (navigator.share) {
       try { await navigator.share({ text }); return; } catch (e) {
         if (e && e.name === "AbortError") return; // ব্যবহারকারী নিজে বাতিল করেছেন
@@ -262,7 +238,9 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     if (r && r.full) flashFor(a.n, "full");
   }, [surah.n, flashFor]);
 
-  const ayahs = ready ? state.ayahs.slice(0, shown) : [];
+  const ayahs = useMemo(() => (ready ? state.ayahs.slice(0, shown) : []), [ready, state.ayahs, shown]);
+  const reading = prefs.mode === "read";
+  const flowItems = useMemo(() => (reading ? ayahs.map((a) => ({ s: surah.n, n: a.n, ar: a.ar })) : []), [reading, ayahs, surah.n]);
   const prev = surah.n > 1 ? meta.surahs[surah.n - 2] : null;
   const next = surah.n < 114 ? meta.surahs[surah.n] : null;
   const where = locateAyah(meta, surah.n, cur);
@@ -276,6 +254,10 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     }, label);
 
   const headBg = prefs.theme === 2 ? th.bar : PRIMARY;
+  const modeBtn = (id, label) => h("button", {
+    key: id, type: "button", onClick: () => prefs.mode !== id && onPrefs({ ...prefs, mode: id }), "aria-pressed": prefs.mode === id,
+    style: { minHeight: 40, padding: "0 16px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "1px solid " + (prefs.mode === id ? accent : LINE), background: prefs.mode === id ? th.bar : "transparent", color: prefs.mode === id ? accent : th.fg },
+  }, label);
 
   return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, display: "flex", flexDirection: "column", background: th.bg, color: th.fg, fontFamily: "'Hind Siliguri', sans-serif" } },
     h("div", { style: { background: headBg, color: "#fff", padding: "10px 8px 10px 12px", display: "flex", alignItems: "center", gap: 8 } },
@@ -288,14 +270,24 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       ),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 48, minHeight: 44, color: "#fff", fontSize: 20, fontWeight: 600 } }, "Aa")
     ),
+    h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid " + LINE } },
+      modeBtn("list", "তালিকা"), modeBtn("read", "রিডিং"),
+      h("span", { style: { flex: 1 } }),
+      onOpenMushaf && ready && h("button", { type: "button", onClick: () => onOpenMushaf(where.page), style: { minHeight: 40, padding: "0 12px", borderRadius: 999, border: "1px solid " + LINE, color: accent, fontSize: 13, fontWeight: 600, background: "transparent" } }, "পৃষ্ঠা-মুসহাফ")
+    ),
     h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px" } },
       state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")
       ),
-      ready && showBismillahHeader(surah.n) && bismillah && prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, bismillah),
-      ayahs.map((a) => {
+      ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, bismillah),
+      ready && reading && h(AyahFlow, {
+        items: flowItems, meta, markers, th, accent, arSize: prefs.arSize,
+        activeKey: sel ? surah.n + ":" + sel.n : "", onTap: (it) => setSel(ayahs[it.n - 1]),
+        headers: false, dividers: true, withIds: true,
+      }),
+      !reading && ayahs.map((a) => {
         const k = surah.n + ":" + a.n;
         return h(AyahRow, {
           key: a.n, a, prefs, th, accent,
@@ -321,6 +313,12 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
         )
       )
     ),
+    reading && sel && h(AyahSheet, {
+      surah, ayah: sel, th, accent, trSize: prefs.trSize,
+      flash: flash.n === sel.n ? flash.kind : "",
+      bm: marked.has(markKey(surah.n, sel.n, "b")), fav: marked.has(markKey(surah.n, sel.n, "f")),
+      onCopy, onShare, onMark: toggleMarkAt, onClose: () => setSel(null),
+    }),
     sheet && h(SettingsSheet, {
       prefs, th, accent, total, curAyah: cur, onPrefs,
       onJump: (n) => { setSheet(false); setJump(n); },

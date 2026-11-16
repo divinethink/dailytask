@@ -62,7 +62,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0 };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list" };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -82,6 +82,7 @@ export function sanitizePrefs(raw) {
     showAr,
     showTr,
     theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)
+    mode: r.mode === "read" ? "read" : "list", // list=আয়াত-তালিকা (অনুবাদসহ), read=অবিচ্ছিন্ন আরবি
   };
 }
 
@@ -123,6 +124,30 @@ function indexIn(meta, starts, s, a) {
 }
 export function locateAyah(meta, s, a) {
   return { juz: indexIn(meta, meta.juz, s, a), page: indexIn(meta, meta.pages, s, a) };
+}
+
+// ───────── ধাপ ৬খ: পৃষ্ঠা-মুসহাফ ─────────
+export const PAGE_COUNT = 604;
+export function clampPage(p) {
+  const n = Math.round(Number(p));
+  return Number.isFinite(n) ? Math.min(PAGE_COUNT, Math.max(1, n)) : 1;
+}
+
+// পৃষ্ঠা p-র আয়াতগুলো ক্রমানুসারে [{s, a}]। শুরু-বিন্দু meta.pages থেকে; শেষ = পরের পৃষ্ঠার শুরুর আগের আয়াত।
+export function pageAyahRefs(meta, p) {
+  const n = clampPage(p);
+  const [s0, a0] = meta.pages[n - 1];
+  const last = meta.surahs[meta.surahs.length - 1];
+  const endG = n < meta.pages.length ? gid(meta, meta.pages[n][0], meta.pages[n][1]) - 1 : last.start + last.ayahs - 1;
+  const out = [];
+  let s = s0;
+  let a = a0;
+  for (let g = gid(meta, s0, a0); g <= endG; g++) {
+    out.push({ s, a });
+    a += 1;
+    if (a > meta.surahs[s - 1].ayahs) { s += 1; a = 1; }
+  }
+  return out;
 }
 
 // UI-র দাগ: কোন আয়াতে পারা/পৃষ্ঠা শুরু, কোনটা সিজদার আয়াত। কী = "সূরা:আয়াত"।
