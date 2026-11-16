@@ -918,12 +918,12 @@
    "sha256": "cc6cf80d984078557fdbb6b4a586c96ca87df9ebc7bc95d1be6055612bb50d26"
   },
   "meta.json": {
-   "bytes": 26304,
-   "sha256": "4c25ed613093a3a19ddae6b4183c019abf7ee24fa9c8a855c0599d19a81f9c28"
+   "bytes": 26392,
+   "sha256": "acd383fae37243f4362ac8f640b22ee636f8a09305da71272f680231a3efb0d5"
   },
   "translations.json": {
-   "bytes": 256,
-   "sha256": "8ce20a3a682229ba618879fe3cc773f2677a798180a1f234793cb72829bafe46"
+   "bytes": 261,
+   "sha256": "eb5fab0d194e9cce209656254441b54dd2c284c11f8d86549ccf1bd83aec81d8"
   },
   "manifest.json": {
    "bytes": 517,

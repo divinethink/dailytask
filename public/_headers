@@ -11,3 +11,7 @@
 # Safe to cache for 1 year. sw.js / index.html / manifest are NOT under /assets/ (unaffected).
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# কুরআনের ডেটা: পথের v1 অপরিবর্তনীয় (বদলাতে হলে v2 ফোল্ডার), তাই ১ বছর cache নিরাপদ।
+/quran/v1/*
+  Cache-Control: public, max-age=31536000, immutable

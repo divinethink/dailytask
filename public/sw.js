@@ -1,6 +1,10 @@
 // v3: /assets/* (Vite hashed build files) এখন cache-first; activate-এ পুরনো
 // "daily-task-v2" cache স্বয়ংক্রিয়ভাবে মুছে যায় (নিচের activate handler)।
 const CACHE = "daily-task-v5";
+// কুরআনের ডেটা (/quran/v1/*): আলাদা cache, যাতে অ্যাপ-আপডেটে (CACHE নাম বদলে) এটা মুছে না যায়।
+// পথের v1 অপরিবর্তনীয় ধরা হয় — ডেটা বদলাতে হলে নতুন ফোল্ডার (v2) ও নতুন cache-নাম।
+const QURAN_CACHE = "quran-v1";
+const QURAN_PREFIX = "/quran/v1/";
 // /assets/ entry-র সর্বোচ্চ সংখ্যা — প্রতি deploy-এ নতুন hash জমে cache
 // অনির্দিষ্টকাল বাড়া ঠেকাতে; সীমা ছাড়ালে সবচেয়ে পুরনো entry আগে বাদ যায়।
 const MAX_ASSET_ENTRIES = 100;
@@ -43,6 +47,35 @@ async function trimAssetCache(cache) {
   for (let i = 0; i < extra; i++) await cache.delete(assetKeys[i]);
 }
 
+function isQuranData(url) {
+  try {
+    return new URL(url).pathname.startsWith(QURAN_PREFIX);
+  } catch {
+    return false;
+  }
+}
+
+// কুরআনের ডেটা: cache-first (অফলাইনে পড়া যায়); ব্যর্থ/ভুল-ধরনের response cache হয় না।
+async function quranCacheFirst(request) {
+  const cache = await caches.open(QURAN_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  try {
+    const res = await fetch(request);
+    const ct = res.headers.get("content-type") || "";
+    if (res.status === 200 && !ct.includes("text/html")) {
+      try {
+        await cache.put(request, res.clone());
+      } catch {
+        // cache-write ব্যর্থ হলেও response ফেরত যাবে
+      }
+    }
+    return res;
+  } catch {
+    return new Response("", { status: 503, statusText: "Offline" });
+  }
+}
+
 async function assetCacheFirst(request) {
   const cache = await caches.open(CACHE);
   const cached = await cache.match(request);
@@ -77,7 +110,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE && k !== QURAN_CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -100,6 +133,12 @@ self.addEventListener("fetch", (e) => {
   // (same-origin) static asset-ই SW cache করবে, বাকি সব browser-এর
   // default(direct network) আচরণে ছেড়ে দেওয়া হচ্ছে।
   if (!e.request.url.startsWith(self.location.origin)) return;
+
+  // কুরআনের ডেটা → আলাদা cache-first।
+  if (isQuranData(e.request.url)) {
+    e.respondWith(quranCacheFirst(e.request));
+    return;
+  }
 
   // [নতুন] hashed build asset → cache-first (নিচের stale-while-revalidate
   // শুধু index.html/manifest/icon-এর জন্য থাকে — auto-update logic অপরিবর্তিত)।

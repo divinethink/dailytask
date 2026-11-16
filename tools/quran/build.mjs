@@ -146,7 +146,7 @@ const surahs = bn.map((x, i) => ({
   ayahs: counts[i],
   start: surahStart[x.id], // গ্লোবাল আয়াত-নম্বর (১..৬২৩৬)
 }));
-const meta = { v: 1, surahs, juz, pages, rukus, sajdas };
+const meta = { v: 1, bismillah: BISMILLAH, surahs, juz, pages, rukus, sajdas }; // bismillah = সূরা-শিরোনামের লাইন (UI)
 record("meta.json", writeJson(path.join(OUT, "meta.json"), meta));
 
 // অনুবাদ-রেজিস্ট্রি: নতুন অনুবাদ = tr/<id>/ ফোল্ডার + এখানে এক এন্ট্রি।
@@ -161,7 +161,7 @@ const translations = {
       nameEn: "Muhiuddin Khan",
       source: "Tanzil.net (bn.bengali)",
       sourceUrl: "https://tanzil.net/trans/bn.bengali",
-      licenseStatus: "unverified",
+      licenseStatus: "owner-confirmed", // Owner নিশ্চিত করেছেন (১৬ নভেম্বর ২০২৬); Tanzil-এর উৎস-উল্লেখ UI-তে থাকে
     },
   ],
 };

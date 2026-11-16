@@ -86,6 +86,7 @@ test("অনুবাদ-রেজিস্ট্রির প্রতিটা
 
 test("meta: ১১৪ সূরা, গ্লোবাল শুরু-নম্বর ক্রমানুসারে, নাম/ধরন আছে", () => {
   assert.equal(meta.surahs.length, 114);
+  assert.equal(meta.bismillah, manifest.arabic.bismillah);
   let g = 1;
   meta.surahs.forEach((x, i) => {
     assert.equal(x.n, i + 1);
