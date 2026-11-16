@@ -12,7 +12,8 @@ import {
   PAGE_SIZE, AR_SIZE, TR_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
   locateAyah, ayahShareText, markKey, MARKS_MAX,
 } from "../../../legacy/quranCore.js";
-import { PRIMARY, AR_FONT, TRANSLATOR, LINE, copyText, BookmarkSvg, HeartSvg, actBtn, Stepper, AyahFlow, AyahSheet } from "./quranUi.jsx";
+import { fontStack } from "../../../legacy/quranFonts.js";
+import { PRIMARY, TRANSLATOR, LINE, copyText, BookmarkSvg, HeartSvg, actBtn, Stepper, AyahFlow, AyahSheet, FontPicker, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
@@ -30,7 +31,7 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, saj
       h("span", { style: { fontSize: 11, ...muted } },
         sajda ? "۩ সিজদার আয়াত" : null, sajda && pageNo ? "  ·  " : null, pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : null)
     ),
-    prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
+    prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.8, color: th.fg, opacity: 0.9, marginTop: prefs.showAr ? 6 : 0 } }, a.tr),
     h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 } },
       h("button", { type: "button", onClick: () => onCopy(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " কপি করুন" },
@@ -86,6 +87,8 @@ function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onC
       h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
       h("div", { style: { display: "flex", gap: 8 } }, themeBtn(0, "সাদা"), themeBtn(1, "সেপিয়া"), themeBtn(2, "ডার্ক")),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 10px" } }),
+      h(FontPicker, { prefs, th, accent, script: "simple", onPrefs }),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 10px" } }),
       h("div", { style: { fontSize: 14, marginBottom: 8 } }, "এই সূরার আয়াতে যান (১–" + toBnDigits(total) + ")"),
       h("div", { style: { display: "flex", gap: 8 } },
         h("input", {
@@ -123,6 +126,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   onMarkRef.current = onMark;
 
   useBackLayer(true, onClose);
+  useEnsureFont(prefs.arFont);
   useBackLayer(sheet, () => setSheet(false));
 
   const th = THEMES[prefs.theme] || THEMES[0];
@@ -281,9 +285,9 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")
       ),
-      ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, bismillah),
+      ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, bismillah),
       ready && reading && h(AyahFlow, {
-        items: flowItems, meta, markers, th, accent, arSize: prefs.arSize,
+        items: flowItems, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont,
         activeKey: sel ? surah.n + ":" + sel.n : "", onTap: (it) => setSel(ayahs[it.n - 1]),
         headers: false, dividers: true, withIds: true,
       }),

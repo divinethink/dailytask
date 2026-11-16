@@ -1,6 +1,8 @@
 // quranCore.js — কুরআন-রিডারের pure লজিক (Firebase/React-মুক্ত, node --test-যোগ্য)।
 // ডেটা-ফাইলের গঠন/উৎস: tools/quran/build.mjs। এখানে শুধু যাচাই, নাম-লেবেল ও "শেষ পাঠ"-এর হিসাব।
 
+import { DEFAULT_FONT, isValidFont } from "./quranFonts.js";
+
 export const QURAN_BASE = "/quran/v1"; // ডেটা বদলাতে হলে নতুন ফোল্ডার (v2) — sw.js-এর cache-first নিয়মের কারণে।
 export const DEFAULT_TRANSLATION = "bn_khan";
 export const LAST_READ_MAX = 3;
@@ -62,7 +64,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list" };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -83,6 +85,7 @@ export function sanitizePrefs(raw) {
     showTr,
     theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)
     mode: r.mode === "read" ? "read" : "list", // list=আয়াত-তালিকা (অনুবাদসহ), read=অবিচ্ছিন্ন আরবি
+    arFont: isValidFont(r.arFont) ? r.arFont : DEFAULT_FONT, // quranFonts.js-এর id; অজানা → আমিরি
   };
 }
 

@@ -5,13 +5,14 @@
 
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
+import { fontStack, fontsForScript } from "../../../legacy/quranFonts.js";
+import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX } from "../../../legacy/quranCore.js";
 
 const { useState, useEffect, useRef, useCallback } = React;
 const h = React.createElement;
 
 export const PRIMARY = "var(--theme-primary, #0E4B43)";
-export const AR_FONT = "'Amiri Quran', 'Noto Naskh Arabic', serif";
 export const TRANSLATOR = "মুহিউদ্দীন খান";
 export const LINE = "rgba(128,128,128,0.28)";
 
@@ -52,17 +53,51 @@ export function Stepper({ label, value, lim, th, onChange }) {
   );
 }
 
+// ───── আরবি ফন্ট-বাছাই (লাইভ প্রিভিউসহ) ─────
+// বাছলেই পাঠ-পর্দায় বদলে যায়; ফন্ট নামার সময় আমিরি দেখায়, না নামলে জানায় ও আমিরিতেই চলে।
+export function useEnsureFont(fontId) {
+  useEffect(() => { ensureFont(fontId); }, [fontId]);
+}
+
+export function FontPicker({ prefs, th, accent, script, onPrefs }) {
+  const [st, setSt] = useState({ id: "", status: "" }); // status: loading | fail
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const pick = (id) => {
+    if (id === prefs.arFont) return;
+    onPrefs({ ...prefs, arFont: id });
+    setSt({ id, status: "loading" });
+    ensureFont(id).then((ok) => { if (alive.current) setSt({ id, status: ok ? "" : "fail" }); });
+  };
+  const list = fontsForScript(script || "simple");
+  return h("div", null,
+    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "আরবি ফন্ট"),
+    h("div", { dir: "rtl", lang: "ar", "aria-label": "ফন্টের প্রিভিউ", style: { fontFamily: fontStack(prefs.arFont), fontSize: Math.min(prefs.arSize, 34), lineHeight: 2.1, textAlign: "center", padding: "6px 8px", borderRadius: 12, background: th.bar, color: th.fg } }, "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"),
+    h("div", { role: "radiogroup", "aria-label": "আরবি ফন্ট", style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } },
+      list.map((f) => {
+        const on = prefs.arFont === f.id;
+        return h("button", {
+          key: f.id, type: "button", role: "radio", "aria-checked": on, onClick: () => pick(f.id),
+          style: { display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "0 12px", borderRadius: 12, textAlign: "left", color: th.fg, background: "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
+        },
+          h("span", null, h("span", { style: { fontSize: 14, fontWeight: 600 } }, f.name), h("span", { style: { fontSize: 11, opacity: 0.6, marginLeft: 8 } }, f.family)),
+          h("span", { style: { fontSize: 12, color: accent } }, on ? (st.id === f.id && st.status === "loading" ? "নামছে…" : "বাছা ✓") : ""));
+      })),
+    st.status === "fail" && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "ফন্টটা নামানো যায়নি (ইন্টারনেট দেখুন)। আপাতত আমিরি কুরআনে দেখানো হচ্ছে।")
+  );
+}
+
 // ───── অবিচ্ছিন্ন আরবি লেখা ─────
 // items: [{s, n, ar}] (ক্রমানুসারে, একাধিক সূরা থাকতে পারে)।
 // headers: সূরার শিরোনাম + বিসমিল্লাহ বসবে কি (মুসহাফে হ্যাঁ; রিডারে নিজের শিরোনাম আছে, তাই না)।
 // dividers: পৃষ্ঠা/পারার শুরুতে ডিভাইডার (রিডিং মোডে)।
 // withIds: স্ক্রলে যাওয়া ও অবস্থান-ট্র্যাকিংয়ের জন্য id/data-a (শুধু একসূরার রিডারে)।
-export function AyahFlow({ items, meta, markers, th, accent, arSize, activeKey, onTap, headers, dividers, withIds }) {
+export function AyahFlow({ items, meta, markers, th, accent, arSize, font, activeKey, onTap, headers, dividers, withIds }) {
   const blocks = [];
   let run = [];
   const flush = (k) => {
     if (!run.length) return;
-    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: arSize, lineHeight: 2.3, textAlign: "justify", color: th.fg, margin: "4px 0" } }, run));
+    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.3, textAlign: "justify", color: th.fg, margin: "4px 0" } }, run));
     run = [];
   };
   items.forEach((it, i) => {
@@ -80,8 +115,8 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, activeKey, 
       blocks.push(h("div", { key: "h" + key, style: { textAlign: "center", margin: "14px 0 6px" } },
         h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1.5px solid " + accent, borderRadius: 12, padding: "6px 14px", background: th.bar, color: accent } },
           h("span", { style: { fontSize: 12, fontWeight: 600 } }, toBnDigits(sm.n) + ". " + sm.bn),
-          h("span", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: 24, lineHeight: 1.8 } }, "سورة " + sm.ar)),
-        showBismillahHeader(it.s) && meta.bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: arSize, lineHeight: 2.2, color: th.fg, padding: "6px 0 0" } }, meta.bismillah)));
+          h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: 24, lineHeight: 1.8 } }, "سورة " + sm.ar)),
+        showBismillahHeader(it.s) && meta.bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.2, color: th.fg, padding: "6px 0 0" } }, meta.bismillah)));
     }
     const active = activeKey === key;
     run.push(h("span", {

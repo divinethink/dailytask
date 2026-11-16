@@ -8,7 +8,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import { AR_SIZE, PAGE_COUNT, clampPage, pageAyahRefs, locateAyah, toBnDigits, markKey } from "../../../legacy/quranCore.js";
-import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions } from "./quranUi.jsx";
+import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef } = React;
 const h = React.createElement;
@@ -48,7 +48,9 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
       bad && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "১ থেকে " + toBnDigits(PAGE_COUNT) + "-এর মধ্যে একটা নম্বর লিখুন।"),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 6px" } }),
       h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
-      h("div", { style: { fontSize: 14, margin: "8px 0" } }, "পাতার রং"),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      h(FontPicker, { prefs, th, accent, script: "simple", onPrefs }),
+      h("div", { style: { fontSize: 14, margin: "12px 0 8px" } }, "পাতার রং"),
       h("div", { style: { display: "flex", gap: 8 } }, themeBtn(0, "সাদা"), themeBtn(1, "সেপিয়া"), themeBtn(2, "ডার্ক"))
     )
   );
@@ -68,6 +70,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
   const actions = useAyahActions(meta.surahs, onMark);
 
   useBackLayer(true, onClose);
+  useEnsureFont(prefs.arFont);
 
   const th = THEMES[prefs.theme] || THEMES[0];
   const accent = prefs.theme === 2 ? "#9FD4C4" : PRIMARY;
@@ -153,7 +156,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
-      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
+      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
       state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "16px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
     ),
     h("div", { style: { display: "flex", gap: 8, padding: "8px 12px calc(8px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid " + LINE, background: th.bg } },
