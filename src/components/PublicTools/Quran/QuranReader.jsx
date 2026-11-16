@@ -1,30 +1,160 @@
 // QuranReader.jsx — একটা সূরার পূর্ণ-স্ক্রিন পাঠ: বিসমিল্লাহ-শিরোনাম, আরবি + বাংলা অনুবাদ।
 // ৩০ আয়াত করে রেন্ডার (লম্বা সূরায় ধীর হয় না); পাঠের অবস্থান থেমে থেমে onPosition-এ জানায়।
+// ধাপ ৩: পাঠ-সেটিংস (ফন্ট-সাইজ, থিম, আরবি/অনুবাদ সুইচ, আয়াতে যান), পারা/পৃষ্ঠা/সিজদার দাগ, কপি ও শেয়ার।
 // React global(window.React, globals.js)।
 
-import { ChevronLeft } from "../../icons.jsx";
+import { ChevronLeft, CopyIcon, ShareIcon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
+import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
-import { PAGE_SIZE, showBismillahHeader, surahTypeLabel, toBnDigits } from "../../../legacy/quranCore.js";
+import {
+  PAGE_SIZE, AR_SIZE, TR_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
+  locateAyah, ayahShareText,
+} from "../../../legacy/quranCore.js";
 
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useCallback, memo } = React;
 const h = React.createElement;
 
 const PRIMARY = "var(--theme-primary, #0E4B43)";
 const AR_FONT = "'Amiri Quran', 'Noto Naskh Arabic', serif";
+const TRANSLATOR = "মুহিউদ্দীন খান";
+const LINE = "rgba(128,128,128,0.28)";
 
-export function QuranReader({ surah, meta, startAyah, bismillah, onClose, onPosition, onNavigate }) {
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e2) { return false; }
+  }
+}
+
+const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
+
+// প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
+const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, sajda, flash, onCopy, onShare }) {
+  const muted = { color: th.fg, opacity: 0.62 };
+  return h("div", { id: "q-a-" + a.n, "data-a": a.n, style: { padding: "14px 0", borderBottom: "1px solid " + LINE } },
+    juzNo > 0 && h("div", { style: { textAlign: "center", margin: "0 0 12px" } },
+      h("span", { style: { display: "inline-block", padding: "4px 14px", borderRadius: 999, background: th.bar, color: accent, fontSize: 12, fontWeight: 600 } },
+        "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1])
+    ),
+    h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } },
+      h("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 28, height: 28, padding: "0 8px", borderRadius: 14, background: th.bar, color: accent, fontSize: 13, fontWeight: 600 } }, toBnDigits(a.n)),
+      h("span", { style: { fontSize: 11, ...muted } },
+        sajda ? "۩ সিজদার আয়াত" : null, sajda && pageNo ? "  ·  " : null, pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : null)
+    ),
+    prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
+    prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.8, color: th.fg, opacity: 0.9, marginTop: prefs.showAr ? 6 : 0 } }, a.tr),
+    h("div", { style: { display: "flex", gap: 4, marginTop: 6 } },
+      h("button", { type: "button", onClick: () => onCopy(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " কপি করুন" },
+        h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
+      h("button", { type: "button", onClick: () => onShare(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " শেয়ার করুন" },
+        h(ShareIcon, { size: 17 }), "শেয়ার")
+    )
+  );
+});
+
+function Stepper({ label, value, lim, th, onChange }) {
+  const btn = (txt, delta, dis) => h("button", {
+    type: "button", disabled: dis, onClick: () => onChange(value + delta),
+    style: { width: 44, height: 44, borderRadius: 12, border: "1px solid " + LINE, background: "transparent", color: th.fg, fontSize: 20, opacity: dis ? 0.35 : 1 },
+    "aria-label": label + (delta > 0 ? " বাড়ান" : " কমান"),
+  }, txt);
+  return h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" } },
+    h("span", { style: { fontSize: 14 } }, label),
+    h("span", { style: { display: "flex", alignItems: "center", gap: 10 } },
+      btn("−", -lim.step, value <= lim.min),
+      h("span", { style: { minWidth: 28, textAlign: "center", fontWeight: 600 } }, toBnDigits(value)),
+      btn("+", lim.step, value >= lim.max))
+  );
+}
+
+function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onClose }) {
+  const [jumpVal, setJumpVal] = useState("");
+  const [bad, setBad] = useState(false);
+  const toggle = (key, other, label) => {
+    const lastOne = prefs[key] && !prefs[other]; // একমাত্র চালু সুইচটা বন্ধ করা যাবে না
+    return h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", fontSize: 14, opacity: lastOne ? 0.6 : 1 } },
+      label,
+      h("input", { type: "checkbox", checked: prefs[key], disabled: lastOne, onChange: (e) => onPrefs({ ...prefs, [key]: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
+    );
+  };
+  const themeBtn = (idx, label) => {
+    const t = THEMES[idx];
+    const on = prefs.theme === idx;
+    return h("button", {
+      key: idx, type: "button", onClick: () => onPrefs({ ...prefs, theme: idx }),
+      style: { flex: 1, minHeight: 44, borderRadius: 12, background: t.bg, color: t.fg, fontSize: 13, fontWeight: 600, border: on ? "2px solid " + accent : "1px solid " + LINE },
+      "aria-pressed": on,
+    }, label);
+  };
+  const go = () => {
+    const n = Number(String(jumpVal).replace(/[০-৯]/g, (d) => "০১২৩৪৫৬৭৮৯".indexOf(d)));
+    if (!Number.isInteger(n) || n < 1 || n > total) { setBad(true); return; }
+    setBad(false);
+    onJump(n);
+  };
+  return h("div", { style: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.4)" }, onClick: onClose },
+    h("div", { onClick: (e) => e.stopPropagation(), style: { background: th.bg, color: th.fg, borderRadius: "18px 18px 0 0", padding: "14px 18px 22px", maxHeight: "85%", overflowY: "auto" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
+        h("strong", { style: { fontSize: 16 } }, "পাঠ-সেটিংস"),
+        h("button", { type: "button", onClick: onClose, style: { minHeight: 40, padding: "0 12px", color: accent, fontWeight: 600 } }, "বন্ধ করুন")
+      ),
+      h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
+      h(Stepper, { label: "অনুবাদের আকার", value: prefs.trSize, lim: TR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, trSize: v }) }),
+      h("div", { style: { borderTop: "1px solid " + LINE, marginTop: 6 } }),
+      toggle("showAr", "showTr", "আরবি দেখান"),
+      toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "6px 0 10px" } }),
+      h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
+      h("div", { style: { display: "flex", gap: 8 } }, themeBtn(0, "সাদা"), themeBtn(1, "সেপিয়া"), themeBtn(2, "ডার্ক")),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 10px" } }),
+      h("div", { style: { fontSize: 14, marginBottom: 8 } }, "এই সূরার আয়াতে যান (১–" + toBnDigits(total) + ")"),
+      h("div", { style: { display: "flex", gap: 8 } },
+        h("input", {
+          type: "text", inputMode: "numeric", value: jumpVal, placeholder: "যেমন " + toBnDigits(Math.max(1, Math.min(total, curAyah + 9))),
+          onChange: (e) => { setJumpVal(e.target.value); setBad(false); },
+          onKeyDown: (e) => { if (e.key === "Enter") go(); },
+          style: { flex: 1, minHeight: 44, borderRadius: 12, border: "1px solid " + (bad ? "#D64545" : LINE), padding: "0 12px", fontSize: 16, background: "transparent", color: th.fg },
+        }),
+        h("button", { type: "button", onClick: go, style: { minHeight: 44, padding: "0 20px", borderRadius: 12, background: PRIMARY, color: "#fff", fontWeight: 600 } }, "যান")
+      ),
+      bad && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "১ থেকে " + toBnDigits(total) + "-এর মধ্যে একটা নম্বর লিখুন।")
+    )
+  );
+}
+
+export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate }) {
   const start = startAyah > 1 ? startAyah : 1;
   const [state, setState] = useState({ status: "loading", ayahs: null });
   const [shown, setShown] = useState(Math.max(PAGE_SIZE, start + 10));
   const [tries, setTries] = useState(0);
+  const [sheet, setSheet] = useState(false);
+  const [jump, setJump] = useState(null);
+  const [cur, setCur] = useState(start);
+  const [flash, setFlash] = useState({ n: 0, kind: "" });
   const bodyRef = useRef(null);
   const sentinelRef = useRef(null);
   const posRef = useRef(0);
   const posCb = useRef(onPosition);
   posCb.current = onPosition;
+  const flashTimer = useRef(null);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   useBackLayer(true, onClose);
+  useBackLayer(sheet, () => setSheet(false));
+
+  const th = THEMES[prefs.theme] || THEMES[0];
+  const accent = prefs.theme === 2 ? "#9FD4C4" : PRIMARY;
 
   useEffect(() => {
     let alive = true;
@@ -49,6 +179,14 @@ export function QuranReader({ surah, meta, startAyah, bismillah, onClose, onPosi
     }
   }, [ready]);
 
+  // "আয়াতে যান": আয়াত এখনো রেন্ডার না হলে আগে তালিকা বাড়ানো, তারপর স্ক্রল।
+  useEffect(() => {
+    if (!jump || !ready) return;
+    const el = document.getElementById("q-a-" + jump);
+    if (el) { el.scrollIntoView({ block: "start" }); setJump(null); }
+    else setShown((s) => Math.min(total, Math.max(s, jump + 10)));
+  }, [jump, shown, ready]);
+
   // স্ক্রল-শেষে আরও আয়াত দেখানো।
   useEffect(() => {
     if (!ready || shown >= total) return undefined;
@@ -62,7 +200,7 @@ export function QuranReader({ surah, meta, startAyah, bismillah, onClose, onPosi
     return () => io.disconnect();
   }, [ready, shown, total]);
 
-  // পাঠের অবস্থান: স্ক্রিনের ওপরের অংশে যে আয়াত, তা ০.৭ সেকেন্ড থেমে থাকলে সংরক্ষণ।
+  // পাঠের অবস্থান: স্ক্রিনের ওপরের অংশে যে আয়াত, তা ০.৭ সেকেন্ড থেমে থাকলে সংরক্ষণ ও শিরোনামে পারা/পৃষ্ঠা হালনাগাদ।
   useEffect(() => {
     if (!ready || typeof IntersectionObserver === "undefined") return undefined;
     const root = bodyRef.current;
@@ -74,61 +212,101 @@ export function QuranReader({ surah, meta, startAyah, bismillah, onClose, onPosi
       if (!a || a === posRef.current) return;
       posRef.current = a;
       clearTimeout(timer);
-      timer = setTimeout(() => posCb.current(surah.n, a), 700);
+      timer = setTimeout(() => { posCb.current(surah.n, a); setCur(a); }, 700);
     }, { root, rootMargin: "0px 0px -75% 0px" });
     root.querySelectorAll("[data-a]").forEach((el) => io.observe(el));
     return () => { io.disconnect(); clearTimeout(timer); };
   }, [ready, shown]);
 
   // বন্ধ করার সময় শেষ অবস্থান নিশ্চিত সংরক্ষণ।
-  useEffect(() => () => { if (posRef.current) posCb.current(surah.n, posRef.current); }, []);
+  useEffect(() => () => {
+    if (posRef.current) posCb.current(surah.n, posRef.current);
+    clearTimeout(flashTimer.current);
+  }, []);
+
+  const flashFor = useCallback((n, kind) => {
+    setFlash({ n, kind });
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash({ n: 0, kind: "" }), 1500);
+  }, []);
+
+  const onCopy = useCallback(async (a) => {
+    const ok = await copyText(ayahShareText(surah, a, prefsRef.current, TRANSLATOR));
+    flashFor(a.n, ok ? "copy" : "fail");
+  }, [surah, flashFor]);
+
+  const onShare = useCallback(async (a) => {
+    const text = ayahShareText(surah, a, prefsRef.current, TRANSLATOR);
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (e) {
+        if (e && e.name === "AbortError") return; // ব্যবহারকারী নিজে বাতিল করেছেন
+      }
+    }
+    const ok = await copyText(text); // শেয়ার সম্ভব না হলে কপি
+    flashFor(a.n, ok ? "copy" : "fail");
+  }, [surah, flashFor]);
 
   const ayahs = ready ? state.ayahs.slice(0, shown) : [];
   const prev = surah.n > 1 ? meta.surahs[surah.n - 2] : null;
   const next = surah.n < 114 ? meta.surahs[surah.n] : null;
+  const where = locateAyah(meta, surah.n, cur);
 
   const navBtn = (label, target) =>
     h("button", {
       type: "button",
       onClick: () => onNavigate(target.n),
       className: "flex-1 py-3 rounded-xl border text-sm font-semibold",
-      style: { borderColor: "#D7DFD9", color: PRIMARY, background: "#fff" },
+      style: { borderColor: LINE, color: accent, background: "transparent" },
     }, label);
 
-  return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, display: "flex", flexDirection: "column", background: "#FFFFFF", fontFamily: "'Hind Siliguri', sans-serif" } },
-    h("div", { style: { background: PRIMARY, color: "#fff", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8 } },
+  const headBg = prefs.theme === 2 ? th.bar : PRIMARY;
+
+  return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, display: "flex", flexDirection: "column", background: th.bg, color: th.fg, fontFamily: "'Hind Siliguri', sans-serif" } },
+    h("div", { style: { background: headBg, color: "#fff", padding: "10px 8px 10px 12px", display: "flex", alignItems: "center", gap: 8 } },
       h("button", { type: "button", onClick: onClose, "aria-label": "ফিরে যান", style: { padding: 8, color: "#fff" } }, h(ChevronLeft, { size: 22 })),
-      h("div", { style: { minWidth: 0 } },
+      h("div", { style: { minWidth: 0, flex: 1 } },
         h("div", { style: { fontWeight: 600, fontSize: 17, lineHeight: 1.3 } }, toBnDigits(surah.n) + ". " + surah.bn),
-        h("div", { style: { fontSize: 12, opacity: 0.85 } }, surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত")
-      )
+        h("div", { style: { fontSize: 12, opacity: 0.85 } },
+          surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত"),
+        ready && h("div", { style: { fontSize: 11, opacity: 0.75 } }, "পারা " + toBnDigits(where.juz) + " · পৃষ্ঠা " + toBnDigits(where.page))
+      ),
+      h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 48, minHeight: 44, color: "#fff", fontSize: 20, fontWeight: 600 } }, "Aa")
     ),
     h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px" } },
-      state.status === "loading" && h("p", { className: "text-center text-sm text-gray-500 py-16" }, "লোড হচ্ছে…"),
+      state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
       state.status === "error" && h("div", { className: "text-center py-16" },
-        h("p", { className: "text-sm text-gray-700 mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
+        h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")
       ),
-      ready && showBismillahHeader(surah.n) && bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: 28, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: "#1F2D2A" } }, bismillah),
-      ayahs.map((a) =>
-        h("div", { key: a.n, id: "q-a-" + a.n, "data-a": a.n, style: { padding: "14px 0", borderBottom: "1px solid #EEF2EF" } },
-          h("div", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 28, height: 28, padding: "0 8px", borderRadius: 14, background: "#E8F0EE", color: PRIMARY, fontSize: 13, fontWeight: 600, marginBottom: 8 } }, toBnDigits(a.n)),
-          h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: 28, lineHeight: 2.2, color: "#1F2D2A" } }, a.ar),
-          h("p", { style: { fontSize: 16, lineHeight: 1.8, color: "#2B3A35", marginTop: 6 } }, a.tr)
-        )
-      ),
+      ready && showBismillahHeader(surah.n) && bismillah && prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, bismillah),
+      ayahs.map((a) => {
+        const k = surah.n + ":" + a.n;
+        return h(AyahRow, {
+          key: a.n, a, prefs, th, accent,
+          juzNo: markers.juz.get(k) || 0,
+          pageNo: markers.page.get(k) || 0,
+          sajda: markers.sajda.has(k),
+          flash: flash.n === a.n ? flash.kind : "",
+          onCopy, onShare,
+        });
+      }),
       ready && shown < total && h("div", { ref: sentinelRef, style: { height: 40 }, "aria-hidden": "true" }),
       ready && shown >= total && h("div", null,
         h("div", { style: { display: "flex", gap: 10, marginTop: 24 } },
           prev ? navBtn("← " + prev.bn, prev) : null,
           next ? navBtn(next.bn + " →", next) : null
         ),
-        h("p", { style: { fontSize: 11, color: "#7B8A84", textAlign: "center", marginTop: 20, lineHeight: 1.6 } },
+        h("p", { style: { fontSize: 11, opacity: 0.6, textAlign: "center", marginTop: 20, lineHeight: 1.6 } },
           "আরবি পাঠ: ",
           h("a", { href: "https://tanzil.net", target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "underline" } }, "Tanzil.net"),
-          " · বাংলা অনুবাদ: মুহিউদ্দীন খান"
+          " · বাংলা অনুবাদ: " + TRANSLATOR
         )
       )
-    )
+    ),
+    sheet && h(SettingsSheet, {
+      prefs, th, accent, total, curAyah: cur, onPrefs,
+      onJump: (n) => { setSheet(false); setJump(n); },
+      onClose: () => setSheet(false),
+    })
   );
 }

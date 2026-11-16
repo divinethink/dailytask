@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   toBnDigits, pad3, surahTypeLabel, showBismillahHeader, refLabel, parseSurahPayload,
   sanitizeLastRead, pushLastRead, LAST_READ_MAX, QUICK_SURAHS,
+  DEFAULT_PREFS, AR_SIZE, TR_SIZE, sanitizePrefs, PARA_NAMES, parseRef, locateAyah, buildMarkers, ayahShareText,
 } from "../src/legacy/quranCore.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -85,4 +86,71 @@ test("pushLastRead: একই সূরা সামনে আসে, ৩-এর
   l = pushLastRead(l, 2, 100, 5);
   assert.deepEqual(l.map((x) => [x.s, x.a]), [[2, 100], [4, 5], [3, 5]]);
   assert.deepEqual(pushLastRead(null, 5, 1, 1), [{ s: 5, a: 1, t: 1 }]);
+});
+
+test("sanitizePrefs: ডিফল্ট, সীমা, দুটোই বন্ধ হওয়া আটকানো", () => {
+  assert.deepEqual(sanitizePrefs(null), DEFAULT_PREFS);
+  assert.deepEqual(sanitizePrefs("x"), DEFAULT_PREFS);
+  const p = sanitizePrefs({ arSize: 999, trSize: 1, showAr: false, showTr: false, theme: 7 });
+  assert.equal(p.arSize, AR_SIZE.max);
+  assert.equal(p.trSize, TR_SIZE.min);
+  assert.equal(p.showAr, true); // দুটোই false হলে আরবি ফেরে
+  assert.equal(p.theme, 0);
+  assert.equal(sanitizePrefs({ showAr: false, showTr: true, theme: 2 }).showAr, false);
+  assert.equal(sanitizePrefs({ theme: 2 }).theme, 2);
+  assert.equal(sanitizePrefs({ arSize: "abc" }).arSize, AR_SIZE.def);
+});
+
+test("পারার নাম ৩০টি", () => {
+  assert.equal(PARA_NAMES.length, 30);
+  PARA_NAMES.forEach((n) => assert.ok(n && n.length > 2));
+});
+
+test("parseRef: বাংলা/ইংরেজি/আরবি অঙ্ক, বিভিন্ন বিভাজক; অবৈধ → null", () => {
+  const S = meta.surahs;
+  assert.deepEqual(parseRef("২:২৫৫", S), { s: 2, a: 255 });
+  assert.deepEqual(parseRef("2:255", S), { s: 2, a: 255 });
+  assert.deepEqual(parseRef(" 36 / 1 ", S), { s: 36, a: 1 });
+  assert.deepEqual(parseRef("18.10", S), { s: 18, a: 10 });
+  assert.deepEqual(parseRef("٢:٢٥٥", S), { s: 2, a: 255 });
+  assert.deepEqual(parseRef("114 6", S), { s: 114, a: 6 });
+  assert.equal(parseRef("2:287", S), null); // বাকারায় ২৮৬
+  assert.equal(parseRef("115:1", S), null);
+  assert.equal(parseRef("0:1", S), null);
+  assert.equal(parseRef("2:0", S), null);
+  assert.equal(parseRef("বাকারা", S), null);
+  assert.equal(parseRef("", S), null);
+  assert.equal(parseRef(null, S), null);
+});
+
+test("locateAyah: পারা ও পৃষ্ঠা (মাদানী ৬০৪)", () => {
+  assert.deepEqual(locateAyah(meta, 1, 1), { juz: 1, page: 1 });
+  assert.equal(locateAyah(meta, 2, 141).juz, 1);
+  assert.equal(locateAyah(meta, 2, 142).juz, 2);
+  assert.equal(locateAyah(meta, 2, 252).juz, 2);
+  assert.equal(locateAyah(meta, 2, 253).juz, 3);
+  assert.equal(locateAyah(meta, 2, 255).page, 42); // আয়াতুল কুরসী
+  assert.deepEqual(locateAyah(meta, 114, 6), { juz: 30, page: 604 });
+  // প্রতিটা পারা/পৃষ্ঠার শুরু-বিন্দু নিজেই নিজের নম্বর দেয়
+  meta.juz.forEach(([s, a], i) => assert.equal(locateAyah(meta, s, a).juz, i + 1));
+  meta.pages.forEach(([s, a], i) => assert.equal(locateAyah(meta, s, a).page, i + 1));
+});
+
+test("buildMarkers: ৩০ পারা, ৬০৪ পৃষ্ঠা, ১৫ সিজদা", () => {
+  const m = buildMarkers(meta);
+  assert.equal(m.juz.size, 30);
+  assert.equal(m.page.size, 604);
+  assert.equal(m.sajda.size, 15);
+  assert.equal(m.juz.get("2:142"), 2);
+  assert.ok(m.sajda.has("7:206"));
+  assert.ok(m.sajda.has("96:19"));
+});
+
+test("ayahShareText: দৃশ্যমান অংশই যায়, সূত্র সহ", () => {
+  const sm = { n: 2, bn: "আল-বাকারা" };
+  const ay = { n: 255, ar: "AR", tr: "TR" };
+  const both = ayahShareText(sm, ay, { showAr: true, showTr: true }, "মুহিউদ্দীন খান");
+  assert.equal(both, "AR\n\nTR\n\n— সূরা আল-বাকারা ২:২৫৫ (অনুবাদ: মুহিউদ্দীন খান)");
+  assert.equal(ayahShareText(sm, ay, { showAr: true, showTr: false }, "ক"), "AR\n\n— সূরা আল-বাকারা ২:২৫৫");
+  assert.equal(ayahShareText(sm, ay, { showAr: false, showTr: true }, ""), "TR\n\n— সূরা আল-বাকারা ২:২৫৫");
 });

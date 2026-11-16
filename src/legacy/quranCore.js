@@ -57,3 +57,91 @@ export function pushLastRead(list, s, a, now) {
   const rest = (Array.isArray(list) ? list : []).filter((x) => x && x.s !== s);
   return [{ s, a, t: now }, ...rest].slice(0, LAST_READ_MAX);
 }
+
+// ───────── ধাপ ৩: পছন্দ (ফন্ট/থিম/সুইচ), পারা-পৃষ্ঠা-অবস্থান, রেফারেন্স-জাম্প, কপি-টেক্সট ─────────
+
+export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
+export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0 };
+
+const clampNum = (v, lim) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return lim.def;
+  return Math.min(lim.max, Math.max(lim.min, Math.round(n)));
+};
+
+// পছন্দ যাচাই: অবৈধ মান → ডিফল্ট। আরবি ও অনুবাদ দুটোই বন্ধ থাকতে পারে না (খালি পর্দা এড়াতে)।
+export function sanitizePrefs(raw) {
+  const r = raw && typeof raw === "object" ? raw : {};
+  let showAr = typeof r.showAr === "boolean" ? r.showAr : true;
+  const showTr = typeof r.showTr === "boolean" ? r.showTr : true;
+  if (!showAr && !showTr) showAr = true;
+  return {
+    arSize: clampNum(r.arSize, AR_SIZE),
+    trSize: clampNum(r.trSize, TR_SIZE),
+    showAr,
+    showTr,
+    theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)
+  };
+}
+
+export const PARA_NAMES = [
+  "আলিফ লাম মীম", "সাইয়াকূল", "তিলকার রুসুল", "লান তানালূ", "ওয়াল মুহসানাত", "লা ইউহিব্বুল্লাহ",
+  "ওয়া ইযা সামিঊ", "ওয়ালাও আন্নানা", "কালাল মালাউ", "ওয়া'লামূ", "ইয়াতাযিরূন", "ওয়ামা মিন দাব্বাহ",
+  "ওয়ামা উবাররিউ", "রুবামা", "সুবহানাল্লাযী", "কালা আলাম", "ইকতারাবা", "কাদ আফলাহা",
+  "ওয়া কালাল্লাযীনা", "আম্মান খালাক্বা", "উতলু মা উহিয়া", "ওয়া মান ইয়াকনুত", "ওয়া মালিয়া", "ফামান আযলামু",
+  "ইলাইহি ইউরাদ্দু", "হা-মীম", "কালা ফামা খাতবুকুম", "কাদ সামিআল্লাহ", "তাবারাকাল্লাযী", "আম্মা",
+];
+
+// "২:২৫৫", "2:255", "২/২৫৫", "2 255", "2.255" → {s, a}; অবৈধ/সীমার বাইরে → null।
+export function parseRef(input, surahs) {
+  if (typeof input !== "string" || !Array.isArray(surahs)) return null;
+  const en = input.replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d))).replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660));
+  const m = en.trim().match(/^(\d{1,3})\s*[:/.\-\s]\s*(\d{1,3})$/);
+  if (!m) return null;
+  const s = Number(m[1]);
+  const a = Number(m[2]);
+  const sm = surahs[s - 1];
+  if (!sm || a < 1 || a > sm.ayahs) return null;
+  return { s, a };
+}
+
+// meta-র শুরু-বিন্দু ([সূরা, আয়াত]) → দ্রুত খোঁজার কাঠামো।
+const gid = (meta, s, a) => meta.surahs[s - 1].start + a - 1;
+
+// আয়াত (s,a) কোন পারা/পৃষ্ঠায় — শুরু-বিন্দুর তালিকায় বাইনারি সার্চ।
+function indexIn(meta, starts, s, a) {
+  const g = gid(meta, s, a);
+  let lo = 0;
+  let hi = starts.length - 1;
+  let ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (gid(meta, starts[mid][0], starts[mid][1]) <= g) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans + 1;
+}
+export function locateAyah(meta, s, a) {
+  return { juz: indexIn(meta, meta.juz, s, a), page: indexIn(meta, meta.pages, s, a) };
+}
+
+// UI-র দাগ: কোন আয়াতে পারা/পৃষ্ঠা শুরু, কোনটা সিজদার আয়াত। কী = "সূরা:আয়াত"।
+export function buildMarkers(meta) {
+  const juz = new Map();
+  const page = new Map();
+  const sajda = new Set();
+  meta.juz.forEach(([s, a], i) => juz.set(s + ":" + a, i + 1));
+  meta.pages.forEach(([s, a], i) => page.set(s + ":" + a, i + 1));
+  meta.sajdas.forEach(([s, a]) => sajda.add(s + ":" + a));
+  return { juz, page, sajda };
+}
+
+// কপি/শেয়ারের লেখা: যা পর্দায় দেখানো হচ্ছে (আরবি/অনুবাদ) তা-ই, শেষে সূত্র।
+export function ayahShareText(surah, ayah, prefs, translatorName) {
+  const parts = [];
+  if (prefs.showAr) parts.push(ayah.ar);
+  if (prefs.showTr) parts.push(ayah.tr);
+  const src = "— সূরা " + surah.bn + " " + toBnDigits(surah.n) + ":" + toBnDigits(ayah.n) +
+    (prefs.showTr && translatorName ? " (অনুবাদ: " + translatorName + ")" : "");
+  return parts.join("\n\n") + "\n\n" + src;
+}
