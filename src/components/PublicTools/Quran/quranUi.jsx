@@ -5,7 +5,8 @@
 
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
-import { fontStack, fontsForScript } from "../../../legacy/quranFonts.js";
+import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
+import { switchScript } from "../../../legacy/quranCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX } from "../../../legacy/quranCore.js";
 
@@ -59,6 +60,23 @@ export function useEnsureFont(fontId) {
   useEffect(() => { ensureFont(fontId); }, [fontId]);
 }
 
+// ───── আরবি লেখার ধরন (Simple / উসমানি) ─────
+// বদলালে পাঠ-পর্দা নতুন লেখা নামায়; ফন্ট বেমানান হলে ওই ধরনের ডিফল্ট ফন্ট বসে। বুকমার্ক/শেষ পাঠ সূরা:আয়াত ধরে, তাই অক্ষত।
+export function ScriptPicker({ prefs, th, accent, onPrefs }) {
+  return h("div", null,
+    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "আরবি লেখার ধরন"),
+    h("div", { role: "radiogroup", "aria-label": "আরবি লেখার ধরন", style: { display: "flex", flexDirection: "column", gap: 6 } },
+      SCRIPTS.map((sc) => {
+        const on = prefs.arScript === sc.id;
+        return h("button", {
+          key: sc.id, type: "button", role: "radio", "aria-checked": on, onClick: () => { if (!on) onPrefs(switchScript(prefs, sc.id)); },
+          style: { display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "6px 12px", borderRadius: 12, textAlign: "left", color: th.fg, background: "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
+        },
+          h("span", null, h("span", { style: { display: "block", fontSize: 14, fontWeight: 600 } }, sc.name), h("span", { style: { display: "block", fontSize: 11, opacity: 0.6 } }, sc.note)),
+          h("span", { style: { fontSize: 12, color: accent } }, on ? "বাছা ✓" : ""));
+      })));
+}
+
 export function FontPicker({ prefs, th, accent, script, onPrefs }) {
   const [st, setSt] = useState({ id: "", status: "" }); // status: loading | fail
   const alive = useRef(true);
@@ -69,10 +87,11 @@ export function FontPicker({ prefs, th, accent, script, onPrefs }) {
     setSt({ id, status: "loading" });
     ensureFont(id).then((ok) => { if (alive.current) setSt({ id, status: ok ? "" : "fail" }); });
   };
-  const list = fontsForScript(script || "simple");
+  const sc = scriptById(script) || scriptById(DEFAULT_SCRIPT);
+  const list = fontsForScript(sc.id);
   return h("div", null,
     h("div", { style: { fontSize: 14, marginBottom: 8 } }, "আরবি ফন্ট"),
-    h("div", { dir: "rtl", lang: "ar", "aria-label": "ফন্টের প্রিভিউ", style: { fontFamily: fontStack(prefs.arFont), fontSize: Math.min(prefs.arSize, 34), lineHeight: 2.1, textAlign: "center", padding: "6px 8px", borderRadius: 12, background: th.bar, color: th.fg } }, "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"),
+    h("div", { dir: "rtl", lang: "ar", "aria-label": "ফন্টের প্রিভিউ", style: { fontFamily: fontStack(prefs.arFont), fontSize: Math.min(prefs.arSize, 34), lineHeight: 2.1, textAlign: "center", padding: "6px 8px", borderRadius: 12, background: th.bar, color: th.fg } }, sc.sample),
     h("div", { role: "radiogroup", "aria-label": "আরবি ফন্ট", style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } },
       list.map((f) => {
         const on = prefs.arFont === f.id;
@@ -92,7 +111,7 @@ export function FontPicker({ prefs, th, accent, script, onPrefs }) {
 // headers: সূরার শিরোনাম + বিসমিল্লাহ বসবে কি (মুসহাফে হ্যাঁ; রিডারে নিজের শিরোনাম আছে, তাই না)।
 // dividers: পৃষ্ঠা/পারার শুরুতে ডিভাইডার (রিডিং মোডে)।
 // withIds: স্ক্রলে যাওয়া ও অবস্থান-ট্র্যাকিংয়ের জন্য id/data-a (শুধু একসূরার রিডারে)।
-export function AyahFlow({ items, meta, markers, th, accent, arSize, font, activeKey, onTap, headers, dividers, withIds }) {
+export function AyahFlow({ items, meta, markers, th, accent, arSize, font, script, activeKey, onTap, headers, dividers, withIds }) {
   const blocks = [];
   let run = [];
   const flush = (k) => {
@@ -116,7 +135,7 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, font, activ
         h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1.5px solid " + accent, borderRadius: 12, padding: "6px 14px", background: th.bar, color: accent } },
           h("span", { style: { fontSize: 12, fontWeight: 600 } }, toBnDigits(sm.n) + ". " + sm.bn),
           h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: 24, lineHeight: 1.8 } }, "سورة " + sm.ar)),
-        showBismillahHeader(it.s) && meta.bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.2, color: th.fg, padding: "6px 0 0" } }, meta.bismillah)));
+        showBismillahHeader(it.s) && meta.bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.2, color: th.fg, padding: "6px 0 0" } }, (scriptById(script) || scriptById(DEFAULT_SCRIPT)).bismillah)));
     }
     const active = activeKey === key;
     run.push(h("span", {

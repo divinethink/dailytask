@@ -1,0 +1,8 @@
+এই ফোল্ডারের ফন্ট-ফাইল উৎস থেকে পাওয়া অবস্থায়, অপরিবর্তিত (শুধু ফাইলের নাম ছোট হাতের ও ফাঁকা-ছাড়া করা হয়েছে)।
+
+amiri-quran-arabic-400.woff2   — Amiri Quran, SIL Open Font License 1.1 (LICENSE-OFL.txt)
+kfgqpc-hafs-regular.otf        — "KFGQPC Uthmanic Script HAFS Regular", King Fahd Glorious Quran Printing Complex (মদীনা)।
+                                  শর্ত: ফন্ট অপরিবর্তিত রাখতে হবে — তাই subset/রূপান্তর/সম্পাদনা করা হয়নি।
+                                  শর্তের পাতা: https://fonts.qurancomplex.gov.sa/wp02/en/?p=19
+me-quran-regular.ttf           — "me_quran Regular", Tanzil Project।
+                                  উৎস-পাতা: https://tanzil.net/docs/me_quran_font — একই কারণে অপরিবর্তিত।

@@ -2,7 +2,7 @@
 // এবং সূরা / পারা / পৃষ্ঠা — তিন ট্যাবে সূচি। ট্যাপ করলে QuranReader পূর্ণ-স্ক্রিনে খোলে।
 // React global(window.React, globals.js)।
 
-import { loadMeta, loadSearchIndex, packComplete } from "../../../legacy/quranData.js";
+import { loadMeta, loadSearchIndex, packComplete, warmScript } from "../../../legacy/quranData.js";
 import {
   readLastRead, writeLastRead, readPrefs, writePrefs, readMarks, writeMarks, readDirty, writeDirty,
 } from "../../../legacy/quranState.js";
@@ -126,7 +126,7 @@ function PageGrid({ meta, onPage }) {
 }
 
 // খুঁজুন: সূরার নাম ও সূরা:আয়াত নম্বর ডেটা ছাড়াই মেলে; আরবি/বাংলা শব্দ খুঁজতে পুরো কুরআন একবার নামাতে হয় (~৭৫০ KB, এরপর অফলাইনেও চলে)।
-function SearchPanel({ meta, onOpen }) {
+function SearchPanel({ meta, onOpen, script, font }) {
   const surahs = meta.surahs;
   const [q, setQ] = useState("");
   const [dq, setDq] = useState("");
@@ -140,9 +140,9 @@ function SearchPanel({ meta, onOpen }) {
   const start = useCallback(() => {
     setSt({ status: "loading", done: 0 });
     loadSearchIndex(surahs, undefined, (done) => { if (aliveRef.current) setSt({ status: "loading", done }); })
-      .then((idx) => { if (aliveRef.current && idx) { setIndex(idx); setSt({ status: "ready", done: 114 }); } })
+      .then((idx) => { if (aliveRef.current && idx) { setIndex(idx); setSt({ status: "ready", done: 114 }); warmScript(surahs, script, font); } }) // বাছা উসমানি লেখা+ফন্টও অফলাইনের জন্য (ব্যর্থ হলে নীরব; পড়ার সময় আবার চেষ্টা)
       .catch(() => { if (aliveRef.current) setSt({ status: "error", done: 0 }); });
-  }, [surahs]);
+  }, [surahs, script, font]);
 
   // আগে নামানো থাকলে নিজে থেকেই ইনডেক্স তৈরি (ক্যাশ থেকে, নেট লাগে না)।
   useEffect(() => { packComplete().then((ok) => { if (ok && aliveRef.current) start(); }); }, [start]);
@@ -401,7 +401,7 @@ export function QuranScreen() {
     tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
     tab === "para" && h(ParaList, { meta, onOpen: openAt }),
     tab === "page" && h(PageGrid, { meta, onPage: setMushaf }),
-    tab === "search" && h(SearchPanel, { meta, onOpen: openAt }),
+    tab === "search" && h(SearchPanel, { meta, onOpen: openAt, script: prefs.arScript, font: prefs.arFont }),
     tab === "saved" && h(SavedList, {
       meta, marks, sync, onOpen: openAt,
       onRemove: (x) => onMark(x.s, x.a, x.k),

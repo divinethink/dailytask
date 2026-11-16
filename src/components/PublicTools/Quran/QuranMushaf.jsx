@@ -8,7 +8,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import { AR_SIZE, PAGE_COUNT, clampPage, pageAyahRefs, locateAyah, toBnDigits, markKey } from "../../../legacy/quranCore.js";
-import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, ScriptPicker, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef } = React;
 const h = React.createElement;
@@ -49,7 +49,9 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 6px" } }),
       h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
-      h(FontPicker, { prefs, th, accent, script: "simple", onPrefs }),
+      h(ScriptPicker, { prefs, th, accent, onPrefs }),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs }),
       h("div", { style: { fontSize: 14, margin: "12px 0 8px" } }, "পাতার রং"),
       h("div", { style: { display: "flex", gap: 8 } }, themeBtn(0, "সাদা"), themeBtn(1, "সেপিয়া"), themeBtn(2, "ডার্ক"))
     )
@@ -84,7 +86,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
     const load = (p) => {
       const refs = pageAyahRefs(meta, p);
       const nos = [...new Set(refs.map((r) => r.s))];
-      return Promise.all(nos.map((n) => loadSurah(meta.surahs[n - 1]))).then((all) => {
+      return Promise.all(nos.map((n) => loadSurah(meta.surahs[n - 1], undefined, prefs.arScript))).then((all) => {
         const by = new Map(nos.map((n, i) => [n, all[i]]));
         return refs.map((r) => { const a = by.get(r.s)[r.a - 1]; return { s: r.s, n: r.a, ar: a.ar, tr: a.tr }; });
       });
@@ -102,7 +104,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       })
       .catch(() => { if (alive) setState({ status: "error", items: null }); });
     return () => { alive = false; };
-  }, [page, tries]);
+  }, [page, tries, prefs.arScript]);
 
   // শেষ পাঠ: পৃষ্ঠায় ১.৫ সেকেন্ড থাকলে প্রথম আয়াত সংরক্ষণ; বন্ধ করার সময়ও।
   useEffect(() => {
@@ -156,7 +158,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
-      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
+      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
       state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "16px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
     ),
     h("div", { style: { display: "flex", gap: 8, padding: "8px 12px calc(8px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid " + LINE, background: th.bg } },

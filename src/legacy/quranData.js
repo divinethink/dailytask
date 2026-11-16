@@ -2,6 +2,7 @@
 // ক্যাশ: ব্রাউজারে in-memory + sw.js-এর আলাদা `quran-v1` cache (অফলাইনে পড়া যায়)।
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, buildSearchIndex } from "./quranCore.js";
+import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
 
 const TIMEOUT_MS = 15000;
 let metaPromise = null;
@@ -38,11 +39,13 @@ export function loadMeta() {
 }
 
 // surah = meta.surahs[i] ({n, ayahs, …}); ফল = [{n, ar, tr}]
-export async function loadSurah(surah, trId = DEFAULT_TRANSLATION) {
-  const key = trId + ":" + surah.n;
+// script = আরবি লেখার ধরন ("simple" ডিফল্ট | "uthmani"); অজানা হলে simple। সার্চ সবসময় simple-এ (নিচে)।
+export async function loadSurah(surah, trId = DEFAULT_TRANSLATION, script = DEFAULT_SCRIPT) {
+  const sc = scriptById(script) || scriptById(DEFAULT_SCRIPT);
+  const key = trId + ":" + sc.id + ":" + surah.n;
   if (surahCache.has(key)) return surahCache.get(key);
   const [ar, tr] = await Promise.all([
-    getJson(QURAN_BASE + "/ar/" + pad3(surah.n) + ".json"),
+    getJson(QURAN_BASE + "/" + sc.dir + "/" + pad3(surah.n) + ".json"),
     getJson(QURAN_BASE + "/tr/" + trId + "/" + pad3(surah.n) + ".json"),
   ]);
   const ayahs = parseSurahPayload(ar, tr, surah);
@@ -103,4 +106,27 @@ export function loadSearchIndex(surahs, trId = DEFAULT_TRANSLATION, onProgress, 
   p.then((idx) => { if (!idx) indexCache.delete(trId); }, () => indexCache.delete(trId));
   indexCache.set(trId, p);
   return p;
+}
+
+// বাছা (simple ছাড়া) লেখার ধরন ও ফন্ট আগেভাগে নামানো, যাতে অফলাইনেও চলে। ব্যর্থ হলে false — পড়া আটকায় না (পড়ার সময় আবার চেষ্টা)।
+export async function warmScript(surahs, script, fontId, onProgress, isAlive) {
+  const sc = scriptById(script);
+  if (!sc || sc.id === DEFAULT_SCRIPT) return true;
+  try {
+    const f = fontById(fontId);
+    if (f && f.file) await fetch(f.file);
+    let next = 0, done = 0;
+    const worker = async () => {
+      while (next < surahs.length) {
+        if (isAlive && !isAlive()) return;
+        const su = surahs[next++];
+        const j = await getJson(QURAN_BASE + "/" + sc.dir + "/" + pad3(su.n) + ".json");
+        if (!j || j.s !== su.n || !Array.isArray(j.a) || j.a.length !== su.ayahs) throw new Error("quran data: " + sc.id + " সূরা " + su.n);
+        done++;
+        if (onProgress) onProgress(done, surahs.length);
+      }
+    };
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    return true;
+  } catch (e) { return false; }
 }

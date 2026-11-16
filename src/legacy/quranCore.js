@@ -1,7 +1,7 @@
 // quranCore.js — কুরআন-রিডারের pure লজিক (Firebase/React-মুক্ত, node --test-যোগ্য)।
 // ডেটা-ফাইলের গঠন/উৎস: tools/quran/build.mjs। এখানে শুধু যাচাই, নাম-লেবেল ও "শেষ পাঠ"-এর হিসাব।
 
-import { DEFAULT_FONT, isValidFont } from "./quranFonts.js";
+import { DEFAULT_FONT, DEFAULT_SCRIPT, isValidScript, scriptById, fontFitsScript } from "./quranFonts.js";
 
 export const QURAN_BASE = "/quran/v1"; // ডেটা বদলাতে হলে নতুন ফোল্ডার (v2) — sw.js-এর cache-first নিয়মের কারণে।
 export const DEFAULT_TRANSLATION = "bn_khan";
@@ -64,7 +64,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -78,6 +78,7 @@ export function sanitizePrefs(raw) {
   let showAr = typeof r.showAr === "boolean" ? r.showAr : true;
   const showTr = typeof r.showTr === "boolean" ? r.showTr : true;
   if (!showAr && !showTr) showAr = true;
+  const arScript = isValidScript(r.arScript) ? r.arScript : DEFAULT_SCRIPT;
   return {
     arSize: clampNum(r.arSize, AR_SIZE),
     trSize: clampNum(r.trSize, TR_SIZE),
@@ -85,8 +86,15 @@ export function sanitizePrefs(raw) {
     showTr,
     theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)
     mode: r.mode === "read" ? "read" : "list", // list=আয়াত-তালিকা (অনুবাদসহ), read=অবিচ্ছিন্ন আরবি
-    arFont: isValidFont(r.arFont) ? r.arFont : DEFAULT_FONT, // quranFonts.js-এর id; অজানা → আমিরি
+    arScript,
+    arFont: fontFitsScript(r.arFont, arScript) ? r.arFont : scriptById(arScript).defaultFont, // অজানা বা লেখার সাথে বেমানান ফন্ট → ওই লেখার ডিফল্ট
   };
+}
+
+// লেখার ধরন বদলালে ফন্ট মানানসই না হলে ওই ধরনের ডিফল্ট ফন্ট বসে (পুরনো পছন্দ অক্ষত থাকে)।
+export function switchScript(prefs, script) {
+  if (!isValidScript(script)) return prefs;
+  return { ...prefs, arScript: script, arFont: fontFitsScript(prefs.arFont, script) ? prefs.arFont : scriptById(script).defaultFont };
 }
 
 export const PARA_NAMES = [

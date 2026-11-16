@@ -10,3 +10,19 @@
   font-style: normal;
   font-display: swap;
 }
+
+/* উসমানি লেখার ফন্ট (ধাপ ৬গ-২)। ফাইল অপরিবর্তিত (লাইসেন্স-শর্ত: /quran/v1/fonts/NOTICE-fonts.txt); শুধু ওই ফন্টে লেখা দেখানোর সময়ই নামে। */
+@font-face {
+  font-family: 'KFGQPC Uthmanic Script HAFS';
+  src: url('/quran/v1/fonts/kfgqpc-hafs-regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Me Quran';
+  src: url('/quran/v1/fonts/me-quran-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
