@@ -14,6 +14,7 @@ import {
 } from "../../../legacy/quranCore.js";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranMushaf } from "./QuranMushaf.jsx";
+import { QuranSettingsOverlay } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const h = React.createElement;
@@ -244,7 +245,8 @@ function SavedList({ meta, marks, sync, onOpen, onRemove, onRetry }) {
   );
 }
 
-export function QuranScreen() {
+// settingsOpen/onSettingsClose: কুরআন-কার্ডের সেটিং-আইকন (QuranTab) থেকে আসে।
+export function QuranScreen({ settingsOpen, onSettingsClose }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
@@ -423,6 +425,7 @@ export function QuranScreen() {
       onMark,
       onOpenMushaf: openMushafFromReader,
     }),
+    settingsOpen && h(QuranSettingsOverlay, { prefs, onPrefs: setPrefs, onClose: onSettingsClose }),
     mushaf && h(QuranMushaf, {
       key: "mushaf",
       meta, markers, prefs, onPrefs: setPrefs,

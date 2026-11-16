@@ -6,7 +6,8 @@
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
 import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLayout } from "../../../legacy/quranFonts.js";
-import { switchScript } from "../../../legacy/quranCore.js";
+import { switchScript, AR_SIZE, TR_SIZE } from "../../../legacy/quranCore.js";
+import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX } from "../../../legacy/quranCore.js";
 
@@ -103,6 +104,89 @@ export function FontPicker({ prefs, th, accent, script, onPrefs }) {
           h("span", { style: { fontSize: 12, color: accent } }, on ? (st.id === f.id && st.status === "loading" ? "নামছে…" : "বাছা ✓") : ""));
       })),
     st.status === "fail" && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "ফন্টটা নামানো যায়নি (ইন্টারনেট দেখুন)। আপাতত আমিরি কুরআনে দেখানো হচ্ছে।")
+  );
+}
+
+// ───── পাঠ-সেটিংস (রিডার ও কুরআন-হোম একই অংশ ব্যবহার করে; পছন্দ একটাই, সব সূরায় প্রযোজ্য) ─────
+export function readerTheme(prefs) {
+  return { th: THEMES[prefs.theme] || THEMES[0], accent: prefs.theme === 2 ? "#9FD4C4" : PRIMARY };
+}
+
+const rule = (margin) => h("div", { style: { borderTop: "1px solid " + LINE, margin } });
+
+function ThemePicker({ prefs, accent, onPrefs }) {
+  return h("div", { style: { display: "flex", gap: 8 } },
+    ["সাদা", "সেপিয়া", "ডার্ক"].map((label, idx) => {
+      const t = THEMES[idx];
+      const on = prefs.theme === idx;
+      return h("button", {
+        key: idx, type: "button", onClick: () => onPrefs({ ...prefs, theme: idx }), "aria-pressed": on,
+        style: { flex: 1, minHeight: 44, borderRadius: 12, background: t.bg, color: t.fg, fontSize: 13, fontWeight: 600, border: on ? "2px solid " + accent : "1px solid " + LINE },
+      }, label);
+    }));
+}
+
+function ModePicker({ prefs, th, accent, onPrefs }) {
+  return h("div", { style: { display: "flex", gap: 8 } },
+    [["list", "তালিকা (অনুবাদসহ)"], ["read", "রিডিং (শুধু আরবি)"]].map(([id, label]) => {
+      const on = prefs.mode === id;
+      return h("button", {
+        key: id, type: "button", onClick: () => !on && onPrefs({ ...prefs, mode: id }), "aria-pressed": on,
+        style: { flex: 1, minHeight: 44, borderRadius: 12, fontSize: 13, fontWeight: 600, color: on ? accent : th.fg, background: on ? th.bar : "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
+      }, label);
+    }));
+}
+
+// switches: আরবি/অনুবাদ সুইচ দেখাবে কি; showMode: "তালিকা/রিডিং" বাছাই দেখাবে কি।
+export function ReaderPrefsBody({ prefs, th, accent, onPrefs, switches, showMode }) {
+  const toggle = (key, other, label) => {
+    const lastOne = prefs[key] && !prefs[other]; // একমাত্র চালু সুইচটা বন্ধ করা যাবে না
+    return h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", fontSize: 14, opacity: lastOne ? 0.6 : 1 } },
+      label,
+      h("input", { type: "checkbox", checked: prefs[key], disabled: lastOne, onChange: (e) => onPrefs({ ...prefs, [key]: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
+    );
+  };
+  return h(React.Fragment, null,
+    h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
+    h(Stepper, { label: "অনুবাদের আকার", value: prefs.trSize, lim: TR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, trSize: v }) }),
+    showMode && rule("6px 0 10px"),
+    showMode && h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পড়ার ধরন"),
+    showMode && h(ModePicker, { prefs, th, accent, onPrefs }),
+    switches && rule("6px 0 0"),
+    switches && toggle("showAr", "showTr", "আরবি দেখান"),
+    switches && toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
+    rule("6px 0 10px"),
+    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
+    h(ThemePicker, { prefs, accent, onPrefs }),
+    rule("14px 0 10px"),
+    h(ScriptPicker, { prefs, th, accent, onPrefs }),
+    rule("10px 0"),
+    h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs })
+  );
+}
+
+// নিচ থেকে ওঠা শিট। children = শিটের শেষে বাড়তি অংশ (যেমন রিডারে "আয়াতে যান")।
+export function SettingsSheet({ title, prefs, th, accent, onPrefs, onClose, switches, showMode, children }) {
+  return h("div", { style: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.4)" }, onClick: onClose },
+    h("div", { onClick: (e) => e.stopPropagation(), style: { background: th.bg, color: th.fg, borderRadius: "18px 18px 0 0", padding: "14px 18px 22px", maxHeight: "85%", overflowY: "auto" } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
+        h("strong", { style: { fontSize: 16 } }, title),
+        h("button", { type: "button", onClick: onClose, style: { minHeight: 40, padding: "0 12px", color: accent, fontWeight: 600 } }, "বন্ধ করুন")
+      ),
+      h(ReaderPrefsBody, { prefs, th, accent, onPrefs, switches, showMode }),
+      children
+    )
+  );
+}
+
+// কুরআন-হোমের সেটিং-আইকন থেকে খোলে। পছন্দ আগেই বদলে রাখা যায়; পরে যেকোনো সূরা/মুসহাফে একই পছন্দে খোলে।
+export function QuranSettingsOverlay({ prefs, onPrefs, onClose }) {
+  useBackLayer(true, onClose);
+  useEnsureFont(prefs.arFont);
+  const { th, accent } = readerTheme(prefs);
+  return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, fontFamily: "'Hind Siliguri', sans-serif" } },
+    h(SettingsSheet, { title: "কুরআন-সেটিংস", prefs, th, accent, onPrefs, onClose, switches: true, showMode: true },
+      h("p", { style: { fontSize: 11, opacity: 0.6, marginTop: 14, lineHeight: 1.6 } }, "এই পছন্দ সব সূরা ও মুসহাফে একই থাকবে।"))
   );
 }
 

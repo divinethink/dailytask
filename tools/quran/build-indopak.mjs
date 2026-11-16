@@ -101,9 +101,7 @@ const mainIntPath = path.resolve(here, "integrity.json");
 const mainInt = JSON.parse(fs.readFileSync(mainIntPath, "utf8"));
 mainInt.files["manifest.json"] = { bytes: Buffer.byteLength(manifestStr), sha256: sha(manifestStr) };
 fs.writeFileSync(mainIntPath, JSON.stringify(mainInt, null, 1));
-fs.writeFileSync(path.join(OUT, "ar-indopak", "NOTICE.txt"),
-  "IndoPak আরবি লেখা: QuranWBW.com (https://quranwbw.com) — অপরিবর্তিত; শুধু শব্দ জোড়া লাগিয়ে আয়াত বানানো, আয়াত-শেষের নম্বর-শব্দ ও অদৃশ্য U+200B/U+FEFF বাদ।\n" +
-  "ব্যবহার: Daily Task — একটি অ-বাণিজ্যিক (সাদাকায়ে জারিয়া) অ্যাপ; QuranWBW-এর কাছ থেকে ইমেইলে অ-বাণিজ্যিক ব্যবহারের অনুমতি পাওয়া গেছে।\n");
+fs.writeFileSync(path.join(OUT, "ar-indopak", "NOTICE.txt"), "শুধু অ-বাণিজ্যিক (ব্যক্তিগত) হিসেবে ব্যবহার হচ্ছে।\n");
 fs.writeFileSync(path.join(here, "integrity-indopak.json"), JSON.stringify({ input: sha(rawStr), files: integrity }, null, 1));
 console.log("✅ IndoPak: ১১৪ সূরা-ফাইল, ৬২৩৬ আয়াত");
 console.log("   ব্যঞ্জনবর্ণ অমিল (Uthmani-র সাথে): " + diffs.length + " (" + diffs.join(",") + ") | sha256 " + manifest.arabicIndopak.sha256.slice(0, 12) + "…");

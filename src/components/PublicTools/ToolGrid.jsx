@@ -203,15 +203,20 @@ export function ToolGridSection({ title, icon, items, onSelect, variant }) {
 }
 
 // স্ক্রিন-হেডার (আমল/সহায়িকা উভয়ে) — নরম সবুজ ব্যান্ড, শিরোনাম+উপ-শিরোনাম।
-export function PageHeader({ title, subtitle }) {
+// right (ঐচ্ছিক): ডানপাশের বাড়তি নিয়ন্ত্রণ, যেমন কুরআনের সেটিং-আইকন।
+export function PageHeader({ title, subtitle, right }) {
+  const text = [
+    React.createElement("h1", { key: "t", className: "text-[19px] leading-tight", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } }, title),
+    subtitle && React.createElement("p", { key: "s", className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle),
+  ];
   return React.createElement(
     "header",
     {
-      className: "mb-3 rounded-2xl border px-4 py-3",
+      className: "mb-3 rounded-2xl border px-4 py-3" + (right ? " flex items-center justify-between gap-3" : ""),
       style: { background: "linear-gradient(135deg, var(--theme-soft, #E8F0EE) 0%, var(--theme-wash, #F2F7F4) 100%)", borderColor: "var(--theme-line, #D3E3DD)" },
     },
-    React.createElement("h1", { className: "text-[19px] leading-tight", style: { fontFamily: SERIF, fontWeight: 500, color: PRIMARY } }, title),
-    subtitle && React.createElement("p", { className: "text-xs mt-0.5", style: { color: "#5B6B64" } }, subtitle)
+    right ? React.createElement("div", { className: "min-w-0" }, text) : text,
+    right
   );
 }
 
