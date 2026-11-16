@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { QURAN_FONTS, DEFAULT_FONT, SCRIPTS, scriptById, fontById, isValidFont, fontsForScript, fontFitsScript, fontStack } from "../src/legacy/quranFonts.js";
+import { QURAN_FONTS, DEFAULT_FONT, SCRIPTS, scriptById, fontById, isValidFont, fontsForScript, fontFitsScript, fontStack, flowLayout } from "../src/legacy/quranFonts.js";
 import { sanitizePrefs, DEFAULT_PREFS, switchScript } from "../src/legacy/quranCore.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,4 +109,12 @@ test("৬গ-৩ পছন্দ: IndoPak বাছলে মানানসই 
   assert.equal(switchScript({ ...DEFAULT_PREFS, arFont: "noto-naskh" }, "indopak").arFont, "alquran-indopak");
   assert.equal(switchScript({ ...DEFAULT_PREFS, arScript: "indopak", arFont: "alquran-indopak" }, "simple").arFont, "amiri-quran");
   assert.equal(sanitizePrefs({ arScript: "uthmani", arFont: "me-quran" }).arFont, "me-quran");
+});
+
+test("flowLayout: simple/উসমানি আগের মতো; ইন্দো-পাক ডান-ঘেঁষা, বড় ও বেশি ফাঁক", () => {
+  for (const id of ["simple", "uthmani"]) assert.deepEqual(flowLayout(id), { sizeScale: 1, lineHeight: 2.3, textAlign: "justify" });
+  const ip = flowLayout("indopak");
+  assert.equal(ip.textAlign, "right");
+  assert.ok(ip.sizeScale > 1 && ip.lineHeight > 2.3);
+  assert.deepEqual(flowLayout("অচেনা"), flowLayout("simple"));
 });

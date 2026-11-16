@@ -5,7 +5,7 @@
 
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
-import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
+import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLayout } from "../../../legacy/quranFonts.js";
 import { switchScript } from "../../../legacy/quranCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX } from "../../../legacy/quranCore.js";
@@ -114,9 +114,10 @@ export function FontPicker({ prefs, th, accent, script, onPrefs }) {
 export function AyahFlow({ items, meta, markers, th, accent, arSize, font, script, activeKey, onTap, headers, dividers, withIds }) {
   const blocks = [];
   let run = [];
+  const lay = flowLayout(script);
   const flush = (k) => {
     if (!run.length) return;
-    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.3, textAlign: "justify", color: th.fg, margin: "4px 0" } }, run));
+    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: Math.round(arSize * lay.sizeScale), lineHeight: lay.lineHeight, textAlign: lay.textAlign, color: th.fg, margin: "4px 0" } }, run));
     run = [];
   };
   items.forEach((it, i) => {

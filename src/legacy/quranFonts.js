@@ -35,3 +35,13 @@ export function fontStack(id) {
   const f = fontById(id) || fontById(DEFAULT_FONT);
   return "'" + f.family + "', 'Amiri Quran', 'Noto Naskh Arabic', serif";
 }
+
+// লেখার ধরন-ভিত্তিক বিন্যাস। ইন্দো-পাক: অক্ষর একটু বড়, লাইনের ফাঁক বেশি, ডান-ঘেঁষা (justify নয়)।
+// ফোনে পছন্দ না হলে শুধু এই সংখ্যাগুলো বদলান। বাকি দুই ধরনের মান আগের মতোই।
+export const SCRIPT_LAYOUT = {
+  indopak: { sizeScale: 1.15, lineHeight: 2.6, textAlign: "right" },
+};
+const BASE_LAYOUT = { sizeScale: 1, lineHeight: 2.3, textAlign: "justify" };
+export function flowLayout(script) {
+  return { ...BASE_LAYOUT, ...(SCRIPT_LAYOUT[script] || {}) };
+}
