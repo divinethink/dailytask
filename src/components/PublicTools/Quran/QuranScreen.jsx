@@ -2,7 +2,7 @@
 // এবং সূরা / পারা / পৃষ্ঠা — তিন ট্যাবে সূচি। ট্যাপ করলে QuranReader পূর্ণ-স্ক্রিনে খোলে।
 // React global(window.React, globals.js)।
 
-import { loadMeta } from "../../../legacy/quranData.js";
+import { loadMeta, loadSearchIndex, packComplete } from "../../../legacy/quranData.js";
 import {
   readLastRead, writeLastRead, readPrefs, writePrefs, readMarks, writeMarks, readDirty, writeDirty,
 } from "../../../legacy/quranState.js";
@@ -10,6 +10,7 @@ import { getQuranUid, loadQuranState, saveQuranState } from "../../../legacy/qur
 import {
   QUICK_SURAHS, PARA_NAMES, refLabel, sanitizeLastRead, pushLastRead, surahTypeLabel, toBnDigits,
   parseRef, buildMarkers, sanitizePrefs, locateAyah, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, markKey,
+  searchSurahNames, searchIndex, SEARCH_MIN, SEARCH_LIMIT,
 } from "../../../legacy/quranCore.js";
 import { QuranReader } from "./QuranReader.jsx";
 
@@ -33,7 +34,7 @@ function Heading({ children }) {
 }
 
 function Tabs({ tab, onTab }) {
-  const items = [["surah", "সূরা"], ["para", "পারা"], ["page", "পৃষ্ঠা"], ["saved", "সংরক্ষিত"]];
+  const items = [["surah", "সূরা"], ["para", "পারা"], ["page", "পৃষ্ঠা"], ["search", "খুঁজুন"], ["saved", "সংরক্ষিত"]];
   return h("div", { className: "flex gap-1 p-1 rounded-xl mt-4 mb-3", style: { background: "#E8EEE9" }, role: "tablist" },
     items.map(([id, label]) =>
       h("button", {
@@ -120,6 +121,85 @@ function PageGrid({ meta, onOpen }) {
         }, toBnDigits(i + 1))
       )
     )
+  );
+}
+
+// খুঁজুন: সূরার নাম ও সূরা:আয়াত নম্বর ডেটা ছাড়াই মেলে; আরবি/বাংলা শব্দ খুঁজতে পুরো কুরআন একবার নামাতে হয় (~৭৫০ KB, এরপর অফলাইনেও চলে)।
+function SearchPanel({ meta, onOpen }) {
+  const surahs = meta.surahs;
+  const [q, setQ] = useState("");
+  const [dq, setDq] = useState("");
+  const [st, setSt] = useState({ status: "idle", done: 0 }); // idle | loading | ready | error
+  const [index, setIndex] = useState(null);
+  const aliveRef = useRef(true);
+
+  useEffect(() => () => { aliveRef.current = false; }, []);
+  useEffect(() => { const t = setTimeout(() => setDq(q), 250); return () => clearTimeout(t); }, [q]);
+
+  const start = useCallback(() => {
+    setSt({ status: "loading", done: 0 });
+    loadSearchIndex(surahs, undefined, (done) => { if (aliveRef.current) setSt({ status: "loading", done }); })
+      .then((idx) => { if (aliveRef.current && idx) { setIndex(idx); setSt({ status: "ready", done: 114 }); } })
+      .catch(() => { if (aliveRef.current) setSt({ status: "error", done: 0 }); });
+  }, [surahs]);
+
+  // আগে নামানো থাকলে নিজে থেকেই ইনডেক্স তৈরি (ক্যাশ থেকে, নেট লাগে না)।
+  useEffect(() => { packComplete().then((ok) => { if (ok && aliveRef.current) start(); }); }, [start]);
+
+  const query = dq.trim();
+  const ref = query ? parseRef(query, surahs) : null;
+  const names = query && !ref ? searchSurahNames(query, surahs) : [];
+  const res = index && query && !ref ? searchIndex(index, query) : null;
+  const tooShort = query && !ref && query.replace(/\s/g, "").length < SEARCH_MIN;
+
+  const row = (key, onClick, title, sub, body) => h("button", {
+    key, type: "button", onClick, className: "w-full text-left px-3 py-3 border-b last:border-b-0", style: { borderColor: "#EEF2EF" },
+  },
+    h("span", { className: "block text-sm font-semibold", style: { color: PRIMARY } }, title),
+    sub && h("span", { className: "block text-xs text-gray-500" }, sub),
+    body
+  );
+  const clamp = (n) => ({ display: "-webkit-box", WebkitLineClamp: n, WebkitBoxOrient: "vertical", overflow: "hidden" });
+
+  return h("div", null,
+    h("input", {
+      type: "search", value: q, onChange: (e) => setQ(e.target.value),
+      placeholder: "সূরার নাম, আরবি বা বাংলা শব্দ লিখুন",
+      className: "w-full rounded-xl border px-3 bg-white mb-2", style: { minHeight: 44, fontSize: 16, borderColor: "#D7DFD9" },
+      "aria-label": "কুরআনে খুঁজুন",
+    }),
+    st.status === "idle" && h("div", { className: "rounded-xl border bg-white p-3 mb-3 text-sm", style: CARD },
+      h("p", { className: "mb-2 text-gray-700" }, "আরবি বা বাংলা শব্দ খুঁজতে পুরো কুরআন একবার ফোনে নামাতে হবে (প্রায় ৭৫০ KB)। নামানোর পর ইন্টারনেট ছাড়াই পুরো কুরআন পড়া ও খোঁজা যাবে।"),
+      h("button", { type: "button", onClick: start, className: "px-4 rounded-xl text-sm font-semibold text-white", style: { minHeight: 44, background: PRIMARY } }, "ডাউনলোড করুন")
+    ),
+    st.status === "loading" && h("div", { className: "rounded-xl border bg-white p-3 mb-3 text-sm", style: CARD },
+      h("p", { className: "mb-2 text-gray-700" }, "নামানো হচ্ছে… " + toBnDigits(st.done) + "/" + toBnDigits(114) + " সূরা"),
+      h("div", { style: { height: 6, borderRadius: 3, background: "#E8EEE9" } }, h("div", { style: { height: 6, borderRadius: 3, background: PRIMARY, width: Math.round((st.done / 114) * 100) + "%" } }))
+    ),
+    st.status === "error" && h("div", { className: "rounded-xl border bg-white p-3 mb-3 text-sm", style: CARD },
+      h("p", { className: "mb-2", style: { color: "#D64545" } }, "পুরোটা নামানো যায়নি। যা নেমেছে তা জমা আছে; ইন্টারনেট দেখে আবার চেষ্টা করুন।"),
+      h("button", { type: "button", onClick: start, className: "px-4 rounded-xl text-sm font-semibold text-white", style: { minHeight: 44, background: PRIMARY } }, "আবার চেষ্টা করুন")
+    ),
+    st.status === "ready" && !query && h("p", { className: "text-xs text-gray-500 px-1 mb-2" }, "ডাউনলোড সম্পন্ন ✓ — এখন ইন্টারনেট ছাড়াই পড়া ও খোঁজা যায়।"),
+    tooShort && h("p", { className: "text-xs text-gray-500 px-1" }, "অন্তত " + toBnDigits(SEARCH_MIN) + "টি অক্ষর লিখুন।"),
+    ref && h("div", { className: "bg-white rounded-2xl border overflow-hidden mb-3", style: CARD },
+      row("ref", () => onOpen(ref.s, ref.a), "সূরা " + refLabel(surahs[ref.s - 1], ref.a), "এই আয়াতে যান")),
+    names.length > 0 && h("div", null,
+      h(Heading, null, "সূরা (" + toBnDigits(names.length) + ")"),
+      h("div", { className: "bg-white rounded-2xl border overflow-hidden mb-3", style: CARD },
+        names.map((x) => row("n" + x.n, () => onOpen(x.n, 1), toBnDigits(x.n) + ". " + x.bn, x.mean + " · " + toBnDigits(x.ayahs) + " আয়াত")))
+    ),
+    res && h("div", null,
+      h(Heading, null, res.total === 0 ? "কোনো আয়াত পাওয়া যায়নি" : toBnDigits(res.total) + "টি আয়াত" + (res.total > SEARCH_LIMIT ? " (প্রথম " + toBnDigits(SEARCH_LIMIT) + "টি)" : "")),
+      res.total > 0 && h("div", { className: "bg-white rounded-2xl border overflow-hidden", style: CARD },
+        res.hits.map((x) => row(x.s + ":" + x.a, () => onOpen(x.s, x.a), "সূরা " + refLabel(surahs[x.s - 1], x.a), null,
+          h("span", { className: "block mt-1" },
+            h("span", { dir: "rtl", lang: "ar", className: "block", style: { fontFamily: "'Amiri Quran', serif", fontSize: 20, lineHeight: 1.9, color: "#1F2D2A", ...clamp(2) } }, x.ar),
+            h("span", { className: "block text-sm text-gray-700", style: clamp(3) }, x.tr)
+          )))
+      )
+    ),
+    query && !ref && st.status !== "ready" && st.status !== "loading" && names.length === 0 && !tooShort && h("p", { className: "text-xs text-gray-500 px-1" }, "আয়াতের লেখায় খুঁজতে আগে ডাউনলোড করুন।")
   );
 }
 
@@ -310,6 +390,7 @@ export function QuranScreen() {
     tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
     tab === "para" && h(ParaList, { meta, onOpen: openAt }),
     tab === "page" && h(PageGrid, { meta, onOpen: openAt }),
+    tab === "search" && h(SearchPanel, { meta, onOpen: openAt }),
     tab === "saved" && h(SavedList, {
       meta, marks, sync, onOpen: openAt,
       onRemove: (x) => onMark(x.s, x.a, x.k),

@@ -207,3 +207,77 @@ export function sanitizeCloudState(raw, surahs) {
   const r = raw && typeof raw === "object" ? raw : {};
   return { marks: sanitizeMarks(r.marks, surahs), last: sanitizeLastRead(r.last, surahs) };
 }
+
+// ───────── ধাপ ৫: সার্চ (আরবি / বাংলা / সূরার নাম) ─────────
+// ডেটা নতুন ফাইল ছাড়াই: সব আয়াত একবার মেমোরিতে নিয়ে normalize করা লেখার ওপর খোঁজা (৬২৩৬ আয়াত — তাৎক্ষণিক)।
+
+export const SEARCH_MIN = 2; // এর চেয়ে ছোট প্রশ্নে খোঁজা হয় না
+export const SEARCH_LIMIT = 100; // সর্বোচ্চ দেখানো ফল
+
+export const hasArabic = (s) => /[؀-ۿݐ-ݿ]/.test(String(s || ""));
+
+// আরবি: হরকত/কুরআনীয় চিহ্ন/টানা-রেখা/আলিফ বাদ; ইয়া/তা-মারবুতার রূপভেদ এক করা — যাতে হরকত ছাড়া লিখলেও মেলে।
+export function normalizeArabic(s) {
+  return String(s || "")
+    .replace(/[ؐ-ًؚ-ٰٟۖ-ۭ࣓-ࣿـ]/g, "")
+    .replace(/[آأإٱ]/g, "ا") // آ أ إ ٱ → ا
+    .replace(/[ىیئ]/g, "ي") // ى ی ئ → ي
+    .replace(/ة/g, "ه") // ة → ه
+    .replace(/ؤ/g, "و") // ؤ → و
+    .replace(/ک/g, "ك") // ک → ك
+    .replace(/\u0627/g, "") // আলিফ বাদ: "العالمين" (খঞ্জর-আলিফ) ও "العلمين" একই হয়ে মেলে
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// বাংলা/ইংরেজি: NFC, ZWJ/ZWNJ বাদ, ছোট হাতের অক্ষর, বাড়তি ফাঁকা বাদ।
+export function normalizeText(s) {
+  return String(s || "").normalize("NFC").replace(/[​-‍﻿]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// সূরার নাম মেলানো (বাংলা/ইংরেজি/অর্থ/আরবি): হাইফেন-ফাঁকা-অ্যাপোস্ট্রফি বাদ দিয়ে।
+const squash = (s) => normalizeText(s).replace(/[-'’‘`\s.]/g, "");
+export function searchSurahNames(q, surahs) {
+  if (!Array.isArray(surahs)) return [];
+  const ar = hasArabic(q);
+  const key = ar ? normalizeArabic(q).replace(/\s/g, "") : squash(q);
+  if (key.length < SEARCH_MIN) return [];
+  return surahs.filter((s) => {
+    if (ar) return normalizeArabic(s.ar).replace(/\s/g, "").includes(key);
+    return squash(s.bn).includes(key) || squash(s.en).includes(key) || squash(s.mean).includes(key);
+  });
+}
+
+// all[i] = সূরা (i+1)-এর [{n, ar, tr}] → খোঁজার ইনডেক্স।
+export function buildSearchIndex(all) {
+  const ar = [];
+  const tr = [];
+  for (const ayahs of all) {
+    ar.push(ayahs.map((a) => normalizeArabic(a.ar)));
+    tr.push(ayahs.map((a) => normalizeText(a.tr)));
+  }
+  return { raw: all, ar, tr };
+}
+
+// প্রশ্নের প্রতিটা শব্দ থাকতে হবে (AND), ক্রম যাই হোক। ফল কুরআনের ক্রমে।
+// আরবি অক্ষর থাকলে আরবি লেখায়, নইলে অনুবাদে খোঁজে।
+export function searchIndex(index, q, limit = SEARCH_LIMIT) {
+  const arabic = hasArabic(q);
+  const norm = arabic ? normalizeArabic(q) : normalizeText(q);
+  const tokens = norm.split(" ").filter(Boolean);
+  if (!index || norm.replace(/\s/g, "").length < SEARCH_MIN) return { field: arabic ? "ar" : "tr", total: 0, hits: [] };
+  const field = arabic ? index.ar : index.tr;
+  const hits = [];
+  let total = 0;
+  for (let si = 0; si < field.length; si++) {
+    const list = field[si];
+    for (let ai = 0; ai < list.length; ai++) {
+      const text = list[ai];
+      if (tokens.every((t) => text.includes(t))) {
+        total++;
+        if (hits.length < limit) hits.push({ s: si + 1, a: ai + 1, ar: index.raw[si][ai].ar, tr: index.raw[si][ai].tr });
+      }
+    }
+  }
+  return { field: arabic ? "ar" : "tr", total, hits };
+}

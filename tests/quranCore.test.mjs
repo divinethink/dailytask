@@ -9,6 +9,7 @@ import {
   sanitizeLastRead, pushLastRead, LAST_READ_MAX, QUICK_SURAHS,
   DEFAULT_PREFS, AR_SIZE, TR_SIZE, sanitizePrefs, PARA_NAMES, parseRef, locateAyah, buildMarkers, ayahShareText,
   MARKS_MAX, markKey, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, sanitizeCloudState,
+  hasArabic, normalizeArabic, normalizeText, searchSurahNames, buildSearchIndex, searchIndex, SEARCH_LIMIT,
 } from "../src/legacy/quranCore.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -225,4 +226,67 @@ test("firestore.rules-এর সীমা quranCore-এর সাথে মে�
   const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
   const blk = rules.slice(rules.indexOf("match /users/{uid}/quran/{docId}"));
   assert.ok(blk.includes("marks.size() <= " + MARKS_MAX));
+});
+
+// ───────── ধাপ ৫: সার্চ ─────────
+const ALL = meta.surahs.map((sm) => {
+  const ar = rd("ar/" + pad3(sm.n) + ".json").a;
+  const tr = rd("tr/bn_khan/" + pad3(sm.n) + ".json").t;
+  return ar.map((t, i) => ({ n: i + 1, ar: t, tr: tr[i] }));
+});
+const IDX = buildSearchIndex(ALL);
+
+test("normalizeArabic: হরকত/রূপভেদ এক হয়; hasArabic", () => {
+  assert.equal(normalizeArabic("ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ"), normalizeArabic("الحمد لله رب العالمين"));
+  assert.equal(normalizeArabic("أَحَد"), normalizeArabic("احد"));
+  assert.equal(normalizeArabic("  "), "");
+  assert.equal(hasArabic("الله"), true);
+  assert.equal(hasArabic("আল্লাহ"), false);
+  assert.equal(hasArabic("allah"), false);
+});
+
+test("normalizeText: ZWNJ/ZWJ বাদ, ছোট হাতের, ফাঁকা এক", () => {
+  assert.equal(normalizeText("  Al-Baqarah \u200C  X "), "al-baqarah x");
+});
+
+test("searchSurahNames: বাংলা/ইংরেজি/আরবি নামে মেলে; ছোট প্রশ্নে খালি", () => {
+  const names = (q) => searchSurahNames(q, S).map((x) => x.n);
+  assert.ok(names("বাকারা").includes(2));
+  assert.ok(names("baqarah").includes(2));
+  assert.ok(names("Al-Baqarah").includes(2));
+  assert.ok(names("ইয়াসীন").includes(36) || names("ইয়াসিন").includes(36) || names("ya").includes(36));
+  assert.ok(names("الفاتحة").includes(1));
+  assert.deepEqual(names("ক"), []);
+  assert.deepEqual(names("zzzzqqq"), []);
+});
+
+test("searchIndex আরবি: হরকত ছাড়া লিখলেও মেলে; আয়াতুল কুরসি; AND-শব্দ", () => {
+  const r = searchIndex(IDX, "الحمد لله رب العالمين");
+  assert.equal(r.field, "ar");
+  assert.ok(r.hits.some((x) => x.s === 1 && x.a === 2));
+  const k = searchIndex(IDX, "الله لا اله الا هو الحي القيوم");
+  assert.ok(k.hits.some((x) => x.s === 2 && x.a === 255));
+  assert.ok(k.hits.some((x) => x.s === 3 && x.a === 2));
+  // ক্রম উল্টে দিলেও (AND) একই আয়াত
+  assert.ok(searchIndex(IDX, "القيوم الحي").hits.some((x) => x.s === 2 && x.a === 255));
+});
+
+test("searchIndex বাংলা: অনুবাদে খোঁজে; ফল কুরআনের ক্রমে; সীমা ও মোট-সংখ্যা", () => {
+  const r = searchIndex(IDX, "পরম করুণাময়");
+  assert.equal(r.field, "tr");
+  assert.ok(r.hits.some((x) => x.s === 1 && x.a === 1));
+  assert.equal(r.hits[0].s <= r.hits[r.hits.length - 1].s, true);
+  const wide = searchIndex(IDX, "আল্লাহ");
+  assert.ok(wide.total > SEARCH_LIMIT);
+  assert.equal(wide.hits.length, SEARCH_LIMIT);
+  assert.equal(searchIndex(IDX, "আল্লাহ", 5).hits.length, 5);
+  const h0 = r.hits[0];
+  assert.ok(h0.ar && h0.tr && Number.isInteger(h0.s) && Number.isInteger(h0.a));
+});
+
+test("searchIndex: ছোট/খালি প্রশ্ন, অনুপস্থিত শব্দ, ইনডেক্স নেই", () => {
+  assert.equal(searchIndex(IDX, "").total, 0);
+  assert.equal(searchIndex(IDX, "ক").total, 0);
+  assert.equal(searchIndex(IDX, "অমিলশব্দকখগঘ").total, 0);
+  assert.equal(searchIndex(null, "আল্লাহ").total, 0);
 });
