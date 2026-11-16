@@ -34,3 +34,37 @@ export function writePrefs(prefs) {
     window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch (e) { /* ignore */ }
 }
+
+// ── ধাপ ৪: বুকমার্ক/পছন্দ (লোকাল কপি) ও "ক্লাউডে পাঠানো বাকি" চিহ্ন ──
+const MARKS_KEY = "dt_quran_marks";
+const DIRTY_KEY = "dt_quran_dirty";
+
+export function readMarks() {
+  try {
+    const raw = window.localStorage.getItem(MARKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function writeMarks(list) {
+  try {
+    window.localStorage.setItem(MARKS_KEY, JSON.stringify(list));
+  } catch (e) { /* ignore */ }
+}
+
+export function readDirty() {
+  try {
+    return window.localStorage.getItem(DIRTY_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+export function writeDirty(on) {
+  try {
+    if (on) window.localStorage.setItem(DIRTY_KEY, "1");
+    else window.localStorage.removeItem(DIRTY_KEY);
+  } catch (e) { /* ignore */ }
+}

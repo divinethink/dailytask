@@ -3,10 +3,13 @@
 // React global(window.React, globals.js)।
 
 import { loadMeta } from "../../../legacy/quranData.js";
-import { readLastRead, writeLastRead, readPrefs, writePrefs } from "../../../legacy/quranState.js";
+import {
+  readLastRead, writeLastRead, readPrefs, writePrefs, readMarks, writeMarks, readDirty, writeDirty,
+} from "../../../legacy/quranState.js";
+import { getQuranUid, loadQuranState, saveQuranState } from "../../../legacy/quranCloud.js";
 import {
   QUICK_SURAHS, PARA_NAMES, refLabel, sanitizeLastRead, pushLastRead, surahTypeLabel, toBnDigits,
-  parseRef, buildMarkers, sanitizePrefs,
+  parseRef, buildMarkers, sanitizePrefs, locateAyah, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, markKey,
 } from "../../../legacy/quranCore.js";
 import { QuranReader } from "./QuranReader.jsx";
 
@@ -30,7 +33,7 @@ function Heading({ children }) {
 }
 
 function Tabs({ tab, onTab }) {
-  const items = [["surah", "সূরা"], ["para", "পারা"], ["page", "পৃষ্ঠা"]];
+  const items = [["surah", "সূরা"], ["para", "পারা"], ["page", "পৃষ্ঠা"], ["saved", "সংরক্ষিত"]];
   return h("div", { className: "flex gap-1 p-1 rounded-xl mt-4 mb-3", style: { background: "#E8EEE9" }, role: "tablist" },
     items.map(([id, label]) =>
       h("button", {
@@ -120,6 +123,46 @@ function PageGrid({ meta, onOpen }) {
   );
 }
 
+const SYNC_TEXT = {
+  local: "শুধু এই ফোনে জমা আছে (লগইন বা ইন্টারনেট নেই)।",
+  saving: "ক্লাউডে সংরক্ষণ হচ্ছে…",
+  synced: "ক্লাউডে সংরক্ষিত ✓ — নতুন ফোনে Google-লগইনেও পাবেন।",
+  error: "ক্লাউডে পাঠানো যায়নি; এই ফোনে জমা আছে।",
+};
+
+function SavedList({ meta, marks, sync, onOpen, onRemove, onRetry }) {
+  const [kind, setKind] = useState("b");
+  const list = marks.filter((x) => x.k === kind);
+  const count = (k) => marks.filter((x) => x.k === k).length;
+  const kinds = [["b", "বুকমার্ক"], ["f", "পছন্দের"]];
+  return h("div", null,
+    h("div", { className: "flex gap-2 mb-2" },
+      kinds.map(([k, label]) => h("button", {
+        key: k, type: "button", onClick: () => setKind(k), "aria-pressed": kind === k,
+        className: "px-4 py-2 rounded-full border text-sm font-semibold",
+        style: { minHeight: 40, borderColor: "#D7DFD9", background: kind === k ? PRIMARY : "#fff", color: kind === k ? "#fff" : PRIMARY },
+      }, label + " (" + toBnDigits(count(k)) + ")"))
+    ),
+    h("p", { className: "text-xs text-gray-500 px-1 mb-2" },
+      SYNC_TEXT[sync] || "",
+      (sync === "error" || sync === "local") && h("button", { type: "button", onClick: onRetry, className: "ml-2 underline font-semibold", style: { color: PRIMARY } }, "আবার চেষ্টা")
+    ),
+    list.length === 0
+      ? h("p", { className: "text-center text-sm text-gray-500 py-10" }, kind === "b"
+        ? "এখনো কোনো বুকমার্ক নেই। আয়াতের নিচের “বুকমার্ক” চাপুন।"
+        : "এখনো কোনো পছন্দের আয়াত নেই। আয়াতের নিচের “পছন্দ” চাপুন।")
+      : h("div", { className: "bg-white rounded-2xl border overflow-hidden", style: CARD },
+        list.map((x) => h("div", { key: markKey(x.s, x.a, x.k), className: "flex items-center border-b last:border-b-0", style: { borderColor: "#EEF2EF" } },
+          h("button", { type: "button", onClick: () => onOpen(x.s, x.a), className: "flex-1 min-w-0 text-left px-3 py-3" },
+            h("span", { className: "block text-base font-semibold", style: { color: PRIMARY } }, "সূরা " + refLabel(meta.surahs[x.s - 1], x.a)),
+            h("span", { className: "block text-xs text-gray-500" }, "পারা " + toBnDigits(locateAyah(meta, x.s, x.a).juz))
+          ),
+          h("button", { type: "button", onClick: () => onRemove(x), className: "px-4 text-sm", style: { minHeight: 44, color: "#D64545" }, "aria-label": refLabel(meta.surahs[x.s - 1], x.a) + " সরান" }, "সরান")
+        ))
+      )
+  );
+}
+
 export function QuranScreen() {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -129,6 +172,15 @@ export function QuranScreen() {
   const [last, setLast] = useState(() => readLastRead());
   const [prefs, setPrefsState] = useState(() => readPrefs());
   const lastRef = useRef(last);
+  const [marks, setMarksState] = useState(() => readMarks());
+  const [sync, setSync] = useState("local");
+  const [syncTries, setSyncTries] = useState(0);
+  const marksRef = useRef(marks);
+  const surahsRef = useRef(null);
+  const uidRef = useRef(null);
+  const loadedRef = useRef(false); // ক্লাউড থেকে প্রথম পড়া সফল হয়েছে কি (না হলে অন্ধভাবে ওভাররাইট নয়)
+  const timerRef = useRef(null);
+  const verRef = useRef(0); // সংরক্ষণ চলাকালে নতুন পরিবর্তন এলে "dirty" চিহ্ন রেখে দিতে
 
   useEffect(() => {
     let alive = true;
@@ -139,6 +191,79 @@ export function QuranScreen() {
     return () => { alive = false; };
   }, [tries]);
 
+  // ক্লাউডে পাঠানো। ব্যর্থ হলে dirty থাকে; পরের খোলায় আবার চেষ্টা (মিলন, ওভাররাইট নয়)।
+  const push = useCallback(async () => {
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+    if (!loadedRef.current || !uidRef.current || !surahsRef.current) return;
+    const ver = verRef.current;
+    setSync("saving");
+    try {
+      await saveQuranState(uidRef.current, { marks: marksRef.current, last: lastRef.current }, surahsRef.current);
+      if (ver === verRef.current) writeDirty(false);
+      setSync("synced");
+    } catch (e) {
+      setSync("error");
+    }
+  }, []);
+
+  const touch = useCallback(() => {
+    verRef.current += 1;
+    writeDirty(true);
+    if (!loadedRef.current) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(push, 4000);
+  }, [push]);
+
+  // meta এলে (বা "আবার চেষ্টা"য়) ক্লাউডের সাথে মিলানো।
+  useEffect(() => {
+    if (!meta) return undefined;
+    let alive = true;
+    const surahs = meta.surahs;
+    surahsRef.current = surahs;
+    (async () => {
+      const uid = await getQuranUid();
+      if (!alive) return;
+      if (!uid) { setSync("local"); return; }
+      uidRef.current = uid;
+      try {
+        const remote = await loadQuranState(uid, surahs);
+        if (!alive) return;
+        const dirty = readDirty();
+        const localMarks = sanitizeMarks(marksRef.current, surahs);
+        let nextMarks = localMarks;
+        let need = dirty;
+        if (!remote) { need = need || localMarks.length > 0 || lastRef.current.length > 0; } else if (dirty) nextMarks = mergeMarks(remote.marks, localMarks, surahs);
+        else nextMarks = remote.marks;
+        const nextLast = remote ? mergeLastRead(remote.last, lastRef.current, surahs) : sanitizeLastRead(lastRef.current, surahs);
+        marksRef.current = nextMarks;
+        lastRef.current = nextLast;
+        setMarksState(nextMarks);
+        setLast(nextLast);
+        writeMarks(nextMarks);
+        writeLastRead(nextLast);
+        loadedRef.current = true;
+        if (need) { verRef.current += 1; await push(); } else setSync("synced");
+      } catch (e) {
+        if (alive) setSync("error");
+      }
+    })();
+    return () => { alive = false; };
+  }, [meta, syncTries, push]);
+
+  // ছাড়ার সময় অপেক্ষমাণ পরিবর্তন সাথে সাথে পাঠানো।
+  useEffect(() => () => { if (timerRef.current) push(); }, [push]);
+
+  const onMark = useCallback((s, a, k) => {
+    const r = toggleMark(marksRef.current, s, a, k, Date.now());
+    if (r.full) return r;
+    marksRef.current = r.list;
+    setMarksState(r.list);
+    writeMarks(r.list);
+    touch();
+    return r;
+  }, [touch]);
+
   const markers = useMemo(() => (meta ? buildMarkers(meta) : null), [meta]);
 
   const savePos = useCallback((s, a) => {
@@ -146,7 +271,8 @@ export function QuranScreen() {
     lastRef.current = next;
     setLast(next);
     writeLastRead(next);
-  }, []);
+    touch();
+  }, [touch]);
 
   const setPrefs = useCallback((p) => {
     const clean = sanitizePrefs(p);
@@ -163,6 +289,7 @@ export function QuranScreen() {
   if (!meta) return h("p", { className: "text-center text-sm text-gray-500 py-16" }, "লোড হচ্ছে…");
 
   const surahs = meta.surahs;
+  const markedSet = new Set(marks.map((x) => markKey(x.s, x.a, x.k)));
   const lastList = sanitizeLastRead(last, surahs);
   const openAt = (s, a) => setOpen({ s, a: a || 1 });
 
@@ -183,6 +310,11 @@ export function QuranScreen() {
     tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
     tab === "para" && h(ParaList, { meta, onOpen: openAt }),
     tab === "page" && h(PageGrid, { meta, onOpen: openAt }),
+    tab === "saved" && h(SavedList, {
+      meta, marks, sync, onOpen: openAt,
+      onRemove: (x) => onMark(x.s, x.a, x.k),
+      onRetry: () => setSyncTries((t) => t + 1),
+    }),
     open && h(QuranReader, {
       key: open.s + ":" + open.a,
       surah: surahs[open.s - 1],
@@ -195,6 +327,8 @@ export function QuranScreen() {
       onClose: () => setOpen(null),
       onPosition: savePos,
       onNavigate: (n) => openAt(n, 1),
+      marked: markedSet,
+      onMark,
     })
   );
 }

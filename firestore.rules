@@ -155,6 +155,22 @@ service cloud.firestore {
         && key.size() <= 100;
     }
 
+    // --- কুরআন-রিডার (ব্যক্তিগত): users/{uid}/quran/state — বুকমার্ক, পছন্দের আয়াত, শেষ পাঠ ---
+    // শুধু নিজ uid। এন্ট্রির ভেতরটা client যাচাই করে (quranCore.sanitizeMarks); Rules ফিল্ড-সীমা ও তালিকার আকার বাঁধে।
+    // marks ≤৩০০ (quranCore.MARKS_MAX-এর সাথে মেলানো), last ≤১০। শুধু doc-id "state"।
+    match /users/{uid}/quran/{docId} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && docId == 'state'
+        && request.resource.data.keys().hasOnly(['v', 'marks', 'last', 'updatedAt'])
+        && request.resource.data.v == 1
+        && request.resource.data.marks is list
+        && request.resource.data.marks.size() <= 300
+        && request.resource.data.last is list
+        && request.resource.data.last.size() <= 10
+        && request.resource.data.updatedAt is number;
+    }
+
     // --- §Google-Login Identity Migration(2_4 §3/§10.2): familyMemberEmails ---
     // Uniqueness-enforcing collection: doc-id = normalizeEmail(email)(trim+
     // lowercase, 2_4 §১০.২ — client এই একই normalization প্রয়োগ করেই doc-id

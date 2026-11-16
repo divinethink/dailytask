@@ -3,13 +3,13 @@
 // ধাপ ৩: পাঠ-সেটিংস (ফন্ট-সাইজ, থিম, আরবি/অনুবাদ সুইচ, আয়াতে যান), পারা/পৃষ্ঠা/সিজদার দাগ, কপি ও শেয়ার।
 // React global(window.React, globals.js)।
 
-import { ChevronLeft, CopyIcon, ShareIcon } from "../../icons.jsx";
+import { ChevronLeft, CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import {
   PAGE_SIZE, AR_SIZE, TR_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
-  locateAyah, ayahShareText,
+  locateAyah, ayahShareText, markKey, MARKS_MAX,
 } from "../../../legacy/quranCore.js";
 
 const { useState, useEffect, useRef, useCallback, memo } = React;
@@ -36,10 +36,14 @@ async function copyText(text) {
   }
 }
 
+// বুকমার্ক ও পছন্দের আইকন: সংরক্ষিত থাকলে ভরাট।
+const BookmarkSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M6 3h12v18l-6-4-6 4z", fill: on ? "currentColor" : "none" }));
+const HeartSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z", fill: on ? "currentColor" : "none" }));
+
 const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
-const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, sajda, flash, onCopy, onShare }) {
+const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, sajda, flash, bm, fav, onCopy, onShare, onMark }) {
   const muted = { color: th.fg, opacity: 0.62 };
   return h("div", { id: "q-a-" + a.n, "data-a": a.n, style: { padding: "14px 0", borderBottom: "1px solid " + LINE } },
     juzNo > 0 && h("div", { style: { textAlign: "center", margin: "0 0 12px" } },
@@ -53,12 +57,17 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, saj
     ),
     prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: AR_FONT, fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.8, color: th.fg, opacity: 0.9, marginTop: prefs.showAr ? 6 : 0 } }, a.tr),
-    h("div", { style: { display: "flex", gap: 4, marginTop: 6 } },
+    h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 } },
       h("button", { type: "button", onClick: () => onCopy(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " কপি করুন" },
         h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
       h("button", { type: "button", onClick: () => onShare(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " শেয়ার করুন" },
-        h(ShareIcon, { size: 17 }), "শেয়ার")
-    )
+        h(ShareIcon, { size: 17 }), "শেয়ার"),
+      h("button", { type: "button", onClick: () => onMark(a, "b"), style: actBtn(accent), "aria-pressed": bm, "aria-label": "আয়াত " + toBnDigits(a.n) + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") },
+        h(BookmarkSvg, { on: bm }), bm ? "বুকমার্কড" : "বুকমার্ক"),
+      h("button", { type: "button", onClick: () => onMark(a, "f"), style: actBtn(accent), "aria-pressed": fav, "aria-label": "আয়াত " + toBnDigits(a.n) + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") },
+        h(HeartSvg, { on: fav }), "পছন্দ")
+    ),
+    flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
 
@@ -132,7 +141,7 @@ function SettingsSheet({ prefs, th, accent, total, curAyah, onPrefs, onJump, onC
   );
 }
 
-export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate }) {
+export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate, marked, onMark }) {
   const start = startAyah > 1 ? startAyah : 1;
   const [state, setState] = useState({ status: "loading", ayahs: null });
   const [shown, setShown] = useState(Math.max(PAGE_SIZE, start + 10));
@@ -149,6 +158,8 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   const flashTimer = useRef(null);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+  const onMarkRef = useRef(onMark);
+  onMarkRef.current = onMark;
 
   useBackLayer(true, onClose);
   useBackLayer(sheet, () => setSheet(false));
@@ -246,6 +257,11 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     flashFor(a.n, ok ? "copy" : "fail");
   }, [surah, flashFor]);
 
+  const toggleMarkAt = useCallback((a, kind) => {
+    const r = onMarkRef.current(surah.n, a.n, kind);
+    if (r && r.full) flashFor(a.n, "full");
+  }, [surah.n, flashFor]);
+
   const ayahs = ready ? state.ayahs.slice(0, shown) : [];
   const prev = surah.n > 1 ? meta.surahs[surah.n - 2] : null;
   const next = surah.n < 114 ? meta.surahs[surah.n] : null;
@@ -287,7 +303,9 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
           pageNo: markers.page.get(k) || 0,
           sajda: markers.sajda.has(k),
           flash: flash.n === a.n ? flash.kind : "",
-          onCopy, onShare,
+          bm: marked.has(markKey(surah.n, a.n, "b")),
+          fav: marked.has(markKey(surah.n, a.n, "f")),
+          onCopy, onShare, onMark: toggleMarkAt,
         });
       }),
       ready && shown < total && h("div", { ref: sentinelRef, style: { height: 40 }, "aria-hidden": "true" }),

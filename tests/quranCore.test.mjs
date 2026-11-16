@@ -8,6 +8,7 @@ import {
   toBnDigits, pad3, surahTypeLabel, showBismillahHeader, refLabel, parseSurahPayload,
   sanitizeLastRead, pushLastRead, LAST_READ_MAX, QUICK_SURAHS,
   DEFAULT_PREFS, AR_SIZE, TR_SIZE, sanitizePrefs, PARA_NAMES, parseRef, locateAyah, buildMarkers, ayahShareText,
+  MARKS_MAX, markKey, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, sanitizeCloudState,
 } from "../src/legacy/quranCore.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -153,4 +154,75 @@ test("ayahShareText: দৃশ্যমান অংশই যায়, সূ�
   assert.equal(both, "AR\n\nTR\n\n— সূরা আল-বাকারা ২:২৫৫ (অনুবাদ: মুহিউদ্দীন খান)");
   assert.equal(ayahShareText(sm, ay, { showAr: true, showTr: false }, "ক"), "AR\n\n— সূরা আল-বাকারা ২:২৫৫");
   assert.equal(ayahShareText(sm, ay, { showAr: false, showTr: true }, ""), "TR\n\n— সূরা আল-বাকারা ২:২৫৫");
+});
+
+// ───────── ধাপ ৪: বুকমার্ক / পছন্দ ─────────
+const S = meta.surahs;
+
+test("sanitizeMarks: অবৈধ বাদ, ডুপ্লিকেট এক, নতুন আগে, সীমা ৩০০", () => {
+  const raw = [
+    { s: 2, a: 255, k: "b", t: 5 },
+    { s: 2, a: 255, k: "b", t: 9 }, // ডুপ্লিকেট
+    { s: 2, a: 255, k: "f", t: 7 }, // ভিন্ন ধরন — আলাদা এন্ট্রি
+    { s: 2, a: 287, k: "b", t: 1 }, // আয়াত সীমার বাইরে
+    { s: 115, a: 1, k: "b", t: 1 }, // সূরা অবৈধ
+    { s: 1, a: 1, k: "x", t: 1 }, // ধরন অবৈধ
+    { s: "2", a: 1, k: "b", t: 1 }, // ধরন-ভুল
+    null, 5,
+    { s: 1, a: 1, k: "b" }, // t নেই → ০
+  ];
+  const out = sanitizeMarks(raw, S);
+  assert.deepEqual(out.map((x) => markKey(x.s, x.a, x.k)), ["2:255:f", "2:255:b", "1:1:b"]);
+  assert.deepEqual(sanitizeMarks("x", S), []);
+  assert.deepEqual(sanitizeMarks([], null), []);
+  const many = Array.from({ length: 400 }, (_, i) => ({ s: 2, a: (i % 286) + 1, k: i < 286 ? "b" : "f", t: i }));
+  assert.equal(sanitizeMarks(many, S).length, MARKS_MAX);
+});
+
+test("toggleMark: যোগ, সরানো, সীমা পূর্ণ হলে যোগ হয় না কিন্তু কিছু মোছেও না", () => {
+  let r = toggleMark([], 2, 255, "b", 10);
+  assert.equal(r.added, true);
+  assert.deepEqual(r.list, [{ s: 2, a: 255, k: "b", t: 10 }]);
+  r = toggleMark(r.list, 2, 255, "f", 11); // ভিন্ন ধরন
+  assert.equal(r.list.length, 2);
+  r = toggleMark(r.list, 2, 255, "b", 12); // সরানো
+  assert.equal(r.added, false);
+  assert.deepEqual(r.list.map((x) => x.k), ["f"]);
+  const full = Array.from({ length: MARKS_MAX }, (_, i) => ({ s: 2, a: (i % 286) + 1, k: i < 286 ? "b" : "f", t: i }));
+  const blocked = toggleMark(full, 3, 1, "b", 99);
+  assert.equal(blocked.full, true);
+  assert.equal(blocked.list, full);
+  assert.equal(toggleMark(full, 2, 1, "b", 99).list.length, MARKS_MAX - 1); // পূর্ণ থাকলেও সরানো চলে
+});
+
+test("mergeMarks: দুই দিকের কিছুই হারায় না; একই কী-তে নতুন সময়", () => {
+  const a = [{ s: 2, a: 1, k: "b", t: 5 }, { s: 3, a: 1, k: "f", t: 1 }];
+  const b = [{ s: 2, a: 1, k: "b", t: 8 }, { s: 4, a: 1, k: "b", t: 2 }];
+  const m = mergeMarks(a, b, S);
+  assert.equal(m.length, 3);
+  assert.equal(m.find((x) => x.s === 2).t, 8);
+  assert.deepEqual(mergeMarks(a, null, S).length, 2);
+});
+
+test("mergeLastRead: প্রতি সূরায় নতুনটা, সর্বোচ্চ ৩", () => {
+  const a = [{ s: 2, a: 10, t: 5 }, { s: 18, a: 1, t: 1 }];
+  const b = [{ s: 2, a: 99, t: 9 }, { s: 36, a: 1, t: 3 }, { s: 55, a: 1, t: 2 }];
+  const m = mergeLastRead(a, b, S);
+  assert.equal(m.length, LAST_READ_MAX);
+  assert.deepEqual(m[0], { s: 2, a: 99, t: 9 });
+  assert.deepEqual(m.map((x) => x.s), [2, 36, 55]);
+});
+
+test("sanitizeCloudState: নষ্ট ডক খালি হয়ে যায়, ভালো অংশ টিকে থাকে", () => {
+  assert.deepEqual(sanitizeCloudState(null, S), { marks: [], last: [] });
+  assert.deepEqual(sanitizeCloudState("x", S), { marks: [], last: [] });
+  const c = sanitizeCloudState({ marks: [{ s: 1, a: 1, k: "b", t: 1 }, { s: 0, a: 0, k: "b" }], last: [{ s: 1, a: 3, t: 2 }] }, S);
+  assert.equal(c.marks.length, 1);
+  assert.equal(c.last.length, 1);
+});
+
+test("firestore.rules-এর সীমা quranCore-এর সাথে মেলে (marks ≤ MARKS_MAX)", () => {
+  const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
+  const blk = rules.slice(rules.indexOf("match /users/{uid}/quran/{docId}"));
+  assert.ok(blk.includes("marks.size() <= " + MARKS_MAX));
 });

@@ -145,3 +145,65 @@ export function ayahShareText(surah, ayah, prefs, translatorName) {
     (prefs.showTr && translatorName ? " (অনুবাদ: " + translatorName + ")" : "");
   return parts.join("\n\n") + "\n\n" + src;
 }
+
+// ───────── ধাপ ৪: বুকমার্ক ও পছন্দের আয়াত (ক্লাউড-সিঙ্কযোগ্য) ─────────
+// এন্ট্রি: { s: সূরা, a: আয়াত, k: "b"(বুকমার্ক) | "f"(পছন্দের), t: সময় }। একই (s,a,k) একবারই।
+// এই sanitize-ই একমাত্র যাচাই (Rules শুধু তালিকার আকার বাঁধে)।
+
+export const MARKS_MAX = 300; // firestore.rules-এর সীমার সাথে মিলিয়ে রাখতে হবে
+export const MARK_KINDS = ["b", "f"];
+
+export const markKey = (s, a, k) => s + ":" + a + ":" + k;
+
+export function sanitizeMarks(raw, surahs) {
+  if (!Array.isArray(raw) || !Array.isArray(surahs)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const x of raw) {
+    if (!x || !Number.isInteger(x.s) || !Number.isInteger(x.a) || !MARK_KINDS.includes(x.k)) continue;
+    const sm = surahs[x.s - 1];
+    if (!sm || x.a < 1 || x.a > sm.ayahs) continue;
+    const key = markKey(x.s, x.a, x.k);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ s: x.s, a: x.a, k: x.k, t: Number.isFinite(x.t) ? x.t : 0 });
+  }
+  out.sort((p, q) => q.t - p.t);
+  return out.slice(0, MARKS_MAX);
+}
+
+// আছে → সরানো; নেই → যোগ। সীমা পূর্ণ হলে নতুন যোগ হয় না (পুরনোটা চুপচাপ মুছে ফেলা হয় না — ডেটা হারানো নয়)।
+export function toggleMark(list, s, a, k, now) {
+  const cur = Array.isArray(list) ? list : [];
+  const key = markKey(s, a, k);
+  if (cur.some((x) => markKey(x.s, x.a, x.k) === key)) {
+    return { list: cur.filter((x) => markKey(x.s, x.a, x.k) !== key), added: false, full: false };
+  }
+  if (cur.length >= MARKS_MAX) return { list: cur, added: false, full: true };
+  return { list: [{ s, a, k, t: now }, ...cur], added: true, full: false };
+}
+
+// দুই তালিকার মিলন (কোনো এন্ট্রি হারায় না); একই কী-তে নতুন সময়টা থাকে।
+export function mergeMarks(a, b, surahs) {
+  const best = new Map();
+  for (const x of sanitizeMarks(a, surahs).concat(sanitizeMarks(b, surahs))) {
+    const key = markKey(x.s, x.a, x.k);
+    const old = best.get(key);
+    if (!old || x.t > old.t) best.set(key, x);
+  }
+  return sanitizeMarks([...best.values()], surahs);
+}
+
+// শেষ পাঠের মিলন: প্রতি সূরায় নতুনটা, সর্বোচ্চ LAST_READ_MAX।
+export function mergeLastRead(a, b, surahs) {
+  return sanitizeLastRead(
+    [...sanitizeLastRead(a, surahs), ...sanitizeLastRead(b, surahs)].sort((p, q) => q.t - p.t),
+    surahs
+  );
+}
+
+// ক্লাউড-ডক (users/{uid}/quran/state) যাচাই; অবৈধ হলে খালি।
+export function sanitizeCloudState(raw, surahs) {
+  const r = raw && typeof raw === "object" ? raw : {};
+  return { marks: sanitizeMarks(r.marks, surahs), last: sanitizeLastRead(r.last, surahs) };
+}
