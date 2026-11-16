@@ -1,6 +1,6 @@
 // tools/quran/build-indopak.mjs — IndoPak আরবি লেখার ডেটা-ফাইল বানানো (একবার চালানো; অ্যাপ চালাতে লাগে না)। ধাপ ৬গ-৩।
 // ব্যবহার: node tools/quran/build-indopak.mjs --src <indopak.json (শব্দ-ভিত্তিক, "সূরা:আয়াত:শব্দ" → {text})> [--out public/quran/v1]
-// উৎস: QuranWBW-এর IndoPak লেখা (QUL-এর মাধ্যমে পাওয়া) — অপরিবর্তিত; শুধু শব্দগুলো ফাঁকা দিয়ে জোড়া, আর আয়াত-শেষের নম্বর-শব্দ বাদ (নম্বর অ্যাপ নিজে আঁকে)।
+// উৎস: QuranWBW-এর IndoPak লেখা (QUL-এর মাধ্যমে পাওয়া) — অপরিবর্তিত; শুধু শব্দগুলো ফাঁকা দিয়ে জোড়া, আয়াত-শেষের নম্বর-শব্দ বাদ, আর অদৃশ্য U+200B/U+FEFF বাদ (ফন্টে নেই; কিছু ফোনে বাক্স দেখায়) (নম্বর অ্যাপ নিজে আঁকে)।
 // নিরাপত্তা: ৬২৩৬ আয়াত, শব্দের ক্রম, নম্বর-শব্দ = আয়াত-নম্বর, প্রতি সূরার সংখ্যা meta.json-এর সাথে মিল,
 //   Uthmani-র সাথে ব্যঞ্জনবর্ণ-কাঠামো মিল (জ্ঞাত রসম-পার্থক্য ছাড়া অমিল থাকলে ডেটা নেওয়া হয় না)।
 // আউটপুট: ar-indopak/NNN.json, ar-indopak/NOTICE.txt, manifest.json-এ arabicIndopak, tools/quran/integrity-indopak.json।
@@ -53,7 +53,8 @@ for (const su of meta.surahs) {
     if (!w) fail("আয়াত নেই: " + su.n + ":" + a);
     const last = w[w.length - 1];
     if (last !== toArabicDigits(a)) fail("শেষ শব্দ আয়াত-নম্বর নয়: " + su.n + ":" + a + " (" + last + ")");
-    const t = w.slice(0, -1).join(" ");
+    // U+200B (ZWSP) ও U+FEFF ফন্টে নেই — কিছু ফোনে বাক্স (▯) দেখায়। অদৃশ্য অক্ষর, তাই বাদ; হরফ/চিহ্ন অক্ষত।
+    const t = w.slice(0, -1).join(" ").replace(/[\u200b\ufeff]/g, "").trim();
     if (w.length < 2 || !t.trim()) fail("খালি আয়াত " + su.n + ":" + a);
     ar.push(t);
   }
@@ -101,7 +102,7 @@ const mainInt = JSON.parse(fs.readFileSync(mainIntPath, "utf8"));
 mainInt.files["manifest.json"] = { bytes: Buffer.byteLength(manifestStr), sha256: sha(manifestStr) };
 fs.writeFileSync(mainIntPath, JSON.stringify(mainInt, null, 1));
 fs.writeFileSync(path.join(OUT, "ar-indopak", "NOTICE.txt"),
-  "IndoPak আরবি লেখা: QuranWBW.com (https://quranwbw.com) — অপরিবর্তিত; শুধু শব্দ জোড়া লাগিয়ে আয়াত বানানো ও আয়াত-শেষের নম্বর-শব্দ বাদ।\n" +
+  "IndoPak আরবি লেখা: QuranWBW.com (https://quranwbw.com) — অপরিবর্তিত; শুধু শব্দ জোড়া লাগিয়ে আয়াত বানানো, আয়াত-শেষের নম্বর-শব্দ ও অদৃশ্য U+200B/U+FEFF বাদ।\n" +
   "ব্যবহার: Daily Task — একটি অ-বাণিজ্যিক (সাদাকায়ে জারিয়া) অ্যাপ; QuranWBW-এর কাছ থেকে ইমেইলে অ-বাণিজ্যিক ব্যবহারের অনুমতি পাওয়া গেছে।\n");
 fs.writeFileSync(path.join(here, "integrity-indopak.json"), JSON.stringify({ input: sha(rawStr), files: integrity }, null, 1));
 console.log("✅ IndoPak: ১১৪ সূরা-ফাইল, ৬২৩৬ আয়াত");
