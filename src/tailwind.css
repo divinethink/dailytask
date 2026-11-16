@@ -26,3 +26,12 @@
   font-style: normal;
   font-display: swap;
 }
+
+/* ইন্দো-পাক লেখার ফন্ট (ধাপ ৬গ-৩)। ফাইল অপরিবর্তিত (QuranWBW-এর অ-বাণিজ্যিক অনুমতি)। */
+@font-face {
+  font-family: 'AlQuran IndoPak QuranWBW';
+  src: url('/quran/v1/fonts/alquran-indopak-quranwbw.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

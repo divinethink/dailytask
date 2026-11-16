@@ -118,3 +118,11 @@ test("flowLayout: simple/উসমানি আগের মতো; ইন্দ
   assert.ok(ip.sizeScale > 1 && ip.lineHeight > 2.3);
   assert.deepEqual(flowLayout("অচেনা"), flowLayout("simple"));
 });
+
+test("@font-face: file-ওয়ালা প্রতিটা ফন্টের নিজের @font-face tailwind.css-এ আছে (না থাকলে ফোনে ফন্ট নামে না)", () => {
+  const css = fs.readFileSync(path.join(root, "src/tailwind.css"), "utf8");
+  for (const f of QURAN_FONTS.filter((x) => x.file)) {
+    assert.ok(css.includes("font-family: '" + f.family + "'"), f.id + ": @font-face নেই");
+    assert.ok(css.includes(f.file), f.id + ": ফাইলের পথ মেলেনি");
+  }
+});
