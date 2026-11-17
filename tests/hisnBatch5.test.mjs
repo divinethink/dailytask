@@ -8,14 +8,15 @@ const skel = (t) => t.replace(/[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]/g, "").r
 const has = (text, frag) => skel(text).includes(skel(frag));
 const all = B.flatMap((c) => c.duas);
 const byHid = (n) => all.find((d) => d.hid === n);
-const IDS = [47, 48, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 93, 106, 108, 109, 110, 111, 112, 113, 114];
+const IDS = [48, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 93, 106, 108, 109, 110, 111, 112, 113, 114];
 
-test("ব্যাচ ৫: ২৫ অধ্যায়, ২৭ দু'আ, id অনন্য, আরবি ও অর্থ আছে, আরবিতে আবরণ নেই", () => {
-  assert.equal(B.length, 25);
-  assert.equal(all.length, 27);
+test("ব্যাচ ৫: ২৪ অধ্যায়, ২৬ দু'আ, id অনন্য, আরবি ও অর্থ আছে, আরবিতে আবরণ নেই", () => {
+  assert.equal(B.length, 24);
+  assert.equal(all.length, 26);
   assert.deepEqual(B.map((c) => c.id), IDS);
-  assert.equal(new Set(all.map((d) => d.id)).size, 27);
-  assert.equal(new Set(all.map((d) => d.hid)).size, 27);
+  assert.equal(new Set(all.map((d) => d.id)).size, 26);
+  assert.equal(new Set(all.map((d) => d.hid)).size, 26);
+  assert.ok(!B.some((c) => c.id === 47) && !byHid(145), "অধ্যায় ৪৭ (হাসান বসরীর উক্তি, হাদিস নয়) বাদ থাকবে");
   assert.equal(B.find((c) => c.id === 108).duas.length, 3);
   for (const d of all) {
     assert.ok(d.title && d.ar && d.bn, d.id);
@@ -44,7 +45,6 @@ test("নির্দেশ/বর্ণনা arPre-তে আলাদা; দ
   assert.ok(has(byHid(146).arPre, "الحسن") && has(byHid(146).ar, "أعيذكما"));
   assert.ok(skel(byHid(195).ar).startsWith(skel("رب اغفر لي")) && !has(byHid(195).ar, "ابن عمر"));
   assert.ok(has(byHid(191).arNote, "بعيرا") && !has(byHid(191).ar, "بعيرا"));
-  assert.equal(byHid(145).ar.split("\n").length, 3);
   assert.equal(byHid(218).ar.split("\n").length, 3);
 });
 

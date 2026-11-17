@@ -9,12 +9,13 @@ const has = (text, frag) => skel(text).includes(skel(frag));
 const all = B.flatMap((c) => c.duas);
 const byHid = (n) => all.find((d) => d.hid === n);
 
-test("ব্যাচ ৭: ১৯ অধ্যায়, ২০ দু'আ, id অনন্য, আরবিতে আবরণ নেই", () => {
-  assert.equal(B.length, 19);
-  assert.equal(all.length, 20);
+test("ব্যাচ ৭: ১৮ অধ্যায়, ১৯ দু'আ, id অনন্য, আরবিতে আবরণ নেই", () => {
+  assert.equal(B.length, 18);
+  assert.equal(all.length, 19);
+  assert.ok(!B.some((c) => c.id === 98) && !byHid(209), "অধ্যায় ৯৮ (সহীহ নয়) বাদ থাকবে");
   assert.equal(B.find((c) => c.id === 101).duas.length, 2);
-  assert.equal(new Set(all.map((d) => d.id)).size, 20);
-  assert.equal(new Set(all.map((d) => d.hid)).size, 20);
+  assert.equal(new Set(all.map((d) => d.id)).size, 19);
+  assert.equal(new Set(all.map((d) => d.hid)).size, 19);
   for (const d of all) {
     assert.ok(d.title && d.ar && d.bn, d.id);
     assert.ok(!/\(\(|\)\)|\u0640/.test(d.ar + (d.arPre || "") + (d.arNote || "")), d.id);
@@ -42,6 +43,6 @@ test("উচ্চারণের নমুনা আরবির সাথে �
 });
 
 test("copyText: আরবি ও অর্থ আছে", () => {
-  const t = copyText(byHid(209));
-  assert.ok(t.includes(byHid(209).ar) && t.includes(byHid(209).bn));
+  const t = copyText(byHid(208));
+  assert.ok(t.includes(byHid(208).ar) && t.includes(byHid(208).bn) && t.includes(byHid(208).ref));
 });
