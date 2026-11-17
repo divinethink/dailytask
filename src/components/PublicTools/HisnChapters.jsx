@@ -1,5 +1,5 @@
 // HisnChapters.jsx — "দোয়া" পেজের "হিসনুল মুসলিম" ট্যাব: অধ্যায়-তালিকা → অধ্যায়ের কার্ড।
-// ডেটা lazy-load (dynamic import)। ব্যাচ ধরে ধরে বাড়ছে — ব্যাচ ১-৫ যুক্ত (৯১টি হিসনের অধ্যায় + সকাল-সন্ধ্যা)।
+// ডেটা lazy-load (dynamic import)। ব্যাচ ধরে ধরে বাড়ছে — ব্যাচ ১-৬ যুক্ত (৯১টি হিসনের অধ্যায় + সকাল-সন্ধ্যা)।
 // React global(window.React, globals.js)।
 
 import { readPrefs } from "../../legacy/quranState.js";
@@ -19,8 +19,8 @@ export function HisnChapters() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js"), import("../../legacy/hisnBatch3.js"), import("../../legacy/hisnBatch4.js"), import("../../legacy/hisnBatch5.js")]).then(
-      ([b1, m, b2, b3, b4, b5]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2, b3.HISN_BATCH3, b4.HISN_BATCH4, b5.HISN_BATCH5), source: m.HISN_SOURCE }); },
+    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js"), import("../../legacy/hisnBatch3.js"), import("../../legacy/hisnBatch4.js"), import("../../legacy/hisnBatch5.js"), import("../../legacy/hisnBatch6.js")]).then(
+      ([b1, m, b2, b3, b4, b5, b6]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2, b3.HISN_BATCH3, b4.HISN_BATCH4, b5.HISN_BATCH5, b6.HISN_BATCH6), source: m.HISN_SOURCE }); },
       () => { if (alive) setState({ status: "error", chapters: [], source: "" }); }
     );
     return () => { alive = false; };
