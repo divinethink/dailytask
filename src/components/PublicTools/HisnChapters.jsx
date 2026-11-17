@@ -19,8 +19,8 @@ export function HisnChapters() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js")]).then(
-      ([b1, m, b2]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2), source: m.HISN_SOURCE }); },
+    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js"), import("../../legacy/hisnBatch3.js")]).then(
+      ([b1, m, b2, b3]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2, b3.HISN_BATCH3), source: m.HISN_SOURCE }); },
       () => { if (alive) setState({ status: "error", chapters: [], source: "" }); }
     );
     return () => { alive = false; };
