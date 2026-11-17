@@ -19,8 +19,8 @@ export function HisnChapters() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js"), import("../../legacy/hisnBatch3.js"), import("../../legacy/hisnBatch4.js"), import("../../legacy/hisnBatch5.js"), import("../../legacy/hisnBatch6.js"), import("../../legacy/hisnBatch7.js")]).then(
-      ([b1, m, b2, b3, b4, b5, b6, b7]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2, b3.HISN_BATCH3, b4.HISN_BATCH4, b5.HISN_BATCH5, b6.HISN_BATCH6, b7.HISN_BATCH7), source: m.HISN_SOURCE }); },
+    Promise.all([import("../../legacy/hisnBatch1.js"), import("../../legacy/hisnData.js"), import("../../legacy/hisnBatch2.js"), import("../../legacy/hisnBatch3.js"), import("../../legacy/hisnBatch4.js"), import("../../legacy/hisnBatch5.js"), import("../../legacy/hisnBatch6.js"), import("../../legacy/hisnBatch7.js"), import("../../legacy/hisnBatch8.js")]).then(
+      ([b1, m, b2, b3, b4, b5, b6, b7, b8]) => { if (alive) setState({ status: "ready", chapters: buildChapters(b1.HISN_BATCH1, m.HISN_MORNING_EVENING, b2.HISN_BATCH2, b3.HISN_BATCH3, b4.HISN_BATCH4, b5.HISN_BATCH5, b6.HISN_BATCH6, b7.HISN_BATCH7, b8.HISN_BATCH8), source: m.HISN_SOURCE }); },
       () => { if (alive) setState({ status: "error", chapters: [], source: "" }); }
     );
     return () => { alive = false; };
