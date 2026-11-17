@@ -31,7 +31,7 @@ export function copyText(d) {
 }
 
 // অধ্যায়-তালিকা: ব্যাচের অধ্যায় + অধ্যায় ২৭ (সকাল-সন্ধ্যা), অধ্যায়-নম্বর অনুযায়ী সাজানো। batch2 ঐচ্ছিক (নতুন ব্যাচ যুক্ত হলে একই ধাঁচে)।
-export function buildChapters(batch1, morning, batch2 = [], batch3 = [], batch4 = []) {
+export function buildChapters(batch1, morning, batch2 = [], batch3 = [], batch4 = [], batch5 = []) {
   const ch27 = { id: 27, title: "সকাল ও সন্ধ্যার যিকর", duas: morning.map((d) => ({ ...d, ref: d.ref || "" })) };
-  return [...batch1, ...batch2, ...batch3, ...batch4, ch27].sort((a, b) => a.id - b.id);
+  return [...batch1, ...batch2, ...batch3, ...batch4, ...batch5, ch27].sort((a, b) => a.id - b.id);
 }
