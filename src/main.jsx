@@ -4,3 +4,6 @@ import "./tailwind.css";
 // bare globals) executes. Import order below = evaluation order.
 import "./globals.js";
 import "./legacy/app.js";
+import { clearChunkReloadFlag } from "./legacy/lazyRetry.js";
+// অ্যাপ ৫ সেকেন্ড টিকে থাকলে ধরে নেওয়া হয় লোড ঠিক আছে; তখন reload-চিহ্ন মুছে যায়।
+setTimeout(clearChunkReloadFlag, 5000);

@@ -1,9 +1,10 @@
+import { lazyRetry } from "../legacy/lazyRetry.js";
 // "কুরআন" নেভ-ট্যাবের পাতা: শিরোনাম-ব্যান্ড + কুরআন-স্ক্রিন। QuranScreen আলাদা chunk — ট্যাবে ঢুকলে তবেই লোড হয়।
 // React global(window.React, globals.js)।
 import { PageHeader } from "./PublicTools/ToolGrid.jsx";
 import { SettingsGear } from "./icons.jsx";
 
-const QuranScreenLazy = React.lazy(() => import("./PublicTools/Quran/QuranScreen.jsx").then((m) => ({ default: m.QuranScreen })));
+const QuranScreenLazy = lazyRetry(() => import("./PublicTools/Quran/QuranScreen.jsx").then((m) => ({ default: m.QuranScreen })));
 
 export function QuranTab() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);

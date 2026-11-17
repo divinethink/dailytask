@@ -1,3 +1,4 @@
+import { lazyRetry } from "./lazyRetry.js";
 import { dbModular, authModular, authModular as auth, logAnalyticsEvent } from "./firebaseConfig.js";
 import { GoogleAuthProvider, signOut, linkWithPopup, unlink, onAuthStateChanged } from "firebase/auth";
 import { query, where, documentId, onSnapshot, doc, getDoc, setDoc, increment, collection, orderBy, limit } from "firebase/firestore";
@@ -93,10 +94,10 @@ import { CreateNewFamilyModal, FamilyCodeChoiceModal, JoinFamilyModal, RenameFam
 // বেশিরভাগ session-এ কখনো খোলা হয় না। এখন React.lazy()+ব্যবহারের জায়গায়
 // React.Suspense(fallback: null, কারণ show=false-এ এমনিতেও কিছু render হয়
 // না) দিয়ে আলাদা chunk-এ সরানো হলো — কোনো logic/condition/prop অপরিবর্তিত।
-const ArchiveModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ArchiveModal })));
-const BackupOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.BackupOptionsModal })));
-const DriveRestoreModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.DriveRestoreModal })));
-const ImportOptionsModal = React.lazy(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ImportOptionsModal })));
+const ArchiveModal = lazyRetry(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ArchiveModal })));
+const BackupOptionsModal = lazyRetry(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.BackupOptionsModal })));
+const DriveRestoreModal = lazyRetry(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.DriveRestoreModal })));
+const ImportOptionsModal = lazyRetry(() => import("../components/BackupRestore.jsx").then(m => ({ default: m.ImportOptionsModal })));
 import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // §Part B §B৫ (Lazy-load, 2_5 Part B §B৫, ১৫ সেপ্টেম্বর ২০২৬): `PrintReport`
 // শুধু `printMode` true হলেই render হয় (নিচে), কিন্তু আগে static import ছিল
@@ -105,7 +106,7 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // convention না) — named-export বলে `.then(m => ({default: m.PrintReport}))`
 // wrapper লাগে। ব্যবহারের জায়গায় (নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
-const PrintReport = React.lazy(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
+const PrintReport = lazyRetry(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
 import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { GoogleRelinkGate } from "../components/GoogleRelinkGate.jsx";
 import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
@@ -152,26 +153,26 @@ import { renderHomeBelow } from "../components/HomeFold.jsx";
 import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
 import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
-const TazkirahManagerScreen = React.lazy(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
-const FieldManagerScreen = React.lazy(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
+const TazkirahManagerScreen = lazyRetry(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
+const FieldManagerScreen = lazyRetry(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
 import { taskFields } from "./customTasks.js";
-const TabLayoutScreen = React.lazy(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
-const HomeLayoutScreen = React.lazy(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
-const PopupMessagesScreen = React.lazy(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
-const MenuPage = React.lazy(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
+const TabLayoutScreen = lazyRetry(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
+const HomeLayoutScreen = lazyRetry(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
+const PopupMessagesScreen = lazyRetry(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
+const MenuPage = lazyRetry(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_MUHASABA, TAB_QURAN, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 import { useBackLayer } from "./backNav.js";
 // §Public Tools Phase A, item ২ (3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো (3_2 §১-এর নীতি
 // অনুযায়ী শুধু import বদল, routing-switch touch হয়নি)। lazy-load(3_2 §২.১ standing
 // rule, PrintReport-এর একই pattern reuse) — prayerTimes ট্যাপ না করলে chunk লোড হবে না।
-const PrayerTimes = React.lazy(() => import("../components/PublicTools/PrayerTimes.jsx").then(m => ({ default: m.PrayerTimes })));
+const PrayerTimes = lazyRetry(() => import("../components/PublicTools/PrayerTimes.jsx").then(m => ({ default: m.PrayerTimes })));
 // §Public Tools Phase A, item ৩/৫ক (3_1 §"আমল হাব", ১৮ সেপ্টেম্বর ২০২৬): "আমল" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual hub component(তাসবীহ inline + বাকি
 // ৭ item "শীঘ্রই আসছে" sub-screen, content pending) বসানো হলো, একই lazy pattern।
 // §Public Tools Phase A, item ৫ (3_1/3_2 §২.২, ১৮ সেপ্টেম্বর ২০২৬): "সহায়িকা" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে ৬-ক্যাটাগরি shell বসানো হলো, একই lazy pattern।
-const PublicToolsShell = React.lazy(() => import("../components/PublicTools/PublicToolsShell.jsx").then(m => ({ default: m.PublicToolsShell })));
+const PublicToolsShell = lazyRetry(() => import("../components/PublicTools/PublicToolsShell.jsx").then(m => ({ default: m.PublicToolsShell })));
 // boot-loading gate(নিচে, `members === null || migrationState === undefined`)
 // আগে শুধু center-spinner দেখাত (blank-screen)। এই pure-presentational, props/
 // state-বিহীন helper সেই একই gate-এ card-shape gray-skeleton দেখায় (header-bar
