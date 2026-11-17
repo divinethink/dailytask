@@ -23,10 +23,15 @@ export function hisnArabicFont(prefs) {
 }
 
 export function copyText(d) {
-  const parts = [d.title, d.ar];
-  if (d.arNote) parts.push(d.arNote);
-  parts.push(d.tr, d.bn);
+  const parts = [d.title, d.arPre, d.ar, d.arNote, d.tr, d.bn];
   if (d.times > 1) parts.push("(" + timesBadge(d) + ")");
   if (d.note) parts.push(d.note);
+  if (d.ref) parts.push("সূত্র: " + d.ref);
   return parts.filter(Boolean).join("\n\n");
+}
+
+// অধ্যায়-তালিকা: ব্যাচের অধ্যায় + অধ্যায় ২৭ (সকাল-সন্ধ্যা), অধ্যায়-নম্বর অনুযায়ী সাজানো। সকাল-সন্ধ্যার দু'আর সূত্র এখনো নেই (ref: "")।
+export function buildChapters(batch1, morning) {
+  const ch27 = { id: 27, title: "সকাল ও সন্ধ্যার যিকর", duas: morning.map((d) => ({ ...d, ref: d.ref || "" })) };
+  return [...batch1, ch27].sort((a, b) => a.id - b.id);
 }

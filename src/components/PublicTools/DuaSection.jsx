@@ -6,6 +6,7 @@
 import { SubScreenHeader } from "./SubScreenHeader.jsx";
 import { PrayerAdhkar } from "./PrayerAdhkar.jsx";
 import { DuaFlashcards } from "./DuaFlashcards.jsx";
+import { HisnChapters } from "./HisnChapters.jsx";
 
 const { useState } = React;
 
@@ -22,6 +23,7 @@ export function DuaSection({ onBack }) {
       [
         { key: "list", label: "নামাজের দোয়া" },
         { key: "flashcards", label: "ফ্ল্যাশকার্ড" },
+        { key: "hisn", label: "হিসনুল মুসলিম" },
       ].map((t) =>
         /*#__PURE__*/React.createElement(
           "button",
@@ -30,7 +32,7 @@ export function DuaSection({ onBack }) {
             type: "button",
             onClick: () => setTab(t.key),
             className:
-              "flex-1 py-2 rounded-xl text-sm font-semibold border " +
+              "flex-1 py-2 rounded-xl text-[13px] font-semibold border " +
               (tab === t.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"),
             style: tab === t.key ? { background: "var(--theme-primary, #0E4B43)" } : undefined,
           },
@@ -41,7 +43,7 @@ export function DuaSection({ onBack }) {
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4" },
-      tab === "list" ? /*#__PURE__*/React.createElement(PrayerAdhkar, null) : /*#__PURE__*/React.createElement(DuaFlashcards, null)
+      tab === "list" ? /*#__PURE__*/React.createElement(PrayerAdhkar, null) : tab === "hisn" ? /*#__PURE__*/React.createElement(HisnChapters, null) : /*#__PURE__*/React.createElement(DuaFlashcards, null)
     )
   );
 }
