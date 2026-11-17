@@ -33,9 +33,9 @@ test("বাংলা অংশে ইংরেজি অক্ষর নেই 
   for (const d of all) for (const k of ["title", "tr", "bn", "note"]) assert.ok(!/[A-Za-z]/.test(d[k] || ""), d.id + "." + k);
 });
 
-test("সূত্র: যাচাই-না-হওয়া দু'আর তালিকা স্থির (১২টি); বাকিতে আসল সূত্র-নম্বর আছে", () => {
+test("সূত্র: যাচাই-না-হওয়া দু'আর তালিকা স্থির (৩টি); বাকিতে আসল সূত্র-নম্বর আছে", () => {
   const un = all.filter((d) => d.ref === UNVERIFIED).map((d) => d.hid);
-  assert.deepEqual(un, [240, 241, 243, 244, 245, 247, 248, 249, 250, 251, 252, 253]);
+  assert.deepEqual(un, [243, 247, 250]);
   for (const d of all.filter((x) => x.ref !== UNVERIFIED)) assert.ok(/[০-৯]/.test(d.ref), d.id + ": সূত্রে সংখ্যা নেই");
 });
 
