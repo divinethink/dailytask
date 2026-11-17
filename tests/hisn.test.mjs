@@ -61,3 +61,10 @@ test("helper: বাংলা সংখ্যা, ব্যাজ, ফন্ট-
   assert.equal(hisnArabicFont(null), "amiri-quran");
   assert.ok(copyText(L[8]).includes(L[8].ar) && copyText(L[8]).includes("৭ বার"));
 });
+
+test("hisn ch27: প্রতিটি দু'আর সূত্র আছে; ID 97 যাচাই-হয়নি বলা আছে", async () => {
+  const { HISN_MORNING_EVENING: L } = await import("../src/legacy/hisnData.js");
+  for (const d of L) assert.ok(d.ref && d.ref.length > 5, d.id);
+  assert.match(L.find((d) => d.hid === 97).ref, /যাচাই হয়নি/);
+  assert.match(L.find((d) => d.hid === 93).ref, /২৬৯১/);
+});

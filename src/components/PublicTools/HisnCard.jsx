@@ -31,7 +31,7 @@ export function HisnCard({ d, open, onToggle, prefs }) {
       d.tr && h("div", { className: "mt-3 text-[13px] leading-relaxed text-emerald-900/90", style: { fontFamily: BN_FONT, whiteSpace: "pre-line" } }, h("span", { className: "font-semibold" }, "উচ্চারণ: "), d.tr),
       h("div", { className: "mt-3 text-[14px] leading-relaxed text-slate-800", style: { fontFamily: BN_FONT, whiteSpace: "pre-line" } }, h("span", { className: "font-semibold" }, "অর্থ: "), d.bn),
       d.note && h("div", { className: "mt-3 text-[12px] leading-relaxed text-slate-500", style: { fontFamily: BN_FONT } }, d.note),
-      h("div", { className: "mt-3 text-[11.5px] leading-relaxed text-slate-500", style: { fontFamily: BN_FONT } }, h("span", { className: "font-semibold" }, "সূত্র: "), d.ref ? d.ref : "যাচাই বাকি (পরের ধাপে যুক্ত হবে)"),
+      h("div", { className: "mt-3 text-[11.5px] leading-relaxed text-slate-500", style: { fontFamily: BN_FONT } }, h("span", { className: "font-semibold" }, "সূত্র: "), d.ref ? d.ref : "যাচাই হয়নি"),
       h("button", { type: "button", onClick: copy, className: "mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600" }, copied ? "কপি হয়েছে ✓" : "কপি")
     )
   );

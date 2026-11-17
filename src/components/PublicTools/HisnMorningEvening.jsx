@@ -36,6 +36,6 @@ export function HisnMorningEvening() {
     state.status === "loading" && h("div", { className: "text-sm text-slate-500 py-4" }, "লোড হচ্ছে…"),
     state.status === "error" && h("div", { className: "text-sm text-red-600 py-4" }, "ডেটা লোড করা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।"),
     shown.map((d) => h(HisnCard, { key: d.id, d, prefs, open: openId === d.id, onToggle: () => setOpenId(openId === d.id ? null : d.id) })),
-    state.status === "ready" && h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + state.source + "। হাদিসের রেফারেন্স ও মান পরের ধাপে যুক্ত হবে।")
+    state.status === "ready" && h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + state.source + "। সূত্র আরবি পাদটীকা থেকে; বাংলা অংশ আলেম-যাচাই হয়নি।")
   );
 }
