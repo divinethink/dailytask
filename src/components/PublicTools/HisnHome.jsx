@@ -8,7 +8,9 @@ import { HisnDuaCard } from "./HisnDuaCard.jsx";
 import { readPrefs } from "../../legacy/quranState.js";
 import { loadHisn } from "../../legacy/hisnLoad.js";
 import { WHEN_FILTERS, filterByWhen, toBn } from "../../legacy/hisnCore.js";
-import { QUICK_CHIPS, groupChapters, neighbors, groupOf } from "../../legacy/hisnGroups.js";
+import { QUICK_CHIPS, groupChapters, neighbors, groupOf, chapterBySwipe } from "../../legacy/hisnGroups.js";
+import { readHisnView, writeHisnView, stepArSize, toggleView } from "../../legacy/hisnPrefs.js";
+import { swipeDelta } from "../../legacy/swipeMonth.js";
 import { useBackLayer } from "../../legacy/backNav.js";
 import { ChevronLeft } from "../icons.jsx";
 
@@ -18,6 +20,7 @@ const PRIMARY = "var(--theme-primary, #0E4B43)";
 const GOLD = "#C89B3C";
 const BN_FONT = "'Noto Serif Bengali', serif";
 const OPEN_KEY = "dt_hisn_open_group";
+const touch = { x: 0, y: 0, ok: false }; // সোয়াইপের শুরুর বিন্দু (re-render-এর মাঝে হারায় না)
 
 const readOpen = () => { try { return window.sessionStorage.getItem(OPEN_KEY) || ""; } catch (e) { return ""; } };
 const writeOpen = (k) => { try { window.sessionStorage.setItem(OPEN_KEY, k); } catch (e) { /* ignore */ } };
@@ -29,6 +32,8 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   const [chId, setChId] = useState(null);
   const [when, setWhen] = useState("all");
   const prefs = useMemo(() => readPrefs(), []);
+  const [view, setViewState] = useState(() => readHisnView(prefs.arSize));
+  const setView = (v) => { setViewState(v); writeHisnView(v); };
 
   useEffect(() => {
     let alive = true;
@@ -47,7 +52,7 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   const openChapter = (id) => { setWhen("all"); setChId(id); };
 
   const ch = chId !== null ? state.chapters.find((c) => c.id === chId) : null;
-  if (ch) return chapterView({ ch, groups, prefs, when, setWhen, openChapter, close: () => setChId(null), source: state.source });
+  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => setChId(null), source: state.source });
 
   const chips = QUICK_CHIPS.filter((c) => state.chapters.some((x) => x.id === c.id));
   return h("div", null,
@@ -101,7 +106,7 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   );
 }
 
-function chapterView({ ch, groups, prefs, when, setWhen, openChapter, close, source }) {
+function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source }) {
   const grp = groupOf(groups, ch.id);
   const nb = neighbors(groups, ch.id);
   const isMorningEvening = ch.id === 27;
@@ -109,14 +114,35 @@ function chapterView({ ch, groups, prefs, when, setWhen, openChapter, close, sou
   const navBtn = (id, label) => id === null
     ? h("div", { className: "flex-1" })
     : h("button", { type: "button", onClick: () => openChapter(id), className: "flex-1 py-2.5 rounded-xl text-[13px] font-semibold border border-slate-200 bg-white text-slate-700 active:bg-slate-50" }, label);
-  return h("div", null,
+  const onStart = (e) => {
+    const tg = e.target;
+    touch.ok = !(tg && tg.closest && tg.closest("[data-no-swipe], input, textarea, select, summary"));
+    const p = e.touches && e.touches[0];
+    if (p) { touch.x = p.clientX; touch.y = p.clientY; }
+  };
+  const onEnd = (e) => {
+    const p = e.changedTouches && e.changedTouches[0];
+    if (!touch.ok || !p) return;
+    const to = chapterBySwipe(groups, ch.id, swipeDelta(p.clientX - touch.x, p.clientY - touch.y));
+    if (to !== null) openChapter(to);
+  };
+  const chip = (key, label) => h("button", { key, type: "button", onClick: () => setView(toggleView(view, key)), "aria-pressed": view[key], className: "px-3 py-1 rounded-full text-[12.5px] font-semibold border " + (view[key] ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: view[key] ? { background: PRIMARY } : undefined }, label);
+  const sizeBtn = (dir, label) => h("button", { type: "button", onClick: () => setView(stepArSize(view, dir)), "aria-label": dir > 0 ? "আরবি বড় করুন" : "আরবি ছোট করুন", className: "w-9 h-8 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold active:bg-slate-50", style: { fontSize: dir > 0 ? 16 : 12 } }, label);
+  const controls = h("div", { className: "flex items-center gap-1.5 pb-3 flex-wrap", "data-no-swipe": true },
+    sizeBtn(-1, "আ"), sizeBtn(1, "আ"),
+    h("span", { className: "w-px h-5 bg-slate-200 mx-1" }),
+    chip("showAr", "আরবি"), chip("showTr", "উচ্চারণ"), chip("showBn", "অর্থ")
+  );
+  return h("div", { onTouchStart: onStart, onTouchEnd: onEnd, style: { minHeight: "70vh" } },
     h("button", { type: "button", onClick: close, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), grp ? grp.title : "আমল, যিকির ও দু'আ"),
     h("div", { className: "pb-3 text-lg font-semibold", style: { color: PRIMARY, fontFamily: BN_FONT } }, toBn(ch.id) + ". " + ch.title),
     isMorningEvening && h("div", { className: "flex gap-2 pb-3" }, WHEN_FILTERS.map((f) =>
       h("button", { key: f.key, type: "button", onClick: () => setWhen(f.key), className: "flex-1 py-1.5 rounded-xl text-sm font-semibold border " + (when === f.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: when === f.key ? { background: PRIMARY } : undefined }, f.label)
     )),
-    duas.map((d) => h(HisnDuaCard, { key: d.id, d, prefs })),
+    controls,
+    duas.map((d) => h(HisnDuaCard, { key: d.id, d, prefs, view })),
     h("div", { className: "flex gap-2 pt-1 pb-3" }, navBtn(nb.prev, "‹ আগের অধ্যায়"), navBtn(nb.next, "পরের অধ্যায় ›")),
+    h("div", { className: "text-[11px] text-slate-400 text-center pb-1" }, "ডানে-বামে সোয়াইপ করেও অধ্যায় বদলানো যায়"),
     h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + source + "।")
   );
 }

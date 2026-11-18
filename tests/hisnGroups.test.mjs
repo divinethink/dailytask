@@ -1,7 +1,7 @@
 // tests/hisnGroups.test.mjs — অধ্যায়-গ্রুপ: প্রতিটা অধ্যায় ঠিক একটা গ্রুপে, কিছু হারায় না।
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HISN_GROUPS, QUICK_CHIPS, groupChapters, flatChapterIds, neighbors, groupOf } from "../src/legacy/hisnGroups.js";
+import { HISN_GROUPS, QUICK_CHIPS, groupChapters, flatChapterIds, neighbors, groupOf, chapterBySwipe } from "../src/legacy/hisnGroups.js";
 import { buildChapters } from "../src/legacy/hisnCore.js";
 import { HISN_MORNING_EVENING } from "../src/legacy/hisnData.js";
 import { HISN_BATCH1 } from "../src/legacy/hisnBatch1.js";
@@ -64,4 +64,14 @@ test("groupOf: অধ্যায়ের গ্রুপ খোঁজে", () 
   assert.equal(groupOf(groups, 28).key, "dailyRest");
   assert.equal(groupOf(groups, 17).key, "salah");
   assert.equal(groupOf(groups, 424242), null);
+});
+
+test("সোয়াইপ-দিশা: -১ আগের, +১ পরের, ০/প্রান্তে null", () => {
+  const groups = groupChapters(chapters);
+  const ids = flatChapterIds(groups);
+  assert.equal(chapterBySwipe(groups, ids[3], -1), ids[2]);
+  assert.equal(chapterBySwipe(groups, ids[3], 1), ids[4]);
+  assert.equal(chapterBySwipe(groups, ids[3], 0), null);
+  assert.equal(chapterBySwipe(groups, ids[0], -1), null);
+  assert.equal(chapterBySwipe(groups, ids[ids.length - 1], 1), null);
 });

@@ -62,3 +62,10 @@ export function neighbors(groups, id) {
 export function groupOf(groups, id) {
   return groups.find((g) => g.chapters.some((c) => c.id === id)) || null;
 }
+
+// সোয়াইপ-দিশা (swipeDelta: -1 = আগের, +1 = পরের) অনুযায়ী যে অধ্যায়ে যাবে; প্রান্তে/০ হলে null।
+export function chapterBySwipe(groups, id, delta) {
+  if (delta === 0) return null;
+  const nb = neighbors(groups, id);
+  return delta < 0 ? nb.prev : nb.next;
+}
