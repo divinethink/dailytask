@@ -9,7 +9,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import {
   PAGE_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
-  locateAyah, ayahShareText, markKey, MARKS_MAX,
+  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
 import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
@@ -18,17 +18,15 @@ const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
-const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, sajda, flash, bm, fav, onCopy, onShare, onMark }) {
+const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, onCopy, onShare, onMark }) {
   const muted = { color: th.fg, opacity: 0.62 };
   return h("div", { id: "q-a-" + a.n, "data-a": a.n, style: { padding: "14px 0", borderBottom: "1px solid " + LINE } },
-    juzNo > 0 && h("div", { style: { textAlign: "center", margin: "0 0 12px" } },
-      h("span", { style: { display: "inline-block", padding: "4px 14px", borderRadius: 999, background: th.bar, color: accent, fontSize: 12, fontWeight: 600 } },
-        "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1])
+    (juzNo > 0 || pageNo > 0) && h("div", { style: { textAlign: "center", margin: "0 0 10px", padding: "3px 10px", borderRadius: 8, background: th.bar, color: accent, fontSize: 11.5, fontWeight: 600 } },
+      [juzNo > 0 ? "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1] : "", pageNo > 0 ? "পৃষ্ঠা " + toBnDigits(pageNo) : "", rukuNo > 0 ? "রুকু " + toBnDigits(rukuNo) : ""].filter(Boolean).join(" · ")
     ),
     h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } },
       h("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 26, padding: "0 7px", borderRadius: 13, background: th.bar, color: accent, fontSize: 12, fontWeight: 600 } }, toBnDigits(a.n)),
-      h("span", { style: { fontSize: 11, ...muted } },
-        sajda ? "۩ সিজদার আয়াত" : null, sajda && pageNo ? "  ·  " : null, pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : null)
+      sajda && h("span", { style: { fontSize: 11, ...muted } }, "۩ সিজদার আয়াত")
     ),
     prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
@@ -226,9 +224,9 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       h("button", { type: "button", onClick: onClose, "aria-label": "ফিরে যান", style: { padding: 8, color: "#fff" } }, h(ChevronLeft, { size: 22 })),
       h("div", { style: { minWidth: 0, flex: 1 } },
         h("div", { style: { fontWeight: 600, fontSize: 16, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } },
-          toBnDigits(surah.n) + ". " + surah.bn, h("span", { style: { fontSize: 11.5, fontWeight: 400, opacity: 0.8 } }, " · " + surah.mean)),
+          toBnDigits(surah.n) + ". " + surah.bn),
         h("div", { style: { fontSize: 11.5, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } },
-          (ready ? "পারা " + toBnDigits(where.juz) + " · পৃষ্ঠা " + toBnDigits(where.page) + " · " : "") + toBnDigits(surah.ayahs) + " আয়াত · " + surahTypeLabel(surah.type))
+          ready ? "পারা " + toBnDigits(where.juz) + " · পৃষ্ঠা " + toBnDigits(where.page) : toBnDigits(surah.ayahs) + " আয়াত")
       ),
       h("div", { role: "group", "aria-label": "পড়ার ধরন", style: { display: "flex", alignItems: "center", background: "rgba(255,255,255,0.18)", borderRadius: 999, padding: 2 } },
         seg("list", "তালিকা", prefs.mode === "list", () => prefs.mode !== "list" && onPrefs({ ...prefs, mode: "list" })),
@@ -243,6 +241,11 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")
       ),
+      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, margin: "14px 0 4px", padding: "8px 14px", border: "1.5px solid " + accent, borderRadius: 14, background: th.bar, color: accent } },
+        h("div", { style: { minWidth: 0 } },
+          h("div", { style: { fontSize: 14, fontWeight: 600 } }, toBnDigits(surah.n) + ". " + surah.bn),
+          h("div", { style: { fontSize: 11.5, opacity: 0.85 } }, surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত")),
+        h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: 26, lineHeight: 1.8, flexShrink: 0 } }, "سورة " + surah.ar)),
       ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, (scriptById(prefs.arScript) || scriptById(DEFAULT_SCRIPT)).bismillah),
       ready && reading && h(AyahFlow, {
         items: flowItems, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript,
@@ -255,6 +258,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
           key: a.n, a, prefs, th, accent,
           juzNo: markers.juz.get(k) || 0,
           pageNo: markers.page.get(k) || 0,
+          rukuNo: markers.page.get(k) || markers.juz.get(k) ? rukuOf(meta, surah.n, a.n) : 0,
           sajda: markers.sajda.has(k),
           flash: flash.n === a.n ? flash.kind : "",
           bm: marked.has(markKey(surah.n, a.n, "b")),

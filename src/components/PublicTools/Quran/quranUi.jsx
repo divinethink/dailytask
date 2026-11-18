@@ -9,7 +9,7 @@ import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLay
 import { switchScript, AR_SIZE, TR_SIZE } from "../../../legacy/quranCore.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
-import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX } from "../../../legacy/quranCore.js";
+import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
 
 const { useState, useEffect, useRef, useCallback } = React;
 const h = React.createElement;
@@ -228,7 +228,7 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, font, scrip
     if (dividers && (pageNo || juzNo)) {
       flush(key);
       blocks.push(h("div", { key: "d" + key, style: { margin: "14px 0 8px", padding: "4px 10px", textAlign: "center", background: th.bar, color: accent, fontSize: 12, fontWeight: 600, borderRadius: 8 } },
-        (pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : "") + (pageNo && juzNo ? " · " : "") + (juzNo ? "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1] : "")));
+        (pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : "") + (pageNo && juzNo ? " · " : "") + (juzNo ? "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1] : "") + (rukuOf(meta, it.s, it.n) ? " · রুকু " + toBnDigits(rukuOf(meta, it.s, it.n)) : "")));
     }
     if (headers && it.n === 1) {
       flush(key);

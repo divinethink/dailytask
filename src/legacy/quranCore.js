@@ -172,6 +172,17 @@ export function buildMarkers(meta) {
   return { juz, page, sajda };
 }
 
+// আয়াতটি সূরার কত নম্বর রুকুতে (১ থেকে)। meta.rukus = [[সূরা, আয়াত], …] (সূরা-আয়াত ক্রমে); ডেটা না থাকলে ০।
+export function rukuOf(meta, s, a) {
+  const list = meta && Array.isArray(meta.rukus) ? meta.rukus : [];
+  let n = 0;
+  for (const r of list) {
+    if (r[0] === s && r[1] <= a) n += 1;
+    else if (r[0] > s) break;
+  }
+  return n;
+}
+
 // কপি/শেয়ারের লেখা: যা পর্দায় দেখানো হচ্ছে (আরবি/অনুবাদ) তা-ই, শেষে সূত্র।
 export function ayahShareText(surah, ayah, prefs, translatorName) {
   const parts = [];
