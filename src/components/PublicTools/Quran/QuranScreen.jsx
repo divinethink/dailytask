@@ -12,7 +12,7 @@ import {
   parseRef, buildMarkers, sanitizePrefs, locateAyah, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, markKey,
   searchSurahNames, searchIndex, SEARCH_MIN, SEARCH_LIMIT,
 } from "../../../legacy/quranCore.js";
-import { ChevronRight, BookIcon } from "../../icons.jsx";
+import { ChevronRight } from "../../icons.jsx";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranMushaf } from "./QuranMushaf.jsx";
 import { QuranSettingsOverlay, Rosette } from "./quranUi.jsx";
@@ -420,13 +420,12 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
     lastList.length > 0 && h(ContinueCard, { meta, item: lastList[0], onOpen: openAt }),
     lastList.length > 1 && h("div", null,
       h(Heading, null, "আগের পাঠ"),
-      h("div", { className: "flex gap-2 overflow-x-auto pb-1" },
+      h("div", { className: "flex gap-2 overflow-x-auto pb-1 no-scrollbar", style: { scrollbarWidth: "none" } },
         lastList.slice(1).map((x) => h(Chip, { key: x.s, label: refLabel(surahs[x.s - 1], x.a), onClick: () => openAt(x.s, x.a) }))
       )
     ),
     h(Heading, null, "দ্রুত লিংক"),
-    h("div", { className: "flex gap-1 overflow-x-auto pb-1" },
-      h(QuickTile, { key: "mushaf", label: "পৃষ্ঠা-মুসহাফ", glyph: h(BookIcon, { size: 26 }), onClick: () => setMushaf(lastList.length ? locateAyah(meta, lastList[0].s, lastList[0].a).page : 1) }),
+    h("div", { className: "flex gap-1 overflow-x-auto pb-1 no-scrollbar", style: { scrollbarWidth: "none" } },
       QUICK_SURAHS.map((n) => h(QuickTile, { key: n, label: surahs[n - 1].bn, glyph: h("span", { dir: "rtl", lang: "ar", style: { fontFamily: "'Amiri Quran', serif", fontSize: 18, lineHeight: 1.4 } }, surahs[n - 1].ar), onClick: () => openAt(n, 1) }))
     ),
     h(Heading, null, "সরাসরি আয়াতে যান"),
