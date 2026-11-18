@@ -12,6 +12,7 @@ import {
   parseRef, buildMarkers, sanitizePrefs, locateAyah, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, markKey,
   searchSurahNames, searchIndex, SEARCH_MIN, SEARCH_LIMIT,
 } from "../../../legacy/quranCore.js";
+import { ChevronRight, BookIcon } from "../../icons.jsx";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranMushaf } from "./QuranMushaf.jsx";
 import { QuranSettingsOverlay, Rosette } from "./quranUi.jsx";
@@ -29,6 +30,30 @@ function Chip({ label, onClick }) {
     className: "shrink-0 px-4 py-2 rounded-full border text-sm font-semibold bg-white",
     style: { borderColor: "#D7DFD9", color: PRIMARY, minHeight: 40 },
   }, label);
+}
+
+// "পড়া চালিয়ে যান": শেষ পাঠের বড় কার্ড — এক ট্যাপে ওই আয়াতে।
+function ContinueCard({ meta, item, onOpen }) {
+  const sm = meta.surahs[item.s - 1];
+  const loc = locateAyah(meta, item.s, item.a);
+  return h("button", {
+    type: "button", onClick: () => onOpen(item.s, item.a),
+    className: "w-full text-left rounded-2xl bg-white border flex items-center gap-3 px-4 py-3 mt-4 active:scale-[0.99] transition-transform",
+    style: { borderColor: "#E4E7E2", borderLeft: "5px solid " + PRIMARY, boxShadow: "0 2px 10px rgba(0,0,0,0.05)" },
+  },
+    h("span", { className: "flex-1 min-w-0" },
+      h("span", { className: "block text-xs font-semibold text-gray-500" }, "পড়া চালিয়ে যান"),
+      h("span", { className: "block text-lg font-bold", style: { color: PRIMARY } }, sm.bn),
+      h("span", { className: "block text-xs text-gray-500" }, "আয়াত " + toBnDigits(item.a) + " · পারা " + toBnDigits(loc.juz) + " · পৃষ্ঠা " + toBnDigits(loc.page))),
+    h("span", { dir: "rtl", lang: "ar", style: { fontFamily: "'Amiri Quran', serif", fontSize: 26, color: "#1F2D2A" } }, sm.ar),
+    h("span", { className: "shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white", style: { background: PRIMARY } }, h(ChevronRight, { size: 20 })));
+}
+
+// দ্রুত লিংকের গোল টাইল।
+function QuickTile({ label, glyph, onClick }) {
+  return h("button", { type: "button", onClick, className: "shrink-0 flex flex-col items-center gap-1.5 active:scale-95 transition-transform", style: { width: 76 } },
+    h("span", { className: "flex items-center justify-center rounded-full", style: { width: 58, height: 58, background: "#fff", border: "1.5px solid #D7DFD9", boxShadow: "0 2px 6px rgba(0,0,0,0.05)", color: PRIMARY } }, glyph),
+    h("span", { className: "text-xs font-semibold text-center leading-tight", style: { color: "#33433D" } }, label));
 }
 
 function Heading({ children }) {
@@ -81,7 +106,7 @@ function SurahList({ surahs, onOpen }) {
         className: "w-full flex items-center gap-3 px-3 py-3 text-left border-b last:border-b-0",
         style: { borderColor: "#EEF2EF" },
       },
-        h(Rosette, { n: toBnDigits(s.n), size: 42, font: 13, color: PRIMARY, bg: "#E8F0EE" }),
+        h(Rosette, { n: toBnDigits(s.n), size: 36, font: "14px", color: PRIMARY, bg: "#E8F0EE" }),
         h("span", { className: "flex-1 min-w-0" },
           h("span", { className: "block text-base font-semibold", style: { color: PRIMARY } }, s.bn),
           h("span", { className: "block text-xs text-gray-500" }, s.mean + " · " + surahTypeLabel(s.type) + " · " + toBnDigits(s.ayahs) + " আয়াত")
@@ -100,7 +125,7 @@ function ParaList({ meta, onOpen }) {
         className: "w-full flex items-center gap-3 px-3 py-3 text-left border-b last:border-b-0",
         style: { borderColor: "#EEF2EF" },
       },
-        h(Rosette, { n: toBnDigits(i + 1), size: 42, font: 13, color: PRIMARY, bg: "#E8F0EE" }),
+        h(Rosette, { n: toBnDigits(i + 1), size: 36, font: "14px", color: PRIMARY, bg: "#E8F0EE" }),
         h("span", { className: "flex-1 min-w-0" },
           h("span", { className: "block text-base font-semibold", style: { color: PRIMARY } }, "পারা " + toBnDigits(i + 1) + " · " + PARA_NAMES[i]),
           h("span", { className: "block text-xs text-gray-500" }, "শুরু: " + refLabel(meta.surahs[s - 1], a))
@@ -392,16 +417,17 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
   };
 
   return h("div", null,
-    lastList.length > 0 && h("div", null,
-      h(Heading, null, "সর্বশেষ পাঠ"),
+    lastList.length > 0 && h(ContinueCard, { meta, item: lastList[0], onOpen: openAt }),
+    lastList.length > 1 && h("div", null,
+      h(Heading, null, "আগের পাঠ"),
       h("div", { className: "flex gap-2 overflow-x-auto pb-1" },
-        lastList.map((x) => h(Chip, { key: x.s, label: refLabel(surahs[x.s - 1], x.a), onClick: () => openAt(x.s, x.a) }))
+        lastList.slice(1).map((x) => h(Chip, { key: x.s, label: refLabel(surahs[x.s - 1], x.a), onClick: () => openAt(x.s, x.a) }))
       )
     ),
     h(Heading, null, "দ্রুত লিংক"),
-    h("div", { className: "flex gap-2 overflow-x-auto pb-1" },
-      h(Chip, { key: "mushaf", label: "পৃষ্ঠা-মুসহাফ", onClick: () => setMushaf(lastList.length ? locateAyah(meta, lastList[0].s, lastList[0].a).page : 1) }),
-      QUICK_SURAHS.map((n) => h(Chip, { key: n, label: surahs[n - 1].bn, onClick: () => openAt(n, 1) }))
+    h("div", { className: "flex gap-1 overflow-x-auto pb-1" },
+      h(QuickTile, { key: "mushaf", label: "পৃষ্ঠা-মুসহাফ", glyph: h(BookIcon, { size: 26 }), onClick: () => setMushaf(lastList.length ? locateAyah(meta, lastList[0].s, lastList[0].a).page : 1) }),
+      QUICK_SURAHS.map((n) => h(QuickTile, { key: n, label: surahs[n - 1].bn, glyph: h("span", { dir: "rtl", lang: "ar", style: { fontFamily: "'Amiri Quran', serif", fontSize: 18, lineHeight: 1.4 } }, surahs[n - 1].ar), onClick: () => openAt(n, 1) }))
     ),
     h(Heading, null, "সরাসরি আয়াতে যান"),
     h(JumpBox, { surahs, onGo: openAt }),

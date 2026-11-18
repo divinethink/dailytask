@@ -171,7 +171,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
           h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
           h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
         state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
-        state.status === "ready" && h("div", { style: { textAlign: "center", marginTop: 10 } }, h(Rosette, { n: toBnDigits(page), size: 36, font: 12, color: accent, bg: th.bar }))
+        state.status === "ready" && h("div", { style: { textAlign: "center", marginTop: 10 } }, h(Rosette, { n: toBnDigits(page), size: 36, font: "12px", color: accent, bg: th.bar, ring: true }))
       ),
       state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "12px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
     ),
