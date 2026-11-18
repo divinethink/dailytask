@@ -1,6 +1,6 @@
 // tools/quran/build-indopak.mjs — IndoPak আরবি লেখার ডেটা-ফাইল বানানো (একবার চালানো; অ্যাপ চালাতে লাগে না)। ধাপ ৬গ-৩।
 // ব্যবহার: node tools/quran/build-indopak.mjs --src <digital-khatt-indopak-ayah-by-ayah-script.json (আয়াত-ভিত্তিক, "সূরা:আয়াত" → {text})> [--out public/quran/v1]
-// উৎস: DigitalKhatt IndoPak লেখা (ইউনিকোড; ফন্টও DigitalKhatt IndoPak, SIL OFL) — অপরিবর্তিত; শুধু (১) শেষের আয়াত-চিহ্ন "۝"+নম্বর+থামার-চিহ্ন বাদ (নম্বর অ্যাপ নিজে আঁকে), (২) ১:৭-এর ভেতরের ٦ চিহ্নের অদৃশ্য RLO (U+202E, ফন্টে নেই) বদলে বাকি সব চিহ্নের মতো "۝٦", (৩) অদৃশ্য U+200B/U+FEFF বাদ।
+// উৎস: DigitalKhatt IndoPak লেখা (ইউনিকোড; ফন্টও DigitalKhatt IndoPak, SIL OFL) — অপরিবর্তিত; শুধু (১) শেষের আয়াত-চিহ্ন "۝"+নম্বর+থামার-চিহ্ন বাদ (নম্বর অ্যাপ নিজে আঁকে), (২) ১:৭-এর মাঝের ٦ চিহ্ন (RLO U+202E সহ) বাদ — অ্যাপে ১:৭ একটাই আয়াত, (৩) অদৃশ্য U+200B/U+FEFF বাদ।
 // নিরাপত্তা: ৬২৩৬ আয়াত, শেষ নম্বর = আয়াত-নম্বর (ফাতিহা ছাড়া; নিচে), প্রতি সূরার সংখ্যা meta.json-এর সাথে মিল,
 //   Uthmani-র সাথে ব্যঞ্জনবর্ণ-কাঠামো মিল (জ্ঞাত রসম-পার্থক্য ছাড়া অমিল থাকলে ডেটা নেওয়া হয় না)।
 // আউটপুট: ar-indopak-dk/NNN.json, ar-indopak-dk/NOTICE.txt, manifest.json-এ arabicIndopak, tools/quran/integrity-indopak.json।
@@ -46,10 +46,10 @@ for (const su of meta.surahs) {
     const want = su.n === 1 ? FATIHA_END[a - 1] : toArabicDigits(a);
     if (m[1] !== want) fail("আয়াত-নম্বর অমিল: " + su.n + ":" + a + " (লেখায় " + m[1] + ", প্রত্যাশিত " + want + ")");
     let t = row.text.slice(0, m.index);
-    // শুধু ১:৭-এর ভেতরের চিহ্ন: RLO + ٦ → "۝٦" (বাকি সব চিহ্নের মতো একই রূপ)
+    // শুধু ১:৭: এই লেখা শেষ আয়াতকে দুই ভাগ করেছে (মাঝে RLO + ٦ চিহ্ন)। অ্যাপের আয়াত-নম্বর Tanzil-এর (১:৭ একটাই আয়াত), তাই মাঝের চিহ্ন বাদ — নইলে ফাতিহায় দুটো "৬" দেখায়।
     if (su.n === 1 && a === 7) {
       if (!/\u202e\u0666/.test(t)) fail("১:৭-এর ভেতরের ٦ চিহ্ন পাওয়া যায়নি");
-      t = t.replace("\u202e\u0666", " \u06dd\u0666");
+      t = t.replace(/\u202e\u0666[^\s]*/u, "");
     }
     t = t.replace(/[\u200b\ufeff]/g, "").trim();
     if (/[\u202e\u202d\u202a-\u202c\u2066-\u2069]/.test(t)) fail("অপ্রত্যাশিত bidi-নিয়ন্ত্রণ অক্ষর: " + su.n + ":" + a);
