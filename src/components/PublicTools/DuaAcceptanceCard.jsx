@@ -20,7 +20,7 @@ export function DuaAcceptanceCard({ onBack }) {
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
-    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দোয়া কবুলের সময়" }),
+    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দু'আ কবুলের সময়" }),
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4" },

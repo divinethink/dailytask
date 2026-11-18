@@ -140,7 +140,7 @@ const ACCENT_SKY = { bg: "linear-gradient(160deg, #EAF6FD 0%, #BFE3F7 100%)", bo
 const FRONT_ITEMS = [
   { kind: "category", id: "quran", icon: "quran", label: "কুরআন" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
-  { kind: "amol", id: "amol", icon: "hands", label: "সকল আমল ও দোয়া", accent: ACCENT_BRONZE },
+  { kind: "amol", id: "amol", icon: "hands", label: "আমল, যিকির ও দু'আ", accent: ACCENT_BRONZE },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
   { kind: "single", id: "blog", icon: "file", label: "ডিভাইন ব্লগ", subtitle: "ইসলামি লেখার সমাহার", accent: ACCENT_SKY },
   { kind: "single", id: "quiz", icon: "help", label: "ইসলামি কুইজ খেলুন" },

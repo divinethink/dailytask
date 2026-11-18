@@ -15,8 +15,8 @@ export const TAB_DEFS = {
       { id: "fullDayAmol", title: "সারাদিনের আমল" },
       { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "dhikr", title: "যিকির" },
-      { id: "dua", title: "দোয়া" },
-      { id: "duaAcceptance", title: "দোয়া কবুলের সময়" },
+      { id: "dua", title: "দু'আ" },
+      { id: "duaAcceptance", title: "দু'আ কবুলের সময়" },
       { id: "deathReminder", title: "মৃত্যুর স্মরণ" }
     ]
   },
@@ -25,7 +25,7 @@ export const TAB_DEFS = {
     defs: [
       { id: "quran", title: "কুরআন" },
       { id: "salah", title: "সালাত ও পবিত্রতা" },
-      { id: "amol", title: "সকল আমল ও দোয়া" },
+      { id: "amol", title: "আমল, যিকির ও দু'আ" },
       { id: "specialDays", title: "বিশেষ দিন ও উপলক্ষ" },
       { id: "blog", title: "ডিভাইন ব্লগ" },
       { id: "quiz", title: "ইসলামি কুইজ" },

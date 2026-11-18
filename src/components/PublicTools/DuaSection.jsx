@@ -16,12 +16,12 @@ export function DuaSection({ onBack }) {
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1]" },
-    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দোয়া" }),
+    /*#__PURE__*/React.createElement(SubScreenHeader, { onBack, title: "দু'আ" }),
     /*#__PURE__*/React.createElement(
       "div",
       { className: "px-4 pb-3 flex gap-2" },
       [
-        { key: "list", label: "নামাজের দোয়া" },
+        { key: "list", label: "নামাজের দু'আ" },
         { key: "flashcards", label: "ফ্ল্যাশকার্ড" },
         { key: "hisn", label: "হিসনুল মুসলিম" },
       ].map((t) =>

@@ -37,8 +37,8 @@ const HUB_ITEMS = [
   { key: "azkar", icon: "sun", label: "সকাল-সন্ধ্যার আমল", Component: MorningEveningAzkar },
   { key: "fullDayAmol", icon: "dayNight", label: "সারাদিনের আমল", Component: FullDayAmol },
   { key: "dhikr", icon: "tasbih", label: "যিকির", Component: DhikrCountGuide },
-  { key: "dua", icon: "dua", label: "দোয়া", Component: DuaSection },
-  { key: "duaAcceptance", icon: "alarm", label: "দোয়া কবুলের সময়", Component: DuaAcceptanceCard },
+  { key: "dua", icon: "dua", label: "দু'আ", Component: DuaSection },
+  { key: "duaAcceptance", icon: "alarm", label: "দু'আ কবুলের সময়", Component: DuaAcceptanceCard },
   { key: "deathReminder", icon: "hourglass", label: "মৃত্যুর স্মরণ", Component: DeathReminderCard },
   { key: "jumuahAmol", icon: "calendarStar", label: "জুমার দিনের বিশেষ আমল", Component: JumuahAmolScreen },
 ];
@@ -78,7 +78,7 @@ export function AmolHub({ tabLayout, onBack } = {}) {
       /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
       "সহায়িকা"
     ),
-    /*#__PURE__*/React.createElement(PageHeader, { title: "সকল আমল ও দোয়া", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
+    /*#__PURE__*/React.createElement(PageHeader, { title: "আমল, যিকির ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
     ...blocks
   );
 }
