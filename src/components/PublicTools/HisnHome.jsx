@@ -1,5 +1,5 @@
 // HisnHome.jsx — "আমল, যিকির ও দু'আ" কার্ডের মূল পেজ (হিসনুল মুসলিম): দ্রুত-যান চিপ, বিশেষ সংকলন সারি,
-// বিষয়ভিত্তিক ভাঁজযোগ্য গ্রুপ, অধ্যায়/দু'আর শিরোনামে সার্চ (hisnSearch.js, pure), অধ্যায় পেজ। ডেটা hisnLoad.js থেকে lazy; গ্রুপ hisnGroups.js (pure)।
+// বিষয়ভিত্তিক ভাঁজযোগ্য গ্রুপ, অধ্যায়/দু'আর শিরোনামে সার্চ (hisnSearch.js, pure), ⭐ প্রিয় ও সর্বশেষ পড়া (hisnFavs.js, শুধু localStorage), অধ্যায় পেজ। ডেটা hisnLoad.js থেকে lazy; গ্রুপ hisnGroups.js (pure)।
 // React global(window.React, globals.js)।
 
 import { PageHeader, VerseCard } from "./ToolGrid.jsx";
@@ -10,6 +10,7 @@ import { loadHisn } from "../../legacy/hisnLoad.js";
 import { WHEN_FILTERS, filterByWhen, toBn } from "../../legacy/hisnCore.js";
 import { QUICK_CHIPS, groupChapters, neighbors, groupOf, chapterBySwipe } from "../../legacy/hisnGroups.js";
 import { searchHisn, highlightParts, isSearchable } from "../../legacy/hisnSearch.js";
+import { readFavs, writeFavs, readLast, writeLast, toggleFav, resolveFavs, resolveLast } from "../../legacy/hisnFavs.js";
 import { readHisnView, writeHisnView, stepArSize, toggleView } from "../../legacy/hisnPrefs.js";
 import { swipeDelta } from "../../legacy/swipeMonth.js";
 import { useBackLayer } from "../../legacy/backNav.js";
@@ -34,6 +35,9 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   const [chId, setChId] = useState(null);
   const [when, setWhen] = useState("all");
   const [query, setQuery] = useState("");
+  const [favs, setFavs] = useState(readFavs);
+  const [last, setLast] = useState(readLast);
+  const [favOpen, setFavOpen] = useState(false);
   const [focusDua, setFocusDua] = useState(null); // সার্চ থেকে খোলা দু'আ: স্ক্রল + হালকা দাগ
   const prefs = useMemo(() => readPrefs(), []);
   const [view, setViewState] = useState(() => readHisnView(prefs.arSize));
@@ -48,6 +52,7 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
     return () => { alive = false; };
   }, []);
 
+  useBackLayer(favOpen, () => setFavOpen(false));
   useBackLayer(chId !== null, () => { setChId(null); setFocusDua(null); });
   useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } }, [chId]);
   useEffect(() => {
@@ -60,12 +65,17 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
 
   const groups = useMemo(() => groupChapters(state.chapters), [state.chapters]);
   const toggle = (k) => { const next = openGroup === k ? "" : k; setOpenGroup(next); writeOpen(next); };
-  const openChapter = (id, duaId = null) => { setWhen("all"); setFocusDua(duaId); setChId(id); };
+  const onToggleFav = (id) => setFavs((cur) => { const next = toggleFav(cur, id); writeFavs(next); return next; });
+  const openChapter = (id, duaId = null) => { const l = { chapterId: id, duaId }; setLast(l); writeLast(l); setWhen("all"); setFocusDua(duaId); setChId(id); };
   const searching = isSearchable(query);
   const found = useMemo(() => (searching ? searchHisn(state.chapters, query) : null), [searching, state.chapters, query]);
 
   const ch = chId !== null ? state.chapters.find((c) => c.id === chId) : null;
-  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => { setChId(null); setFocusDua(null); }, source: state.source, focusDua });
+  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => { setChId(null); setFocusDua(null); }, source: state.source, focusDua, favs, onToggleFav });
+
+  const favList = resolveFavs(state.chapters, favs);
+  const lastRead = resolveLast(state.chapters, last);
+  if (favOpen && !searching) return favView({ favList, onBack: () => setFavOpen(false), openChapter });
 
   const chips = QUICK_CHIPS.filter((c) => state.chapters.some((x) => x.id === c.id));
   return h("div", null,
@@ -78,11 +88,20 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
       query && h("button", { type: "button", onClick: () => setQuery(""), "aria-label": "মুছে ফেলুন", className: "absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-xl leading-none text-slate-400 active:text-slate-600" }, "×")
     ),
 
+    !searching && lastRead && h("button", { type: "button", onClick: () => openChapter(lastRead.chapterId, lastRead.duaId), className: "w-full flex items-center gap-3 mb-3 px-4 py-3 rounded-2xl border text-left active:scale-[.99] transition-transform", style: { background: "var(--theme-soft, #E8F0EE)", borderColor: "var(--theme-line, #D3E3DD)" } },
+      h("span", { className: "text-lg", style: { color: PRIMARY } }, "▶"),
+      h("span", { className: "flex-1 min-w-0" },
+        h("span", { className: "block text-[11.5px] text-slate-500" }, "সর্বশেষ পড়া"),
+        h("span", { className: "block text-[14px] font-semibold text-emerald-950 truncate", style: { fontFamily: BN_FONT } }, lastRead.title)
+      )
+    ),
+
     searching && searchView({ found, query, status: state.status, openChapter }),
 
-    !searching && chips.length > 0 && h("div", { className: "mb-1" },
+    !searching && state.status === "ready" && h("div", { className: "mb-1" },
       h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5" }, "দ্রুত যান"),
       h("div", { className: "flex gap-2 overflow-x-auto pb-2 -mx-4 px-4", "data-no-swipe": true },
+        h("button", { type: "button", onClick: () => setFavOpen(true), className: "shrink-0 px-3 py-1.5 rounded-full text-[13px] font-semibold border active:scale-95 transition-transform", style: { color: "#9A6B00", borderColor: GOLD, background: "#FBF3DC", fontFamily: BN_FONT } }, "★ প্রিয়" + (favList.length ? " (" + toBn(favList.length) + ")" : "")),
         chips.map((c) => h("button", { key: c.id, type: "button", onClick: () => openChapter(c.id), className: "shrink-0 px-3 py-1.5 rounded-full text-[13px] font-semibold border bg-white active:scale-95 transition-transform", style: { color: PRIMARY, borderColor: "var(--theme-line, #D3E3DD)", fontFamily: BN_FONT } }, c.label))
       )
     ),
@@ -134,6 +153,23 @@ function hl(text, query) {
     : p.text));
 }
 
+// ⭐ প্রিয় দু'আর তালিকা (নতুন আগে)।
+function favView({ favList, onBack, openChapter }) {
+  return h("div", null,
+    h("button", { type: "button", onClick: onBack, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), "আমল, যিকির ও দু'আ"),
+    h("div", { className: "pb-3 text-lg font-semibold", style: { color: PRIMARY, fontFamily: BN_FONT } }, "★ প্রিয় দু'আ"),
+    favList.length === 0
+      ? h("div", { className: "text-sm text-slate-600 py-6 text-center leading-relaxed", style: { fontFamily: BN_FONT } }, "এখনো কোনো প্রিয় দু'আ নেই। দু'আর কার্ডে “☆ প্রিয়” চাপলে এখানে জমা হবে।")
+      : h("div", { className: "bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-3 px-3" }, favList.map((d) => h("button", { key: d.duaId, type: "button", onClick: () => openChapter(d.chapterId, d.duaId), className: "w-full flex items-center gap-3 py-2.5 px-1 text-left border-b border-slate-100 last:border-b-0 active:bg-slate-50" },
+          h("span", { className: "flex-1 min-w-0" },
+            h("span", { className: "block text-[14px] text-emerald-950", style: { fontFamily: BN_FONT } }, d.title),
+            h("span", { className: "block text-[11.5px] text-slate-500 truncate", style: { fontFamily: BN_FONT } }, toBn(d.chapterId) + ". " + d.chapterTitle)
+          ),
+          h(ToolIcon, { name: "chevronRight", size: 14, color: GOLD })
+        )))
+  );
+}
+
 // সার্চের ফল: অধ্যায় আগে, তারপর দু'আ। found = searchHisn-এর ফল।
 function searchView({ found, query, status, openChapter }) {
   if (status === "loading") return h("div", { className: "text-sm text-slate-500 py-4" }, "লোড হচ্ছে…");
@@ -162,7 +198,7 @@ function searchView({ found, query, status, openChapter }) {
   );
 }
 
-function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source, focusDua }) {
+function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source, focusDua, favs, onToggleFav }) {
   const grp = groupOf(groups, ch.id);
   const nb = neighbors(groups, ch.id);
   const isMorningEvening = ch.id === 27;
@@ -196,7 +232,7 @@ function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChap
       h("button", { key: f.key, type: "button", onClick: () => setWhen(f.key), className: "flex-1 py-1.5 rounded-xl text-sm font-semibold border " + (when === f.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: when === f.key ? { background: PRIMARY } : undefined }, f.label)
     )),
     controls,
-    duas.map((d) => h("div", { key: d.id, id: "hisn-dua-" + d.id, className: focusDua === d.id ? "rounded-2xl ring-2 ring-amber-300 scroll-mt-3" : "scroll-mt-3" }, h(HisnDuaCard, { d, prefs, view }))),
+    duas.map((d) => h("div", { key: d.id, id: "hisn-dua-" + d.id, className: focusDua === d.id ? "rounded-2xl ring-2 ring-amber-300 scroll-mt-3" : "scroll-mt-3" }, h(HisnDuaCard, { d, prefs, view, fav: favs.includes(d.id), onToggleFav }))),
     h("div", { className: "flex gap-2 pt-1 pb-3" }, navBtn(nb.prev, "‹ আগের অধ্যায়"), navBtn(nb.next, "পরের অধ্যায় ›")),
     h("div", { className: "text-[11px] text-slate-400 text-center pb-1" }, "ডানে-বামে সোয়াইপ করেও অধ্যায় বদলানো যায়"),
     h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + source + "।")

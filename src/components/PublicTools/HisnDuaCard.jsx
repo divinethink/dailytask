@@ -10,8 +10,8 @@ const PRIMARY = "var(--theme-primary, #0E4B43)";
 const BN_FONT = "'Noto Serif Bengali', serif";
 const BTN = "text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 active:bg-slate-50";
 
-// view = {arSize, showAr, showTr, showBn} (hisnPrefs.js); prefs = শুধু আরবি ফন্টের জন্য (কুরআন-রিডারের পছন্দ)।
-export function HisnDuaCard({ d, prefs, view }) {
+// fav/onToggleFav (ঐচ্ছিক) = ⭐ প্রিয় (hisnFavs.js, ডিভাইস-লোকাল)। view = {arSize, showAr, showTr, showBn} (hisnPrefs.js); prefs = শুধু আরবি ফন্টের জন্য (কুরআন-রিডারের পছন্দ)।
+export function HisnDuaCard({ d, prefs, view, fav = false, onToggleFav }) {
   const [msg, setMsg] = useState("");
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(""), 1500); };
   const copy = async () => {
@@ -46,6 +46,7 @@ export function HisnDuaCard({ d, prefs, view }) {
     h("div", { className: "mt-3 flex items-center gap-2" },
       h("button", { type: "button", onClick: copy, className: BTN }, "কপি"),
       h("button", { type: "button", onClick: share, className: BTN }, "শেয়ার"),
+      onToggleFav && h("button", { type: "button", onClick: () => onToggleFav(d.id), "aria-pressed": fav, "aria-label": fav ? "প্রিয় থেকে সরান" : "প্রিয়তে রাখুন", className: BTN, style: fav ? { color: "#9A6B00", borderColor: "#C89B3C", background: "#FBF3DC" } : undefined }, fav ? "★ প্রিয়" : "☆ প্রিয়"),
       msg && h("span", { className: "text-xs text-slate-500" }, msg)
     )
   );
