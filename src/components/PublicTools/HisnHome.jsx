@@ -1,5 +1,5 @@
 // HisnHome.jsx — "আমল, যিকির ও দু'আ" কার্ডের মূল পেজ (হিসনুল মুসলিম): দ্রুত-যান চিপ, বিশেষ সংকলন সারি,
-// বিষয়ভিত্তিক ভাঁজযোগ্য গ্রুপ, অধ্যায় পেজ। ডেটা hisnLoad.js থেকে lazy; গ্রুপ hisnGroups.js (pure)।
+// বিষয়ভিত্তিক ভাঁজযোগ্য গ্রুপ, অধ্যায়/দু'আর শিরোনামে সার্চ (hisnSearch.js, pure), অধ্যায় পেজ। ডেটা hisnLoad.js থেকে lazy; গ্রুপ hisnGroups.js (pure)।
 // React global(window.React, globals.js)।
 
 import { PageHeader, VerseCard } from "./ToolGrid.jsx";
@@ -9,6 +9,7 @@ import { readPrefs } from "../../legacy/quranState.js";
 import { loadHisn } from "../../legacy/hisnLoad.js";
 import { WHEN_FILTERS, filterByWhen, toBn } from "../../legacy/hisnCore.js";
 import { QUICK_CHIPS, groupChapters, neighbors, groupOf, chapterBySwipe } from "../../legacy/hisnGroups.js";
+import { searchHisn, highlightParts, isSearchable } from "../../legacy/hisnSearch.js";
 import { readHisnView, writeHisnView, stepArSize, toggleView } from "../../legacy/hisnPrefs.js";
 import { swipeDelta } from "../../legacy/swipeMonth.js";
 import { useBackLayer } from "../../legacy/backNav.js";
@@ -20,6 +21,7 @@ const PRIMARY = "var(--theme-primary, #0E4B43)";
 const GOLD = "#C89B3C";
 const BN_FONT = "'Noto Serif Bengali', serif";
 const OPEN_KEY = "dt_hisn_open_group";
+const MAX_DUA_RESULTS = 40;
 const touch = { x: 0, y: 0, ok: false }; // সোয়াইপের শুরুর বিন্দু (re-render-এর মাঝে হারায় না)
 
 const readOpen = () => { try { return window.sessionStorage.getItem(OPEN_KEY) || ""; } catch (e) { return ""; } };
@@ -31,6 +33,8 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   const [openGroup, setOpenGroup] = useState(readOpen);
   const [chId, setChId] = useState(null);
   const [when, setWhen] = useState("all");
+  const [query, setQuery] = useState("");
+  const [focusDua, setFocusDua] = useState(null); // সার্চ থেকে খোলা দু'আ: স্ক্রল + হালকা দাগ
   const prefs = useMemo(() => readPrefs(), []);
   const [view, setViewState] = useState(() => readHisnView(prefs.arSize));
   const setView = (v) => { setViewState(v); writeHisnView(v); };
@@ -44,29 +48,46 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
     return () => { alive = false; };
   }, []);
 
-  useBackLayer(chId !== null, () => setChId(null));
+  useBackLayer(chId !== null, () => { setChId(null); setFocusDua(null); });
   useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } }, [chId]);
+  useEffect(() => {
+    if (chId === null || focusDua === null) return undefined;
+    const t = setTimeout(() => {
+      try { const el = document.getElementById("hisn-dua-" + focusDua); if (el) el.scrollIntoView({ block: "start" }); } catch (e) { /* ignore */ }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [chId, focusDua]);
 
   const groups = useMemo(() => groupChapters(state.chapters), [state.chapters]);
   const toggle = (k) => { const next = openGroup === k ? "" : k; setOpenGroup(next); writeOpen(next); };
-  const openChapter = (id) => { setWhen("all"); setChId(id); };
+  const openChapter = (id, duaId = null) => { setWhen("all"); setFocusDua(duaId); setChId(id); };
+  const searching = isSearchable(query);
+  const found = useMemo(() => (searching ? searchHisn(state.chapters, query) : null), [searching, state.chapters, query]);
 
   const ch = chId !== null ? state.chapters.find((c) => c.id === chId) : null;
-  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => setChId(null), source: state.source });
+  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => { setChId(null); setFocusDua(null); }, source: state.source, focusDua });
 
   const chips = QUICK_CHIPS.filter((c) => state.chapters.some((x) => x.id === c.id));
   return h("div", null,
     onBack && h("button", { type: "button", onClick: onBack, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), "সহায়িকা"),
     h(PageHeader, { title: "আমল, যিকির ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
 
-    chips.length > 0 && h("div", { className: "mb-1" },
+    h("div", { className: "relative mb-3" },
+      h("input", { type: "search", value: query, onChange: (e) => setQuery(e.target.value), placeholder: "দু'আ খুঁজুন…", "aria-label": "দু'আ বা অধ্যায় খুঁজুন", enterKeyHint: "search", autoComplete: "off", className: "w-full rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2.5 text-[16px] text-emerald-950 outline-none focus:border-emerald-700", style: { fontFamily: BN_FONT, WebkitAppearance: "none" } }),
+      h("span", { className: "absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" }, h("svg", { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "#94A3B8", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, h("circle", { cx: 11, cy: 11, r: 7 }), h("path", { d: "M20 20l-4-4" }))),
+      query && h("button", { type: "button", onClick: () => setQuery(""), "aria-label": "মুছে ফেলুন", className: "absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-xl leading-none text-slate-400 active:text-slate-600" }, "×")
+    ),
+
+    searching && searchView({ found, query, status: state.status, openChapter }),
+
+    !searching && chips.length > 0 && h("div", { className: "mb-1" },
       h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5" }, "দ্রুত যান"),
       h("div", { className: "flex gap-2 overflow-x-auto pb-2 -mx-4 px-4", "data-no-swipe": true },
         chips.map((c) => h("button", { key: c.id, type: "button", onClick: () => openChapter(c.id), className: "shrink-0 px-3 py-1.5 rounded-full text-[13px] font-semibold border bg-white active:scale-95 transition-transform", style: { color: PRIMARY, borderColor: "var(--theme-line, #D3E3DD)", fontFamily: BN_FONT } }, c.label))
       )
     ),
 
-    collections.length > 0 && h("div", { className: "mb-3" },
+    !searching && collections.length > 0 && h("div", { className: "mb-3" },
       h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5" }, "বিশেষ সংকলন"),
       h("div", { className: "flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4", "data-no-swipe": true },
         collections.map((c) => h("button", { key: c.key, type: "button", onClick: () => onSelectItem(c.key), className: "shrink-0 w-[84px] flex flex-col items-center gap-1.5 bg-white rounded-2xl border border-slate-200/80 shadow-sm px-1.5 py-2.5 active:scale-95 transition-transform" },
@@ -76,10 +97,10 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
       )
     ),
 
-    h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5" }, "বিষয় অনুযায়ী"),
-    state.status === "loading" && h("div", { className: "text-sm text-slate-500 py-4" }, "লোড হচ্ছে…"),
-    state.status === "error" && h("div", { className: "text-sm text-red-600 py-4" }, "ডেটা লোড করা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।"),
-    groups.map((g) => {
+    !searching && h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5" }, "বিষয় অনুযায়ী"),
+    !searching && state.status === "loading" && h("div", { className: "text-sm text-slate-500 py-4" }, "লোড হচ্ছে…"),
+    !searching && state.status === "error" && h("div", { className: "text-sm text-red-600 py-4" }, "ডেটা লোড করা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।"),
+    (searching ? [] : groups).map((g) => {
       const open = openGroup === g.key;
       return h("div", { key: g.key, className: "bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-2.5 overflow-hidden" },
         h("button", { type: "button", onClick: () => toggle(g.key), "aria-expanded": open, className: "w-full flex items-center gap-3 px-4 py-3.5 text-left" },
@@ -106,7 +127,42 @@ export function HisnHome({ collections, onSelectItem, onBack }) {
   );
 }
 
-function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source }) {
+// মিলে যাওয়া অংশ হাইলাইট করা শিরোনাম।
+function hl(text, query) {
+  return highlightParts(text, query).map((p, i) => (p.hit
+    ? h("mark", { key: i, style: { background: "#F6E3A6", color: "inherit", borderRadius: 3, padding: "0 1px" } }, p.text)
+    : p.text));
+}
+
+// সার্চের ফল: অধ্যায় আগে, তারপর দু'আ। found = searchHisn-এর ফল।
+function searchView({ found, query, status, openChapter }) {
+  if (status === "loading") return h("div", { className: "text-sm text-slate-500 py-4" }, "লোড হচ্ছে…");
+  if (status === "error") return h("div", { className: "text-sm text-red-600 py-4" }, "ডেটা লোড করা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।");
+  const chs = found ? found.chapters : [];
+  const duas = found ? found.duas : [];
+  if (!chs.length && !duas.length) return h("div", { className: "text-sm text-slate-600 py-6 text-center", style: { fontFamily: BN_FONT } }, "কিছু পাওয়া যায়নি, অন্য শব্দে খুঁজুন");
+  const shown = duas.slice(0, MAX_DUA_RESULTS);
+  const label = (t) => h("div", { className: "text-xs font-semibold text-slate-500 pb-1.5 pt-1" }, t);
+  const card = (children) => h("div", { className: "bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-3 px-3" }, children);
+  return h("div", { className: "pb-3" },
+    chs.length > 0 && label("অধ্যায় (" + toBn(chs.length) + ")"),
+    chs.length > 0 && card(chs.map((c) => h("button", { key: c.id, type: "button", onClick: () => openChapter(c.id), className: "w-full flex items-center gap-3 py-2.5 px-1 text-left border-b border-slate-100 last:border-b-0 active:bg-slate-50" },
+      h("span", { className: "w-8 h-8 rounded-full text-white text-[13px] font-semibold flex items-center justify-center shrink-0", style: { background: PRIMARY } }, toBn(c.id)),
+      h("span", { className: "flex-1 text-[14px] text-emerald-950", style: { fontFamily: BN_FONT } }, hl(c.title, query))
+    ))),
+    duas.length > 0 && label("দু'আ (" + toBn(duas.length) + ")"),
+    duas.length > 0 && card(shown.map((d) => h("button", { key: d.duaId, type: "button", onClick: () => openChapter(d.chapterId, d.duaId), className: "w-full flex items-center gap-3 py-2.5 px-1 text-left border-b border-slate-100 last:border-b-0 active:bg-slate-50" },
+      h("span", { className: "flex-1 min-w-0" },
+        h("span", { className: "block text-[14px] text-emerald-950", style: { fontFamily: BN_FONT } }, hl(d.title, query)),
+        h("span", { className: "block text-[11.5px] text-slate-500 truncate", style: { fontFamily: BN_FONT } }, toBn(d.chapterId) + ". " + d.chapterTitle)
+      ),
+      h(ToolIcon, { name: "chevronRight", size: 14, color: GOLD })
+    ))),
+    duas.length > shown.length && h("div", { className: "text-xs text-slate-500 text-center pb-2", style: { fontFamily: BN_FONT } }, "আরও " + toBn(duas.length - shown.length) + "টি আছে; আরও নির্দিষ্ট শব্দ লিখুন।")
+  );
+}
+
+function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source, focusDua }) {
   const grp = groupOf(groups, ch.id);
   const nb = neighbors(groups, ch.id);
   const isMorningEvening = ch.id === 27;
@@ -140,7 +196,7 @@ function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChap
       h("button", { key: f.key, type: "button", onClick: () => setWhen(f.key), className: "flex-1 py-1.5 rounded-xl text-sm font-semibold border " + (when === f.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: when === f.key ? { background: PRIMARY } : undefined }, f.label)
     )),
     controls,
-    duas.map((d) => h(HisnDuaCard, { key: d.id, d, prefs, view })),
+    duas.map((d) => h("div", { key: d.id, id: "hisn-dua-" + d.id, className: focusDua === d.id ? "rounded-2xl ring-2 ring-amber-300 scroll-mt-3" : "scroll-mt-3" }, h(HisnDuaCard, { d, prefs, view }))),
     h("div", { className: "flex gap-2 pt-1 pb-3" }, navBtn(nb.prev, "‹ আগের অধ্যায়"), navBtn(nb.next, "পরের অধ্যায় ›")),
     h("div", { className: "text-[11px] text-slate-400 text-center pb-1" }, "ডানে-বামে সোয়াইপ করেও অধ্যায় বদলানো যায়"),
     h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + source + "।")
