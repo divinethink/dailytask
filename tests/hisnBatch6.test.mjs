@@ -38,7 +38,7 @@ test("সংখ্যা ও কাঠামো: ১৪৮ নম্বর ৭ �
 test("উচ্চারণের নমুনা আরবির সাথে মেলে", () => {
   assert.ok(byHid(163).tr.includes("সুন্নাতি") && has(byHid(163).ar, "سنة رسول الله"));
   assert.ok(byHid(168).tr.includes("রা‘দু") && has(byHid(168).ar, "الرعد"));
-  assert.ok(byHid(173).tr.includes("মুতিরনা") && has(byHid(173).ar, "مطرنا"));
+  assert.ok(byHid(173).tr.includes("মুত্বিরনা") && has(byHid(173).ar, "مطرنا"));
 });
 
 test("copyText ঠিক", () => {
