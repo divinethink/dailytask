@@ -14,7 +14,7 @@ test("ডিফল্ট: কিছু না থাকলে ডিফল্ট
 });
 
 test("অচেনা/ডুপ্লিকেট/ভুল-টাইপ id বাদ, বাদ-পড়া id শেষে যুক্ত", () => {
-  assert.deepEqual(sanitizeOrder("amol", ["dua", "dua", "x", 5, null, "azkar"]).slice(0, 2), ["dua", "azkar"]);
+  assert.deepEqual(sanitizeOrder("amol", ["dua", "dua", "x", 5, null, "azkar", "dhikr"]).slice(0, 2), ["dua", "dhikr"]);
   assert.equal(sanitizeOrder("amol", ["dua"]).length, defaultOrder("amol").length);
   assert.deepEqual(sanitizeOrder("amol", "bad"), defaultOrder("amol"));
 });
@@ -51,7 +51,7 @@ test("আইডি-সামঞ্জস্য: TAB_DEFS ও আসল UI-এর
 
 test("সহায়িকা পুনর্বিন্যাস: সকল-আমল প্রথম টাইল, জুমা আমল হাবে, তাসবীহ কাস্টমাইজ-তালিকায় নেই, পুনরাবৃত্তি নেই", () => {
   assert.deepEqual(defaultOrder("tools"), ["quran", "salah", "amol", "specialDays", "blog", "quiz", "qibla", "toolsTracking"]);
-  assert.deepEqual(defaultOrder("amol").slice(0, 4), ["azkar", "fullDayAmol", "jumuahAmol", "dhikr"]);
+  assert.deepEqual(defaultOrder("amol").slice(0, 4), ["fullDayAmol", "jumuahAmol", "dhikr", "dua"]);
   assert.ok(!defaultOrder("tools").includes("jumuahAmol"));
   assert.ok(defaultOrder("amol").includes("jumuahAmol"));
   assert.ok(!defaultOrder("amol").includes("tasbih"));

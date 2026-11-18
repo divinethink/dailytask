@@ -10,7 +10,6 @@
 import { JumuahAmol } from "./JumuahAmol.jsx";
 import { SubScreenHeader } from "./SubScreenHeader.jsx";
 import { ReaderTitleContext } from "./readerContext.js";
-import { MorningEveningAzkar } from "./MorningEveningAzkar.jsx";
 import { FullDayAmol } from "./FullDayAmol.jsx";
 import { DhikrCountGuide } from "./DhikrCountGuide.jsx";
 import { PrayerAdhkar } from "./PrayerAdhkar.jsx";
@@ -49,7 +48,6 @@ function FlashcardsScreen({ onBack }) {
 const SUB_ITEMS = [{ key: "prayerAdhkar", label: "নামাজের দু'আ", Component: PrayerAdhkarScreen }];
 
 const HUB_ITEMS = [
-  { key: "azkar", icon: "sun", label: "সকাল-সন্ধ্যার আমল", Component: MorningEveningAzkar },
   { key: "fullDayAmol", icon: "dayNight", label: "সারাদিনের আমল", Component: FullDayAmol },
   { key: "dhikr", icon: "tasbih", label: "যিকির", Component: DhikrCountGuide },
   { key: "dua", icon: "dua", label: "দু'আ ফ্ল্যাশকার্ড", Component: FlashcardsScreen },
@@ -72,12 +70,12 @@ export function AmolHub({ tabLayout, onBack } = {}) {
     );
   }
 
-  // ক্রম+লুকানো (member/app_design tabLayout): বিশেষ সংকলন সারি। হিসনের মূল পেজ নিচের HisnHome।
+  // ক্রম+লুকানো (member/app_design tabLayout): বিষয়-তালিকার বাড়তি আইটেম (hisnGroups.js GROUP_EXTRAS অনুযায়ী গ্রুপে বসে)। সকাল-সন্ধ্যা = হিসনের অধ্যায় ২৭ (আলাদা টাইল নেই)।
   const items = visibleIds("amol", tabLayout).map((id) => HUB_ITEMS.find((i) => i.key === id)).filter(Boolean);
 
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
-    /*#__PURE__*/React.createElement(HisnHome, { collections: items, onSelectItem: setActiveItem, onBack })
+    /*#__PURE__*/React.createElement(HisnHome, { extras: items, onSelectItem: setActiveItem, onBack })
   );
 }

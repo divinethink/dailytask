@@ -1,7 +1,7 @@
 // tests/hisnGroups.test.mjs — অধ্যায়-গ্রুপ: প্রতিটা অধ্যায় ঠিক একটা গ্রুপে, কিছু হারায় না।
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HISN_GROUPS, QUICK_CHIPS, groupChapters, flatChapterIds, neighbors, groupOf, chapterBySwipe } from "../src/legacy/hisnGroups.js";
+import { HISN_GROUPS, QUICK_CHIPS, GROUP_ICONS, GROUP_EXTRAS, withExtras, groupChapters, flatChapterIds, neighbors, groupOf, chapterBySwipe } from "../src/legacy/hisnGroups.js";
 import { buildChapters } from "../src/legacy/hisnCore.js";
 import { HISN_MORNING_EVENING } from "../src/legacy/hisnData.js";
 import { HISN_BATCH1 } from "../src/legacy/hisnBatch1.js";
@@ -74,4 +74,25 @@ test("সোয়াইপ-দিশা: -১ আগের, +১ পরের, 
   assert.equal(chapterBySwipe(groups, ids[3], 0), null);
   assert.equal(chapterBySwipe(groups, ids[0], -1), null);
   assert.equal(chapterBySwipe(groups, ids[ids.length - 1], 1), null);
+});
+
+const ITEMS = ["fullDayAmol", "jumuahAmol", "dhikr", "dua", "duaAcceptance", "deathReminder"].map((key) => ({ key, icon: "list", label: key }));
+
+test("বাড়তি আইটেম নির্ধারিত গ্রুপে বসে, কিছু হারায় না, ক্রম অটুট", () => {
+  const gs = withExtras(groupChapters(chapters), ITEMS);
+  const got = gs.flatMap((g) => g.extras.map((x) => x.key));
+  assert.deepEqual([...got].sort(), ITEMS.map((i) => i.key).sort());
+  assert.deepEqual(gs.find((g) => g.key === "virtue").extras.map((x) => x.key), ["dhikr", "dua", "duaAcceptance"]);
+  assert.deepEqual(gs.find((g) => g.key === "dailyRest").extras.map((x) => x.key), ["fullDayAmol"]);
+  assert.equal(gs.find((g) => g.key === "other"), undefined);
+});
+
+test("অজানা আইটেম 'অন্যান্য'-এ; ডেটা না এলেও টুল-গ্রুপ আসে; আইকন সবার আছে", () => {
+  const odd = withExtras(groupChapters(chapters), [{ key: "newTool", icon: "list", label: "x" }]);
+  assert.deepEqual(odd[odd.length - 1].extras.map((x) => x.key), ["newTool"]);
+  const bare = withExtras([], ITEMS);
+  assert.equal(bare.reduce((n, g) => n + g.extras.length, 0), ITEMS.length);
+  assert.deepEqual(bare.map((g) => g.key), ["dailyRest", "salah", "illDeath", "virtue"]);
+  assert.ok(HISN_GROUPS.every((g) => GROUP_ICONS[g.key]));
+  assert.ok(Object.values(GROUP_EXTRAS).flat().every((k) => ITEMS.some((i) => i.key === k)));
 });

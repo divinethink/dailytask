@@ -45,6 +45,33 @@ export const QUICK_CHIPS = [
   { label: "বিপদে পড়লে", id: 53 },
 ];
 
+// গ্রুপের আইকন (ToolIcons-এর নাম); না থাকলে "list"।
+export const GROUP_ICONS = { dailyRest: "dayNight", dressClean: "drop", homeMosque: "mosque", salah: "hands", foodFast: "wheat", social: "heart", hardship: "dua", illDeath: "hourglass", nature: "leaf", travelHajj: "suitcase", virtue: "star", other: "list" };
+
+// হাবের বাড়তি আইটেম (key = AmolHub-এর HUB_ITEMS key) কোন গ্রুপে বসবে। তালিকায় না থাকা আইটেম "অন্যান্য" গ্রুপে — কখনো হারায় না।
+export const GROUP_EXTRAS = { dailyRest: ["fullDayAmol"], salah: ["jumuahAmol"], illDeath: ["deathReminder"], virtue: ["dhikr", "dua", "duaAcceptance"] };
+
+// groups = groupChapters-এর ফল; items = [{key,icon,label}] (ক্রম অপরিবর্তিত)। ফেরত: প্রতি গ্রুপে extras যুক্ত; শুধু-extras গ্রুপও আসে (ডেটা না এলেও টুল পাওয়া যায়)।
+export function withExtras(groups, items) {
+  const list = Array.isArray(items) ? items : [];
+  const home = new Map();
+  for (const it of list) {
+    const gk = Object.keys(GROUP_EXTRAS).find((k) => GROUP_EXTRAS[k].includes(it.key)) || "other";
+    if (!home.has(gk)) home.set(gk, []);
+    home.get(gk).push(it);
+  }
+  const out = groups.map((g) => ({ ...g, extras: home.get(g.key) || [] }));
+  for (const gk of HISN_GROUPS.map((g) => g.key).concat(OTHER.key)) {
+    if (!home.has(gk) || out.some((g) => g.key === gk)) continue;
+    const meta = HISN_GROUPS.find((g) => g.key === gk) || OTHER;
+    const shell = { key: gk, title: meta.title, chapters: [], extras: home.get(gk) };
+    const at = HISN_GROUPS.findIndex((g) => g.key === gk);
+    const pos = at < 0 ? out.length : out.findIndex((g) => HISN_GROUPS.findIndex((x) => x.key === g.key) > at);
+    out.splice(pos < 0 ? out.length : pos, 0, shell);
+  }
+  return out;
+}
+
 // গ্রুপের ক্রম ধরে সব অধ্যায়ের চ্যাপ্টার-id-এর সমতল তালিকা।
 export function flatChapterIds(groups) {
   return groups.flatMap((g) => g.chapters.map((c) => c.id));

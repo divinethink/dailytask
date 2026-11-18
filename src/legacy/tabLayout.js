@@ -11,7 +11,6 @@ export const TAB_DEFS = {
   amol: {
     title: "আমল",
     defs: [
-      { id: "azkar", title: "সকাল-সন্ধ্যার আমল" },
       { id: "fullDayAmol", title: "সারাদিনের আমল" },
       { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "dhikr", title: "যিকির" },

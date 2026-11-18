@@ -46,7 +46,7 @@ export function HisnDuaCard({ d, prefs, view, fav = false, onToggleFav }) {
     h("div", { className: "mt-3 flex items-center gap-2" },
       h("button", { type: "button", onClick: copy, className: BTN }, "কপি"),
       h("button", { type: "button", onClick: share, className: BTN }, "শেয়ার"),
-      onToggleFav && h("button", { type: "button", onClick: () => onToggleFav(d.id), "aria-pressed": fav, "aria-label": fav ? "প্রিয় থেকে সরান" : "প্রিয়তে রাখুন", className: BTN, style: fav ? { color: "#9A6B00", borderColor: "#C89B3C", background: "#FBF3DC" } : undefined }, fav ? "★ প্রিয়" : "☆ প্রিয়"),
+      onToggleFav && h("button", { type: "button", onClick: () => onToggleFav(d.id), "aria-pressed": fav, "aria-label": fav ? "পছন্দ থেকে সরান" : "পছন্দে রাখুন", className: BTN, style: fav ? { color: "#9A6B00", borderColor: "#C89B3C", background: "#FBF3DC" } : undefined }, fav ? "★ পছন্দ" : "☆ পছন্দ"),
       msg && h("span", { className: "text-xs text-slate-500" }, msg)
     )
   );
