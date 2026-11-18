@@ -32,3 +32,33 @@ export function groupChapters(chapters) {
   if (rest.length) out.push({ ...OTHER, chapters: rest });
   return out;
 }
+
+// হোম পেজের "দ্রুত যান" চিপ: সরাসরি একটা অধ্যায়ে (id হিসনের অধ্যায়-নম্বর)। এক নজরে সবচেয়ে বেশি লাগে এমন বিষয়।
+export const QUICK_CHIPS = [
+  { label: "ঘুমানোর সময়", id: 28 },
+  { label: "খাওয়ার আগে", id: 69 },
+  { label: "খাওয়ার পরে", id: 70 },
+  { label: "টয়লেট", id: 6 },
+  { label: "ঘর থেকে বের হওয়া", id: 10 },
+  { label: "মসজিদে প্রবেশ", id: 13 },
+  { label: "সফরের দু'আ", id: 96 },
+  { label: "বিপদে পড়লে", id: 53 },
+];
+
+// গ্রুপের ক্রম ধরে সব অধ্যায়ের চ্যাপ্টার-id-এর সমতল তালিকা।
+export function flatChapterIds(groups) {
+  return groups.flatMap((g) => g.chapters.map((c) => c.id));
+}
+
+// আগের/পরের অধ্যায় (গ্রুপের ক্রমে); প্রান্তে বা অজানা id-তে null।
+export function neighbors(groups, id) {
+  const ids = flatChapterIds(groups);
+  const i = ids.indexOf(id);
+  if (i < 0) return { prev: null, next: null };
+  return { prev: i > 0 ? ids[i - 1] : null, next: i < ids.length - 1 ? ids[i + 1] : null };
+}
+
+// id যে গ্রুপে আছে (ফেরার বোতামের লেখার জন্য); না পেলে null।
+export function groupOf(groups, id) {
+  return groups.find((g) => g.chapters.some((c) => c.id === id)) || null;
+}

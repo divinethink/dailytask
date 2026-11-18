@@ -15,7 +15,7 @@ export const TAB_DEFS = {
       { id: "fullDayAmol", title: "সারাদিনের আমল" },
       { id: "jumuahAmol", title: "জুমার দিনের বিশেষ আমল" },
       { id: "dhikr", title: "যিকির" },
-      { id: "dua", title: "দু'আ" },
+      { id: "dua", title: "দু'আ ফ্ল্যাশকার্ড" },
       { id: "duaAcceptance", title: "দু'আ কবুলের সময়" },
       { id: "deathReminder", title: "মৃত্যুর স্মরণ" }
     ]

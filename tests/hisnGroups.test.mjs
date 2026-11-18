@@ -1,7 +1,7 @@
 // tests/hisnGroups.test.mjs — অধ্যায়-গ্রুপ: প্রতিটা অধ্যায় ঠিক একটা গ্রুপে, কিছু হারায় না।
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HISN_GROUPS, groupChapters } from "../src/legacy/hisnGroups.js";
+import { HISN_GROUPS, QUICK_CHIPS, groupChapters, flatChapterIds, neighbors, groupOf } from "../src/legacy/hisnGroups.js";
 import { buildChapters } from "../src/legacy/hisnCore.js";
 import { HISN_MORNING_EVENING } from "../src/legacy/hisnData.js";
 import { HISN_BATCH1 } from "../src/legacy/hisnBatch1.js";
@@ -42,4 +42,26 @@ test("নতুন অধ্যায় 'অন্যান্য'-এ আস�
 
 test("খালি ইনপুটে খালি ফল", () => {
   assert.deepEqual(groupChapters([]), []);
+});
+
+test("দ্রুত-যান চিপের প্রতিটা id ডেটায় আছে", () => {
+  const have = new Set(chapters.map((c) => c.id));
+  for (const c of QUICK_CHIPS) assert.ok(have.has(c.id), "অজানা চিপ id " + c.id);
+});
+
+test("আগের/পরের অধ্যায়: প্রান্তে null, মাঝে ঠিক প্রতিবেশী", () => {
+  const groups = groupChapters(chapters);
+  const ids = flatChapterIds(groups);
+  assert.equal(ids.length, chapters.length);
+  assert.deepEqual(neighbors(groups, ids[0]), { prev: null, next: ids[1] });
+  assert.deepEqual(neighbors(groups, ids[ids.length - 1]), { prev: ids[ids.length - 2], next: null });
+  assert.deepEqual(neighbors(groups, ids[5]), { prev: ids[4], next: ids[6] });
+  assert.deepEqual(neighbors(groups, -1), { prev: null, next: null });
+});
+
+test("groupOf: অধ্যায়ের গ্রুপ খোঁজে", () => {
+  const groups = groupChapters(chapters);
+  assert.equal(groupOf(groups, 28).key, "dailyRest");
+  assert.equal(groupOf(groups, 17).key, "salah");
+  assert.equal(groupOf(groups, 424242), null);
 });
