@@ -28,6 +28,12 @@ function TapCounter({ times }) {
   );
 }
 
+// "(শব্দ)" অংশ আলাদা bidi-isolate + এক লাইনে রাখা: নইলে বন্ধনী উল্টো/ভাঙা দেখায়।
+function arNodes(text) {
+  if (!text || text.indexOf("(") < 0) return text;
+  return text.split(/(\([^)]*\))/).map((part, i) => (i % 2 ? h("span", { key: i, style: { unicodeBidi: "isolate", whiteSpace: "nowrap" } }, part) : part));
+}
+
 // fav/onToggleFav (ঐচ্ছিক) = ⭐ প্রিয় (hisnFavs.js, ডিভাইস-লোকাল)। view = {arSize, showAr, showTr, showBn} (hisnPrefs.js); prefs = শুধু আরবি ফন্টের জন্য (কুরআন-রিডারের পছন্দ)।
 export function HisnDuaCard({ d, prefs, view, fav = false, onToggleFav, counter = false }) {
   const [msg, setMsg] = useState("");
@@ -44,15 +50,16 @@ export function HisnDuaCard({ d, prefs, view, fav = false, onToggleFav, counter 
     }
   };
   const badge = timesBadge(d);
-  const arBase = { fontFamily: fontStack(hisnArabicFont(prefs)), textAlign: "right" };
-  const small = Math.max(18, view.arSize - 8);
+  const arBase = { fontFamily: fontStack(hisnArabicFont(prefs)), textAlign: "justify", textAlignLast: "center" };
+  const size = Math.round(view.arSize * 0.86); // ক্রমাগত বড় লাগছিল: কুরআন-রিডারের আকারের ~৮৬%
+  const small = Math.max(18, size - 6);
   return h("div", { className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 mb-3 px-4 py-3" },
     h("div", { className: "flex items-start gap-2 pb-2" },
       h("div", { className: "flex-1 text-[15px] font-semibold text-emerald-950", style: { fontFamily: BN_FONT } }, d.title),
       badge && h("span", { className: "text-xs font-semibold px-2 py-0.5 rounded-full text-white shrink-0", style: { background: PRIMARY } }, badge)
     ),
     view.showAr && d.arPre && h("div", { dir: "rtl", lang: "ar", className: "text-slate-500", style: { ...arBase, fontSize: small, lineHeight: 2 } }, d.arPre),
-    view.showAr && h("div", { dir: "rtl", lang: "ar", style: { ...arBase, fontSize: view.arSize, lineHeight: 2.3, color: "#1F2D2A", whiteSpace: "pre-line" } }, d.ar),
+    view.showAr && h("div", { dir: "rtl", lang: "ar", style: { ...arBase, fontSize: size, lineHeight: 2.0, color: "#1F2D2A", whiteSpace: "pre-line" } }, arNodes(d.ar)),
     view.showAr && d.arNote && h("div", { dir: "rtl", lang: "ar", className: "mt-1 text-slate-500", style: { ...arBase, fontSize: small, lineHeight: 2 } }, d.arNote),
     view.showTr && d.tr && h("div", { className: "mt-3 pl-3", style: { borderLeft: "3px solid rgba(200,155,60,0.35)" } },
       h("div", { className: "text-[11px] font-semibold text-slate-500 pb-0.5" }, "উচ্চারণ"),

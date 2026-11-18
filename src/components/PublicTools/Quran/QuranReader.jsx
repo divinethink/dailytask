@@ -248,7 +248,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
         h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: 26, lineHeight: 1.8, flexShrink: 0 } }, "سورة " + surah.ar)),
       ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, (scriptById(prefs.arScript) || scriptById(DEFAULT_SCRIPT)).bismillah),
       ready && reading && h(AyahFlow, {
-        items: flowItems, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript,
+        items: flowItems, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap,
         activeKey: sel ? surah.n + ":" + sel.n : "", onTap: (it) => setSel(ayahs[it.n - 1]),
         headers: false, dividers: true, withIds: true,
       }),

@@ -1,7 +1,7 @@
 // quranCore.js — কুরআন-রিডারের pure লজিক (Firebase/React-মুক্ত, node --test-যোগ্য)।
 // ডেটা-ফাইলের গঠন/উৎস: tools/quran/build.mjs। এখানে শুধু যাচাই, নাম-লেবেল ও "শেষ পাঠ"-এর হিসাব।
 
-import { DEFAULT_FONT, DEFAULT_SCRIPT, isValidScript, scriptById, fontFitsScript } from "./quranFonts.js";
+import { DEFAULT_FONT, DEFAULT_SCRIPT, isValidScript, scriptById, fontFitsScript, DEFAULT_ALIGN, DEFAULT_GAP, isValidAlign, isValidGap } from "./quranFonts.js";
 
 export const QURAN_BASE = "/quran/v1"; // ডেটা বদলাতে হলে নতুন ফোল্ডার (v2) — sw.js-এর cache-first নিয়মের কারণে।
 export const DEFAULT_TRANSLATION = "bn_khan";
@@ -64,7 +64,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -87,6 +87,8 @@ export function sanitizePrefs(raw) {
     theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)
     mode: r.mode === "read" ? "read" : "list", // list=আয়াত-তালিকা (অনুবাদসহ), read=অবিচ্ছিন্ন আরবি
     arScript,
+    arAlign: isValidAlign(r.arAlign) ? r.arAlign : DEFAULT_ALIGN, // রিডিং/মুসহাফের এলাইন
+    arGap: isValidGap(r.arGap) ? r.arGap : DEFAULT_GAP, // লাইন-ফাঁক
     arFont: fontFitsScript(r.arFont, arScript) ? r.arFont : scriptById(arScript).defaultFont, // অজানা বা লেখার সাথে বেমানান ফন্ট → ওই লেখার ডিফল্ট
   };
 }

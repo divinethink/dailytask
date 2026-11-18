@@ -5,7 +5,7 @@
 
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
-import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLayout } from "../../../legacy/quranFonts.js";
+import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLayout, ALIGNS, GAPS } from "../../../legacy/quranFonts.js";
 import { switchScript, AR_SIZE, TR_SIZE } from "../../../legacy/quranCore.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
@@ -95,6 +95,24 @@ export function ScriptPicker({ prefs, th, accent, onPrefs }) {
       })));
 }
 
+// রিডিং/মুসহাফের লাইন-সাজানো: এলাইন ও লাইন-ফাঁক (তালিকা-মোডে প্রযোজ্য নয়)।
+export function LayoutPicker({ prefs, th, accent, onPrefs }) {
+  const row = (title, key, list) => h("div", { style: { marginBottom: 8 } },
+    h("div", { style: { fontSize: 13, opacity: 0.8, marginBottom: 6 } }, title),
+    h("div", { role: "radiogroup", "aria-label": title, style: { display: "flex", gap: 6 } },
+      list.map(([id, label]) => {
+        const on = prefs[key] === id;
+        return h("button", {
+          key: id, type: "button", role: "radio", "aria-checked": on, onClick: () => !on && onPrefs({ ...prefs, [key]: id }),
+          style: { flex: 1, minHeight: 44, borderRadius: 12, fontSize: 13, fontWeight: 600, color: on ? accent : th.fg, background: on ? th.bar : "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
+        }, label);
+      })));
+  return h("div", null,
+    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "রিডিং ও মুসহাফের লাইন-সাজানো"),
+    row("এলাইন", "arAlign", ALIGNS),
+    row("লাইনের ফাঁক", "arGap", GAPS));
+}
+
 export function FontPicker({ prefs, th, accent, script, onPrefs }) {
   const [st, setSt] = useState({ id: "", status: "" }); // status: loading | fail
   const alive = useRef(true);
@@ -176,6 +194,8 @@ export function ReaderPrefsBody({ prefs, th, accent, onPrefs, switches, showMode
     h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
     h(ThemePicker, { prefs, accent, onPrefs }),
     rule("14px 0 10px"),
+    h(LayoutPicker, { prefs, th, accent, onPrefs }),
+    rule("10px 0"),
     h(ScriptPicker, { prefs, th, accent, onPrefs }),
     rule("10px 0"),
     h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs })
@@ -212,13 +232,13 @@ export function QuranSettingsOverlay({ prefs, onPrefs, onClose }) {
 // headers: সূরার শিরোনাম + বিসমিল্লাহ বসবে কি (মুসহাফে হ্যাঁ; রিডারে নিজের শিরোনাম আছে, তাই না)।
 // dividers: পৃষ্ঠা/পারার শুরুতে ডিভাইডার (রিডিং মোডে)।
 // withIds: স্ক্রলে যাওয়া ও অবস্থান-ট্র্যাকিংয়ের জন্য id/data-a (শুধু একসূরার রিডারে)।
-export function AyahFlow({ items, meta, markers, th, accent, arSize, font, script, activeKey, onTap, headers, dividers, withIds }) {
+export function AyahFlow({ items, meta, markers, th, accent, arSize, font, script, align, gap, activeKey, onTap, headers, dividers, withIds }) {
   const blocks = [];
   let run = [];
-  const lay = flowLayout(script);
+  const lay = flowLayout(script, align, gap);
   const flush = (k) => {
     if (!run.length) return;
-    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: Math.round(arSize * lay.sizeScale), lineHeight: lay.lineHeight, textAlign: lay.textAlign, color: th.fg, margin: "4px 0" } }, run));
+    blocks.push(h("div", { key: "p" + k, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: Math.round(arSize * lay.sizeScale), lineHeight: lay.lineHeight, textAlign: lay.textAlign, textAlignLast: lay.textAlignLast, color: th.fg, margin: "4px 0" } }, run));
     run = [];
   };
   items.forEach((it, i) => {

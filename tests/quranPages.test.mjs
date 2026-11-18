@@ -54,5 +54,5 @@ test("sanitizePrefs.mode: ডিফল্ট list; read শুধু ঠিক �
   assert.equal(sanitizePrefs({ mode: "read" }).mode, "read");
   assert.equal(sanitizePrefs({ mode: "x" }).mode, "list");
   const old = sanitizePrefs({ arSize: 30, trSize: 18, showAr: true, showTr: false, theme: 1 }); // মোড-হীন পুরনো সেটিংস
-  assert.deepEqual(old, { arSize: 30, trSize: 18, showAr: true, showTr: false, theme: 1, mode: "list", arFont: "amiri-quran", arScript: "simple" });
+  assert.deepEqual(old, { arSize: 30, trSize: 18, showAr: true, showTr: false, theme: 1, mode: "list", arFont: "amiri-quran", arScript: "simple", arAlign: "justify", arGap: "normal" });
 });

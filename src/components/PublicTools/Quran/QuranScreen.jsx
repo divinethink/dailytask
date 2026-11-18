@@ -376,13 +376,19 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
   const markedSet = new Set(marks.map((x) => markKey(x.s, x.a, x.k)));
   const lastList = sanitizeLastRead(last, surahs);
   const openAt = (s, a) => setOpen({ s, a: a || 1 });
-  // রিডার বন্ধ হওয়ার "back" শেষ হলে তবেই মুসহাফ খোলা; নইলে সেই back নতুন মুসহাফকেও বন্ধ করে দেয়।
-  const openMushafFromReader = (p) => {
-    setOpen(null);
+  // এক স্তর বন্ধ হওয়ার "back" শেষ হলে তবেই পরেরটা খোলা; নইলে সেই back নতুন স্তরকেও বন্ধ করে দেয়।
+  const afterBack = (fn) => {
     let done = false;
-    const go = () => { if (done) return; done = true; window.removeEventListener("popstate", go); setMushaf(p); };
+    const go = () => { if (done) return; done = true; window.removeEventListener("popstate", go); fn(); };
     window.addEventListener("popstate", go);
     setTimeout(go, 400);
+  };
+  const openMushafFromReader = (p) => { setOpen(null); afterBack(() => setMushaf(p)); };
+  // মুসহাফ থেকে তালিকা/রিডিং-এ ফেরা: মোড বদলে ওই পৃষ্ঠার প্রথম আয়াতে রিডার।
+  const openReaderFromMushaf = (mode, s, a) => {
+    setPrefs({ ...prefs, mode });
+    setMushaf(null);
+    afterBack(() => setOpen({ s, a }));
   };
 
   return h("div", null,
@@ -431,6 +437,7 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
       meta, markers, prefs, onPrefs: setPrefs,
       startPage: mushaf,
       onClose: () => setMushaf(null),
+      onSwitchMode: openReaderFromMushaf,
       onPosition: savePos,
       marked: markedSet,
       onMark,

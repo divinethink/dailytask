@@ -111,12 +111,24 @@ test("৬গ-৩ পছন্দ: IndoPak বাছলে মানানসই 
   assert.equal(sanitizePrefs({ arScript: "uthmani", arFont: "me-quran" }).arFont, "me-quran");
 });
 
-test("flowLayout: simple/উসমানি আগের মতো; ইন্দো-পাক ডান-ঘেঁষা, বড় ও বেশি ফাঁক", () => {
-  for (const id of ["simple", "uthmani"]) assert.deepEqual(flowLayout(id), { sizeScale: 1, lineHeight: 2.3, textAlign: "justify" });
+test("flowLayout: ডিফল্ট দুই-পাশ-সমান, শেষ লাইন মাঝে; ইন্দো-পাক বড় ও বেশি ফাঁক; এলাইন/ফাঁক বদলায়", () => {
+  for (const id of ["simple", "uthmani"]) assert.deepEqual(flowLayout(id), { sizeScale: 1, lineHeight: 2.1, textAlign: "justify", textAlignLast: "center" });
   const ip = flowLayout("indopak");
-  assert.equal(ip.textAlign, "right");
-  assert.ok(ip.sizeScale > 1 && ip.lineHeight > 2.3);
+  assert.ok(ip.sizeScale > 1 && ip.lineHeight > 2.1);
   assert.deepEqual(flowLayout("অচেনা"), flowLayout("simple"));
+  assert.equal(flowLayout("simple", "right", "tight").textAlign, "right");
+  assert.equal(flowLayout("simple", "right", "tight").textAlignLast, "right");
+  assert.equal(flowLayout("simple", "center").textAlignLast, "center");
+  assert.ok(flowLayout("simple", "justify", "tight").lineHeight < flowLayout("simple", "justify", "loose").lineHeight);
+  assert.deepEqual(flowLayout("simple", "bogus", "bogus"), flowLayout("simple")); // অবৈধ → ডিফল্ট
+});
+
+test("sanitizePrefs: arAlign/arGap — পুরনো পছন্দে না থাকলে ডিফল্ট, অবৈধ মান ডিফল্ট", () => {
+  const d = sanitizePrefs({ arSize: 30 });
+  assert.equal(d.arAlign, "justify");
+  assert.equal(d.arGap, "normal");
+  assert.equal(sanitizePrefs({ arAlign: "center", arGap: "tight" }).arAlign, "center");
+  assert.equal(sanitizePrefs({ arAlign: "x", arGap: 5 }).arGap, "normal");
 });
 
 test("@font-face: file-ওয়ালা প্রতিটা ফন্টের নিজের @font-face tailwind.css-এ আছে (না থাকলে ফোনে ফন্ট নামে না)", () => {

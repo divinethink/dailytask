@@ -8,7 +8,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import { AR_SIZE, PAGE_COUNT, clampPage, pageAyahRefs, locateAyah, toBnDigits, markKey } from "../../../legacy/quranCore.js";
-import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, ScriptPicker, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, ScriptPicker, LayoutPicker, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef } = React;
 const h = React.createElement;
@@ -49,6 +49,8 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 6px" } }),
       h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      h(LayoutPicker, { prefs, th, accent, onPrefs }),
+      h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
       h(ScriptPicker, { prefs, th, accent, onPrefs }),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
       h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs }),
@@ -58,7 +60,7 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
   );
 }
 
-export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose, onPosition, marked, onMark }) {
+export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose, onSwitchMode, onPosition, marked, onMark }) {
   const [page, setPage] = useState(clampPage(startPage));
   const [state, setState] = useState({ status: "loading", items: null });
   const [tries, setTries] = useState(0);
@@ -145,12 +147,21 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
     style: { flex: 1, minHeight: 44, borderRadius: 12, border: "1px solid " + LINE, background: "transparent", color: accent, fontSize: 14, fontWeight: 600, opacity: dis ? 0.35 : 1 },
   }, label);
 
+  // তালিকা/রিডিং চাপলে ওই পৃষ্ঠার প্রথম আয়াতে রিডার খোলে (মোড বদলে)।
+  const seg = (key, label, on, mode) => h("button", {
+    key, type: "button", "aria-pressed": on, disabled: !on && !first,
+    onClick: () => { if (!on && first && onSwitchMode) onSwitchMode(mode, first.s, first.n); },
+    style: { minHeight: 40, padding: "0 10px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, border: "none", background: on ? "#fff" : "transparent", color: on ? "#1F2D2A" : "#fff" },
+  }, label);
+
   return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, display: "flex", flexDirection: "column", background: th.bg, color: th.fg, fontFamily: "'Hind Siliguri', sans-serif" } },
     h("div", { style: { background: headBg, color: "#fff", padding: "10px 8px 10px 12px", display: "flex", alignItems: "center", gap: 8 } },
       h("button", { type: "button", onClick: onClose, "aria-label": "ফিরে যান", style: { padding: 8, color: "#fff" } }, h(ChevronLeft, { size: 22 })),
       h("div", { style: { minWidth: 0, flex: 1 } },
         h("div", { style: { fontWeight: 600, fontSize: 17, lineHeight: 1.3 } }, "পৃষ্ঠা " + toBnDigits(page) + " / " + toBnDigits(PAGE_COUNT)),
         h("div", { style: { fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, where ? "পারা " + toBnDigits(where.juz) + " · " + names : "")),
+      onSwitchMode && h("div", { role: "group", "aria-label": "পড়ার ধরন", style: { display: "flex", alignItems: "center", background: "rgba(255,255,255,0.18)", borderRadius: 999, padding: 2 } },
+        seg("list", "তালিকা", false, "list"), seg("read", "রিডিং", false, "read"), seg("mushaf", "মুসহাফ", true, "mushaf")),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "মুসহাফ-সেটিংস ও পৃষ্ঠায় যান", style: { minWidth: 48, minHeight: 44, color: "#fff", fontSize: 20, fontWeight: 600 } }, "Aa")
     ),
     h("div", { ref: bodyRef, "data-testid": "mushaf-body", onTouchStart, onTouchEnd, style: { flex: 1, overflowY: "auto", padding: "4px 16px 16px" } },
@@ -158,7 +169,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
-      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
+      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
       state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "16px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
     ),
     h("div", { style: { display: "flex", gap: 8, padding: "8px 12px calc(8px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid " + LINE, background: th.bg } },

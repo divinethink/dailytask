@@ -36,12 +36,19 @@ export function fontStack(id) {
   return "'" + f.family + "', 'Amiri Quran', 'Noto Naskh Arabic', serif";
 }
 
-// লেখার ধরন-ভিত্তিক বিন্যাস। ইন্দো-পাক: অক্ষর একটু বড়, লাইনের ফাঁক বেশি, ডান-ঘেঁষা (justify নয়)।
-// ফোনে পছন্দ না হলে শুধু এই সংখ্যাগুলো বদলান। বাকি দুই ধরনের মান আগের মতোই।
-export const SCRIPT_LAYOUT = {
-  indopak: { sizeScale: 1.15, lineHeight: 2.6, textAlign: "right" },
-};
-const BASE_LAYOUT = { sizeScale: 1, lineHeight: 2.3, textAlign: "justify" };
-export function flowLayout(script) {
-  return { ...BASE_LAYOUT, ...(SCRIPT_LAYOUT[script] || {}) };
+// লেখার ধরন-ভিত্তিক বিন্যাস + পাঠকের বাছা এলাইন ও লাইন-ফাঁক (prefs.arAlign / prefs.arGap)।
+// ইন্দো-পাক: অক্ষর একটু বড়, লাইনের ফাঁক একটু বেশি। ফোনে পছন্দ না হলে শুধু এই সংখ্যাগুলো বদলান।
+export const ALIGNS = [["justify", "দুই পাশ সমান"], ["right", "ডান-ঘেঁষা"], ["center", "মাঝে"]];
+export const GAPS = [["tight", "ঘন"], ["normal", "মাঝারি"], ["loose", "ফাঁকা"]];
+export const DEFAULT_ALIGN = "justify";
+export const DEFAULT_GAP = "normal";
+export const isValidAlign = (v) => ALIGNS.some((a) => a[0] === v);
+export const isValidGap = (v) => GAPS.some((g) => g[0] === v);
+const LINE_H = { tight: 1.8, normal: 2.1, loose: 2.5 };
+const SCRIPT_LAYOUT = { indopak: { sizeScale: 1.15, add: 0.3 } };
+export function flowLayout(script, align, gap) {
+  const sc = SCRIPT_LAYOUT[script] || { sizeScale: 1, add: 0 };
+  const a = isValidAlign(align) ? align : DEFAULT_ALIGN;
+  const g = isValidGap(gap) ? gap : DEFAULT_GAP;
+  return { sizeScale: sc.sizeScale, lineHeight: Math.round((LINE_H[g] + sc.add) * 100) / 100, textAlign: a, textAlignLast: a === "justify" ? "center" : a };
 }
