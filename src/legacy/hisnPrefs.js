@@ -52,3 +52,12 @@ export function readHisnView(defaultArSize) {
 export function writeHisnView(view) {
   try { window.localStorage.setItem(KEY, JSON.stringify(view)); } catch (e) { /* ignore */ }
 }
+
+// "একটা একটা করে পড়ুন" মোড চালু কি না (আলাদা key — উপরের view-স্কিমা অপরিবর্তিত)। ডিফল্ট বন্ধ।
+const FOCUS_KEY = "dt_hisn_focus";
+export function readHisnFocus() {
+  try { return window.localStorage.getItem(FOCUS_KEY) === "1"; } catch (e) { return false; }
+}
+export function writeHisnFocus(on) {
+  try { window.localStorage.setItem(FOCUS_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
+}

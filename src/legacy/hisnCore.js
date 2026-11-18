@@ -35,3 +35,18 @@ export function buildChapters(batch1, morning, batch2 = [], batch3 = [], batch4 
   const ch27 = { id: 27, title: "সকাল ও সন্ধ্যার যিকর", duas: morning.map((d) => ({ ...d, ref: d.ref || "" })) };
   return [...batch1, ...batch2, ...batch3, ...batch4, ...batch5, ...batch6, ...batch7, ...batch8, ch27].sort((a, b) => a.id - b.id);
 }
+
+// "একটা একটা করে" মোড ও ট্যাপ-গণনার pure হিসাব।
+// গণনা: ট্যাপে ১ বাড়ে, লক্ষ্য (times) ছাড়ায় না; অবৈধ ইনপুটে নিরাপদ।
+export function bumpCount(cur, times) {
+  const t = Math.max(1, Math.floor(Number(times)) || 1);
+  const c = Math.max(0, Math.floor(Number(cur)) || 0);
+  return Math.min(t, c + 1);
+}
+// তালিকার সূচক সীমার ভেতরে রাখা (-১/অবৈধ → ০, খালি তালিকায় ০)।
+export function clampIndex(i, len) {
+  const n = Math.floor(Number(i));
+  const max = Math.max(0, (Number(len) || 0) - 1);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(max, n);
+}

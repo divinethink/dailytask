@@ -7,11 +7,11 @@ import { ToolIcon } from "./ToolIcons.jsx";
 import { HisnDuaCard } from "./HisnDuaCard.jsx";
 import { readPrefs } from "../../legacy/quranState.js";
 import { loadHisn } from "../../legacy/hisnLoad.js";
-import { WHEN_FILTERS, filterByWhen, toBn } from "../../legacy/hisnCore.js";
+import { WHEN_FILTERS, filterByWhen, toBn, clampIndex } from "../../legacy/hisnCore.js";
 import { QUICK_CHIPS, GROUP_ICONS, groupChapters, withExtras, neighbors, groupOf, chapterBySwipe } from "../../legacy/hisnGroups.js";
 import { searchHisn, highlightParts, isSearchable } from "../../legacy/hisnSearch.js";
 import { readFavs, writeFavs, readLast, writeLast, toggleFav, resolveFavs, resolveLast } from "../../legacy/hisnFavs.js";
-import { readHisnView, writeHisnView, stepArSize, toggleView } from "../../legacy/hisnPrefs.js";
+import { readHisnView, writeHisnView, stepArSize, toggleView, readHisnFocus, writeHisnFocus } from "../../legacy/hisnPrefs.js";
 import { swipeDelta } from "../../legacy/swipeMonth.js";
 import { useBackLayer } from "../../legacy/backNav.js";
 import { ChevronLeft } from "../icons.jsx";
@@ -43,6 +43,8 @@ export function HisnHome({ extras, onSelectItem, onBack }) {
   const [favs, setFavs] = useState(readFavs);
   const [last, setLast] = useState(readLast);
   const [favOpen, setFavOpen] = useState(false);
+  const [focus, setFocus] = useState(readHisnFocus); // "একটা একটা করে" মোড
+  const [fIdx, setFIdx] = useState(null); // ওই মোডের বর্তমান দু'আর সূচক (null = সার্চ/সর্বশেষ-পড়া থেকে বা ০)
   const [focusDua, setFocusDua] = useState(null); // সার্চ থেকে খোলা দু'আ: স্ক্রল + হালকা দাগ
   const prefs = useMemo(() => readPrefs(), []);
   const [view, setViewState] = useState(() => readHisnView(prefs.arSize));
@@ -72,12 +74,15 @@ export function HisnHome({ extras, onSelectItem, onBack }) {
   const gs = useMemo(() => withExtras(groups, extras), [groups, extras]);
   const toggle = (k) => { const next = openGroup === k ? "" : k; setOpenGroup(next); writeOpen(next); };
   const onToggleFav = (id) => setFavs((cur) => { const next = toggleFav(cur, id); writeFavs(next); return next; });
-  const openChapter = (id, duaId = null) => { const l = { chapterId: id, duaId }; setLast(l); writeLast(l); setWhen("all"); setFocusDua(duaId); setChId(id); };
+  const openChapter = (id, duaId = null) => { const l = { chapterId: id, duaId }; setLast(l); writeLast(l); setWhen("all"); setFocusDua(duaId); setFIdx(null); setChId(id); };
+  const stepDua = (chapterId, duaId, i) => { setFIdx(i); const l = { chapterId, duaId }; setLast(l); writeLast(l); };
+  const toggleFocus = () => { const v = !focus; setFocus(v); writeHisnFocus(v); setFIdx(null); };
+  useEffect(() => { if (fIdx !== null) { try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } } }, [fIdx]);
   const searching = isSearchable(query);
   const found = useMemo(() => (searching ? searchHisn(state.chapters, query) : null), [searching, state.chapters, query]);
 
   const ch = chId !== null ? state.chapters.find((c) => c.id === chId) : null;
-  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close: () => { setChId(null); setFocusDua(null); }, source: state.source, focusDua, favs, onToggleFav });
+  if (ch) return chapterView({ ch, groups, prefs, view, setView, when, setWhen: (k) => { setWhen(k); setFIdx(0); }, focus, toggleFocus, fIdx, stepDua, openChapter, close: () => { setChId(null); setFocusDua(null); }, source: state.source, focusDua, favs, onToggleFav });
 
   const favList = resolveFavs(state.chapters, favs);
   const lastRead = resolveLast(state.chapters, last);
@@ -206,11 +211,14 @@ function searchView({ found, query, status, openChapter }) {
   );
 }
 
-function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChapter, close, source, focusDua, favs, onToggleFav }) {
+function chapterView({ ch, groups, prefs, view, setView, when, setWhen, focus, toggleFocus, fIdx, stepDua, openChapter, close, source, focusDua, favs, onToggleFav }) {
   const grp = groupOf(groups, ch.id);
   const nb = neighbors(groups, ch.id);
   const isMorningEvening = ch.id === 27;
   const duas = isMorningEvening ? filterByWhen(ch.duas, when) : ch.duas;
+  const focusOn = focus && duas.length > 1;
+  const idx = clampIndex(fIdx !== null ? fIdx : duas.findIndex((x) => x.id === focusDua), duas.length);
+  const goDua = (i) => stepDua(ch.id, duas[i].id, i);
   const navBtn = (id, label) => id === null
     ? h("div", { className: "flex-1" })
     : h("button", { type: "button", onClick: () => openChapter(id), className: "flex-1 py-2.5 rounded-xl text-[13px] font-semibold border border-slate-200 bg-white text-slate-700 active:bg-slate-50" }, label);
@@ -223,7 +231,13 @@ function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChap
   const onEnd = (e) => {
     const p = e.changedTouches && e.changedTouches[0];
     if (!touch.ok || !p) return;
-    const to = chapterBySwipe(groups, ch.id, swipeDelta(p.clientX - touch.x, p.clientY - touch.y));
+    const dl = swipeDelta(p.clientX - touch.x, p.clientY - touch.y);
+    if (focusOn) { // এই মোডে সোয়াইপ = দু'আ বদল (অধ্যায় নয়)
+      if (dl > 0 && idx < duas.length - 1) goDua(idx + 1);
+      else if (dl < 0 && idx > 0) goDua(idx - 1);
+      return;
+    }
+    const to = chapterBySwipe(groups, ch.id, dl);
     if (to !== null) openChapter(to);
   };
   const chip = (key, label) => h("button", { key, type: "button", onClick: () => setView(toggleView(view, key)), "aria-pressed": view[key], className: "px-3 py-1 rounded-full text-[12.5px] font-semibold border " + (view[key] ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: view[key] ? { background: PRIMARY } : undefined }, label);
@@ -231,7 +245,21 @@ function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChap
   const controls = h("div", { className: "flex items-center gap-1.5 pb-3 flex-wrap", "data-no-swipe": true },
     sizeBtn(-1, "আ"), sizeBtn(1, "আ"),
     h("span", { className: "w-px h-5 bg-slate-200 mx-1" }),
-    chip("showAr", "আরবি"), chip("showTr", "উচ্চারণ"), chip("showBn", "অর্থ")
+    chip("showAr", "আরবি"), chip("showTr", "উচ্চারণ"), chip("showBn", "অর্থ"),
+    duas.length > 1 && h("button", { type: "button", onClick: toggleFocus, "aria-pressed": focus, className: "px-3 py-1 rounded-full text-[12.5px] font-semibold border " + (focus ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: focus ? { background: PRIMARY } : undefined }, "একটা একটা করে")
+  );
+  const stepBtn = (label, disabled, onClick) => h("button", { type: "button", disabled, onClick, className: "flex-1 min-h-[48px] rounded-xl text-[14px] font-semibold border border-slate-200 bg-white text-slate-700 active:bg-slate-50 disabled:opacity-35" }, label);
+  const lastIdx = duas.length - 1;
+  const focusView = focusOn && h("div", null,
+    h("div", { className: "pb-3" },
+      h("div", { className: "flex items-center justify-between text-[12px] text-slate-500 pb-1" }, h("span", null, "দু'আ " + toBn(idx + 1) + " / " + toBn(duas.length)), h("span", null, "ডানে-বামে সোয়াইপ করুন")),
+      h("div", { className: "h-1 rounded-full bg-slate-200 overflow-hidden" }, h("div", { style: { width: Math.round(((idx + 1) / duas.length) * 100) + "%", height: "100%", background: PRIMARY, transition: "width .2s" } }))
+    ),
+    h("div", { id: "hisn-dua-" + duas[idx].id, className: "scroll-mt-3" }, h(HisnDuaCard, { key: duas[idx].id, d: duas[idx], prefs, view, fav: favs.includes(duas[idx].id), onToggleFav, counter: true })),
+    h("div", { className: "flex gap-2 pt-1 pb-3" },
+      stepBtn("‹ আগেরটা", idx === 0, () => goDua(idx - 1)),
+      idx < lastIdx ? stepBtn("পরেরটা ›", false, () => goDua(idx + 1)) : stepBtn("পরের অধ্যায় ›", nb.next === null, () => openChapter(nb.next))
+    )
   );
   return h("div", { onTouchStart: onStart, onTouchEnd: onEnd, style: { minHeight: "70vh" } },
     h("button", { type: "button", onClick: close, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), grp ? grp.title : "আমল, যিকির ও দু'আ"),
@@ -240,9 +268,9 @@ function chapterView({ ch, groups, prefs, view, setView, when, setWhen, openChap
       h("button", { key: f.key, type: "button", onClick: () => setWhen(f.key), className: "flex-1 py-1.5 rounded-xl text-sm font-semibold border " + (when === f.key ? "text-white border-transparent" : "text-slate-600 border-slate-200 bg-white"), style: when === f.key ? { background: PRIMARY } : undefined }, f.label)
     )),
     controls,
-    duas.map((d) => h("div", { key: d.id, id: "hisn-dua-" + d.id, className: focusDua === d.id ? "rounded-2xl ring-2 ring-amber-300 scroll-mt-3" : "scroll-mt-3" }, h(HisnDuaCard, { d, prefs, view, fav: favs.includes(d.id), onToggleFav }))),
-    h("div", { className: "flex gap-2 pt-1 pb-3" }, navBtn(nb.prev, "‹ আগের অধ্যায়"), navBtn(nb.next, "পরের অধ্যায় ›")),
-    h("div", { className: "text-[11px] text-slate-400 text-center pb-1" }, "ডানে-বামে সোয়াইপ করেও অধ্যায় বদলানো যায়"),
+    focusOn ? focusView : duas.map((d) => h("div", { key: d.id, id: "hisn-dua-" + d.id, className: focusDua === d.id ? "rounded-2xl ring-2 ring-amber-300 scroll-mt-3" : "scroll-mt-3" }, h(HisnDuaCard, { d, prefs, view, fav: favs.includes(d.id), onToggleFav }))),
+    !focusOn && h("div", { className: "flex gap-2 pt-1 pb-3" }, navBtn(nb.prev, "‹ আগের অধ্যায়"), navBtn(nb.next, "পরের অধ্যায় ›")),
+    !focusOn && h("div", { className: "text-[11px] text-slate-400 text-center pb-1" }, "ডানে-বামে সোয়াইপ করেও অধ্যায় বদলানো যায়"),
     h("div", { className: "text-[11px] text-slate-500 pb-2", style: { fontFamily: BN_FONT } }, "উৎস: " + source + "।")
   );
 }
