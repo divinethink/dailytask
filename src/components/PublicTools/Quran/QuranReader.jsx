@@ -4,7 +4,7 @@
 // ধাপ ৬খ: "তালিকা / রিডিং" সুইচ — রিডিং মোডে অনুবাদ ছাড়া অবিচ্ছিন্ন আরবি (আয়াতে ট্যাপ করলে শিট)।
 // React global(window.React, globals.js)।
 
-import { ChevronLeft, CopyIcon, ShareIcon } from "../../icons.jsx";
+import { ChevronLeft } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import {
@@ -12,7 +12,7 @@ import {
   locateAyah, ayahShareText, markKey, MARKS_MAX,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
-import { PRIMARY, TRANSLATOR, LINE, copyText, BookmarkSvg, HeartSvg, actBtn, AyahFlow, AyahSheet, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
@@ -26,22 +26,13 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, saj
         "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1])
     ),
     h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } },
-      h("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 28, height: 28, padding: "0 8px", borderRadius: 14, background: th.bar, color: accent, fontSize: 13, fontWeight: 600 } }, toBnDigits(a.n)),
+      h("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 26, padding: "0 7px", borderRadius: 13, background: th.bar, color: accent, fontSize: 12, fontWeight: 600 } }, toBnDigits(a.n)),
       h("span", { style: { fontSize: 11, ...muted } },
         sajda ? "۩ সিজদার আয়াত" : null, sajda && pageNo ? "  ·  " : null, pageNo ? "পৃষ্ঠা " + toBnDigits(pageNo) : null)
     ),
     prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
-    prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.8, color: th.fg, opacity: 0.9, marginTop: prefs.showAr ? 6 : 0 } }, a.tr),
-    h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 } },
-      h("button", { type: "button", onClick: () => onCopy(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " কপি করুন" },
-        h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
-      h("button", { type: "button", onClick: () => onShare(a), style: actBtn(accent), "aria-label": "আয়াত " + toBnDigits(a.n) + " শেয়ার করুন" },
-        h(ShareIcon, { size: 17 }), "শেয়ার"),
-      h("button", { type: "button", onClick: () => onMark(a, "b"), style: actBtn(accent), "aria-pressed": bm, "aria-label": "আয়াত " + toBnDigits(a.n) + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") },
-        h(BookmarkSvg, { on: bm }), bm ? "বুকমার্কড" : "বুকমার্ক"),
-      h("button", { type: "button", onClick: () => onMark(a, "f"), style: actBtn(accent), "aria-pressed": fav, "aria-label": "আয়াত " + toBnDigits(a.n) + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") },
-        h(HeartSvg, { on: fav }), "পছন্দ")
-    ),
+    prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
+    h(AyahActions, { a, accent, flash, bm, fav, onCopy, onShare, onMark }),
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
@@ -225,26 +216,26 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
     }, label);
 
   const headBg = prefs.theme === 2 ? th.bar : PRIMARY;
-  const modeBtn = (id, label) => h("button", {
-    key: id, type: "button", onClick: () => prefs.mode !== id && onPrefs({ ...prefs, mode: id }), "aria-pressed": prefs.mode === id,
-    style: { minHeight: 40, padding: "0 16px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "1px solid " + (prefs.mode === id ? accent : LINE), background: prefs.mode === id ? th.bar : "transparent", color: prefs.mode === id ? accent : th.fg },
+  const seg = (key, label, on, onClick) => h("button", {
+    key, type: "button", onClick, "aria-pressed": on,
+    style: { minHeight: 40, padding: "0 10px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, border: "none", background: on ? "#fff" : "transparent", color: on ? "#1F2D2A" : "#fff" },
   }, label);
 
   return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, display: "flex", flexDirection: "column", background: th.bg, color: th.fg, fontFamily: "'Hind Siliguri', sans-serif" } },
-    h("div", { style: { background: headBg, color: "#fff", padding: "10px 8px 10px 12px", display: "flex", alignItems: "center", gap: 8 } },
+    h("div", { style: { background: headBg, color: "#fff", padding: "6px 6px 6px 4px", display: "flex", alignItems: "center", gap: 4 } },
       h("button", { type: "button", onClick: onClose, "aria-label": "ফিরে যান", style: { padding: 8, color: "#fff" } }, h(ChevronLeft, { size: 22 })),
       h("div", { style: { minWidth: 0, flex: 1 } },
-        h("div", { style: { fontWeight: 600, fontSize: 17, lineHeight: 1.3 } }, toBnDigits(surah.n) + ". " + surah.bn),
-        h("div", { style: { fontSize: 12, opacity: 0.85 } },
-          surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত"),
-        ready && h("div", { style: { fontSize: 11, opacity: 0.75 } }, "পারা " + toBnDigits(where.juz) + " · পৃষ্ঠা " + toBnDigits(where.page))
+        h("div", { style: { fontWeight: 600, fontSize: 16, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } },
+          toBnDigits(surah.n) + ". " + surah.bn, h("span", { style: { fontSize: 11.5, fontWeight: 400, opacity: 0.8 } }, " · " + surah.mean)),
+        h("div", { style: { fontSize: 11.5, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } },
+          (ready ? "পারা " + toBnDigits(where.juz) + " · পৃষ্ঠা " + toBnDigits(where.page) + " · " : "") + toBnDigits(surah.ayahs) + " আয়াত · " + surahTypeLabel(surah.type))
       ),
-      h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 48, minHeight: 44, color: "#fff", fontSize: 20, fontWeight: 600 } }, "Aa")
-    ),
-    h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid " + LINE } },
-      modeBtn("list", "তালিকা"), modeBtn("read", "রিডিং"),
-      h("span", { style: { flex: 1 } }),
-      onOpenMushaf && ready && h("button", { type: "button", onClick: () => onOpenMushaf(where.page), style: { minHeight: 40, padding: "0 12px", borderRadius: 999, border: "1px solid " + LINE, color: accent, fontSize: 13, fontWeight: 600, background: "transparent" } }, "পৃষ্ঠা-মুসহাফ")
+      h("div", { role: "group", "aria-label": "পড়ার ধরন", style: { display: "flex", alignItems: "center", background: "rgba(255,255,255,0.18)", borderRadius: 999, padding: 2 } },
+        seg("list", "তালিকা", prefs.mode === "list", () => prefs.mode !== "list" && onPrefs({ ...prefs, mode: "list" })),
+        seg("read", "রিডিং", prefs.mode === "read", () => prefs.mode !== "read" && onPrefs({ ...prefs, mode: "read" })),
+        onOpenMushaf && ready && seg("mushaf", "মুসহাফ", false, () => onOpenMushaf(where.page))
+      ),
+      h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 44, minHeight: 44, color: "#fff", fontSize: 19, fontWeight: 600 } }, "Aa")
     ),
     h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px" } },
       state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),

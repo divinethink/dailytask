@@ -35,10 +35,27 @@ export async function copyText(text) {
 }
 
 // বুকমার্ক ও পছন্দের আইকন: সংরক্ষিত থাকলে ভরাট।
-export const BookmarkSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M6 3h12v18l-6-4-6 4z", fill: on ? "currentColor" : "none" }));
-export const HeartSvg = ({ on }) => h(Icon, { size: 17 }, h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z", fill: on ? "currentColor" : "none" }));
+export const BookmarkSvg = ({ on, size = 17 }) => h(Icon, { size }, h("path", { d: "M6 3h12v18l-6-4-6 4z", fill: on ? "currentColor" : "none" }));
+export const HeartSvg = ({ on, size = 17 }) => h(Icon, { size }, h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z", fill: on ? "currentColor" : "none" }));
 
 export const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
+
+export const MoreSvg = () => h(Icon, { size: 20 }, [5, 12, 19].map((cx) => h("circle", { key: cx, cx, cy: 12, r: 1.7, fill: "currentColor" })));
+const iconBtn = (color, on) => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44, borderRadius: 12, color, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "none", cursor: "pointer" });
+
+// আয়াতের নিচের আইকন-সারি: শেয়ার, বুকমার্ক, ⋯ (খুললে কপি ও পছন্দ)। লেখা নেই; অবস্থা aria-label-এ।
+export function AyahActions({ a, accent, flash, bm, fav, onCopy, onShare, onMark }) {
+  const [more, setMore] = useState(false);
+  const n = toBnDigits(a.n);
+  return h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2, marginTop: 4, marginLeft: -10 } },
+    h("button", { type: "button", onClick: () => onShare(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 20 })),
+    h("button", { type: "button", onClick: () => onMark(a, "b"), style: iconBtn(accent, bm), "aria-pressed": bm, "aria-label": "আয়াত " + n + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") }, h(BookmarkSvg, { on: bm, size: 20 })),
+    h("button", { type: "button", onClick: () => setMore((v) => !v), style: iconBtn(accent, more), "aria-expanded": more, "aria-label": "আরও" }, h(MoreSvg)),
+    more && h("button", { type: "button", onClick: () => onCopy(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" }, h(CopyIcon, { size: 20 })),
+    more && h("button", { type: "button", onClick: () => onMark(a, "f"), style: iconBtn(accent, fav), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav, size: 20 })),
+    (flash === "copy" || flash === "fail") && h("span", { style: { fontSize: 12, color: accent, marginLeft: 6 } }, flash === "copy" ? "কপি হয়েছে ✓" : "কপি করা যায়নি")
+  );
+}
 
 export function Stepper({ label, value, lim, th, onChange }) {
   const btn = (txt, delta, dis) => h("button", {
