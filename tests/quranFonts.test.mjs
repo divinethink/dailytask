@@ -16,7 +16,7 @@ test("ফন্ট-তালিকা: id অনন্য, ডিফল্ট �
   for (const f of QURAN_FONTS) {
     assert.ok(f.file || f.google, f.id + ": উৎস নেই");
     assert.ok(f.scripts.length > 0 && f.family && f.name);
-    assert.match(f.license, /OFL|KFGQPC|Tanzil|QuranWBW/);
+    assert.match(f.license, /OFL|KFGQPC|Tanzil/);
   }
 });
 
@@ -88,7 +88,7 @@ test("৬গ-৩ IndoPak ডেটা: ১১৪ ফাইল, আয়াত-�
   const man = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
   const all = [];
   for (const su of meta.surahs) {
-    const j = JSON.parse(fs.readFileSync(path.join(base, "ar-indopak", String(su.n).padStart(3, "0") + ".json"), "utf8"));
+    const j = JSON.parse(fs.readFileSync(path.join(base, "ar-indopak-dk", String(su.n).padStart(3, "0") + ".json"), "utf8"));
     assert.equal(j.s, su.n);
     assert.equal(j.a.length, su.ayahs);
     assert.ok(j.a.every((t) => typeof t === "string" && t.trim() && !/[\u0660-\u0669]\s*$/.test(t.replace(/[\u200b\u200f\u2002\ufeff]/g, ""))), "সূরা " + su.n);
@@ -155,7 +155,7 @@ test("প্রতিটা ফন্টের নিজের ফাইল আ�
 
 test("উসমানি ও IndoPak: প্রতিটা সূরা-ফাইলের SHA-256 integrity-uthmani/integrity-indopak.json-এর সাথে মেলে", async () => {
   const { createHash } = await import("node:crypto");
-  for (const [name, dir] of [["integrity-uthmani.json", "ar-uthmani"], ["integrity-indopak.json", "ar-indopak"]]) {
+  for (const [name, dir] of [["integrity-uthmani.json", "ar-uthmani"], ["integrity-indopak.json", "ar-indopak-dk"]]) {
     const integ = JSON.parse(fs.readFileSync(path.join(root, "tools", "quran", name), "utf8"));
     const rels = Object.keys(integ.files);
     assert.equal(rels.length, 114, name);

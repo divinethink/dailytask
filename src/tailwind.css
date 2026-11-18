@@ -43,10 +43,10 @@
   font-display: swap;
 }
 
-/* ইন্দো-পাক লেখার ফন্ট (ধাপ ৬গ-৩)। ফাইল অপরিবর্তিত (QuranWBW-এর অ-বাণিজ্যিক অনুমতি)। */
+/* ইন্দো-পাক লেখার ফন্ট (ধাপ ৬গ-৩)। ফাইল অপরিবর্তিত (DigitalKhatt, SIL OFL)। */
 @font-face {
-  font-family: 'AlQuran IndoPak QuranWBW';
-  src: url('/quran/v1/fonts/alquran-indopak-quranwbw.ttf') format('truetype');
+  font-family: 'DigitalKhatt IndoPak';
+  src: url('/quran/v1/fonts/digitalkhatt-indopak.otf') format('opentype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;

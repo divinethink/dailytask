@@ -926,8 +926,8 @@
    "sha256": "eb5fab0d194e9cce209656254441b54dd2c284c11f8d86549ccf1bd83aec81d8"
   },
   "manifest.json": {
-   "bytes": 1238,
-   "sha256": "803813b0534ac9ac688a3e7d728ed3f20ec33a76a44c284ac2968eb0f05c87a5"
+   "bytes": 1215,
+   "sha256": "00ccfd992d8ce4e073d87fbaa57bead7613cdc64ed1afcd6bd1dc90558fb98cf"
   }
  }
 }

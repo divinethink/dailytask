@@ -6,7 +6,8 @@ kfgqpc-hafs-regular.otf        — "KFGQPC Uthmanic Script HAFS Regular", King F
                                   শর্তের পাতা: https://fonts.qurancomplex.gov.sa/wp02/en/?p=19
 me-quran-regular.ttf           — "me_quran Regular", Tanzil Project।
                                   উৎস-পাতা: https://tanzil.net/docs/me_quran_font — একই কারণে অপরিবর্তিত।
-alquran-indopak-quranwbw.ttf   — শুধু অ-বাণিজ্যিক (ব্যক্তিগত) হিসেবে ব্যবহার হচ্ছে।
+digitalkhatt-indopak.otf       — "DigitalKhatt IndoPak", Copyright (c) 2024 Amine Anane, Copyright © 2024 Tarteel Inc.; SIL Open Font License 1.1 (LICENSE-OFL.txt)।
+                                  উৎস: https://github.com/DigitalKhatt — ফাইল অপরিবর্তিত।
 noto-naskh-arabic-400.woff2    — Noto Naskh Arabic (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/noto-naskh-arabic; ফাইল অপরিবর্তিত।
 scheherazade-new-400.woff2     — Scheherazade New (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/scheherazade-new; ফাইল অপরিবর্তিত।
                                   (OFL-এর পূর্ণ পাঠ: LICENSE-OFL.txt)
