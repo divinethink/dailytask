@@ -8,7 +8,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { loadSurah } from "../../../legacy/quranData.js";
 import { AR_SIZE, PAGE_COUNT, clampPage, pageAyahRefs, locateAyah, toBnDigits, markKey } from "../../../legacy/quranCore.js";
-import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, ScriptPicker, LayoutPicker, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, LINE, Stepper, AyahFlow, AyahSheet, useAyahActions, FontPicker, ScriptPicker, LayoutPicker, Rosette, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef } = React;
 const h = React.createElement;
@@ -164,13 +164,16 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
         seg("list", "তালিকা", false, "list"), seg("read", "রিডিং", false, "read"), seg("mushaf", "মুসহাফ", true, "mushaf")),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "মুসহাফ-সেটিংস ও পৃষ্ঠায় যান", style: { minWidth: 48, minHeight: 44, color: "#fff", fontSize: 20, fontWeight: 600 } }, "Aa")
     ),
-    h("div", { ref: bodyRef, "data-testid": "mushaf-body", onTouchStart, onTouchEnd, style: { flex: 1, overflowY: "auto", padding: "4px 16px 16px" } },
-      state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
-      state.status === "error" && h("div", { className: "text-center py-16" },
-        h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
-        h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
-      state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
-      state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "16px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
+    h("div", { ref: bodyRef, "data-testid": "mushaf-body", onTouchStart, onTouchEnd, style: { flex: 1, overflowY: "auto", padding: "12px 12px 16px", background: th.bar } },
+      h("div", { style: { background: th.bg, borderRadius: 16, border: "1px solid " + LINE, boxShadow: "0 2px 12px rgba(0,0,0,0.08), inset 0 0 0 5px " + th.bg + ", inset 0 0 0 6px " + accent + "66", padding: "14px 16px 12px" } },
+        state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
+        state.status === "error" && h("div", { className: "text-center py-16" },
+          h("p", { className: "text-sm mb-3" }, "পৃষ্ঠাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
+          h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")),
+        state.status === "ready" && h(AyahFlow, { items, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap, activeKey: selKey, onTap: setSel, headers: true, dividers: false, withIds: false }),
+        state.status === "ready" && h("div", { style: { textAlign: "center", marginTop: 10 } }, h(Rosette, { n: toBnDigits(page), size: 36, font: 12, color: accent, bg: th.bar }))
+      ),
+      state.status === "ready" && h("p", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", margin: "12px 0 4px", lineHeight: 1.6 } }, "আয়াতে ট্যাপ করলে অনুবাদ; সোয়াইপ করলে পাতা উল্টাবে")
     ),
     h("div", { style: { display: "flex", gap: 8, padding: "8px 12px calc(8px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid " + LINE, background: th.bg } },
       navBtn("‹ আগের", page - 1, page <= 1),

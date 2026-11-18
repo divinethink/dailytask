@@ -12,7 +12,7 @@ import {
   locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
-import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SurahBanner, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
@@ -241,11 +241,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
         h("button", { type: "button", onClick: () => setTries((t) => t + 1), className: "px-4 py-2 rounded-xl text-sm font-semibold text-white", style: { background: PRIMARY } }, "আবার চেষ্টা করুন")
       ),
-      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, margin: "14px 0 4px", padding: "8px 14px", border: "1.5px solid " + accent, borderRadius: 14, background: th.bar, color: accent } },
-        h("div", { style: { minWidth: 0 } },
-          h("div", { style: { fontSize: 14, fontWeight: 600 } }, toBnDigits(surah.n) + ". " + surah.bn),
-          h("div", { style: { fontSize: 11.5, opacity: 0.85 } }, surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত")),
-        h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: 26, lineHeight: 1.8, flexShrink: 0 } }, "سورة " + surah.ar)),
+      h("div", { style: { margin: "14px 0 4px" } }, h(SurahBanner, { s: surah, font: prefs.arFont, th, accent, extra: surah.mean + " · " + surahTypeLabel(surah.type) + " · " + toBnDigits(surah.ayahs) + " আয়াত" })),
       ready && showBismillahHeader(surah.n) && bismillah && (prefs.showAr || reading) && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, textAlign: "center", padding: "20px 0 8px", color: th.fg } }, (scriptById(prefs.arScript) || scriptById(DEFAULT_SCRIPT)).bismillah),
       ready && reading && h(AyahFlow, {
         items: flowItems, meta, markers, th, accent, arSize: prefs.arSize, font: prefs.arFont, script: prefs.arScript, align: prefs.arAlign, gap: prefs.arGap,

@@ -227,6 +227,28 @@ export function QuranSettingsOverlay({ prefs, onPrefs, onClose }) {
   );
 }
 
+// ───── অলংকরণ: অষ্টভুজ তারা (আয়াত/সূরা/পৃষ্ঠা-নম্বর) ও সূরার ব্যানার ─────
+// size/font px বা em (CSS-এর মান)। color = রেখার রং, bg = ভেতরের হালকা রং।
+export function Rosette({ n, size, font, color, bg, margin }) {
+  const long = String(n).length >= 3;
+  return h("span", { dir: "ltr", style: { position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, width: size, height: size, margin, color, fontFamily: "'Hind Siliguri', sans-serif", fontSize: font, fontWeight: 600, lineHeight: 1, verticalAlign: "middle" } },
+    h("svg", { viewBox: "0 0 40 40", width: "100%", height: "100%", "aria-hidden": "true", style: { position: "absolute", inset: 0 } },
+      h("circle", { cx: 20, cy: 20, r: 14, fill: bg }),
+      h("rect", { x: 9, y: 9, width: 22, height: 22, rx: 2, fill: "none", stroke: "currentColor", strokeWidth: 1.8 }),
+      h("rect", { x: 9, y: 9, width: 22, height: 22, rx: 2, fill: "none", stroke: "currentColor", strokeWidth: 1.8, transform: "rotate(45 20 20)" })),
+    h("span", { style: { position: "relative", fontSize: long ? "0.78em" : "1em" } }, n));
+}
+
+export function SurahBanner({ s, font, th, accent, extra }) {
+  return h("div", { style: { border: "4px double " + accent, borderRadius: 14, padding: "6px 12px", background: "linear-gradient(180deg, " + th.bar + ", " + th.bg + ")", color: accent, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } },
+    h("div", { style: { minWidth: 0, display: "flex", alignItems: "center", gap: 8 } },
+      h(Rosette, { n: toBnDigits(s.n), size: 34, font: 12, color: accent, bg: th.bg }),
+      h("div", { style: { minWidth: 0 } },
+        h("div", { style: { fontSize: 14, fontWeight: 600 } }, s.bn),
+        extra && h("div", { style: { fontSize: 11.5, opacity: 0.85 } }, extra))),
+    h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: 26, lineHeight: 1.7, flexShrink: 0 } }, "سورة " + s.ar));
+}
+
 // ───── অবিচ্ছিন্ন আরবি লেখা ─────
 // items: [{s, n, ar}] (ক্রমানুসারে, একাধিক সূরা থাকতে পারে)।
 // headers: সূরার শিরোনাম + বিসমিল্লাহ বসবে কি (মুসহাফে হ্যাঁ; রিডারে নিজের শিরোনাম আছে, তাই না)।
@@ -254,9 +276,7 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, font, scrip
       flush(key);
       const sm = meta.surahs[it.s - 1];
       blocks.push(h("div", { key: "h" + key, style: { textAlign: "center", margin: "14px 0 6px" } },
-        h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1.5px solid " + accent, borderRadius: 12, padding: "6px 14px", background: th.bar, color: accent } },
-          h("span", { style: { fontSize: 12, fontWeight: 600 } }, toBnDigits(sm.n) + ". " + sm.bn),
-          h("span", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: 24, lineHeight: 1.8 } }, "سورة " + sm.ar)),
+        h(SurahBanner, { s: sm, font, th, accent }),
         showBismillahHeader(it.s) && meta.bismillah && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(font), fontSize: arSize, lineHeight: 2.2, color: th.fg, padding: "6px 0 0" } }, (scriptById(script) || scriptById(DEFAULT_SCRIPT)).bismillah)));
     }
     const active = activeKey === key;
@@ -268,7 +288,7 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, font, scrip
       it.ar,
       markers.sajda.has(key) ? " ۩" : "",
       " ",
-      h("span", { dir: "ltr", style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "1.5em", height: "1.5em", padding: "0 0.3em", borderRadius: 999, border: "1.5px solid " + accent, color: accent, fontFamily: "'Hind Siliguri', sans-serif", fontSize: "0.5em", fontWeight: 600, lineHeight: 1, verticalAlign: "middle", margin: "0 0.35em" } }, toBnDigits(it.n)),
+      h(Rosette, { n: toBnDigits(it.n), size: toBnDigits(it.n).length >= 3 ? "2.2em" : "1.9em", font: "0.5em", color: accent, bg: th.bar, margin: "0 0.3em" }),
       " "));
   });
   flush("end");

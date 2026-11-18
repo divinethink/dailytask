@@ -14,7 +14,7 @@ import {
 } from "../../../legacy/quranCore.js";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranMushaf } from "./QuranMushaf.jsx";
-import { QuranSettingsOverlay } from "./quranUi.jsx";
+import { QuranSettingsOverlay, Rosette } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const h = React.createElement;
@@ -81,7 +81,7 @@ function SurahList({ surahs, onOpen }) {
         className: "w-full flex items-center gap-3 px-3 py-3 text-left border-b last:border-b-0",
         style: { borderColor: "#EEF2EF" },
       },
-        h("span", { className: "shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold", style: { background: "#E8F0EE", color: PRIMARY } }, toBnDigits(s.n)),
+        h(Rosette, { n: toBnDigits(s.n), size: 42, font: 13, color: PRIMARY, bg: "#E8F0EE" }),
         h("span", { className: "flex-1 min-w-0" },
           h("span", { className: "block text-base font-semibold", style: { color: PRIMARY } }, s.bn),
           h("span", { className: "block text-xs text-gray-500" }, s.mean + " · " + surahTypeLabel(s.type) + " · " + toBnDigits(s.ayahs) + " আয়াত")
@@ -100,7 +100,7 @@ function ParaList({ meta, onOpen }) {
         className: "w-full flex items-center gap-3 px-3 py-3 text-left border-b last:border-b-0",
         style: { borderColor: "#EEF2EF" },
       },
-        h("span", { className: "shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold", style: { background: "#E8F0EE", color: PRIMARY } }, toBnDigits(i + 1)),
+        h(Rosette, { n: toBnDigits(i + 1), size: 42, font: 13, color: PRIMARY, bg: "#E8F0EE" }),
         h("span", { className: "flex-1 min-w-0" },
           h("span", { className: "block text-base font-semibold", style: { color: PRIMARY } }, "পারা " + toBnDigits(i + 1) + " · " + PARA_NAMES[i]),
           h("span", { className: "block text-xs text-gray-500" }, "শুরু: " + refLabel(meta.surahs[s - 1], a))
