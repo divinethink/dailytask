@@ -64,7 +64,7 @@ const btnStyle = (kind, extra) => {
   if (kind === "danger") return { ...base, border: "1px solid #EBC3C3", color: "#C0392B", background: "transparent", ...extra };
   return { ...base, border: "1px solid " + LINE, color: PRIMARY, background: "#fff", ...extra };
 };
-const selectStyle = { minHeight: 48, borderRadius: 14, border: "1px solid " + LINE, padding: "0 12px", fontSize: 15, background: "#fff", color: "#1A2621" };
+const selectStyle = { minHeight: 44, borderRadius: 12, border: "1px solid " + LINE, padding: "0 10px", fontSize: 15, background: "#fff", color: "#1A2621" };
 
 // ── বৃত্তাকার অগ্রগতি ──
 function Ring({ percent }) {
@@ -84,22 +84,21 @@ function Stat({ value, label }) {
 
 // + / − স্টেপার (≥৪৪px)
 function Stepper({ value, step, onChange, label }) {
-  const b = { width: 48, height: 48, borderRadius: 14, border: "1px solid " + LINE, background: "#fff", color: PRIMARY, fontSize: 22, fontWeight: 600, cursor: "pointer" };
+  const b = { width: 44, height: 44, borderRadius: 12, border: "1px solid " + LINE, background: "#fff", color: PRIMARY, fontSize: 22, fontWeight: 600, cursor: "pointer" };
   return h("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
     h("button", { type: "button", "aria-label": label + " কমান", disabled: value <= PER_DAY.min, onClick: () => onChange(clampPerDay(value - step)), style: { ...b, opacity: value <= PER_DAY.min ? 0.4 : 1 } }, "−"),
-    h("div", { style: { minWidth: 64, textAlign: "center", fontSize: 22, fontWeight: 700, color: PRIMARY } }, toBnDigits(value)),
+    h("div", { style: { minWidth: 56, textAlign: "center", fontSize: 21, fontWeight: 700, color: PRIMARY } }, toBnDigits(value)),
     h("button", { type: "button", "aria-label": label + " বাড়ান", disabled: value >= PER_DAY.max, onClick: () => onChange(clampPerDay(value + step)), style: { ...b, opacity: value >= PER_DAY.max ? 0.4 : 1 } }, "+"));
 }
 
 function PosPicker({ label, surahs, value, onChange }) {
   const sm = surahs[value.s - 1];
-  return h("div", { style: { marginBottom: 12 } },
-    h("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#5B6B64", margin: "0 0 6px 2px" } }, label),
-    h("div", { style: { display: "flex", gap: 8 } },
-      h("select", { "aria-label": label + " — সূরা", value: value.s, style: { ...selectStyle, flex: 1, minWidth: 0 }, onChange: (e) => onChange({ s: Number(e.target.value), a: 1 }) },
-        surahs.map((x) => h("option", { key: x.n, value: x.n }, toBnDigits(x.n) + ". " + x.bn))),
-      h("select", { "aria-label": label + " — আয়াত", value: value.a, style: { ...selectStyle, width: 104 }, onChange: (e) => onChange({ s: value.s, a: Number(e.target.value) }) },
-        Array.from({ length: sm.ayahs }, (_, i) => h("option", { key: i + 1, value: i + 1 }, "আয়াত " + toBnDigits(i + 1))))));
+  return h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
+    h("div", { style: { width: 36, flexShrink: 0, fontSize: 12.5, fontWeight: 600, color: "#5B6B64" } }, label),
+    h("select", { "aria-label": label + " — সূরা", value: value.s, style: { ...selectStyle, flex: 1, minWidth: 0 }, onChange: (e) => onChange({ s: Number(e.target.value), a: 1 }) },
+      surahs.map((x) => h("option", { key: x.n, value: x.n }, toBnDigits(x.n) + ". " + x.bn))),
+    h("select", { "aria-label": label + " — আয়াত", value: value.a, style: { ...selectStyle, width: 96 }, onChange: (e) => onChange({ s: value.s, a: Number(e.target.value) }) },
+      Array.from({ length: sm.ayahs }, (_, i) => h("option", { key: i + 1, value: i + 1 }, "আয়াত " + toBnDigits(i + 1)))));
 }
 
 function Setup({ mode, surahs, counts, onCreate }) {
@@ -111,20 +110,20 @@ function Setup({ mode, surahs, counts, onCreate }) {
   const st = plan ? statsOf(plan, counts) : null;
   const chip = (on) => ({ minHeight: 40, padding: "0 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid " + (on ? PRIMARY : LINE), background: on ? SOFT : "#fff", color: PRIMARY });
   return h("div", { style: { ...cardBase, overflow: "hidden" } },
-    h("div", { style: { background: HERO_BG, padding: "18px 18px 16px", color: "#fff" } },
-      h("div", { style: { fontSize: 18, fontWeight: 700 } }, W.title),
-      h("div", { style: { fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 } }, W.intro)),
-    h("div", { style: { padding: 18 } },
+    h("div", { style: { background: HERO_BG, padding: "12px 16px", color: "#fff" } },
+      h("div", { style: { fontSize: 16, fontWeight: 700 } }, W.title)),
+    h("div", { style: { padding: 14 } },
       h(PosPicker, { label: "শুরু", surahs, value: from, onChange: setFrom }),
       h(PosPicker, { label: "শেষ", surahs, value: to, onChange: setTo }),
-      h("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#5B6B64", margin: "4px 0 8px 2px" } }, "দৈনিক লক্ষ্য (আয়াত)"),
-      h(Stepper, { value: clampPerDay(perDay), step: W.step, onChange: setPer, label: "দৈনিক লক্ষ্য" }),
-      W.presets.length > 0 && st && h("div", { style: { display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" } },
-        W.presets.map((d) => h("button", { key: d, type: "button", onClick: () => setPer(perDayForDays(st.total, d)), style: chip(perDayForDays(st.total, d) === clampPerDay(perDay)) }, toBnDigits(d) + " দিনে শেষ"))),
-      !plan && h("div", { style: { color: "#C0392B", fontSize: 13, marginTop: 12 } }, "শেষ আয়াত শুরুর আগে হতে পারে না।"),
-      st && h("div", { style: { marginTop: 14, padding: "10px 14px", borderRadius: 14, background: SOFT, color: PRIMARY, fontSize: 13.5, fontWeight: 600, textAlign: "center" } },
+      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 10 } },
+        h("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#5B6B64" } }, "দৈনিক লক্ষ্য (আয়াত)"),
+        h(Stepper, { value: clampPerDay(perDay), step: W.step, onChange: setPer, label: "দৈনিক লক্ষ্য" })),
+      W.presets.length > 0 && st && h("div", { style: { display: "flex", gap: 8, marginTop: 10 } },
+        W.presets.map((d) => h("button", { key: d, type: "button", onClick: () => setPer(perDayForDays(st.total, d)), style: { ...chip(perDayForDays(st.total, d) === clampPerDay(perDay)), flex: 1, padding: "0 4px" } }, toBnDigits(d) + " দিনে শেষ"))),
+      !plan && h("div", { style: { color: "#C0392B", fontSize: 13, marginTop: 10 } }, "শেষ আয়াত শুরুর আগে হতে পারে না।"),
+      st && h("div", { style: { marginTop: 10, padding: "8px 12px", borderRadius: 12, background: SOFT, color: PRIMARY, fontSize: 13.5, fontWeight: 600, textAlign: "center" } },
         "মোট " + toBnDigits(st.total) + " আয়াত · প্রায় " + toBnDigits(st.daysLeft) + " দিন"),
-      h("button", { type: "button", disabled: !plan, onClick: () => plan && onCreate(plan), style: btnStyle("primary", { width: "100%", marginTop: 16, opacity: plan ? 1 : 0.5 }) }, "প্ল্যান শুরু করুন")));
+      h("button", { type: "button", disabled: !plan, onClick: () => plan && onCreate(plan), style: btnStyle("primary", { width: "100%", marginTop: 12, minHeight: 46, opacity: plan ? 1 : 0.5 }) }, "প্ল্যান শুরু করুন")));
 }
 
 export function HifzPlanner({ onOpenQuran }) {
@@ -160,17 +159,23 @@ export function HifzPlanner({ onOpenQuran }) {
   const plan = plans[mode];
   const save = (p) => { setPlans((x) => ({ ...x, [mode]: p })); writePlan(mode, p); };
 
-  const modeBar = h("div", { role: "group", "aria-label": "প্ল্যানের ধরন", style: { display: "flex", gap: 4, padding: 4, borderRadius: 18, background: SOFT, marginBottom: 14 } },
+  const modeBar = h("div", { role: "group", "aria-label": "প্ল্যানের ধরন", style: { display: "flex", gap: 8, padding: 6, borderRadius: 18, background: SOFT, marginBottom: 12 } },
     Object.keys(WORDS).map((k) => {
       const on = mode === k;
       const started = plans[k] && !statsOf(plans[k], counts).finished;
       return h("button", {
         key: k, type: "button", "aria-pressed": on,
         onClick: () => { setMode(k); setConfirmDel(false); },
-        style: { flex: 1, minHeight: 52, borderRadius: 14, border: "none", cursor: "pointer", background: on ? "#fff" : "transparent", color: PRIMARY, boxShadow: on ? "0 2px 8px rgba(15,40,35,0.14)" : "none", lineHeight: 1.25 },
+        style: {
+          flex: 1, minHeight: 46, borderRadius: 14, cursor: "pointer", lineHeight: 1.25,
+          border: "1px solid " + (on ? PRIMARY : LINE),
+          background: on ? HERO_BG : "#fff",
+          color: on ? "#fff" : PRIMARY,
+          boxShadow: on ? "0 4px 10px -4px rgba(14,75,67,0.55)" : "0 1px 2px rgba(15,40,35,0.08)",
+        },
       },
-      h("div", { style: { fontSize: 15, fontWeight: 700 } }, WORDS[k].tab + (started ? " •" : "")),
-      h("div", { style: { fontSize: 11.5, opacity: 0.75 } }, WORDS[k].sub));
+      h("span", { style: { fontSize: 15, fontWeight: 700 } }, WORDS[k].tab + (started ? " •" : "")),
+      h("span", { style: { fontSize: 12, opacity: on ? 0.85 : 0.7, marginLeft: 6 } }, WORDS[k].sub));
     }));
 
   if (!plan) return h("div", null, modeBar, h(Setup, { key: mode, mode, surahs, counts, onCreate: save }));

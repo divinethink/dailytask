@@ -37,6 +37,11 @@ function ChipRow({ children }) {
   return h("div", { className: "flex gap-2 overflow-x-auto no-scrollbar px-4 py-3 bg-white", style: { scrollbarWidth: "none" } }, children);
 }
 
+// আলাদা কার্ড: গোল কোণ, বর্ডার, হালকা ছায়া — অংশগুলো আলাদা বোঝার জন্য।
+function Card({ children }) {
+  return h("div", { className: "mx-3 mt-3 rounded-2xl border overflow-hidden bg-white shadow-sm", style: { borderColor: "#D7DFD9" } }, children);
+}
+
 // হালকা ধূসর ব্যান্ড-শিরোনাম।
 function Heading({ children }) {
   return h("div", { className: "px-4 py-2 text-sm font-semibold", style: { background: "#ECEFEA", color: "#4A5A53" } }, children);
@@ -344,22 +349,26 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
   const markedSet = new Set(marks.map((x) => markKey(x.s, x.a, x.k)));
   const lastList = sanitizeLastRead(last, surahs);
   const openAt = (s, a) => setOpen({ s, a: a || 1 });
-  return h("div", null,
-    lastList.length > 0 && h("div", null,
+  return h("div", { className: "pb-4" },
+    lastList.length > 0 && h(Card, null,
       h(Heading, null, "শেষ পাঠ"),
       h(ChipRow, null, lastList.map((x) => h(Chip, { key: x.s, label: refLabel(surahs[x.s - 1], x.a), onClick: () => openAt(x.s, x.a) })))
     ),
-    h(Heading, null, "দ্রুত লিংক"),
-    h(ChipRow, null, QUICK_SURAHS.map((n) => h(Chip, { key: n, label: surahs[n - 1].bn, onClick: () => openAt(n, 1) }))),
-    h(Tabs, { tab, onTab: setTab }),
-    tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
-    tab === "para" && h(ParaList, { meta, onOpen: openAt }),
-    tab === "search" && h("div", { className: "px-4 pt-3" }, h(SearchPanel, { meta, onOpen: openAt, script: prefs.arScript, font: prefs.arFont })),
-    tab === "saved" && h("div", { className: "px-4 pt-3" }, h(SavedList, {
-      meta, marks, sync, onOpen: openAt,
-      onRemove: (x) => onMark(x.s, x.a, x.k),
-      onRetry: () => setSyncTries((t) => t + 1),
-    })),
+    h(Card, null,
+      h(Heading, null, "দ্রুত লিংক"),
+      h(ChipRow, null, QUICK_SURAHS.map((n) => h(Chip, { key: n, label: surahs[n - 1].bn, onClick: () => openAt(n, 1) })))
+    ),
+    h(Card, null,
+      h(Tabs, { tab, onTab: setTab }),
+      tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
+      tab === "para" && h(ParaList, { meta, onOpen: openAt }),
+      tab === "search" && h("div", { className: "px-4 pt-3 pb-3" }, h(SearchPanel, { meta, onOpen: openAt, script: prefs.arScript, font: prefs.arFont })),
+      tab === "saved" && h("div", { className: "px-4 pt-3 pb-3" }, h(SavedList, {
+        meta, marks, sync, onOpen: openAt,
+        onRemove: (x) => onMark(x.s, x.a, x.k),
+        onRetry: () => setSyncTries((t) => t + 1),
+      }))
+    ),
     open && h(QuranReader, {
       key: open.s + ":" + open.a,
       surah: surahs[open.s - 1],
