@@ -22,7 +22,7 @@ export const TAB_DEFS = {
   tools: {
     title: "সহায়িকা",
     defs: [
-      { id: "quran", title: "কুরআন" },
+      { id: "quran", title: "কুরআন হিফজ প্ল্যানার" },
       { id: "salah", title: "সালাত ও পবিত্রতা" },
       { id: "amol", title: "আমল, যিকির ও দু'আ" },
       { id: "specialDays", title: "বিশেষ দিন ও উপলক্ষ" },

@@ -17,8 +17,8 @@ const INACTIVE_COLOR = "#8A9A8F";
 
 const NAV_ITEMS = [
   { id: TAB_FAMILY, label: "হোম", Icon: HomeIcon, supportsFilled: true },
-  { id: TAB_QURAN, label: "কুরআন", Icon: BookIcon, supportsFilled: false },
   { id: TAB_PRAYER_TIMES, label: "সময়সূচি", Icon: ClockIcon, supportsFilled: false },
+  { id: TAB_QURAN, label: "কুরআন", Icon: BookIcon, supportsFilled: false },
   { id: TAB_TOOLS, label: "সহায়িকা", Icon: CompassIcon, supportsFilled: true },
   { id: TAB_SETTINGS, label: "মেনু", Icon: MenuIcon, supportsFilled: false }
 ];

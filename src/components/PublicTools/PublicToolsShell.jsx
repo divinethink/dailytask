@@ -96,7 +96,7 @@ const CATEGORIES = [
   {
     id: "quran",
     icon: "quran",
-    label: "কুরআন",
+    label: "কুরআন হিফজ প্ল্যানার",
     items: [
       { key: "paraIndex", icon: "list", label: "৩০ পারার সূচি" },
       { key: "khatmTracker", icon: "bookmarkCheck", label: "কুরআন খতম ট্র্যাকিং" },
@@ -138,7 +138,7 @@ const ACCENT_BRONZE = { bg: "linear-gradient(160deg, #FBF1DC 0%, #F0D9A6 100%)",
 const ACCENT_SKY = { bg: "linear-gradient(160deg, #EAF6FD 0%, #BFE3F7 100%)", border: "#86C5E8", disc: "radial-gradient(circle at 30% 25%, #F4FBFF 0%, #C9E8F8 100%)", ring: "#86C5E8", icon: "#1F6FA3", text: "#134A70" };
 
 const FRONT_ITEMS = [
-  { kind: "category", id: "quran", icon: "quran", label: "কুরআন" },
+  { kind: "category", id: "quran", icon: "quran", label: "কুরআন হিফজ প্ল্যানার" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
   { kind: "amol", id: "amol", icon: "hands", label: "আমল, যিকির ও দু'আ", accent: ACCENT_BRONZE },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
