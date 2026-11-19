@@ -43,6 +43,9 @@ export const HeartSvg = ({ on, size = 17 }) => h(Icon, { size }, h("path", { d: 
 
 export const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
 
+// তাফসির-বোতাম: স্পষ্ট বর্ডার-পিল; খোলা থাকলে ভরাট।
+export const tafsirBtn = (accent, on) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 14px", margin: "0 4px", borderRadius: 999, fontSize: 13, fontWeight: 600, color: accent, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "1.5px solid " + accent, cursor: "pointer" });
+
 export const MoreSvg = () => h(Icon, { size: 20 }, [5, 12, 19].map((cx) => h("circle", { key: cx, cx, cy: 12, r: 1.7, fill: "currentColor" })));
 const iconBtn = (color, on) => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44, borderRadius: 12, color, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "none", cursor: "pointer" });
 
@@ -54,7 +57,7 @@ export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCo
   return h("div", null, h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2, marginTop: 4, marginLeft: -10 } },
     h("button", { type: "button", onClick: () => onShare(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 20 })),
     h("button", { type: "button", onClick: () => onMark(a, "b"), style: iconBtn(accent, bm), "aria-pressed": bm, "aria-label": "আয়াত " + n + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") }, h(BookmarkSvg, { on: bm, size: 20 })),
-    surah && h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: { ...actBtn(accent), fontWeight: showTafsir ? 700 : 400 }, "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, showTafsir ? "তাফসির ▲" : "তাফসির"),
+    surah && h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: tafsirBtn(accent, showTafsir), "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, "📖 তাফসির " + (showTafsir ? "▴" : "▾")),
     h("button", { type: "button", onClick: () => setMore((v) => !v), style: iconBtn(accent, more), "aria-expanded": more, "aria-label": "আরও" }, h(MoreSvg)),
     more && h("button", { type: "button", onClick: () => onCopy(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" }, h(CopyIcon, { size: 20 })),
     more && h("button", { type: "button", onClick: () => onMark(a, "f"), style: iconBtn(accent, fav), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav, size: 20 })),
@@ -331,7 +334,7 @@ function TafsirBody({ surah, ayah, th, accent, trSize }) {
     loadTafsir(surah).then((p) => { if (live) setSt({ s: "ok", item: findTafsir(p, ayah.n) }); }).catch(() => { if (live) setSt({ s: "err" }); });
     return () => { live = false; };
   }, [surah.n, ayah.n, tick]);
-  const box = { borderTop: "1px solid " + LINE, marginTop: 8, paddingTop: 10 };
+  const box = { marginTop: 10, padding: "12px 14px 4px", borderRadius: 14, background: "rgba(128,128,128,0.09)", borderLeft: "3px solid " + accent };
   if (st.s === "load") return h("div", { style: { ...box, fontSize: 13, opacity: 0.75 }, role: "status" }, "তাফসির আনা হচ্ছে…");
   if (st.s === "err" || !st.item) {
     return h("div", { style: { ...box, fontSize: 13 }, role: "alert" },
@@ -356,7 +359,7 @@ function FmBody({ surah, ayah, th, accent, trSize, arFont }) {
     loadFm(surah.n).then((g) => { if (live) setSt({ s: "ok", item: fmForAyah(g, ayah.n) }); }).catch(() => { if (live) setSt({ s: "err" }); });
     return () => { live = false; };
   }, [surah.n, ayah.n, tick]);
-  const box = { borderTop: "1px solid " + LINE, marginTop: 8, paddingTop: 10 };
+  const box = { marginTop: 10, padding: "12px 14px 4px", borderRadius: 14, background: "rgba(128,128,128,0.09)", borderLeft: "3px solid " + accent };
   if (st.s === "load") return h("div", { style: { ...box, fontSize: 13, opacity: 0.75 }, role: "status" }, "তাফসির আনা হচ্ছে…");
   if (st.s === "err" || !st.item) {
     return h("div", { style: { ...box, fontSize: 13 }, role: "alert" },
@@ -383,7 +386,7 @@ function TafsirPanel({ surah, ayah, th, accent, trSize, extra, arFont }) {
   }, [extra]);
   const hasFm = !!(extra && findFmRange(idx, surah.n, ayah.n));
   useEffect(() => { if (!hasFm) setSrc("ik"); }, [hasFm]);
-  const chip = (id, label) => h("button", { key: id, type: "button", onClick: () => setSrc(id), "aria-pressed": src === id, style: { minHeight: 44, padding: "0 14px", borderRadius: 12, fontSize: 13, fontWeight: src === id ? 700 : 400, color: accent, background: src === id ? "rgba(128,128,128,0.16)" : "transparent", border: "1px solid " + LINE } }, label);
+  const chip = (id, label) => h("button", { key: id, type: "button", onClick: () => setSrc(id), "aria-pressed": src === id, style: { minHeight: 40, padding: "0 16px", borderRadius: 999, fontSize: 13, fontWeight: src === id ? 700 : 500, color: accent, background: src === id ? "rgba(128,128,128,0.16)" : "transparent", border: "1px solid " + LINE } }, label);
   return h("div", null,
     hasFm && h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }, role: "group", "aria-label": "তাফসিরের উৎস" }, chip("ik", "ইবনে কাসীর"), chip("fm", "ফাতহুল মাজীদ")),
     hasFm && src === "fm" ? h(FmBody, { surah, ayah, th, accent, trSize, arFont }) : h(TafsirBody, { surah, ayah, th, accent, trSize }));
@@ -402,7 +405,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, extr
       h("p", { style: { fontSize: trSize, lineHeight: 1.8, opacity: 0.92, margin: "4px 0 8px" } }, ayah.tr),
       h("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 6 } }, "অনুবাদ: " + TRANSLATOR),
       h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid " + LINE, paddingTop: 6 } },
-        tafsir && h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: { ...actBtn(accent), fontWeight: showTafsir ? 700 : 400 }, "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, showTafsir ? "তাফসির ▲" : "তাফসির"),
+        tafsir && h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: tafsirBtn(accent, showTafsir), "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, "📖 তাফসির " + (showTafsir ? "▴" : "▾")),
         h("button", { type: "button", onClick: () => onCopy(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" },
           h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
         h("button", { type: "button", onClick: () => onShare(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 17 }), "শেয়ার"),
