@@ -200,14 +200,14 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     if (!locked && win !== "open") {
       body = (
         <div className="mt-3">
-          <div className="rounded-2xl p-4 flex items-center gap-3 mb-3" style={{ background: win === "before" ? "#FFFBF0" : "#F6F7F5", border: "1px solid " + (win === "before" ? "#EADFBE" : "#E4E7E2") }}>
+          {report && report.ok && report.weekdayValid >= 3 && weekdayEl(report)}
+          <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: win === "before" ? "#FFFBF0" : "#F6F7F5", border: "1px solid " + (win === "before" ? "#EADFBE" : "#E4E7E2") }}>
             <span className="text-3xl" aria-hidden>🔒</span>
             <div className="min-w-0">
               <div className="text-sm font-bold text-slate-800">{win === "before" ? W.monthBeforeTitle : W.monthClosedTitle}</div>
               {win === "closed" && <div className="text-xs text-slate-500 mt-0.5">{W.monthClosedHint}</div>}
             </div>
           </div>
-          {report && report.ok && report.weekdayValid >= 3 && weekdayEl(report)}
         </div>
       );
     } else if (!report || !report.ok) {
