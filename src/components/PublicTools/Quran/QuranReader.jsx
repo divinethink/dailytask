@@ -9,7 +9,7 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { loadSurah, loadWbw } from "../../../legacy/quranData.js";
 import {
   PAGE_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
-  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf, alignWords, wbwSupported,
+  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf, alignWords, wbwSupported, AR_SIZE, TR_SIZE,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
 import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SurahBanner, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
@@ -87,6 +87,40 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   const flashTimer = useRef(null);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+  const onPrefsRef = useRef(onPrefs);
+  onPrefsRef.current = onPrefs;
+
+  // দুই-আঙুল পিঞ্চ → আরবি ও অনুবাদের আকার একসাথে (সেটিংসের সীমার ভেতরে)
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return undefined;
+    let d0 = 0, a0 = 0, t0 = 0;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const clamp = (v, lim, step) => Math.min(lim.max, Math.max(lim.min, Math.round(v / step) * step));
+    const ts = (e) => {
+      if (e.touches.length === 2) { d0 = dist(e.touches); a0 = prefsRef.current.arSize; t0 = prefsRef.current.trSize; }
+    };
+    const tm = (e) => {
+      if (e.touches.length !== 2 || d0 <= 0) return;
+      e.preventDefault();
+      const r = dist(e.touches) / d0;
+      const ar = clamp(a0 * r, AR_SIZE, AR_SIZE.step);
+      const tr = clamp(t0 * r, TR_SIZE, TR_SIZE.step);
+      const p = prefsRef.current;
+      if (ar !== p.arSize || tr !== p.trSize) onPrefsRef.current({ ...p, arSize: ar, trSize: tr });
+    };
+    const te = (e) => { if (e.touches.length < 2) d0 = 0; };
+    el.addEventListener("touchstart", ts, { passive: true });
+    el.addEventListener("touchmove", tm, { passive: false });
+    el.addEventListener("touchend", te, { passive: true });
+    el.addEventListener("touchcancel", te, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", ts);
+      el.removeEventListener("touchmove", tm);
+      el.removeEventListener("touchend", te);
+      el.removeEventListener("touchcancel", te);
+    };
+  }, []);
   const onMarkRef = useRef(onMark);
   onMarkRef.current = onMark;
 
@@ -252,7 +286,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       ),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 44, minHeight: 44, color: "#fff", fontSize: 19, fontWeight: 600 } }, "Aa")
     ),
-    h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px" } },
+    h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px", touchAction: "pan-y" } },
       state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
