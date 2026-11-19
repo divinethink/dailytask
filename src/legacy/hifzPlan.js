@@ -3,9 +3,17 @@
 // counts = ১১৪টা সূরার আয়াত-সংখ্যার তালিকা (meta.surahs থেকে)। তারিখ-নির্ভর নয়, অগ্রগতি-নির্ভর।
 
 export const HIFZ_KEY = "dt_hifz_plan";
+export const KHATAM_KEY = "dt_khatam_plan"; // খতম (তিলাওয়াত) প্ল্যান — হিফজের থেকে আলাদা, একই হিসাব
+export const planKey = (mode) => (mode === "khatam" ? KHATAM_KEY : HIFZ_KEY);
 export const GOTO_KEY = "dt_quran_goto"; // প্ল্যানার → কুরআন ট্যাবে "এই আয়াতে খুলুন"-এর হ্যান্ডঅফ
 export const GOTO_TTL_MS = 60000;
-export const PER_DAY = { min: 1, max: 100, def: 5 };
+export const PER_DAY = { min: 1, max: 1000, def: 5 };
+
+// "N দিনে শেষ" — দৈনিক লক্ষ্য = মোট ÷ দিন (উপরের দিকে গোল)।
+export function perDayForDays(total, days) {
+  if (!isInt(total) || total < 1 || !isInt(days) || days < 1) return PER_DAY.def;
+  return clampPerDay(Math.ceil(total / days));
+}
 
 const isInt = (x) => Number.isInteger(x);
 

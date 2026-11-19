@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone,
-  setPerDay, statsOf, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
+  setPerDay, statsOf, perDayForDays, planKey, HIFZ_KEY, KHATAM_KEY, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
 } from "../src/legacy/hifzPlan.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -31,7 +31,7 @@ test("makePlan: উল্টো/অবৈধ পরিসর null; perDay সী
   assert.equal(makePlan(C, { s: 2, a: 5 }, { s: 200, a: 1 }, 5, 1), null);
   assert.equal(makePlan(C, null, { s: 2, a: 4 }, 5, 1), null);
   assert.equal(makePlan(C, { s: 1, a: 1 }, { s: 1, a: 7 }, 0, 1).perDay, 1);
-  assert.equal(clampPerDay(9999), 100);
+  assert.equal(clampPerDay(99999), 1000);
   assert.equal(clampPerDay("x"), 5);
 });
 
@@ -92,4 +92,17 @@ test("হ্যান্ডঅফ: তাজা ও বৈধ হলেই; প�
   assert.equal(readGoto(g, C, 900), null);
   assert.equal(readGoto({ s: 2, a: 9999, t: 1000 }, C, 1001), null);
   assert.equal(readGoto(null, C, 1), null);
+});
+
+test("খতম: পুরো কুরআন ৩০ দিনে → দৈনিক ২০৮; পরিসর ৬২৩৬ আয়াত", () => {
+  const total = C.reduce((x, y) => x + y, 0);
+  assert.equal(total, 6236);
+  assert.equal(perDayForDays(total, 30), 208);
+  assert.equal(perDayForDays(total, 0), 5);
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: C[113] }, 208, 1);
+  assert.equal(totalOf(p, C), 6236);
+  assert.equal(statsOf(p, C).daysLeft, 30);
+  assert.equal(planKey("khatam"), KHATAM_KEY);
+  assert.equal(planKey("hifz"), HIFZ_KEY);
+  assert.notEqual(KHATAM_KEY, HIFZ_KEY);
 });
