@@ -3,6 +3,7 @@
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, parseWbwPayload, buildSearchIndex } from "./quranCore.js";
 import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
+import { validateTafsirPayload } from "./quranTafsir.js";
 import { sanitizeIndex, sanitizePage, clamp16, M16_VER } from "./mushaf16.js";
 
 const TIMEOUT_MS = 15000;
@@ -57,6 +58,22 @@ export async function loadSurah(surah, trId = DEFAULT_TRANSLATION, script = DEFA
   return ayahs;
 }
 
+// তাফসির (ইবনে কাসীর, বাংলা): সূরা ধরে on-demand; আয়াত-শিটে "তাফসির" চাপলেই নামে (পুরো-নামানো প্যাকে নেই)।
+// সূরা-ফাইল বড় হতে পারে (সর্বোচ্চ ~২.৭ MB), তাই শুধু একবার নামে ও মেমরিতে থাকে; sw.js-এর cache-first-এ অফলাইনেও মেলে।
+const tafsirCache = new Map();
+export function loadTafsir(surah) {
+  const key = surah.n;
+  if (!tafsirCache.has(key)) {
+    const p = getJson(QURAN_BASE + "/tafsir/ibn-kathir-bn/" + pad3(surah.n) + ".json").then((j) => {
+      const ok = validateTafsirPayload(j, surah.n, surah.ayahs);
+      if (!ok) throw new Error("তাফসির ফাইল অবৈধ");
+      return ok;
+    });
+    p.catch(() => { tafsirCache.delete(key); }); // ব্যর্থ হলে পরেরবার আবার চেষ্টা
+    tafsirCache.set(key, p);
+  }
+  return tafsirCache.get(key);
+}
 
 // ── ১৬-লাইন ইন্দো-পাক মুসহাফ (public/quran/v1/mushaf16) ──
 let m16IndexPromise = null;

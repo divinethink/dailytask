@@ -1,0 +1,461 @@
+{
+ "input": "55b81a8e733f31720acab24a5455d0d8b03435ddd4c06ef9659e6e3f8bbc10dd",
+ "files": {
+  "tafsir/ibn-kathir-bn/001.json": {
+   "bytes": 347219,
+   "sha256": "8ed1317383bbe1bb9d029e3e1c858b2d412d8597542b8ddd750e7743ff987a66"
+  },
+  "tafsir/ibn-kathir-bn/002.json": {
+   "bytes": 2770355,
+   "sha256": "42834456824d6025d40967b607d3d7d31a38e5776f36b1a8498cb4e194e1fad6"
+  },
+  "tafsir/ibn-kathir-bn/003.json": {
+   "bytes": 1030966,
+   "sha256": "64b32663a0cd7f491f2a440b3fd6a81ea6db933c56c8cd49291c8ab3e81a006e"
+  },
+  "tafsir/ibn-kathir-bn/004.json": {
+   "bytes": 1611212,
+   "sha256": "b0ec7cd497a31192d5df3ea9f3ad16d6e00222e7f423112753fffe67ff74e479"
+  },
+  "tafsir/ibn-kathir-bn/005.json": {
+   "bytes": 1167184,
+   "sha256": "307342e69cf5aa46ce075c49ae69b17b74feba610877c18612657c6c8e51974b"
+  },
+  "tafsir/ibn-kathir-bn/006.json": {
+   "bytes": 886658,
+   "sha256": "b208989a866a206212c045deba44b6fd663df5a6eb40c338195e3ee1841a3ca3"
+  },
+  "tafsir/ibn-kathir-bn/007.json": {
+   "bytes": 896235,
+   "sha256": "425935579959233c7a66b88c1b0a45b08d0fea1c0a8bf5acc3029c3cda2eca6b"
+  },
+  "tafsir/ibn-kathir-bn/008.json": {
+   "bytes": 562065,
+   "sha256": "7a3adfd3891de7e2767a99a0264fdf37a0f795006e71019fb39d3c2a6f385996"
+  },
+  "tafsir/ibn-kathir-bn/009.json": {
+   "bytes": 887080,
+   "sha256": "c5b043e1bd5565ce0d5c14481c15ebc4b7143f9d38095ccd232a0cab1853b4b0"
+  },
+  "tafsir/ibn-kathir-bn/010.json": {
+   "bytes": 329682,
+   "sha256": "662a6df7292b4bee44ee50d6524143e7bef111ed8b9d0280e96b602d62cad37f"
+  },
+  "tafsir/ibn-kathir-bn/011.json": {
+   "bytes": 353404,
+   "sha256": "e815476489b3e7acfa2de3490bec1730c2239685e8a27aa1fe76e5286ced516a"
+  },
+  "tafsir/ibn-kathir-bn/012.json": {
+   "bytes": 394335,
+   "sha256": "4b2e6ea0b43971b2e452c37ab96899874b5949284a4617c506cf16cd8470cd82"
+  },
+  "tafsir/ibn-kathir-bn/013.json": {
+   "bytes": 279443,
+   "sha256": "1f3fea81cdef3721101be235acca4d69ca3dd2c028d2086079f0a5954ed523e3"
+  },
+  "tafsir/ibn-kathir-bn/014.json": {
+   "bytes": 278819,
+   "sha256": "60dad84465eb6a5baae19a0c8f39c4419357cd487baf5022351b0f724014118c"
+  },
+  "tafsir/ibn-kathir-bn/015.json": {
+   "bytes": 161086,
+   "sha256": "f6de637de9ebb9578a2a4605224cd566a83ad119832510238896deb4b6d2d9ac"
+  },
+  "tafsir/ibn-kathir-bn/016.json": {
+   "bytes": 362766,
+   "sha256": "5158ba0299263c12a61eddc7532664cec7bf3da3612a489d3f0d2d6df80065d9"
+  },
+  "tafsir/ibn-kathir-bn/017.json": {
+   "bytes": 745335,
+   "sha256": "35d95a0e157c748b1a75e79aa4f6e03b0f51ea2b6c66b5aac978a1ead17dd6d2"
+  },
+  "tafsir/ibn-kathir-bn/018.json": {
+   "bytes": 408369,
+   "sha256": "e9463a915806698e3b2a3860cb0ee47ee379a073f6f98610f1b4444e2d2914eb"
+  },
+  "tafsir/ibn-kathir-bn/019.json": {
+   "bytes": 319716,
+   "sha256": "135ae363c7046852f97aca5c0800bc07abaabcf79b376a02bf7e1ceea8a35b3e"
+  },
+  "tafsir/ibn-kathir-bn/020.json": {
+   "bytes": 366217,
+   "sha256": "656b3719662e736e4aee354408d53472c4836ccd0613f75b1f0bfac95bd56f2c"
+  },
+  "tafsir/ibn-kathir-bn/021.json": {
+   "bytes": 365444,
+   "sha256": "c76b54634900c413f797953273e612d427021f97647281a85d0aace983a0fb52"
+  },
+  "tafsir/ibn-kathir-bn/022.json": {
+   "bytes": 380615,
+   "sha256": "b5d0fcb1509bf47504d13a0645740c58eee7b1a286e1816bbe5629245093de2c"
+  },
+  "tafsir/ibn-kathir-bn/023.json": {
+   "bytes": 253004,
+   "sha256": "05d9f4fb08886ca4290d8f131d5786c8e0a7f95b95e1ffb2c96acdd7ce60a5bd"
+  },
+  "tafsir/ibn-kathir-bn/024.json": {
+   "bytes": 516944,
+   "sha256": "f2d93da4510e57cc5e5f50949b82b19a7a4c94c6b08799def362848c2f1cba58"
+  },
+  "tafsir/ibn-kathir-bn/025.json": {
+   "bytes": 283248,
+   "sha256": "b88155b91326d2f67fbecaac74ca0950a35173863cb5f1ece9f5ce0d01e18707"
+  },
+  "tafsir/ibn-kathir-bn/026.json": {
+   "bytes": 269387,
+   "sha256": "820181c3dfe811f2fa6628945315e299d2d51549d8ec73a9a667ccac8327dab4"
+  },
+  "tafsir/ibn-kathir-bn/027.json": {
+   "bytes": 263499,
+   "sha256": "e6d1e5447e2dd102cf2b81025fc7d4f7d8906ae8c1f7cab1a2bdbd6bac43ecbc"
+  },
+  "tafsir/ibn-kathir-bn/028.json": {
+   "bytes": 256071,
+   "sha256": "9b3e4a9123522af7d1e13b2c0e6a615cab65d7d299d9a07a84c80a50f4dc4a43"
+  },
+  "tafsir/ibn-kathir-bn/029.json": {
+   "bytes": 197434,
+   "sha256": "5e5227cd294a3abc8af93f8b225653f307cabff85a196c2676b288e9585593cb"
+  },
+  "tafsir/ibn-kathir-bn/030.json": {
+   "bytes": 188485,
+   "sha256": "8b4badb17ddd6c7ad2067b8d4eb27bc4621830ef769b37c1a6fe11b2393f0784"
+  },
+  "tafsir/ibn-kathir-bn/031.json": {
+   "bytes": 153163,
+   "sha256": "ee5fcb6e00c78cf0dbf2ccb4947c8e80b095b0c3d08ac306001807d670286dc4"
+  },
+  "tafsir/ibn-kathir-bn/032.json": {
+   "bytes": 91958,
+   "sha256": "5a8f42141b7cff1bc53dbf0e0b58d3bec9d803616e5ceeb0aebada18c0026c95"
+  },
+  "tafsir/ibn-kathir-bn/033.json": {
+   "bytes": 630184,
+   "sha256": "6da1d24956b5844f4443919693c30f484786729fc7d9dc110c1cde1685f4ad8d"
+  },
+  "tafsir/ibn-kathir-bn/034.json": {
+   "bytes": 217218,
+   "sha256": "c7983137ee11d14edcc7f8a43788412148028d6fe08c1e8c9b84b1e30459ae76"
+  },
+  "tafsir/ibn-kathir-bn/035.json": {
+   "bytes": 150166,
+   "sha256": "a35677aec05d8964a98c0cac5d638416c7d86824135ea39a16c228a7b22dce68"
+  },
+  "tafsir/ibn-kathir-bn/036.json": {
+   "bytes": 206046,
+   "sha256": "f20c7c431870b382e6c528157b06e450e0224ed85aac1b7888e82b337abae53c"
+  },
+  "tafsir/ibn-kathir-bn/037.json": {
+   "bytes": 242434,
+   "sha256": "bd44253263b9e2c89f126207a48f87f84a59f87cb001076871d7c98adcdd32c1"
+  },
+  "tafsir/ibn-kathir-bn/038.json": {
+   "bytes": 198722,
+   "sha256": "99ba15a44b2564e1016ce4f7adb9c8f6a1418d15e95ac5661162a816cd9d5eca"
+  },
+  "tafsir/ibn-kathir-bn/039.json": {
+   "bytes": 266630,
+   "sha256": "b63562efd59bb2c4bb0bb2038f741ad8f58813302d839b4ef766dde89ece1852"
+  },
+  "tafsir/ibn-kathir-bn/040.json": {
+   "bytes": 235134,
+   "sha256": "4f075659015b3dfe934006e2851313fedcfef9567949b18762bdbcd2bc84e580"
+  },
+  "tafsir/ibn-kathir-bn/041.json": {
+   "bytes": 174179,
+   "sha256": "47bff64867be9e9dbdde72f0396c83ba822acb38c2f43633395226a4576ae7b0"
+  },
+  "tafsir/ibn-kathir-bn/042.json": {
+   "bytes": 188590,
+   "sha256": "4747d1281b73190008f1e08dab959e0aeb57f69024e1261f8092ba4e6c359bd5"
+  },
+  "tafsir/ibn-kathir-bn/043.json": {
+   "bytes": 167005,
+   "sha256": "372f43ae3c0c8759a9003b6c7336d7788cdfbcfd1f7a2a3db5c3a4232f61fea0"
+  },
+  "tafsir/ibn-kathir-bn/044.json": {
+   "bytes": 117100,
+   "sha256": "79d3b3ffc9432fdf0f59a841816ee97572837716b46a16199dc7e3cdbac8645f"
+  },
+  "tafsir/ibn-kathir-bn/045.json": {
+   "bytes": 60083,
+   "sha256": "498be889f6a51ae096829d35114a2d39527f8c5fc94b124563dadb538087a3d4"
+  },
+  "tafsir/ibn-kathir-bn/046.json": {
+   "bytes": 227027,
+   "sha256": "ebf47397d639b17d0de1efc8c8d51bb91b3846df2a6c858845d6c87c1a8daffc"
+  },
+  "tafsir/ibn-kathir-bn/047.json": {
+   "bytes": 111170,
+   "sha256": "e3f0c655502b766d789de5b07ef7516d9d081e3827dce4328294ab1e0518d27c"
+  },
+  "tafsir/ibn-kathir-bn/048.json": {
+   "bytes": 275053,
+   "sha256": "f9a36a0755d8d116b710cea66a6a93f4ce9c328e1ef24145b63e482cb1e184d3"
+  },
+  "tafsir/ibn-kathir-bn/049.json": {
+   "bytes": 167986,
+   "sha256": "386b48f722faefa28c4365e6522d0fc05b69d3c58e3742e84aa89e7d6292c0d7"
+  },
+  "tafsir/ibn-kathir-bn/050.json": {
+   "bytes": 119908,
+   "sha256": "ee0096e5a3093e079eac82cafe6c04f75849035c0811163008e4192d6edf5ecf"
+  },
+  "tafsir/ibn-kathir-bn/051.json": {
+   "bytes": 82956,
+   "sha256": "57166a7465c38ffe520648cd8b3ea986b8fc1f4bf3ca80aad6d2ad3f2f68ed92"
+  },
+  "tafsir/ibn-kathir-bn/052.json": {
+   "bytes": 80488,
+   "sha256": "f1dac9f595ac5e7f9f3cc45fd52668af2dd632a67c14e118bac3aa1c879d6368"
+  },
+  "tafsir/ibn-kathir-bn/053.json": {
+   "bytes": 160819,
+   "sha256": "222f29f110aafae51d7598d145a917676008b0f33a454f2a035e95a8cbaf07f9"
+  },
+  "tafsir/ibn-kathir-bn/054.json": {
+   "bytes": 87994,
+   "sha256": "d3ff41d244602a982918e34925c01a1077d468523d4f1e324d55e478bd0fa469"
+  },
+  "tafsir/ibn-kathir-bn/055.json": {
+   "bytes": 127252,
+   "sha256": "cd3d54dd1579057c9b201441bac0938f49c3282a01cf4f7e12d5baa284e932db"
+  },
+  "tafsir/ibn-kathir-bn/056.json": {
+   "bytes": 207348,
+   "sha256": "923fba6a61151c14ef264f50db467678af836f7210af8ad704cf0664fa96c727"
+  },
+  "tafsir/ibn-kathir-bn/057.json": {
+   "bytes": 189996,
+   "sha256": "b418ae240dcd6fc37216dc81485ad66cc8579ed488820d5cccd7b1ff55156d9d"
+  },
+  "tafsir/ibn-kathir-bn/058.json": {
+   "bytes": 141569,
+   "sha256": "1719975bc9b88263abc2c24b6c0f533588b32b9b5e33cb8c33698453d120800e"
+  },
+  "tafsir/ibn-kathir-bn/059.json": {
+   "bytes": 179493,
+   "sha256": "085a0ab6f00133ccb3ea70285cde00d87dba1eb0f50b705d9a888228af57954c"
+  },
+  "tafsir/ibn-kathir-bn/060.json": {
+   "bytes": 137697,
+   "sha256": "7d856fa50f09be20388bf7842afbc6b90988fc6205c95197a5f24806ee545abc"
+  },
+  "tafsir/ibn-kathir-bn/061.json": {
+   "bytes": 75919,
+   "sha256": "5e2b8a4bedcb7be7cafc8afabd4c664f774f769bc8346aa201b3dcf17ce07d1d"
+  },
+  "tafsir/ibn-kathir-bn/062.json": {
+   "bytes": 60476,
+   "sha256": "873b9d5c7813e30464f44e6a401988c977fe139c28c8c0d9cfed93e80b08915a"
+  },
+  "tafsir/ibn-kathir-bn/063.json": {
+   "bytes": 65441,
+   "sha256": "bc062329507c40f5a094a723816fe7219b31ee03fc7f34c62a487586235e42b6"
+  },
+  "tafsir/ibn-kathir-bn/064.json": {
+   "bytes": 38415,
+   "sha256": "a45ef42f4347d8ee08f36165e8accaffa58ee2e954595a2e9cc3ff174e8edfbd"
+  },
+  "tafsir/ibn-kathir-bn/065.json": {
+   "bytes": 95260,
+   "sha256": "238ae407fc2a1fc5eceee7b4762f73b0684a80c169c677ddd2a4af88a2a31287"
+  },
+  "tafsir/ibn-kathir-bn/066.json": {
+   "bytes": 104408,
+   "sha256": "23b549abf9acc4701ed52903cc0332cf3e16a279afbc4628a5df4c263091f9e3"
+  },
+  "tafsir/ibn-kathir-bn/067.json": {
+   "bytes": 58266,
+   "sha256": "886e7860adf924aa02a8198625b83f1ef98f940b44ecb3b15dd2766a37822bc9"
+  },
+  "tafsir/ibn-kathir-bn/068.json": {
+   "bytes": 109076,
+   "sha256": "5a603c1a1d121e1caa3b320cb4e8bf7ef118e6d33685123cf97fa37549bcff53"
+  },
+  "tafsir/ibn-kathir-bn/069.json": {
+   "bytes": 66393,
+   "sha256": "51ba1a71fe0c7d3186a88c156d794347779409c4c73a3c4f3ca2a5745c6d5808"
+  },
+  "tafsir/ibn-kathir-bn/070.json": {
+   "bytes": 59777,
+   "sha256": "9d57ab5759ac9303046998cce7ce4cb13d770955072d3168c18733efe52b0711"
+  },
+  "tafsir/ibn-kathir-bn/071.json": {
+   "bytes": 50187,
+   "sha256": "cb0742266974f41f6fb44d771a054c983c81f9742366525c6d356b7b89474d6d"
+  },
+  "tafsir/ibn-kathir-bn/072.json": {
+   "bytes": 55645,
+   "sha256": "fc68fb38771a90e9349e32e8c9f9b020b4ba63aaf58893eae42b9dca6063bfd1"
+  },
+  "tafsir/ibn-kathir-bn/073.json": {
+   "bytes": 68811,
+   "sha256": "ab7f4093c7fcd83bf1669b209b5011c7b37e618c79b7544212196558241e310f"
+  },
+  "tafsir/ibn-kathir-bn/074.json": {
+   "bytes": 88147,
+   "sha256": "97c9d7bf8ccc01024cc0a86ef8a8413fe778a9d03e8761396c1335d8d32ea0de"
+  },
+  "tafsir/ibn-kathir-bn/075.json": {
+   "bytes": 59864,
+   "sha256": "83a547444fbfe865aa684b27097413d6588769b3ba8ce0837593823d0159b2b3"
+  },
+  "tafsir/ibn-kathir-bn/076.json": {
+   "bytes": 60842,
+   "sha256": "c0c526ac04a7ed093a2d50745e91ac0827ac67e410f6d664f878194b093c6fec"
+  },
+  "tafsir/ibn-kathir-bn/077.json": {
+   "bytes": 34694,
+   "sha256": "6bac4ffe2052803e5a0cd586fa79b73df5a0f096cd478005f782d16d1ee97232"
+  },
+  "tafsir/ibn-kathir-bn/078.json": {
+   "bytes": 52057,
+   "sha256": "e8b227923a40f2f7d2e9193914cdafb61cd23125d3d85368431f355edf951e4f"
+  },
+  "tafsir/ibn-kathir-bn/079.json": {
+   "bytes": 37833,
+   "sha256": "7d79b3cbaef25424cccbdfec757c12db489654efe45032107992e0f25649a417"
+  },
+  "tafsir/ibn-kathir-bn/080.json": {
+   "bytes": 42114,
+   "sha256": "7f183c9c2373be3562f51ecf118a766a9493e3b901a182af0addffa8992d1798"
+  },
+  "tafsir/ibn-kathir-bn/081.json": {
+   "bytes": 53466,
+   "sha256": "de1cee0dd4c4be63b82e17a23b7a27156ea03fdd9e6621f980e652247351b1ab"
+  },
+  "tafsir/ibn-kathir-bn/082.json": {
+   "bytes": 25185,
+   "sha256": "589734a119015e4eeecc4f31edfe975da14370a56283cf816c6748539030a29a"
+  },
+  "tafsir/ibn-kathir-bn/083.json": {
+   "bytes": 43716,
+   "sha256": "c47727eb2b49de5c441bf19e63aca61b68b255227be7d139cbb0f5a4dd5f500f"
+  },
+  "tafsir/ibn-kathir-bn/084.json": {
+   "bytes": 34430,
+   "sha256": "7016f98b3db62156f5ed086a64d411061d1cdc8f386e26ccdd21f1dd6c9c0c63"
+  },
+  "tafsir/ibn-kathir-bn/085.json": {
+   "bytes": 77205,
+   "sha256": "58616db8544335301f40507e6cb431c34039982bc841ecfe781bb72c763f905b"
+  },
+  "tafsir/ibn-kathir-bn/086.json": {
+   "bytes": 12331,
+   "sha256": "269bd85a83f77c6ed003e733973801be3f7adea9a6fcfa0332135909833ebe25"
+  },
+  "tafsir/ibn-kathir-bn/087.json": {
+   "bytes": 28422,
+   "sha256": "97d225ca92aa6fb7c731456eb96143fac96ee16843e51ac2db7bee3465b72f2c"
+  },
+  "tafsir/ibn-kathir-bn/088.json": {
+   "bytes": 31502,
+   "sha256": "d187822fc7ff8c65734129535fcf03f75ffb357e9a4320f2d83a77dd25d34f22"
+  },
+  "tafsir/ibn-kathir-bn/089.json": {
+   "bytes": 62029,
+   "sha256": "e55cb6630cd692a1492657eb92517fa600cfd5c08f6ee8275274283af347c768"
+  },
+  "tafsir/ibn-kathir-bn/090.json": {
+   "bytes": 34817,
+   "sha256": "c31a845ba61f8803bfa5295b00ed040d618fd5aa98cf35f5333369bfb448797a"
+  },
+  "tafsir/ibn-kathir-bn/091.json": {
+   "bytes": 28227,
+   "sha256": "305b33ec8337faeaf946baacd55ff679ebe5a315480ece2161189ca9db72e3cd"
+  },
+  "tafsir/ibn-kathir-bn/092.json": {
+   "bytes": 37535,
+   "sha256": "9823f2edd3c13ef5e990c419c697f73e3d00e8a67593343447f0c7ccbd5cbd75"
+  },
+  "tafsir/ibn-kathir-bn/093.json": {
+   "bytes": 35943,
+   "sha256": "5a8a4206b6f6c313c01e011a9f4ba08c44341daeeb0f2af711636e47496c9baf"
+  },
+  "tafsir/ibn-kathir-bn/094.json": {
+   "bytes": 29094,
+   "sha256": "86d2fc78fcc901666960fb9c3dfbefefed26c3ef36e03dec6af41cc8331310af"
+  },
+  "tafsir/ibn-kathir-bn/095.json": {
+   "bytes": 9195,
+   "sha256": "dd594cb4bb61ac9a8527ae44ee5fd7962b85535bbcd706857a04b756da01de94"
+  },
+  "tafsir/ibn-kathir-bn/096.json": {
+   "bytes": 27407,
+   "sha256": "d0e92aaca92e0365e8da4a0c0c960b1919488fc39b02ab6735578031b23ca2c4"
+  },
+  "tafsir/ibn-kathir-bn/097.json": {
+   "bytes": 85364,
+   "sha256": "a3bc1db18fec5f095da3e3678c4fd10339e900c78361bad888b36b7f58ee8abb"
+  },
+  "tafsir/ibn-kathir-bn/098.json": {
+   "bytes": 26059,
+   "sha256": "ba6dec98ce6e2563ae1cb63996e10768498cc02d6fc8b67c517c2a1103d73367"
+  },
+  "tafsir/ibn-kathir-bn/099.json": {
+   "bytes": 30813,
+   "sha256": "196e1edc0a7fd7ac354402ca507e63c41809b8dd66766566527b58e276f6f757"
+  },
+  "tafsir/ibn-kathir-bn/100.json": {
+   "bytes": 15472,
+   "sha256": "ab6197942fca77f65ed6ea2422178dd3a9a5066630869a1b306ddb4f6067c725"
+  },
+  "tafsir/ibn-kathir-bn/101.json": {
+   "bytes": 10299,
+   "sha256": "3ae18223ca76b2fb9f2690d8cacf146a52cae7fe8e9b82df2bc4d2c01bb75b68"
+  },
+  "tafsir/ibn-kathir-bn/102.json": {
+   "bytes": 36850,
+   "sha256": "592e8079d61f0d8e0f9d97fd7d6bf63914921bf66045294b6ce9f8150be36b32"
+  },
+  "tafsir/ibn-kathir-bn/103.json": {
+   "bytes": 5428,
+   "sha256": "fe34657e355b32c7726b57638f6977330d4cdde4879313e26185ac1fe02504b3"
+  },
+  "tafsir/ibn-kathir-bn/104.json": {
+   "bytes": 5735,
+   "sha256": "0f601ce9779c8cf70febc0a86dbe02975baa574cbb07050f3b7c86a3d521d529"
+  },
+  "tafsir/ibn-kathir-bn/105.json": {
+   "bytes": 45074,
+   "sha256": "2227ad995152c4dce91daa01aa21f269a3492630d9745d8444aae4f365e8e731"
+  },
+  "tafsir/ibn-kathir-bn/106.json": {
+   "bytes": 9897,
+   "sha256": "22f0abd1d675540b521289b68f7b44b46c89065f3b79f819560f12c5d5bb4477"
+  },
+  "tafsir/ibn-kathir-bn/107.json": {
+   "bytes": 18089,
+   "sha256": "46301ba14f0cb1ce1aecb4b678a1b8c7c8fc6e479763a4decc5f2e5118666757"
+  },
+  "tafsir/ibn-kathir-bn/108.json": {
+   "bytes": 28004,
+   "sha256": "cdbcb1ea1462324b866beef395160e85cf6914b9601f0ed41c7594f3aa628999"
+  },
+  "tafsir/ibn-kathir-bn/109.json": {
+   "bytes": 18846,
+   "sha256": "00ee62973e0c74d3104aaa3f230fdf45ed9eba232ba06c2a5ada2d174eb77eea"
+  },
+  "tafsir/ibn-kathir-bn/110.json": {
+   "bytes": 28318,
+   "sha256": "e9fb433ee6ea432448a6cd3c06733cda60663e67c6caee196fe664e32216fb74"
+  },
+  "tafsir/ibn-kathir-bn/111.json": {
+   "bytes": 21478,
+   "sha256": "8d63bb2fc0d709e16010aacde007b346bbe0cb3a49dc62359f24c15bdc2a3250"
+  },
+  "tafsir/ibn-kathir-bn/112.json": {
+   "bytes": 52363,
+   "sha256": "520ed588e053a3bab20b3e0f1f85c9c3667dc2625dda9e7f75e65224c2438c68"
+  },
+  "tafsir/ibn-kathir-bn/113.json": {
+   "bytes": 17645,
+   "sha256": "783b4c9f5a2b6218f2f07ed5c3e4c38ccbad4670c58d4d57b69a08b52c82c433"
+  },
+  "tafsir/ibn-kathir-bn/114.json": {
+   "bytes": 19203,
+   "sha256": "b4953dd5d887561d02c6860b3f8883abaffde44c449dc9b254b12b0079806c27"
+  }
+ }
+}

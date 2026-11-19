@@ -9,6 +9,8 @@ import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLay
 import { switchScript, AR_SIZE, TR_SIZE, wbwSupported } from "../../../legacy/quranCore.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
+import { loadTafsir } from "../../../legacy/quranData.js";
+import { findTafsir, tafsirBlocks, tafsirRangeNote, TAFSIR_NAME } from "../../../legacy/quranTafsir.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
 
 const { useState, useEffect, useRef, useCallback } = React;
@@ -296,8 +298,34 @@ export function AyahFlow({ items, meta, markers, th, accent, arSize, font, scrip
 }
 
 // ───── আয়াতে ট্যাপ করলে নিচের শিট: অনুবাদ, কপি, শেয়ার, বুকমার্ক, পছন্দ ─────
+// তাফসির-অংশ: সূরার ফাইল প্রথমবার চাইলে নামে; ব্যর্থ হলে "আবার চেষ্টা"।
+function TafsirBody({ surah, ayah, th, accent, trSize }) {
+  const [st, setSt] = useState({ s: "load" });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    setSt({ s: "load" });
+    loadTafsir(surah).then((p) => { if (live) setSt({ s: "ok", item: findTafsir(p, ayah.n) }); }).catch(() => { if (live) setSt({ s: "err" }); });
+    return () => { live = false; };
+  }, [surah.n, ayah.n, tick]);
+  const box = { borderTop: "1px solid " + LINE, marginTop: 8, paddingTop: 10 };
+  if (st.s === "load") return h("div", { style: { ...box, fontSize: 13, opacity: 0.75 }, role: "status" }, "তাফসির আনা হচ্ছে…");
+  if (st.s === "err" || !st.item) {
+    return h("div", { style: { ...box, fontSize: 13 }, role: "alert" },
+      "তাফসির আনা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।",
+      h("button", { type: "button", onClick: () => setTick((t) => t + 1), style: actBtn(accent) }, "আবার চেষ্টা"));
+  }
+  const note = tafsirRangeNote(st.item, toBnDigits);
+  const blocks = tafsirBlocks(st.item.html);
+  return h("div", { style: box },
+    h("div", { style: { fontSize: 12, opacity: 0.7, marginBottom: 6 } }, TAFSIR_NAME + (note ? " · " + note : "")),
+    blocks.map((segs, i) => h("p", { key: i, style: { fontSize: trSize, lineHeight: 1.95, margin: "0 0 10px" } },
+      segs.map((x, j) => (x.b ? h("strong", { key: j }, x.t) : x.t)))));
+}
+
 export function AyahSheet({ surah, ayah, th, accent, trSize, flash, bm, fav, onCopy, onShare, onMark, onClose }) {
   useBackLayer(true, onClose);
+  const [showTafsir, setShowTafsir] = useState(false);
   const n = toBnDigits(ayah.n);
   return h("div", { style: { position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.4)" }, onClick: onClose },
     h("div", { onClick: (e) => e.stopPropagation(), style: { background: th.bg, color: th.fg, borderRadius: "18px 18px 0 0", padding: "14px 18px 20px", maxHeight: "80%", overflowY: "auto" } },
@@ -308,13 +336,15 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, flash, bm, fav, onC
       h("p", { style: { fontSize: trSize, lineHeight: 1.8, opacity: 0.92, margin: "4px 0 8px" } }, ayah.tr),
       h("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 6 } }, "অনুবাদ: " + TRANSLATOR),
       h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid " + LINE, paddingTop: 6 } },
+        h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: { ...actBtn(accent), fontWeight: showTafsir ? 700 : 400 }, "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, showTafsir ? "তাফসির ▲" : "তাফসির"),
         h("button", { type: "button", onClick: () => onCopy(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" },
           h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
         h("button", { type: "button", onClick: () => onShare(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 17 }), "শেয়ার"),
         h("button", { type: "button", onClick: () => onMark(ayah, "b"), style: actBtn(accent), "aria-pressed": bm, "aria-label": "আয়াত " + n + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") }, h(BookmarkSvg, { on: bm }), bm ? "বুকমার্কড" : "বুকমার্ক"),
         h("button", { type: "button", onClick: () => onMark(ayah, "f"), style: actBtn(accent), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav }), "পছন্দ")
       ),
-      flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
+      flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।"),
+      showTafsir && h(TafsirBody, { surah, ayah, th, accent, trSize })
     )
   );
 }
