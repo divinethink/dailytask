@@ -56,16 +56,45 @@ function isQuranData(url) {
 }
 
 // কুরআনের ডেটা: cache-first (অফলাইনে পড়া যায়); ব্যর্থ/ভুল-ধরনের response cache হয় না।
+// তাফসিরের সূরা-ফাইল (প্রতি তাফসিরে সর্বশেষ TAFSIR_KEEP টা) ফোনে রাখা হয়; পুরনোগুলো মোছে — অফলাইনে সাম্প্রতিক সূরা চলে, সাইজ অনির্দিষ্ট বাড়ে না।
+const TAFSIR_KEEP = 8;
+const TAFSIR_FILE = /\/quran\/v1\/tafsir\/([^/]+)\/\d{3}\.json$/;
+async function trimTafsir(cache, url) {
+  try {
+    const m = TAFSIR_FILE.exec(new URL(url).pathname);
+    if (!m) return;
+    const same = (await cache.keys()).filter((r) => {
+      const x = TAFSIR_FILE.exec(new URL(r.url).pathname);
+      return x && x[1] === m[1];
+    });
+    // keys() ঢোকার ক্রমে আসে — সামনের (পুরনো) গুলো আগে মোছা
+    for (const r of same.slice(0, Math.max(0, same.length - TAFSIR_KEEP))) await cache.delete(r);
+  } catch {
+    // সীমা-ছাঁটাই ব্যর্থ হলেও পড়া আটকায় না
+  }
+}
+
 async function quranCacheFirst(request) {
   const cache = await caches.open(QURAN_CACHE);
   const cached = await cache.match(request);
-  if (cached) return cached;
+  if (cached) {
+    // তাফসির-সূরা আবার পড়লে "সর্বশেষ"-এ সরানো, যাতে চালু সূরা মোছা না পড়ে
+    if (TAFSIR_FILE.test(new URL(request.url).pathname)) {
+      try {
+        await cache.put(request, cached.clone());
+      } catch {
+        // নীরব
+      }
+    }
+    return cached;
+  }
   try {
     const res = await fetch(request);
     const ct = res.headers.get("content-type") || "";
     if (res.status === 200 && !ct.includes("text/html")) {
       try {
         await cache.put(request, res.clone());
+        await trimTafsir(cache, request.url);
       } catch {
         // cache-write ব্যর্থ হলেও response ফেরত যাবে
       }
@@ -113,11 +142,11 @@ self.addEventListener("activate", (e) => {
       Promise.all(keys.filter((k) => k !== CACHE && k !== QURAN_CACHE).map((k) => caches.delete(k)))
     )
   );
-  // সরানো ফিচারের (১৬-লাইন মুসহাফ, ফাতহুল মাজীদ) পুরনো ক্যাশ-করা ফাইল ফোন থেকে মোছা (best-effort)।
+  // সরানো ফিচারের (১৬-লাইন মুসহাফ) পুরনো ক্যাশ-করা ফাইল ফোন থেকে মোছা (best-effort)।
   e.waitUntil(
     caches.open(QURAN_CACHE).then((c) =>
       c.keys().then((reqs) =>
-        Promise.all(reqs.filter((r) => /\/quran\/v1\/(mushaf16|tafsir\/fathul-majid-bn)\//.test(r.url)).map((r) => c.delete(r)))
+        Promise.all(reqs.filter((r) => /\/quran\/v1\/mushaf16\//.test(r.url)).map((r) => c.delete(r)))
       )
     ).catch(() => {})
   );
