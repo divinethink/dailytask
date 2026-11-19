@@ -113,6 +113,14 @@ self.addEventListener("activate", (e) => {
       Promise.all(keys.filter((k) => k !== CACHE && k !== QURAN_CACHE).map((k) => caches.delete(k)))
     )
   );
+  // সরানো ফিচারের (১৬-লাইন মুসহাফ, ফাতহুল মাজীদ) পুরনো ক্যাশ-করা ফাইল ফোন থেকে মোছা (best-effort)।
+  e.waitUntil(
+    caches.open(QURAN_CACHE).then((c) =>
+      c.keys().then((reqs) =>
+        Promise.all(reqs.filter((r) => /\/quran\/v1\/(mushaf16|tafsir\/fathul-majid-bn)\//.test(r.url)).map((r) => c.delete(r)))
+      )
+    ).catch(() => {})
+  );
   self.clients.claim();
 });
 

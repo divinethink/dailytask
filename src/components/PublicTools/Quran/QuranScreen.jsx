@@ -2,7 +2,7 @@
 // এবং সূরা / পারা / পৃষ্ঠা — তিন ট্যাবে সূচি। ট্যাপ করলে QuranReader পূর্ণ-স্ক্রিনে খোলে।
 // React global(window.React, globals.js)।
 
-import { loadMeta, loadSearchIndex, packComplete, warmScript } from "../../../legacy/quranData.js";
+import { loadMeta, loadSearchIndex, packComplete } from "../../../legacy/quranData.js";
 import {
   readLastRead, writeLastRead, readPrefs, writePrefs, readMarks, writeMarks, readDirty, writeDirty,
 } from "../../../legacy/quranState.js";
@@ -14,8 +14,6 @@ import {
 } from "../../../legacy/quranCore.js";
 import { ChevronRight } from "../../icons.jsx";
 import { QuranReader } from "./QuranReader.jsx";
-import { QuranMushaf } from "./QuranMushaf.jsx";
-import { QuranMushaf16 } from "./QuranMushaf16.jsx";
 import { QuranSettingsOverlay, Rosette } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -62,7 +60,7 @@ function Heading({ children }) {
 }
 
 function Tabs({ tab, onTab }) {
-  const items = [["surah", "সূরা"], ["para", "পারা"], ["page", "পৃষ্ঠা"], ["search", "খুঁজুন"], ["saved", "সংরক্ষিত"]];
+  const items = [["surah", "সূরা"], ["para", "পারা"], ["search", "খুঁজুন"], ["saved", "সংরক্ষিত"]];
   return h("div", { className: "flex gap-1 p-1 rounded-xl mt-4 mb-3", style: { background: "#E8EEE9" }, role: "tablist" },
     items.map(([id, label]) =>
       h("button", {
@@ -136,22 +134,6 @@ function ParaList({ meta, onOpen }) {
   );
 }
 
-function PageGrid({ meta, onPage }) {
-  return h("div", null,
-    h("p", { className: "text-xs text-gray-500 px-1 mb-2" }, "মাদানী মুসহাফের ৬০৪ পৃষ্ঠা। পৃষ্ঠা খুলে সোয়াইপ করলে পাতা উল্টাবে, সূরা পেরিয়েও পড়া যাবে।"),
-    h("div", { className: "grid grid-cols-5 gap-2" },
-      meta.pages.map((_pg, i) =>
-        h("button", {
-          key: i, type: "button", onClick: () => onPage(i + 1),
-          className: "rounded-xl border bg-white text-sm font-semibold",
-          style: { minHeight: 44, borderColor: "#D7DFD9", color: PRIMARY },
-          "aria-label": "পৃষ্ঠা " + toBnDigits(i + 1),
-        }, toBnDigits(i + 1))
-      )
-    )
-  );
-}
-
 // খুঁজুন: সূরার নাম ও সূরা:আয়াত নম্বর ডেটা ছাড়াই মেলে; আরবি/বাংলা শব্দ খুঁজতে পুরো কুরআন একবার নামাতে হয় (~৭৫০ KB, এরপর অফলাইনেও চলে)।
 function SearchPanel({ meta, onOpen, script, font }) {
   const surahs = meta.surahs;
@@ -167,9 +149,9 @@ function SearchPanel({ meta, onOpen, script, font }) {
   const start = useCallback(() => {
     setSt({ status: "loading", done: 0 });
     loadSearchIndex(surahs, undefined, (done) => { if (aliveRef.current) setSt({ status: "loading", done }); })
-      .then((idx) => { if (aliveRef.current && idx) { setIndex(idx); setSt({ status: "ready", done: 114 }); warmScript(surahs, script, font); } }) // বাছা উসমানি লেখা+ফন্টও অফলাইনের জন্য (ব্যর্থ হলে নীরব; পড়ার সময় আবার চেষ্টা)
+      .then((idx) => { if (aliveRef.current && idx) { setIndex(idx); setSt({ status: "ready", done: 114 }); } })
       .catch(() => { if (aliveRef.current) setSt({ status: "error", done: 0 }); });
-  }, [surahs, script, font]);
+  }, [surahs]);
 
   // আগে নামানো থাকলে নিজে থেকেই ইনডেক্স তৈরি (ক্যাশ থেকে, নেট লাগে না)।
   useEffect(() => { packComplete().then((ok) => { if (ok && aliveRef.current) start(); }); }, [start]);
@@ -277,7 +259,6 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [open, setOpen] = useState(null); // { s, a }
-  const [mushaf, setMushaf] = useState(null); // পৃষ্ঠা-নম্বর
   const [tab, setTab] = useState("surah");
   const [last, setLast] = useState(() => readLastRead());
   const [prefs, setPrefsState] = useState(() => readPrefs());
@@ -402,21 +383,6 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
   const markedSet = new Set(marks.map((x) => markKey(x.s, x.a, x.k)));
   const lastList = sanitizeLastRead(last, surahs);
   const openAt = (s, a) => setOpen({ s, a: a || 1 });
-  // এক স্তর বন্ধ হওয়ার "back" শেষ হলে তবেই পরেরটা খোলা; নইলে সেই back নতুন স্তরকেও বন্ধ করে দেয়।
-  const afterBack = (fn) => {
-    let done = false;
-    const go = () => { if (done) return; done = true; window.removeEventListener("popstate", go); fn(); };
-    window.addEventListener("popstate", go);
-    setTimeout(go, 400);
-  };
-  const openMushafFromReader = (p) => { setOpen(null); afterBack(() => setMushaf(p)); };
-  // মুসহাফ থেকে তালিকা/রিডিং-এ ফেরা: মোড বদলে ওই পৃষ্ঠার প্রথম আয়াতে রিডার।
-  const openReaderFromMushaf = (mode, s, a) => {
-    setPrefs({ ...prefs, mode });
-    setMushaf(null);
-    afterBack(() => setOpen({ s, a }));
-  };
-
   return h("div", null,
     lastList.length > 0 && h(ContinueCard, { meta, item: lastList[0], onOpen: openAt }),
     lastList.length > 1 && h("div", null,
@@ -434,7 +400,6 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
     h(Tabs, { tab, onTab: setTab }),
     tab === "surah" && h(SurahList, { surahs, onOpen: openAt }),
     tab === "para" && h(ParaList, { meta, onOpen: openAt }),
-    tab === "page" && h(PageGrid, { meta, onPage: setMushaf }),
     tab === "search" && h(SearchPanel, { meta, onOpen: openAt, script: prefs.arScript, font: prefs.arFont }),
     tab === "saved" && h(SavedList, {
       meta, marks, sync, onOpen: openAt,
@@ -455,32 +420,7 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
       onNavigate: (n) => openAt(n, 1),
       marked: markedSet,
       onMark,
-      onOpenMushaf: openMushafFromReader,
     }),
-    settingsOpen && h(QuranSettingsOverlay, { prefs, onPrefs: setPrefs, onClose: onSettingsClose }),
-    // আরবি লেখার ধরন ইন্দো-পাক হলে ১৬-লাইনের মুসহাফ; বাকিতে আগের মাদানী মুসহাফ
-    mushaf && (prefs.arScript === "indopak"
-      ? h(QuranMushaf16, {
-        key: "mushaf16",
-        meta, prefs, onPrefs: setPrefs,
-        startPage: mushaf,
-        onClose: () => setMushaf(null),
-        onSwitchMode: openReaderFromMushaf,
-        onPosition: savePos,
-        marked: markedSet,
-        onMark,
-        onLeave16: setMushaf,
-      })
-      : h(QuranMushaf, {
-        key: "mushaf",
-        meta, markers, prefs, onPrefs: setPrefs,
-        startPage: mushaf,
-        onClose: () => setMushaf(null),
-        onSwitchMode: openReaderFromMushaf,
-        onPosition: savePos,
-        marked: markedSet,
-        onMark,
-        onPageSync: setMushaf,
-      }))
+    settingsOpen && h(QuranSettingsOverlay, { prefs, onPrefs: setPrefs, onClose: onSettingsClose })
   );
 }

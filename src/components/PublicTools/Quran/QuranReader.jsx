@@ -69,7 +69,7 @@ function AyahJump({ total, curAyah, th, onJump }) {
   );
 }
 
-export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate, marked, onMark, onOpenMushaf }) {
+export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, bismillah, onClose, onPosition, onNavigate, marked, onMark }) {
   const start = startAyah > 1 ? startAyah : 1;
   const [state, setState] = useState({ status: "loading", ayahs: null });
   const [shown, setShown] = useState(Math.max(PAGE_SIZE, start + 10));
@@ -248,8 +248,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       ),
       h("div", { role: "group", "aria-label": "পড়ার ধরন", style: { display: "flex", alignItems: "center", background: "rgba(255,255,255,0.18)", borderRadius: 999, padding: 2 } },
         seg("list", "তালিকা", prefs.mode === "list", () => prefs.mode !== "list" && onPrefs({ ...prefs, mode: "list" })),
-        seg("read", "রিডিং", prefs.mode === "read", () => prefs.mode !== "read" && onPrefs({ ...prefs, mode: "read" })),
-        onOpenMushaf && ready && seg("mushaf", "মুসহাফ", false, () => onOpenMushaf(where.page))
+        seg("read", "রিডিং", prefs.mode === "read", () => prefs.mode !== "read" && onPrefs({ ...prefs, mode: "read" }))
       ),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 44, minHeight: 44, color: "#fff", fontSize: 19, fontWeight: 600 } }, "Aa")
     ),

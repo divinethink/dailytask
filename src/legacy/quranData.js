@@ -2,10 +2,9 @@
 // ক্যাশ: ব্রাউজারে in-memory + sw.js-এর আলাদা `quran-v1` cache (অফলাইনে পড়া যায়)।
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, parseWbwPayload, buildSearchIndex } from "./quranCore.js";
-import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
+import { scriptById, DEFAULT_SCRIPT } from "./quranFonts.js";
 import { validateTafsirPayload } from "./quranTafsir.js";
 import { FM_BASE, parseFmIndex, parseFmPayload } from "./quranTafsirFm.js";
-import { sanitizeIndex, sanitizePage, clamp16, M16_VER } from "./mushaf16.js";
 
 const TIMEOUT_MS = 15000;
 let metaPromise = null;
@@ -96,33 +95,6 @@ export function loadFm(surahN) {
   return fmCache.get(surahN);
 }
 
-// ── ১৬-লাইন ইন্দো-পাক মুসহাফ (public/quran/v1/mushaf16) ──
-let m16IndexPromise = null;
-const m16Pages = new Map();
-
-export function loadMushaf16Index() {
-  if (!m16IndexPromise) {
-    m16IndexPromise = getJson(QURAN_BASE + "/mushaf16/index.json?v=" + M16_VER).then((raw) => {
-      const idx = sanitizeIndex(raw);
-      if (!idx) throw new Error("mushaf16 index অবৈধ");
-      return idx;
-    });
-    m16IndexPromise.catch(() => { m16IndexPromise = null; });
-  }
-  return m16IndexPromise;
-}
-
-// ফল = [{t:"s",s} | {t:"b"} | {t:"a", c, segs:[{s,a,words}]}]
-export async function loadMushaf16Page(p) {
-  const n = clamp16(p);
-  if (m16Pages.has(n)) return m16Pages.get(n);
-  const lines = sanitizePage(await getJson(QURAN_BASE + "/mushaf16/" + pad3(n) + ".json?v=" + M16_VER), n);
-  if (!lines) throw new Error("mushaf16 পৃষ্ঠা অবৈধ: " + n);
-  if (m16Pages.size > 40) m16Pages.delete(m16Pages.keys().next().value);
-  m16Pages.set(n, lines);
-  return lines;
-}
-
 // শব্দে শব্দে অর্থ (ইংরেজি): সূরা-ভিত্তিক, on-demand; ফল = প্রতি আয়াতের অর্থ-তালিকা (বা null)। ব্যর্থ হলে throw — UI শুধু অর্থ-ছাড়া সাধারণ আয়াত দেখায়।
 // sw.js-এর বিদ্যমান `/quran/v1/` cache-first নিয়মেই অফলাইনে পড়া যায় (একবার খোলা সূরা)। ডেটা শোধরালে `?v=`-এর সংখ্যা বাড়াতে হবে (arUrl-এর মতো)।
 const WBW_VER = 1;
@@ -187,27 +159,4 @@ export function loadSearchIndex(surahs, trId = DEFAULT_TRANSLATION, onProgress, 
   p.then((idx) => { if (!idx) indexCache.delete(trId); }, () => indexCache.delete(trId));
   indexCache.set(trId, p);
   return p;
-}
-
-// বাছা (simple ছাড়া) লেখার ধরন ও ফন্ট আগেভাগে নামানো, যাতে অফলাইনেও চলে। ব্যর্থ হলে false — পড়া আটকায় না (পড়ার সময় আবার চেষ্টা)।
-export async function warmScript(surahs, script, fontId, onProgress, isAlive) {
-  const sc = scriptById(script);
-  if (!sc || sc.id === DEFAULT_SCRIPT) return true;
-  try {
-    const f = fontById(fontId);
-    if (f && f.file) await fetch(f.file);
-    let next = 0, done = 0;
-    const worker = async () => {
-      while (next < surahs.length) {
-        if (isAlive && !isAlive()) return;
-        const su = surahs[next++];
-        const j = await getJson(arUrl(sc, su.n));
-        if (!j || j.s !== su.n || !Array.isArray(j.a) || j.a.length !== su.ayahs) throw new Error("quran data: " + sc.id + " সূরা " + su.n);
-        done++;
-        if (onProgress) onProgress(done, surahs.length);
-      }
-    };
-    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    return true;
-  } catch (e) { return false; }
 }

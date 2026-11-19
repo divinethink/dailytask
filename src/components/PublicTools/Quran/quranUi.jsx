@@ -1,4 +1,4 @@
-// quranUi.jsx — QuranReader ও QuranMushaf-এর ভাগ-করা অংশ: কপি, আইকন, স্টেপার,
+// quranUi.jsx — QuranReader ও কুরআন-স্ক্রিনের ভাগ-করা অংশ: কপি, আইকন, স্টেপার,
 // অবিচ্ছিন্ন আরবি লেখা (AyahFlow), আয়াত-শিট (AyahSheet) ও কপি/শেয়ার-হুক।
 // আয়াতের নম্বর CSS-এর গোল চিহ্নে আঁকা (ফন্টের চিহ্ন নয়), যাতে যেকোনো ফন্টে ঠিক দেখায়।
 // React global(window.React, globals.js)।
