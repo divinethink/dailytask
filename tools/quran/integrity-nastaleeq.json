@@ -22,8 +22,8 @@
    "sha256": "09aae690e13bb2b6d5c53c1f617616362c9b6880ef1bf4285376d5be2f1d2415"
   },
   "ar-nastaleeq/006.json": {
-   "bytes": 53359,
-   "sha256": "3342250e717b65dfca00bb5f7af9d7322560943b8db4ddd5c082890ca76f15f7"
+   "bytes": 53357,
+   "sha256": "ca987d8321ae03517d44a006f21304fabe201c5b36a95cd5dff8bebf5cc622d0"
   },
   "ar-nastaleeq/007.json": {
    "bytes": 59748,
@@ -106,8 +106,8 @@
    "sha256": "28e6d5eaa8524b77ae62efda37c7019791b55f6d3ebd694b41806a8c1842c363"
   },
   "ar-nastaleeq/027.json": {
-   "bytes": 20083,
-   "sha256": "4ced8331e035423b4105ccd17df54073e7d1e4a5edac38974a400067b69bd6e7"
+   "bytes": 20085,
+   "sha256": "14270f664aab87b58aae7a15e35ae9a1682eeb17101fd9a6c1a6aee8e844cd98"
   },
   "ar-nastaleeq/028.json": {
    "bytes": 24681,
@@ -162,8 +162,8 @@
    "sha256": "548a173de3264ddb50cf2598910cc46720c61b9781b3a6223c8aa92298f33860"
   },
   "ar-nastaleeq/041.json": {
-   "bytes": 14058,
-   "sha256": "e74f617a1839c554de51c3da963d15b19ff6b87082e1d7ed173d070c354c83f9"
+   "bytes": 14056,
+   "sha256": "ec467fdfbc16b11afca0f562e143fef255bec45df937f5417ec6e8fe442ca087"
   },
   "ar-nastaleeq/042.json": {
    "bytes": 14766,
