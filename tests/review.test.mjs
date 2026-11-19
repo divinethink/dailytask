@@ -1,7 +1,7 @@
 // চালান: node --test tests/   (কোনো dependency লাগে না)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, weekUnlockAt, unlockCountdown, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, prevChunk, weekUnlockAt, weekLockAt, monthUnlockAt, monthLockAt, windowState, unlockCountdown, reviewDocId, validateReview, LIMITS } from "../src/legacy/reviewSchema.js";
 import { weekFieldMoves, weekFieldExtremes, weekGlance, weeklyGap, countFieldTotal, weekdayAverages, weakestWeekdays, bestImprovementAndDrop, rankMoves, goalSuccess, monthDelta } from "../src/legacy/reviewCalc.js";
 import { elapsedDays, prevMonthOf, buildMonthlyReport, goalSummary, suggestDecisions, fill } from "../src/legacy/reviewMonthly.js";
 import { REVIEW_TEXT } from "../src/legacy/reviewText.js";
@@ -89,20 +89,38 @@ test("bestImprovementAndDrop", () => {
   const tie = bestImprovementAndDrop([{ key: "b", prev: 0, cur: 2 }, { key: "a", prev: 0, cur: 2 }]);
   assert.equal(tie.improvement.key, "a");
 });
-test("লক: সপ্তাহ খোলে বৃহস্পতিবার রাত ৮টায়; শেষ হওয়া সপ্তাহ খোলা", () => {
-  const at = weekUnlockAt(2026, 10, 3); // ১৩–১৯ নভেম্বর ⇒ ১৯ নভেম্বর (বৃহস্পতি) রাত ৮টা
+test("লক: সপ্তাহ খোলে বৃহস্পতিবার রাত ৯টায়, বন্ধ হয় শনিবার রাত ১১টায়", () => {
+  const at = weekUnlockAt(2026, 10, 3); // ১৩–১৯ নভেম্বর ⇒ ১৯ নভেম্বর (বৃহস্পতি) রাত ৯টা
   assert.equal(at.getDay(), 4);
-  assert.deepEqual([at.getMonth(), at.getDate(), at.getHours(), at.getMinutes()], [10, 19, 20, 0]);
-  // রবিবার ১৫ নভেম্বর দুপুর ১টা ⇒ ৪ দিন ৭ ঘণ্টা
-  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 15, 13, 0)), { days: 4, hours: 7, mins: 0 });
-  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 19, 19, 30)), { days: 0, hours: 0, mins: 30 });
-  assert.equal(unlockCountdown(at, new Date(2026, 10, 19, 20, 0)), null);   // ঠিক সময়ে খোলা
-  assert.equal(unlockCountdown(at, new Date(2026, 10, 20, 9, 0)), null);    // শুক্রবার: খোলা
-  assert.equal(unlockCountdown(weekUnlockAt(2026, 10, 2), new Date(2026, 10, 15)), null); // আগের সপ্তাহ খোলা
+  assert.deepEqual([at.getMonth(), at.getDate(), at.getHours(), at.getMinutes()], [10, 19, 21, 0]);
+  // রবিবার ১৫ নভেম্বর দুপুর ১টা ⇒ ৪ দিন ৮ ঘণ্টা
+  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 15, 13, 0)), { days: 4, hours: 8, mins: 0 });
+  assert.deepEqual(unlockCountdown(at, new Date(2026, 10, 19, 20, 30)), { days: 0, hours: 0, mins: 30 });
+  assert.equal(unlockCountdown(at, new Date(2026, 10, 19, 21, 0)), null);   // ঠিক সময়ে খোলা
+  const lk = weekLockAt(2026, 10, 3);
+  assert.equal(lk.getDay(), 6);
+  assert.deepEqual([lk.getMonth(), lk.getDate(), lk.getHours()], [10, 21, 23]);
+  assert.equal(windowState(at, lk, new Date(2026, 10, 19, 20, 59)), "before");
+  assert.equal(windowState(at, lk, new Date(2026, 10, 20, 9, 0)), "open");   // শুক্রবার: খোলা
+  assert.equal(windowState(at, lk, new Date(2026, 10, 21, 22, 59)), "open");
+  assert.equal(windowState(at, lk, new Date(2026, 10, 21, 23, 0)), "closed"); // শনিবার রাত ১১টা
   // মাস-পেরোনো সপ্তাহ: ১ম সপ্তাহ শেষ ৫ নভেম্বর
   const w1 = weekUnlockAt(2026, 10, 1);
   assert.deepEqual([w1.getMonth(), w1.getDate()], [10, 5]);
 });
+test("লক: মাসিক খোলে মাসের শেষ দিন রাত ৮টায়, বন্ধ হয় পরের মাসের ৩ তারিখ রাত ১১টায়", () => {
+  const mu = monthUnlockAt(2026, 10), ml = monthLockAt(2026, 10); // নভেম্বর
+  assert.deepEqual([mu.getMonth(), mu.getDate(), mu.getHours()], [10, 30, 20]);
+  assert.deepEqual([ml.getMonth(), ml.getDate(), ml.getHours()], [11, 3, 23]);
+  assert.equal(windowState(mu, ml, new Date(2026, 10, 30, 19, 59)), "before");
+  assert.equal(windowState(mu, ml, new Date(2026, 10, 30, 20, 0)), "open");
+  assert.equal(windowState(mu, ml, new Date(2026, 11, 3, 22, 59)), "open");
+  assert.equal(windowState(mu, ml, new Date(2026, 11, 3, 23, 0)), "closed");
+  // ডিসেম্বর ⇒ ৩১ ডিসেম্বর; জানুয়ারির ৩ তারিখ (বছর পেরোনো)
+  assert.deepEqual([monthUnlockAt(2026, 11).getFullYear(), monthUnlockAt(2026, 11).getDate()], [2026, 31]);
+  assert.deepEqual([monthLockAt(2026, 11).getFullYear(), monthLockAt(2026, 11).getMonth(), monthLockAt(2026, 11).getDate()], [2027, 0, 3]);
+});
+
 test("rankMoves: উন্নতি/অবনতি/অপরিবর্তিত আলাদা ও ক্রমে", () => {
   const r = rankMoves([
     { key: "c", prev: 1, cur: 4 }, { key: "a", prev: 0, cur: 3 }, { key: "b", prev: 2, cur: 9 },

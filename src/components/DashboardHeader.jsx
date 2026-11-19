@@ -16,6 +16,7 @@
 import { ChevronDown, User, X } from "./icons.jsx";
 import { doc, writeBatch } from "firebase/firestore";
 import { NotificationPanel } from "./NotificationPanel.jsx";
+import { isLocalNotice } from "../legacy/useReviewNotices.js";
 import { ProfileDropdownGoogle } from "./ProfileDropdownGoogle.jsx";
 
 export function DashboardHeader({
@@ -47,6 +48,7 @@ export function DashboardHeader({
   newMemberEmail,
   newName,
   notifications,
+  localNotices,
   selectedId,
   selectedMember,
   setAddingMember,
@@ -160,7 +162,9 @@ export function DashboardHeader({
           // §Notification System(২৩ আগস্ট ২০২৬ সংশোধন) — seen করলে item
           // panel থেকে সরে না (শুধু delete/Clear-all করলেই সরবে); এখানে শুধু
           // read:true mark করা হয় (badge কমানোর জন্য), list অপরিবর্তিত থাকে।
-          const toMark = notifications.filter(n => !n.read);
+          const localMark = notifications.filter(n => !n.read && isLocalNotice(n));
+          if (localMark.length > 0 && localNotices) localNotices.markRead(localMark.map(n => n.id));
+          const toMark = notifications.filter(n => !n.read && !isLocalNotice(n));
           if (toMark.length > 0) {
             const batch = writeBatch(db);
             toMark.forEach(n => {
@@ -185,7 +189,7 @@ export function DashboardHeader({
     className: "text-sm leading-none"
   }, "🔔"), notifications.filter(n => !n.read).length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center"
-  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, db, getFamilyId })))), addingMember && /*#__PURE__*/React.createElement("div", {
+  }, toBn(notifications.filter(n => !n.read).length))), /*#__PURE__*/React.createElement(NotificationPanel, { show: showNotifPanel, onClose: () => setShowNotifPanel(false), notifications, setNotifications, db, getFamilyId, localNotices })))), addingMember && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-md"
   }, members.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-[11px] text-emerald-100 font-semibold px-1 mb-1.5"

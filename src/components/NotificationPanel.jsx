@@ -4,6 +4,7 @@
 // ownership stays in App()). JSX + inline Firestore calls unchanged (moved as-is).
 import { Trash } from "./icons.jsx";
 import { doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { isLocalNotice } from "../legacy/useReviewNotices.js";
 
 export function NotificationPanel({
   show,
@@ -11,7 +12,8 @@ export function NotificationPanel({
   notifications,
   setNotifications,
   db,
-  getFamilyId
+  getFamilyId,
+  localNotices
 }) {
   return show && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-40",
@@ -25,6 +27,7 @@ export function NotificationPanel({
     className: "px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex items-start gap-2"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => {
+      if (isLocalNotice(n)) return;
       updateDoc(doc(db, "families", getFamilyId(), "notifications", n.id), { read: true }).catch(() => {});
     },
     className: "flex-1 cursor-pointer"
@@ -36,6 +39,7 @@ export function NotificationPanel({
     type: "button",
     onClick: e => {
       e.stopPropagation();
+      if (isLocalNotice(n)) { if (localNotices) localNotices.dismiss([n.id]); return; }
       deleteDoc(doc(db, "families", getFamilyId(), "notifications", n.id)).catch(() => {});
       setNotifications(prev => prev.filter(x => x.id !== n.id));
     },
@@ -48,7 +52,9 @@ export function NotificationPanel({
       const all = notifications;
       if (all.length === 0) return;
       const batch = writeBatch(db);
-      all.forEach(n => {
+      const localIds = all.filter(isLocalNotice).map(n => n.id);
+      if (localIds.length > 0 && localNotices) localNotices.dismiss(localIds);
+      all.filter(n => !isLocalNotice(n)).forEach(n => {
         batch.delete(doc(db, "families", getFamilyId(), "notifications", n.id));
       });
       batch.commit().catch(() => {});

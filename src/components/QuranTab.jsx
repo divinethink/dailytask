@@ -7,6 +7,7 @@ const QuranScreenLazy = lazyRetry(() => import("./PublicTools/Quran/QuranScreen.
 
 export function QuranTab() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [searchTick, setSearchTick] = React.useState(0); // সার্চ-বাটন চাপলে "খুঁজুন" ট্যাব খোলে
   return React.createElement(
     "div",
     { className: "min-h-screen pb-20 bg-[#F4F7F1]" },
@@ -14,15 +15,21 @@ export function QuranTab() {
       // সরল হেডার: শিরোনাম ও সেটিং-বাটন।
       React.createElement("div", { className: "flex items-center justify-between px-4 pt-5 pb-3" },
         React.createElement("div", { className: "text-2xl font-bold", style: { color: "var(--theme-primary, #0E4B43)" } }, "কুরআন"),
-        React.createElement("button", {
+        React.createElement("div", { className: "flex items-center gap-2" },
+          React.createElement("button", {
+          type: "button", onClick: () => setSearchTick((t) => t + 1), "aria-label": "কুরআনে খুঁজুন",
+          className: "shrink-0 flex items-center justify-center rounded-full active:scale-95 transition-transform",
+          style: { width: 44, height: 44, color: "var(--theme-primary, #0E4B43)", background: "#E8F0EE" },
+        }, React.createElement("svg", { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, React.createElement("circle", { cx: 11, cy: 11, r: 7 }), React.createElement("path", { d: "M20 20l-3.5-3.5" }))),
+          React.createElement("button", {
           type: "button", onClick: () => setSettingsOpen(true), "aria-label": "কুরআন-সেটিংস",
           className: "shrink-0 flex items-center justify-center rounded-full active:scale-95 transition-transform",
           style: { width: 44, height: 44, color: "var(--theme-primary, #0E4B43)", background: "#E8F0EE" },
-        }, React.createElement(SettingsGear, { size: 22 }))),
+        }, React.createElement(SettingsGear, { size: 22 })))),
       React.createElement(
         React.Suspense,
         { fallback: React.createElement("p", { className: "text-center text-sm text-gray-500 py-16" }, "লোড হচ্ছে…") },
-        React.createElement(QuranScreenLazy, { settingsOpen, onSettingsClose: () => setSettingsOpen(false) })
+        React.createElement(QuranScreenLazy, { searchTick, settingsOpen, onSettingsClose: () => setSettingsOpen(false) })
       )
     )
   );

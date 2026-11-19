@@ -63,10 +63,28 @@ function prevChunk(year, month0, week) {
   return { year: y, month0: m, week: chunkCount(y, m) };
 }
 
-// ধাপ ৪ (লক): সপ্তাহের ফর্ম খোলে সপ্তাহের শেষ দিন (বৃহস্পতিবার) রাত ৮টায় (Owner-অনুমোদিত); শেষ হওয়া সপ্তাহ সবসময় খোলা।
-const UNLOCK_HOUR = 20;
+// লক-সময় (Owner-অনুমোদিত): সাপ্তাহিক মুহাসাবা খোলে সপ্তাহের শেষ দিন (বৃহস্পতিবার) রাত ৯টায়, বন্ধ হয় শনিবার রাত ১১টায়।
+// মাসিক খোলে মাসের শেষ দিন রাত ৮টায়, বন্ধ হয় পরের মাসের ৩ তারিখ রাত ১১টায়। সময় পেরোলে ফর্ম/রিপোর্ট বন্ধ; সেভ-করা ডেটা অক্ষত।
+const UNLOCK_HOUR = 21;
+const LOCK_HOUR = 23;
+const MONTH_UNLOCK_HOUR = 20;
 function weekUnlockAt(year, month0, week) {
   return new Date(year, month0, chunkRange(year, month0, week).end, UNLOCK_HOUR, 0, 0);
+}
+function weekLockAt(year, month0, week) {
+  return new Date(year, month0, chunkRange(year, month0, week).end + 2, LOCK_HOUR, 0, 0);
+}
+function monthUnlockAt(year, month0) {
+  return new Date(year, month0 + 1, 0, MONTH_UNLOCK_HOUR, 0, 0);
+}
+function monthLockAt(year, month0) {
+  return new Date(year, month0 + 1, 3, LOCK_HOUR, 0, 0);
+}
+// 'before' (এখনো খোলেনি) | 'open' | 'closed' (সময় শেষ)
+function windowState(unlockAt, lockAt, now) {
+  if (now.getTime() < unlockAt.getTime()) return "before";
+  if (now.getTime() >= lockAt.getTime()) return "closed";
+  return "open";
 }
 // এখনো লক থাকলে { days, hours, mins } (পূর্ণসংখ্যা, নিচের দিকে কাটা), খোলা থাকলে null।
 function unlockCountdown(unlockAt, now) {
@@ -117,4 +135,4 @@ function validateReview(input) {
   return { ok: true, value: out };
 }
 
-export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, dayRelToday, prevChunk, weekUnlockAt, unlockCountdown, UNLOCK_HOUR, reviewDocId, validateReview };
+export { REVIEW_SCHEMA_VERSION, GOAL_RESULTS, LIMITS, ALLOWED_KEYS, chunkCount, chunkOfDate, chunkRange, chunkWeekKey, chunkStarted, chunkOfRange, dayRelToday, prevChunk, weekUnlockAt, weekLockAt, monthUnlockAt, monthLockAt, windowState, unlockCountdown, UNLOCK_HOUR, LOCK_HOUR, MONTH_UNLOCK_HOUR, reviewDocId, validateReview };

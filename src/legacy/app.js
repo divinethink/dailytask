@@ -162,6 +162,7 @@ const PopupMessagesScreen = lazyRetry(() => import("../components/PopupMessagesS
 const MenuPage = lazyRetry(() => import("../components/MenuPage.jsx").then(m => ({ default: m.MenuPage })));
 import { TAB_FAMILY, TAB_MUHASABA, TAB_QURAN, TAB_PRAYER_TIMES, TAB_AMOL, TAB_TOOLS, TAB_SETTINGS, ACTIVE_TAB_STORAGE_KEY } from "./tabs.js";
 import { useBackLayer } from "./backNav.js";
+import { useReviewNotices } from "./useReviewNotices.js";
 // §Public Tools Phase A, item ২ (3_1/3_2 §৪, ১৮ সেপ্টেম্বর ২০২৬): "সময়সূচি" ট্যাব —
 // PublicToolsPlaceholder প্রতিস্থাপন করে actual component বসানো হলো (3_2 §১-এর নীতি
 // অনুযায়ী শুধু import বদল, routing-switch touch হয়নি)। lazy-load(3_2 §২.১ standing
@@ -297,6 +298,8 @@ function App() {
   // item সরে; badge/unread-count আলাদাভাবে notifications.filter(!read) থেকে
   // derive করা হয়।
   const [notifications, setNotifications] = useState([]);
+  // মুহাসাবা-আনলকের স্থানীয় নোটিফিকেশন (সার্ভার/push নেই; অ্যাপ খোলা থাকলে বেলে আসে)
+  const localNotices = useReviewNotices(!isGuestMode, auth.currentUser ? auth.currentUser.uid : "");
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   // accessPending: এই পরিবারের ডেটায় প্রবেশাধিকার নেই (permission-denied) — "অনুমোদনের অপেক্ষায়" স্ক্রিন দেখায়।
@@ -1836,7 +1839,8 @@ function App() {
     newGender: newGender,
     newMemberEmail: newMemberEmail,
     newName: newName,
-    notifications: notifications,
+    notifications: [...localNotices.items, ...notifications],
+    localNotices: localNotices,
     selectedId: selectedId,
     selectedMember: selectedMember,
     setAddingMember: setAddingMember,

@@ -156,7 +156,7 @@ export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
     React.createElement(
       "button",
       { type: "button", onClick: () => setShowRoutine((v) => !v), "aria-expanded": showRoutine, className: "w-full min-h-[44px] flex items-center justify-between gap-2 rounded-xl border border-[#EBD9A8] bg-[#FFFBF0] px-3 text-xs font-semibold text-[#8A6A1C]" + (notes.length ? " mt-2" : "") },
-      React.createElement("span", null, "🌿 প্রতিদিনের আমল, ইতিহাস ও ঘুমের আগে (" + toBn(routine.length) + ")"),
+      React.createElement("span", null, "🌿 প্রতিদিনের আমল"),
       React.createElement(ChevronDown, { size: 15, color: "#8A6A1C", className: "transition-transform" + (showRoutine ? " rotate-180" : "") })
     ),
     showRoutine && React.createElement("ul", { className: "space-y-2 mt-2" }, routine.map((n, i) => React.createElement(Row, { key: "r" + i, n, muted: n.tone === "sleep" }))),

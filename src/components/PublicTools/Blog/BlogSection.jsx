@@ -50,6 +50,7 @@ export function BlogSection({ onBack }) {
   const isCreator = isCreatorAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [q, setQ] = useState(""); // সার্চ: শিরোনাম বা ট্যাগ
   const [selectedCategory, setSelectedCategory] = useState(null); // null = ক্যাটাগরি-গ্রিড; নইলে লেখার তালিকা
   const [selectedPost, setSelectedPost] = useState(null); // full post object
   const [expandedPost, setExpandedPost] = useState({}); // { [postId]: true } — "আরো পড়ুন" দেখানো হয়েছে
@@ -79,6 +80,10 @@ export function BlogSection({ onBack }) {
 
   const filteredPosts =
     selectedCategory === ALL_CATEGORY || selectedCategory === null ? posts : posts.filter((p) => p.category === selectedCategory);
+  const needle = q.trim().toLowerCase();
+  const searchResults = needle
+    ? posts.filter((p) => (p.title || "").toLowerCase().includes(needle) || (Array.isArray(p.tags) ? p.tags : []).some((t) => String(t).toLowerCase().includes(needle)))
+    : [];
   const countOf = (c) => (c === ALL_CATEGORY ? posts.length : posts.filter((p) => p.category === c).length);
   const inListView = view === "list" && selectedCategory !== null;
   // ফোনের ব্যাক: তালিকা থেকে গ্রিডে ফেরা
@@ -197,14 +202,14 @@ export function BlogSection({ onBack }) {
 
   const listTitle = selectedCategory !== null && h("div", { className: "px-4 pt-3 pb-1 text-sm font-bold", style: { color: ink } }, catLabel(selectedCategory));
 
-  const postList = loading
+  const buildList = (list, emptyMsg) => loading
     ? h("div", { className: "flex justify-center py-16" }, h(Loader2, { size: 24, className: "animate-spin" }))
     : loadError
     ? h("div", { className: "px-4 py-8 text-sm text-red-600 text-center" }, loadError)
-    : filteredPosts.length === 0
-    ? h("div", { className: "px-4 py-16 text-sm text-slate-500 text-center" }, "এই ক্যাটাগরিতে এখনো কোনো লেখা নেই।")
+    : list.length === 0
+    ? h("div", { className: "px-4 py-16 text-sm text-slate-500 text-center" }, emptyMsg)
     : h("div", { className: "px-4 flex flex-col gap-3" },
-      filteredPosts.map((post) => {
+      list.map((post) => {
         const { preview, hasMore } = splitByMoreMarker(post.body);
         const canEdit = canEditPost(post);
         return h("div", { key: post.id, className: "bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 cursor-pointer", onClick: () => openDetail(post) },
@@ -218,8 +223,18 @@ export function BlogSection({ onBack }) {
           h("div", { className: "mt-1 text-xs font-semibold", style: { color: PRIMARY } }, hasMore || preview ? "আরো পড়ুন" : ""));
       }));
 
+  const postList = buildList(filteredPosts, "এই ক্যাটাগরিতে এখনো কোনো লেখা নেই।");
+  const searchBar = !loading && !loadError && h("div", { className: "px-3 pt-3" },
+    h("div", { className: "flex items-center gap-2 rounded-2xl bg-white border px-3", style: { borderColor: "var(--theme-line, #D7DFD9)", minHeight: 48 } },
+      h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "#8A9A8F", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, h("circle", { cx: 11, cy: 11, r: 7 }), h("path", { d: "M20 20l-3.5-3.5" })),
+      h("input", { type: "search", value: q, onChange: (e) => setQ(e.target.value), placeholder: "লেখা খুঁজুন (শিরোনাম বা ট্যাগ)", "aria-label": "লেখা খুঁজুন", className: "flex-1 min-w-0 bg-transparent outline-none text-sm py-2" }),
+      q && h("button", { type: "button", onClick: () => setQ(""), "aria-label": "মুছুন", style: { minWidth: 32, minHeight: 32 } }, h(X, { size: 16 }))));
+
   return h("div", { className: "min-h-screen pb-24 bg-[#F4F7F1] relative" },
     header,
     drawer,
-    inListView ? h("div", null, listTitle, h("div", { className: "pt-2" }, postList)) : (loadError || loading ? postList : grid));
+    searchBar,
+    needle
+      ? h("div", null, h("div", { className: "px-4 pt-3 pb-1 text-sm font-bold", style: { color: ink } }, "খোঁজার ফল (" + toBnDigits(searchResults.length) + ")"), h("div", { className: "pt-2" }, buildList(searchResults, "কোনো লেখা পাওয়া যায়নি।")))
+      : inListView ? h("div", null, listTitle, h("div", { className: "pt-2" }, postList)) : (loadError || loading ? postList : grid));
 }

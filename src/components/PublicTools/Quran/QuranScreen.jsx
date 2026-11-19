@@ -208,12 +208,13 @@ function SavedList({ meta, marks, sync, onOpen, onRemove, onRetry }) {
 }
 
 // settingsOpen/onSettingsClose: কুরআন-কার্ডের সেটিং-আইকন (QuranTab) থেকে আসে।
-export function QuranScreen({ settingsOpen, onSettingsClose }) {
+export function QuranScreen({ settingsOpen, onSettingsClose, searchTick }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [open, setOpen] = useState(null); // { s, a }
   const [tab, setTab] = useState("surah");
+  useEffect(() => { if (searchTick > 0) setTab("search"); }, [searchTick]);
   const [last, setLast] = useState(() => readLastRead());
   const [prefs, setPrefsState] = useState(() => readPrefs());
   const lastRef = useRef(last);

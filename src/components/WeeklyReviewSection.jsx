@@ -3,7 +3,7 @@
 // কোথাও সেভ/লগ হয় না; সপ্তাহ বদলালে বা পাতা ছাড়লে মুছে যায়।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT as T } from "../legacy/reviewText.js";
-import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, dayRelToday, prevChunk, weekUnlockAt, unlockCountdown } from "../legacy/reviewSchema.js";
+import { chunkCount, chunkOfDate, chunkRange, chunkWeekKey, dayRelToday, prevChunk, weekUnlockAt, weekLockAt, unlockCountdown } from "../legacy/reviewSchema.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
 import { weeklyGap, countFieldTotal, weekGlance, weekFieldExtremes, weekFieldMoves } from "../legacy/reviewCalc.js";
 import { loadReview, saveReview } from "../legacy/reviewData.js";
@@ -63,6 +63,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const [, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 60000); return () => clearInterval(t); }, []);
   const lock = unlockCountdown(weekUnlockAt(year, month0, week), new Date());
+  const closed = !lock && Date.now() >= weekLockAt(year, month0, week).getTime(); // শনিবার রাত ১১টার পর বন্ধ
   const isThisWeek = isCurMonth && week === (trailing ? maxWeek : curWeek.week);
   const range = chunkRange(year, month0, week);
   const sd = new Date(year, month0, range.start), ed = new Date(year, month0, range.end);
@@ -239,8 +240,16 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           ))}
         </div>
         <div className="text-xs text-slate-500 mb-2">{rangeLabel} <span title={T.privateTag}>🔒</span></div>
-        {glanceEl && (lock || step === 1) && glanceEl}
-        {lock ? (
+        {glanceEl && (lock || closed || step === 1) && glanceEl}
+        {closed ? (
+          <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#F6F7F5", border: "1px solid #E4E7E2" }}>
+            <span className="text-3xl" aria-hidden>🔒</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-800">{T.window.weekClosedTitle}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{T.window.weekClosedHint}</div>
+            </div>
+          </div>
+        ) : lock ? (
           <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#FFFBF0", border: "1px solid #EADFBE" }}>
             <span className="text-3xl" aria-hidden>🔒</span>
             <div className="min-w-0">

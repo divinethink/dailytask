@@ -4,7 +4,7 @@
 // "সভায় পাঠান": শুধু আমলের হিসাব থেকে তৈরি সিদ্ধান্ত, সম্পাদনাযোগ্য; ব্যক্তিগত মুহাসাবার লেখা কখনো যায় না।
 // React global (window.React) — বাকি কম্পোনেন্টের মতোই।
 import { REVIEW_TEXT } from "../legacy/reviewText.js";
-import { chunkCount, chunkStarted, chunkWeekKey } from "../legacy/reviewSchema.js";
+import { chunkCount, chunkStarted, chunkWeekKey, monthUnlockAt, monthLockAt, windowState } from "../legacy/reviewSchema.js";
 import { buildMonthlyReport, goalSummary, suggestDecisions, prevMonthOf, fill } from "../legacy/reviewMonthly.js";
 import { loadReviewsForWeeks } from "../legacy/reviewData.js";
 import { loadMonthEntriesOnce } from "../legacy/monthEntriesOnce.js";
@@ -171,9 +171,22 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
     fold === "fixed" ? null : <ChevronDown size={18} className={"shrink-0 text-slate-400 transition-transform" + (open ? " rotate-180" : "")} />
   );
 
+  // লক-সময়: মাসের শেষ দিন রাত ৮টা থেকে পরের মাসের ৩ তারিখ রাত ১১টা পর্যন্ত খোলা
+  const win = windowState(monthUnlockAt(year, month0), monthLockAt(year, month0), new Date());
+  const W = REVIEW_TEXT.window;
   let body = null;
   if (open) {
-    if (!report || !report.ok) {
+    if (!locked && win !== "open") {
+      body = (
+        <div className="rounded-2xl p-4 flex items-center gap-3 mt-3" style={{ background: win === "before" ? "#FFFBF0" : "#F6F7F5", border: "1px solid " + (win === "before" ? "#EADFBE" : "#E4E7E2") }}>
+          <span className="text-3xl" aria-hidden>🔒</span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-slate-800">{win === "before" ? W.monthBeforeTitle : W.monthClosedTitle}</div>
+            {win === "closed" && <div className="text-xs text-slate-500 mt-0.5">{W.monthClosedHint}</div>}
+          </div>
+        </div>
+      );
+    } else if (!report || !report.ok) {
       body = <p className="text-sm text-slate-500 mt-3">{T.noData}</p>;
     } else {
       const r = report;
