@@ -27,6 +27,7 @@ export function FoldWrap({ fold, title, children }) {
 }
 
 import { sanitizeLayout, cardTitle } from "../legacy/homeLayout.js";
+import { isTomorrowNow } from "./tomorrowCalendarData.js";
 
 // হোম/ট্যাব কাস্টমাইজ শুধু App Creator করেন; তাঁর সেভ-করা লেআউট (গ্লোবাল অ্যাপ ডিজাইন) সবার জন্য এক।
 // `member` হিসেবে এখানে app.js-এর designSrc আসে(.homeLayout); না থাকলে ডিফল্ট।
@@ -67,7 +68,7 @@ export function renderHomeBelow(member, nodes, order) {
   cards.forEach(c => {
     if (!c.visible || !nodes[c.id]) return;
     const key = c.id + ":" + c.fold;
-    const title = cardTitle("below", c.id);
+    const title = c.id === "tomorrow" && !isTomorrowNow() ? "আজ" : cardTitle("below", c.id); // সময় অনুযায়ী আগামীকাল/আজ
     let el;
     if (c.id === "weekly" || c.id === "meeting" || c.id === "monthlyReport" || c.id === "trend") {
       el = nodes[c.id](c.fold);

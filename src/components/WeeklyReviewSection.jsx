@@ -102,7 +102,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   }, [open, locked, migrationState, memberId, weekKey]);
 
   // সপ্তাহ মাস পেরোলে (১ম/২য় সপ্তাহ) আগের মাসের এন্ট্রি একবার পড়া হয়। day ≤ ০ ⇒ আগের মাসের দিন (new Date(year, month0, day) ঠিক তারিখ দেয়)।
-  const needPrev = range.start <= 0 || (week > 1 && chunkRange(year, month0, week - 1).start <= 0);
+  const needPrev = range.start <= 0 || (week > 1 && chunkRange(year, month0, week - 1).start <= 0) || (week > 2 && chunkRange(year, month0, week - 2).start <= 0);
   const pm = month0 === 0 ? { year: year - 1, month0: 11 } : { year, month0: month0 - 1 };
   const prevKey = memberId + "|" + pm.year + "|" + pm.month0;
   const [prevMon, setPrevMon] = useState({ key: "", entries: null });
@@ -163,6 +163,16 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
       excused: (f, e) => isFieldExcusable(f, member) && isExcused(e, f.key)
     });
   }, [days, upTo, week, year, month0, monthEntries, allFields, member]);
+  // লক অবস্থায় দেখানো: গত সপ্তাহের সেরা আমল ও সবচেয়ে অবনতি (গত সপ্তাহ একই মাসে থাকলে); নইলে শুধু লক্ষ্য।
+  const lastWeek = useMemo(() => {
+    if (week <= 1) return { best: null, worst: null, upKey: null, dropKey: null };
+    const listOf = w => { const r = chunkRange(year, month0, w); const out = []; for (let d = r.start; d <= r.end; d++) out.push({ day: d, entry: entryOf(d) }); return out; };
+    const lw = listOf(week - 1);
+    const opts = { fields: allFields, ratioOf: (f, e) => fieldRatioToday(f, e), applies: f => !!f.key && fieldApplies(f, member), excused: (f, e) => isFieldExcusable(f, member) && isExcused(e, f.key) };
+    const ex = weekFieldExtremes({ days: lw, ...opts });
+    const mv = week > 2 ? weekFieldMoves({ days: lw, prevDays: listOf(week - 2), ...opts }) : { improvement: null, drop: null };
+    return { best: ex.best, worst: ex.worst, upKey: mv.improvement && mv.improvement.key, dropKey: mv.drop && mv.drop.key };
+  }, [week, year, month0, monthEntries, prevEntries, allFields, member]);
   const fieldName = k => { const f = allFields.find(x => x.key === k); return f ? (f.shortLabel || f.label) : ""; };
   const loggedDays = days.filter(d => d.entry).length;
   const jam = allFields.find(f => f.key === "jamaat" && fieldApplies(f, member));
@@ -226,6 +236,28 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
       </div>
     ) : null;
 
+  const lwBest = lastWeek.upKey || (lastWeek.best && lastWeek.best.key), lwWorst = lastWeek.dropKey || (lastWeek.worst && lastWeek.worst.key);
+  const lastWeekEl = (
+    <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
+      {(lwBest || lwWorst) && (
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.14)" }}>
+            <div className="text-[11px] opacity-90">{G.lastBest}</div>
+            <div className="text-sm font-bold leading-snug">{lwBest ? fieldName(lwBest) : "—"}</div>
+          </div>
+          <div className="rounded-lg p-2.5" style={{ background: "rgba(232,163,23,0.24)" }}>
+            <div className="text-[11px] opacity-90">{G.lastWorst}</div>
+            <div className="text-sm font-bold leading-snug">{lwWorst ? fieldName(lwWorst) : "—"}</div>
+          </div>
+        </div>
+      )}
+      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.14)" }}>
+        <div className="text-[11px] opacity-90">🎯 {G.thisGoal}</div>
+        <div className="text-sm font-bold leading-snug">{prevGoal || G.noGoal}</div>
+      </div>
+    </div>
+  );
+
   let body = null;
   if (open) {
     if (locked) body = <p className="text-sm text-slate-500 mt-3">{T.lockedNote}</p>;
@@ -240,7 +272,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
           ))}
         </div>
         <div className="text-xs text-slate-500 mb-2">{rangeLabel} <span title={T.privateTag}>🔒</span></div>
-        {glanceEl && (lock || closed || step === 1) && glanceEl}
+        {lock && !closed ? lastWeekEl : glanceEl && (closed || step === 1) && glanceEl}
         {closed ? (
           <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#F6F7F5", border: "1px solid #E4E7E2" }}>
             <span className="text-3xl" aria-hidden>🔒</span>

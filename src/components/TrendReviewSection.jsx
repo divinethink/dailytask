@@ -99,8 +99,8 @@ function TrendRow({ r, months, BN_MONTHS, toBn, comment, selected, onToggle, onS
   );
 }
 
-// প্রথমে দেখানো মূল ৮টি আমল (এই ক্রমে); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
-const KEY_ORDER = ["fardPrayers", "jamaat", "exercise", "healthyFood", "noLyingBackbitingPride", "dawah", "earlyMorning"];
+// প্রথমে দেখানো মূল ৩টি আমল (এই ক্রমে, ব্যায়াম পর্যন্ত); বাকিগুলো "অন্যান্য আমল"-এ ভাঁজ করা।
+const KEY_ORDER = ["fardPrayers", "jamaat", "exercise"];
 
 function monthTag(months, BN_MONTHS, toBn) {
   const a = months[0], c = months[2];

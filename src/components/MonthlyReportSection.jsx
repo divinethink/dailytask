@@ -175,22 +175,45 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
   const win = windowState(monthUnlockAt(year, month0), monthLockAt(year, month0), new Date());
   const W = REVIEW_TEXT.window;
   let body = null;
+  // কোন বারে পিছিয়ে পড়েন — মাসিক লক থাকলেও এই কার্ড দেখানো হয়
+  const weekdayEl = r => {
+    const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
+    return (
+      r.weekdayValid < 3 ? (
+                <div className="rounded-2xl px-3.5 py-3 mb-3 flex items-center gap-2.5" style={{ background: "#F6F8F5", border: "1px dashed #D5E3D8" }}>
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] shrink-0" style={{ background: "#FDEFE3" }}>🗓️</span>
+                  <p className="text-[13px] text-slate-600 leading-snug"><b className="text-slate-800">{T.weekdayTitle}</b> — {T.weekdayNeedMore}</p>
+                </div>
+              ) : (
+                <SectionCard icon="🗓️" title={T.weekdayTitle} accent="#D9822B" tint="#FDEFE3">
+                  <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
+                  {r.weakest.length > 0 && (
+                    <p className="text-sm rounded-xl p-2.5 mt-2.5 leading-relaxed" style={{ background: "#FDEFE3", color: "#9A3412" }}>
+                      {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
+                    </p>
+                  )}
+                </SectionCard>
+              )
+    );
+  };
   if (open) {
     if (!locked && win !== "open") {
       body = (
-        <div className="rounded-2xl p-4 flex items-center gap-3 mt-3" style={{ background: win === "before" ? "#FFFBF0" : "#F6F7F5", border: "1px solid " + (win === "before" ? "#EADFBE" : "#E4E7E2") }}>
-          <span className="text-3xl" aria-hidden>🔒</span>
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-slate-800">{win === "before" ? W.monthBeforeTitle : W.monthClosedTitle}</div>
-            {win === "closed" && <div className="text-xs text-slate-500 mt-0.5">{W.monthClosedHint}</div>}
+        <div className="mt-3">
+          <div className="rounded-2xl p-4 flex items-center gap-3 mb-3" style={{ background: win === "before" ? "#FFFBF0" : "#F6F7F5", border: "1px solid " + (win === "before" ? "#EADFBE" : "#E4E7E2") }}>
+            <span className="text-3xl" aria-hidden>🔒</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-800">{win === "before" ? W.monthBeforeTitle : W.monthClosedTitle}</div>
+              {win === "closed" && <div className="text-xs text-slate-500 mt-0.5">{W.monthClosedHint}</div>}
+            </div>
           </div>
+          {report && report.ok && report.weekdayValid >= 3 && weekdayEl(report)}
         </div>
       );
     } else if (!report || !report.ok) {
       body = <p className="text-sm text-slate-500 mt-3">{T.noData}</p>;
     } else {
       const r = report;
-      const weakNames = r.weakest.map(i => BN_WEEKDAYS[i]).join(" ও ");
       const mv = r.moves;
       const totalCount = mv.ups.length + mv.downs.length + mv.same.length;
       const firstRows = [...mv.downs.slice(0, 3), ...mv.ups.slice(0, 2)];
@@ -261,21 +284,7 @@ export function MonthlyReportSection({ fold, onShiftMonth, migrationState, membe
             </div>
           )}
 
-          {r.weekdayValid < 3 ? (
-            <div className="rounded-2xl px-3.5 py-3 mb-3 flex items-center gap-2.5" style={{ background: "#F6F8F5", border: "1px dashed #D5E3D8" }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] shrink-0" style={{ background: "#FDEFE3" }}>🗓️</span>
-              <p className="text-[13px] text-slate-600 leading-snug"><b className="text-slate-800">{T.weekdayTitle}</b> — {T.weekdayNeedMore}</p>
-            </div>
-          ) : (
-            <SectionCard icon="🗓️" title={T.weekdayTitle} accent="#D9822B" tint="#FDEFE3">
-              <WeekdayBars avgs={r.weekdays} weakest={r.weakest} names={BN_WEEKDAYS} toBn={toBn} />
-              {r.weakest.length > 0 && (
-                <p className="text-sm rounded-xl p-2.5 mt-2.5 leading-relaxed" style={{ background: "#FDEFE3", color: "#9A3412" }}>
-                  {fill(r.weakest.length === 2 ? T.weekdayNoteTwo : T.weekdayNoteOne, { days: weakNames })}
-                </p>
-              )}
-            </SectionCard>
-          )}
+          {weekdayEl(r)}
 
           {r.weeks.filter(w => w.avg !== null).length >= 2 && (
             <SectionCard icon="📈" title={T.trendTitle} accent="#2D6A5C" tint="#E3F0EA">

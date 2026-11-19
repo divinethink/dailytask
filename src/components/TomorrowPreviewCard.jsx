@@ -6,7 +6,7 @@
 import { getHijriDate, HIJRI_MONTHS_BN } from "../legacy/appHelpers.js";
 import { getSavedLocation, getSavedMadhab } from "../legacy/publicToolsSettings.js";
 import { peekCachedDailyTimings } from "../legacy/publicToolsPrayerApi.js";
-import { WEEKDAYS_BN, MILESTONES, calendarNotes, historyFor } from "./tomorrowCalendarData.js";
+import { WEEKDAYS_BN, MILESTONES, calendarNotes, historyFor, isTomorrowNow } from "./tomorrowCalendarData.js";
 import { isCreatorAuth } from "../legacy/familyIdentity.js";
 import { fetchSection } from "../legacy/editableContent.js";
 import { EXTRAS_SECTION_ID, normalizeExtras, extrasFor, builtinId, applyOverrides, splitBullets, DAILY_AMOL, SLEEP_EXTRA } from "./tomorrowExtras.js";
@@ -99,19 +99,21 @@ function Row({ n, muted }) {
   );
 }
 
-// todaySaved=false হলে কার্ড "আজ"-এর বার্তা দেখায়; আজকের ডেটা সেভ হলে "আগামীকাল"।
-export function TomorrowPreviewCard({ toBn, todaySaved = true }) {
+// সময় অনুযায়ী: সন্ধ্যা ৭টা–রাত ১২টা "আগামীকাল", রাত ১২টার পর "আজ" (isTomorrowNow)। todaySaved আর ব্যবহার হয় না।
+export function TomorrowPreviewCard({ toBn }) {
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 60000); return () => clearInterval(id); }, []);
   // ক্রিয়েটরের যোগ-করা বাড়তি বাক্য: doc না থাকলে/পড়া ব্যর্থ হলে খালি — কার্ড আগের মতোই চলে
   const [extras, setExtras] = React.useState({ items: [], sleepText: "", overrides: {} });
   const [editing, setEditing] = React.useState(false);
-  const [showRoutine, setShowRoutine] = React.useState(true); // সাধারণ (রোজকার) তথ্য ডিফল্টে খোলা (১৫ নভেম্বর ২০২৬, owner-requested); ভাঁজ করা যায়
+  const [showRoutine, setShowRoutine] = React.useState(false); // "প্রতিদিনের আমল" ডিফল্টে ভাঁজ করা (২০ নভেম্বর ২০২৬, owner-requested); ট্যাপে খোলে
   React.useEffect(() => {
     let alive = true;
     fetchSection(EXTRAS_SECTION_ID).then((d) => { if (alive) setExtras(normalizeExtras(d)); });
     return () => { alive = false; };
   }, []);
   const isCreator = isCreatorAuth();
-  const isTomorrow = !!todaySaved;
+  const isTomorrow = isTomorrowNow();
   const date = new Date(Date.now() + (isTomorrow ? 86400000 : 0));
   const hijri = getHijriDate(date);
   const { notes: builtinNotes, special, fastingDay, history } = tomorrowNotes(date, hijri, isTomorrow);

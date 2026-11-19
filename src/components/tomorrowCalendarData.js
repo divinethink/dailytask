@@ -132,3 +132,8 @@ export function calendarNotes(w, hm, hd) {
   if (hd >= 13 && hd <= 15 && !eidDay) special = true;
   return { notes, special, fastingDay };
 }
+
+// কার্ডে "আগামীকাল" না "আজ": সন্ধ্যা ৭টা থেকে রাত ১২টার আগ পর্যন্ত আগামীকাল; রাত ১২টার পর থেকে সন্ধ্যা ৭টা পর্যন্ত আজ।
+// (TomorrowFocusPicker-এর SWITCH_HOUR-এর সাথে মেলানো)
+export const TOMORROW_SWITCH_HOUR = 19;
+export function isTomorrowNow(now = new Date()) { return now.getHours() >= TOMORROW_SWITCH_HOUR; }

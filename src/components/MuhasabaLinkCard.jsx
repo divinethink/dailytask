@@ -4,7 +4,6 @@
 import { ChevronRight } from "./icons.jsx";
 
 export function MuhasabaLinkCard({ avgPct, toBn, onOpen }) {
-  const hasPct = typeof avgPct === "number";
   return React.createElement(
     "div",
     { className: "px-5 mt-5" },
@@ -19,8 +18,8 @@ export function MuhasabaLinkCard({ avgPct, toBn, onOpen }) {
       React.createElement(
         "div",
         { className: "min-w-0" },
-        React.createElement("div", { className: "text-sm font-bold leading-snug" }, hasPct ? "এ মাস " + toBn(avgPct) + "%" : "মুহাসাবা"),
-        React.createElement("div", { className: "mt-0.5 text-xs opacity-80" }, "বিস্তারিত দেখুন")
+        React.createElement("div", { className: "text-sm font-bold leading-snug" }, "মুহাসাবা"),
+        React.createElement("div", { className: "mt-0.5 text-xs opacity-80" }, "মুহাসাবা দেখতে এখানে ট্যাপ করুন")
       ),
       React.createElement(ChevronRight, { size: 18, color: "#E4D3A8" })
     )
