@@ -28,7 +28,6 @@ import { WuduGuide } from "./WuduGuide.jsx";
 import { GhuslGuide } from "./GhuslGuide.jsx";
 import { TayammumGuide } from "./TayammumGuide.jsx";
 import { IstikharaGuide } from "./IstikharaGuide.jsx";
-import { ParaIndex } from "./ParaIndex.jsx";
 import { HifzPlanner } from "./HifzPlanner.jsx";
 import { JumuahAmol } from "./JumuahAmol.jsx";
 import { RamadanPrep } from "./RamadanPrep.jsx";
@@ -59,8 +58,7 @@ const ACTIVE_ITEM_COMPONENTS = {
   ghusl: GhuslGuide,
   tayammum: TayammumGuide,
   istikhara: IstikharaGuide,
-  paraIndex: ParaIndex,
-  hifzPlanner: HifzPlanner,
+  quran: HifzPlanner, // সহায়িকার "কুরআন প্ল্যানার" টাইল সরাসরি এটা খোলে (id "quran" অপরিবর্তিত — সেভ-করা লেআউট ভাঙে না)
   jumuahAmol: JumuahAmol,
   ramadanPrep: RamadanPrep,
   eidPrayer: EidPrayerGuide,
@@ -93,15 +91,6 @@ const CATEGORIES = [
       { key: "ghusl", icon: "drops", label: "ফরজ গোসলের নিয়ম" },
       { key: "tayammum", icon: "palm", label: "তায়াম্মুমের নিয়ম" },
       { key: "istikhara", icon: "moonStar", label: "ইস্তিখারার সালাতের নিয়ম" },
-    ],
-  },
-  {
-    id: "quran",
-    icon: "quran",
-    label: "কুরআন প্ল্যানার",
-    items: [
-      { key: "paraIndex", icon: "list", label: "৩০ পারার সূচি" },
-      { key: "hifzPlanner", icon: "bookmarkCheck", label: "হিফজ ও খতম প্ল্যানার" },
     ],
   },
   {
@@ -140,7 +129,7 @@ const ACCENT_BRONZE = { bg: "linear-gradient(160deg, #FBF1DC 0%, #F0D9A6 100%)",
 const ACCENT_SKY = { bg: "linear-gradient(160deg, #EAF6FD 0%, #BFE3F7 100%)", border: "#86C5E8", disc: "radial-gradient(circle at 30% 25%, #F4FBFF 0%, #C9E8F8 100%)", ring: "#86C5E8", icon: "#1F6FA3", text: "#134A70" };
 
 const FRONT_ITEMS = [
-  { kind: "category", id: "quran", icon: "quran", label: "কুরআন প্ল্যানার" },
+  { kind: "tool", key: "quran", icon: "quran", label: "কুরআন প্ল্যানার" },
   { kind: "category", id: "salah", icon: "mosque", label: "সালাত ও পবিত্রতা" },
   { kind: "amol", id: "amol", icon: "hands", label: "আমল, যিকির ও দু'আ", accent: ACCENT_BRONZE },
   { kind: "category", id: "specialDays", icon: "moon", label: "বিশেষ দিন ও উপলক্ষ" },
