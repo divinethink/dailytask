@@ -237,26 +237,20 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
     ) : null;
 
   const lwBest = lastWeek.upKey || (lastWeek.best && lastWeek.best.key), lwWorst = lastWeek.dropKey || (lastWeek.worst && lastWeek.worst.key);
-  const lastWeekEl = (
+  const lastWeekEl = (lwBest || lwWorst) ? (
     <div className="rounded-xl p-3 mb-3 text-white" style={{ background: GLANCE_BG }}>
-      {(lwBest || lwWorst) && (
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.14)" }}>
-            <div className="text-[11px] opacity-90">{G.lastBest}</div>
-            <div className="text-sm font-bold leading-snug">{lwBest ? fieldName(lwBest) : "—"}</div>
-          </div>
-          <div className="rounded-lg p-2.5" style={{ background: "rgba(232,163,23,0.24)" }}>
-            <div className="text-[11px] opacity-90">{G.lastWorst}</div>
-            <div className="text-sm font-bold leading-snug">{lwWorst ? fieldName(lwWorst) : "—"}</div>
-          </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.14)" }}>
+          <div className="text-[11px] opacity-90">{G.lastBest}</div>
+          <div className="text-sm font-bold leading-snug">{lwBest ? fieldName(lwBest) : "—"}</div>
         </div>
-      )}
-      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.14)" }}>
-        <div className="text-[11px] opacity-90">🎯 {G.thisGoal}</div>
-        <div className="text-sm font-bold leading-snug">{prevGoal || G.noGoal}</div>
+        <div className="rounded-lg p-2.5" style={{ background: "rgba(232,163,23,0.24)" }}>
+          <div className="text-[11px] opacity-90">{G.lastWorst}</div>
+          <div className="text-sm font-bold leading-snug">{lwWorst ? fieldName(lwWorst) : "—"}</div>
+        </div>
       </div>
     </div>
-  );
+  ) : null;
 
   let body = null;
   if (open) {
