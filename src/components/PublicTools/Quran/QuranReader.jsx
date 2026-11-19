@@ -38,7 +38,7 @@ const AyahRow = memo(function AyahRow({ a, surah, prefs, th, accent, juzNo, page
       ))
     ),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
-    h(AyahActions, { a, surah: prefs.tafsir !== false ? surah : null, th, trSize: prefs.trSize, accent, flash, bm, fav, onCopy, onShare, onMark }),
+    h(AyahActions, { a, surah: prefs.tafsir !== false ? surah : null, th, trSize: prefs.trSize, accent, flash, bm, fav, onCopy, onShare, onMark, extraTafsir: true, arFont: prefs.arFont }),
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
@@ -295,7 +295,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       )
     ),
     reading && sel && h(AyahSheet, {
-      surah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false,
+      surah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false, extraTafsir: true, arFont: prefs.arFont,
       flash: flash.n === sel.n ? flash.kind : "",
       bm: marked.has(markKey(surah.n, sel.n, "b")), fav: marked.has(markKey(surah.n, sel.n, "f")),
       onCopy, onShare, onMark: toggleMarkAt, onClose: () => setSel(null),

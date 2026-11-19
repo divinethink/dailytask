@@ -4,6 +4,7 @@
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, parseWbwPayload, buildSearchIndex } from "./quranCore.js";
 import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
 import { validateTafsirPayload } from "./quranTafsir.js";
+import { FM_BASE, parseFmIndex, parseFmPayload } from "./quranTafsirFm.js";
 import { sanitizeIndex, sanitizePage, clamp16, M16_VER } from "./mushaf16.js";
 
 const TIMEOUT_MS = 15000;
@@ -73,6 +74,26 @@ export function loadTafsir(surah) {
     tafsirCache.set(key, p);
   }
   return tafsirCache.get(key);
+}
+
+// দ্বিতীয় তাফসির (ফাতহুল মাজীদ): ছোট index (কোন আয়াতে আছে) + সূরা-ফাইল, দুটোই on-demand।
+// ব্যর্থ হলে throw; পরেরবার আবার চেষ্টা। sw.js-এর `quran-v1` cache-first-এ অফলাইনেও মেলে।
+let fmIndexPromise = null;
+const fmCache = new Map();
+export function loadFmIndex() {
+  if (!fmIndexPromise) {
+    fmIndexPromise = getJson(FM_BASE + "/index.json").then((raw) => parseFmIndex(raw));
+    fmIndexPromise.catch(() => { fmIndexPromise = null; });
+  }
+  return fmIndexPromise;
+}
+export function loadFm(surahN) {
+  if (!fmCache.has(surahN)) {
+    const p = getJson(FM_BASE + "/" + pad3(surahN) + ".json").then((raw) => parseFmPayload(raw, surahN));
+    p.catch(() => { fmCache.delete(surahN); });
+    fmCache.set(surahN, p);
+  }
+  return fmCache.get(surahN);
 }
 
 // ── ১৬-লাইন ইন্দো-পাক মুসহাফ (public/quran/v1/mushaf16) ──

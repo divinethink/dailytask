@@ -9,8 +9,9 @@ import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLay
 import { switchScript, AR_SIZE, TR_SIZE, wbwSupported } from "../../../legacy/quranCore.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
-import { loadTafsir } from "../../../legacy/quranData.js";
+import { loadTafsir, loadFmIndex, loadFm } from "../../../legacy/quranData.js";
 import { findTafsir, tafsirBlocks, tafsirRangeNote, TAFSIR_NAME } from "../../../legacy/quranTafsir.js";
+import { findFmRange, fmForAyah, fmBlocks, fmRangeNote, FM_NAME } from "../../../legacy/quranTafsirFm.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
 
 const { useState, useEffect, useRef, useCallback } = React;
@@ -46,7 +47,7 @@ export const MoreSvg = () => h(Icon, { size: 20 }, [5, 12, 19].map((cx) => h("ci
 const iconBtn = (color, on) => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44, borderRadius: 12, color, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "none", cursor: "pointer" });
 
 // আয়াতের নিচের আইকন-সারি: শেয়ার, বুকমার্ক, ⋯ (খুললে কপি ও পছন্দ)। লেখা নেই; অবস্থা aria-label-এ।
-export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCopy, onShare, onMark }) {
+export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCopy, onShare, onMark, extraTafsir, arFont }) {
   const [more, setMore] = useState(false);
   const [showTafsir, setShowTafsir] = useState(false);
   const n = toBnDigits(a.n);
@@ -58,7 +59,7 @@ export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCo
     more && h("button", { type: "button", onClick: () => onCopy(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" }, h(CopyIcon, { size: 20 })),
     more && h("button", { type: "button", onClick: () => onMark(a, "f"), style: iconBtn(accent, fav), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav, size: 20 })),
     (flash === "copy" || flash === "fail") && h("span", { style: { fontSize: 12, color: accent, marginLeft: 6 } }, flash === "copy" ? "কপি হয়েছে ✓" : "কপি করা যায়নি")
-  ), surah && showTafsir && h(TafsirBody, { surah, ayah: a, th, accent, trSize }));
+  ), surah && showTafsir && h(TafsirPanel, { surah, ayah: a, th, accent, trSize, extra: extraTafsir, arFont }));
 }
 
 export function Stepper({ label, value, lim, th, onChange }) {
@@ -330,7 +331,50 @@ function TafsirBody({ surah, ayah, th, accent, trSize }) {
       segs.map((x, j) => (x.b ? h("strong", { key: j }, x.t) : x.t)))));
 }
 
-export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, flash, bm, fav, onCopy, onShare, onMark, onClose }) {
+// দ্বিতীয় তাফসির (ফাতহুল মাজীদ): শুধু সেই আয়াতে, যার ব্যাখ্যা আছে।
+function FmBody({ surah, ayah, th, accent, trSize, arFont }) {
+  const [st, setSt] = useState({ s: "load" });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    setSt({ s: "load" });
+    loadFm(surah.n).then((g) => { if (live) setSt({ s: "ok", item: fmForAyah(g, ayah.n) }); }).catch(() => { if (live) setSt({ s: "err" }); });
+    return () => { live = false; };
+  }, [surah.n, ayah.n, tick]);
+  const box = { borderTop: "1px solid " + LINE, marginTop: 8, paddingTop: 10 };
+  if (st.s === "load") return h("div", { style: { ...box, fontSize: 13, opacity: 0.75 }, role: "status" }, "তাফসির আনা হচ্ছে…");
+  if (st.s === "err" || !st.item) {
+    return h("div", { style: { ...box, fontSize: 13 }, role: "alert" },
+      "তাফসির আনা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।",
+      h("button", { type: "button", onClick: () => setTick((t) => t + 1), style: actBtn(accent) }, "আবার চেষ্টা"));
+  }
+  const note = fmRangeNote(st.item.a, toBnDigits);
+  return h("div", { style: box },
+    h("div", { style: { fontSize: 12, opacity: 0.7, marginBottom: 6 } }, FM_NAME + (note ? " · " + note : "")),
+    fmBlocks(st.item.t).map((b, i) => (b.kind === "ar"
+      ? h("div", { key: i, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(arFont), fontSize: 22, lineHeight: 2.1, margin: "6px 0", color: th.fg } }, b.parts.map((p) => p.t).join(""))
+      : h("p", { key: i, style: { fontSize: trSize, lineHeight: 1.95, margin: "0 0 10px" } }, b.parts.map((p, j) => (p.b ? h("strong", { key: j }, p.t) : p.t))))));
+}
+
+// তাফসির-অংশের মোড়ক: extra বন্ধ (মুসহাফ) বা এই আয়াতে ফাতহুল মাজীদ না থাকলে আগের মতোই শুধু ইবনে কাসীর।
+function TafsirPanel({ surah, ayah, th, accent, trSize, extra, arFont }) {
+  const [idx, setIdx] = useState(null);
+  const [src, setSrc] = useState("ik");
+  useEffect(() => {
+    if (!extra) return undefined;
+    let live = true;
+    loadFmIndex().then((m) => { if (live) setIdx(m); }).catch(() => {});
+    return () => { live = false; };
+  }, [extra]);
+  const hasFm = !!(extra && findFmRange(idx, surah.n, ayah.n));
+  useEffect(() => { if (!hasFm) setSrc("ik"); }, [hasFm]);
+  const chip = (id, label) => h("button", { key: id, type: "button", onClick: () => setSrc(id), "aria-pressed": src === id, style: { minHeight: 44, padding: "0 14px", borderRadius: 12, fontSize: 13, fontWeight: src === id ? 700 : 400, color: accent, background: src === id ? "rgba(128,128,128,0.16)" : "transparent", border: "1px solid " + LINE } }, label);
+  return h("div", null,
+    hasFm && h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }, role: "group", "aria-label": "তাফসিরের উৎস" }, chip("ik", "ইবনে কাসীর"), chip("fm", "ফাতহুল মাজীদ")),
+    hasFm && src === "fm" ? h(FmBody, { surah, ayah, th, accent, trSize, arFont }) : h(TafsirBody, { surah, ayah, th, accent, trSize }));
+}
+
+export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, extraTafsir, arFont, flash, bm, fav, onCopy, onShare, onMark, onClose }) {
   useBackLayer(true, onClose);
   const [showTafsir, setShowTafsir] = useState(false);
   const n = toBnDigits(ayah.n);
@@ -351,7 +395,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, flas
         h("button", { type: "button", onClick: () => onMark(ayah, "f"), style: actBtn(accent), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav }), "পছন্দ")
       ),
       flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।"),
-      tafsir && showTafsir && h(TafsirBody, { surah, ayah, th, accent, trSize })
+      tafsir && showTafsir && h(TafsirPanel, { surah, ayah, th, accent, trSize, extra: extraTafsir, arFont })
     )
   );
 }
