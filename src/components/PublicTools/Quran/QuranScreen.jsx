@@ -15,6 +15,7 @@ import {
 import { ChevronRight } from "../../icons.jsx";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranMushaf } from "./QuranMushaf.jsx";
+import { QuranMushaf16 } from "./QuranMushaf16.jsx";
 import { QuranSettingsOverlay, Rosette } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -457,15 +458,29 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
       onOpenMushaf: openMushafFromReader,
     }),
     settingsOpen && h(QuranSettingsOverlay, { prefs, onPrefs: setPrefs, onClose: onSettingsClose }),
-    mushaf && h(QuranMushaf, {
-      key: "mushaf",
-      meta, markers, prefs, onPrefs: setPrefs,
-      startPage: mushaf,
-      onClose: () => setMushaf(null),
-      onSwitchMode: openReaderFromMushaf,
-      onPosition: savePos,
-      marked: markedSet,
-      onMark,
-    })
+    // আরবি লেখার ধরন ইন্দো-পাক হলে ১৬-লাইনের মুসহাফ; বাকিতে আগের মাদানী মুসহাফ
+    mushaf && (prefs.arScript === "indopak"
+      ? h(QuranMushaf16, {
+        key: "mushaf16",
+        meta, prefs, onPrefs: setPrefs,
+        startPage: mushaf,
+        onClose: () => setMushaf(null),
+        onSwitchMode: openReaderFromMushaf,
+        onPosition: savePos,
+        marked: markedSet,
+        onMark,
+        onLeave16: setMushaf,
+      })
+      : h(QuranMushaf, {
+        key: "mushaf",
+        meta, markers, prefs, onPrefs: setPrefs,
+        startPage: mushaf,
+        onClose: () => setMushaf(null),
+        onSwitchMode: openReaderFromMushaf,
+        onPosition: savePos,
+        marked: markedSet,
+        onMark,
+        onPageSync: setMushaf,
+      }))
   );
 }

@@ -3,6 +3,7 @@
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, buildSearchIndex } from "./quranCore.js";
 import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
+import { sanitizeIndex, sanitizePage, clamp16 } from "./mushaf16.js";
 
 const TIMEOUT_MS = 15000;
 let metaPromise = null;
@@ -51,6 +52,34 @@ export async function loadSurah(surah, trId = DEFAULT_TRANSLATION, script = DEFA
   const ayahs = parseSurahPayload(ar, tr, surah);
   surahCache.set(key, ayahs);
   return ayahs;
+}
+
+
+// ── ১৬-লাইন ইন্দো-পাক মুসহাফ (public/quran/v1/mushaf16) ──
+let m16IndexPromise = null;
+const m16Pages = new Map();
+
+export function loadMushaf16Index() {
+  if (!m16IndexPromise) {
+    m16IndexPromise = getJson(QURAN_BASE + "/mushaf16/index.json").then((raw) => {
+      const idx = sanitizeIndex(raw);
+      if (!idx) throw new Error("mushaf16 index অবৈধ");
+      return idx;
+    });
+    m16IndexPromise.catch(() => { m16IndexPromise = null; });
+  }
+  return m16IndexPromise;
+}
+
+// ফল = [{t:"s",s} | {t:"b"} | {t:"a", c, segs:[{s,a,words}]}]
+export async function loadMushaf16Page(p) {
+  const n = clamp16(p);
+  if (m16Pages.has(n)) return m16Pages.get(n);
+  const lines = sanitizePage(await getJson(QURAN_BASE + "/mushaf16/" + pad3(n) + ".json"), n);
+  if (!lines) throw new Error("mushaf16 পৃষ্ঠা অবৈধ: " + n);
+  if (m16Pages.size > 40) m16Pages.delete(m16Pages.keys().next().value);
+  m16Pages.set(n, lines);
+  return lines;
 }
 
 // ── ধাপ ৫: পুরো কুরআন নামানো (অফলাইন) ও সার্চ-ইনডেক্স ──

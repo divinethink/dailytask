@@ -15,13 +15,13 @@ const h = React.createElement;
 
 const SWIPE_MIN = 60; // পাতা উল্টাতে ন্যূনতম আঙুল-টানা (px)
 
-function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
+export function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose, total = PAGE_COUNT, hideSize = false, hideLayout = false, note = "" }) {
   useBackLayer(true, onClose);
   const [val, setVal] = useState("");
   const [bad, setBad] = useState(false);
   const go = () => {
     const n = Number(String(val).replace(/[০-৯]/g, (d) => "০১২৩৪৫৬৭৮৯".indexOf(d)));
-    if (!Number.isInteger(n) || n < 1 || n > PAGE_COUNT) { setBad(true); return; }
+    if (!Number.isInteger(n) || n < 1 || n > total) { setBad(true); return; }
     onJump(n);
   };
   const themeBtn = (idx, label) => {
@@ -35,22 +35,23 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
         h("strong", { style: { fontSize: 16 } }, "মুসহাফ-সেটিংস"),
         h("button", { type: "button", onClick: onClose, style: { minHeight: 40, padding: "0 12px", color: accent, fontWeight: 600 } }, "বন্ধ করুন")),
-      h("div", { style: { fontSize: 14, margin: "8px 0" } }, "পৃষ্ঠায় যান (১–" + toBnDigits(PAGE_COUNT) + ")"),
+      h("div", { style: { fontSize: 14, margin: "8px 0" } }, "পৃষ্ঠায় যান (১–" + toBnDigits(total) + ")"),
       h("div", { style: { display: "flex", gap: 8 } },
         h("input", {
-          type: "text", inputMode: "numeric", value: val, placeholder: "যেমন " + toBnDigits(Math.min(PAGE_COUNT, page + 9)),
+          type: "text", inputMode: "numeric", value: val, placeholder: "যেমন " + toBnDigits(Math.min(total, page + 9)),
           onChange: (e) => { setVal(e.target.value); setBad(false); },
           onKeyDown: (e) => { if (e.key === "Enter") go(); },
           "aria-label": "পৃষ্ঠা নম্বর",
           style: { flex: 1, minHeight: 44, borderRadius: 12, border: "1px solid " + (bad ? "#D64545" : LINE), padding: "0 12px", fontSize: 16, background: "transparent", color: th.fg },
         }),
         h("button", { type: "button", onClick: go, style: { minHeight: 44, padding: "0 20px", borderRadius: 12, background: PRIMARY, color: "#fff", fontWeight: 600 } }, "যান")),
-      bad && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "১ থেকে " + toBnDigits(PAGE_COUNT) + "-এর মধ্যে একটা নম্বর লিখুন।"),
+      bad && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "১ থেকে " + toBnDigits(total) + "-এর মধ্যে একটা নম্বর লিখুন।"),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "14px 0 6px" } }),
-      h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
-      h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
-      h(LayoutPicker, { prefs, th, accent, onPrefs }),
-      h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      !hideSize && h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
+      !hideSize && h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      !hideLayout && h(LayoutPicker, { prefs, th, accent, onPrefs }),
+      !hideLayout && h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
+      note && h("div", { style: { fontSize: 12.5, opacity: 0.75, lineHeight: 1.7, margin: "2px 0 6px" } }, note),
       h(ScriptPicker, { prefs, th, accent, onPrefs }),
       h("div", { style: { borderTop: "1px solid " + LINE, margin: "10px 0" } }),
       h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs }),
@@ -60,7 +61,7 @@ function MushafSheet({ prefs, th, accent, page, onPrefs, onJump, onClose }) {
   );
 }
 
-export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose, onSwitchMode, onPosition, marked, onMark }) {
+export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose, onSwitchMode, onPosition, marked, onMark, onPageSync }) {
   const [page, setPage] = useState(clampPage(startPage));
   const [state, setState] = useState({ status: "loading", items: null });
   const [tries, setTries] = useState(0);
@@ -187,6 +188,6 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       onCopy: actions.onCopy, onShare: actions.onShare, onMark: actions.toggle,
       onClose: () => setSel(null),
     }),
-    sheet && h(MushafSheet, { prefs, th, accent, page, onPrefs, onJump: (n) => { setSheet(false); go(n); }, onClose: () => setSheet(false) })
+    sheet && h(MushafSheet, { prefs, th, accent, page, onPrefs: (p) => { if (onPageSync) onPageSync(page); onPrefs(p); }, onJump: (n) => { setSheet(false); go(n); }, onClose: () => setSheet(false) })
   );
 }
