@@ -62,19 +62,80 @@ export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCo
   ), surah && showTafsir && h(TafsirPanel, { surah, ayah: a, th, accent, trSize, extra: extraTafsir, arFont }));
 }
 
+// ───── সেটিংস-শিটের ভাগ-করা উপাদান: গ্রুপ-কার্ড, সুইচ, সেগমেন্ট, স্টেপার ─────
+const HAIR = "1px solid " + LINE;
+const TRACK = "rgba(128,128,128,0.2)";
+
+// শিরোনাম + কার্ড। প্রতিটা সন্তান আলাদা সারি; মাঝে হালকা রেখা।
+function Section({ title, th, note, children }) {
+  const rows = React.Children.toArray(children);
+  return h("section", { style: { marginTop: 20 } },
+    title && h("h3", { style: { fontSize: 12.5, fontWeight: 700, opacity: 0.6, margin: "0 4px 8px" } }, title),
+    h("div", { style: { background: th.bar, borderRadius: 16, padding: "0 16px" } },
+      rows.map((r, i) => h("div", { key: i, style: { borderTop: i ? HAIR : "none" } }, r))),
+    note && h("p", { style: { fontSize: 11.5, opacity: 0.6, lineHeight: 1.6, margin: "8px 4px 0" } }, note));
+}
+
+function ToggleRow({ label, sub, on, disabled, accent, onChange }) {
+  return h("button", {
+    type: "button", role: "switch", "aria-checked": on, disabled, onClick: () => onChange(!on),
+    style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, width: "100%", minHeight: 56, padding: "10px 0", textAlign: "left", color: "inherit", background: "transparent", border: "none", opacity: disabled ? 0.5 : 1 },
+  },
+    h("span", { style: { minWidth: 0 } },
+      h("span", { style: { display: "block", fontSize: 15 } }, label),
+      sub && h("span", { style: { display: "block", fontSize: 12, opacity: 0.62, lineHeight: 1.55, marginTop: 2 } }, sub)),
+    h("span", { "aria-hidden": "true", style: { position: "relative", flexShrink: 0, width: 50, height: 30, borderRadius: 999, background: on ? accent : "rgba(128,128,128,0.4)", transition: "background .18s" } },
+      h("span", { style: { position: "absolute", top: 3, left: on ? 23 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left .18s" } })));
+}
+
 export function Stepper({ label, value, lim, th, onChange }) {
   const btn = (txt, delta, dis) => h("button", {
     type: "button", disabled: dis, onClick: () => onChange(value + delta),
-    style: { width: 44, height: 44, borderRadius: 12, border: "1px solid " + LINE, background: "transparent", color: th.fg, fontSize: 20, opacity: dis ? 0.35 : 1 },
+    style: { width: 46, height: 44, border: "none", background: "transparent", color: "inherit", fontSize: 22, opacity: dis ? 0.3 : 1 },
     "aria-label": label + (delta > 0 ? " বাড়ান" : " কমান"),
   }, txt);
-  return h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" } },
-    h("span", { style: { fontSize: 14 } }, label),
-    h("span", { style: { display: "flex", alignItems: "center", gap: 10 } },
+  return h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 58 } },
+    h("span", { style: { fontSize: 15 } }, label),
+    h("span", { style: { display: "flex", alignItems: "center", borderRadius: 14, background: th.bg, boxShadow: "0 0 0 1px " + LINE } },
       btn("−", -lim.step, value <= lim.min),
-      h("span", { style: { minWidth: 28, textAlign: "center", fontWeight: 600 } }, toBnDigits(value)),
-      btn("+", lim.step, value >= lim.max))
-  );
+      h("span", { style: { minWidth: 34, textAlign: "center", fontWeight: 700, fontSize: 15 } }, toBnDigits(value)),
+      btn("+", lim.step, value >= lim.max)));
+}
+
+// দুই-তিন বিকল্পের সেগমেন্ট-বাছাই।
+function Segmented({ label, value, list, th, accent, onChange }) {
+  return h("div", { role: "radiogroup", "aria-label": label, style: { display: "flex", gap: 2, padding: 3, borderRadius: 13, background: TRACK } },
+    list.map(([id, text]) => {
+      const on = value === id;
+      return h("button", {
+        key: id, type: "button", role: "radio", "aria-checked": on, onClick: () => !on && onChange(id),
+        style: { flex: 1, minHeight: 42, padding: "4px 6px", borderRadius: 10, fontSize: 13, lineHeight: 1.3, fontWeight: on ? 700 : 500, border: "none", color: on ? accent : "inherit", background: on ? th.bg : "transparent", boxShadow: on ? "0 1px 4px rgba(0,0,0,0.14)" : "none" },
+      }, text);
+    }));
+}
+
+function Field({ label, children }) {
+  return h("div", { style: { padding: "12px 0 14px" } },
+    label && h("div", { style: { fontSize: 13, opacity: 0.7, marginBottom: 8 } }, label),
+    children);
+}
+
+// ডান পাশের গোল রেডিও-চিহ্ন।
+function RadioDot({ on, accent, text }) {
+  if (text) return h("span", { style: { fontSize: 12, color: accent, flexShrink: 0 } }, text);
+  return h("span", { "aria-hidden": "true", style: { flexShrink: 0, width: 22, height: 22, boxSizing: "border-box", borderRadius: "50%", border: "2px solid " + (on ? accent : "rgba(128,128,128,0.5)"), display: "flex", alignItems: "center", justifyContent: "center" } },
+    on && h("span", { style: { width: 10, height: 10, borderRadius: "50%", background: accent } }));
+}
+
+function OptionRow({ on, accent, title, sub, extra, right, onClick }) {
+  return h("button", {
+    type: "button", role: "radio", "aria-checked": on, onClick,
+    style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", minHeight: 58, padding: "10px 0", textAlign: "left", color: "inherit", background: "transparent", border: "none" },
+  },
+    h("span", { style: { minWidth: 0 } },
+      h("span", { style: { display: "block", fontSize: 15, fontWeight: on ? 700 : 500 } }, title, extra && h("span", { style: { fontSize: 11.5, opacity: 0.55, fontWeight: 400, marginLeft: 8 } }, extra)),
+      sub && h("span", { style: { display: "block", fontSize: 12, opacity: 0.62, marginTop: 2 } }, sub)),
+    h(RadioDot, { on, accent, text: right }));
 }
 
 // ───── আরবি ফন্ট-বাছাই (লাইভ প্রিভিউসহ) ─────
@@ -83,39 +144,21 @@ export function useEnsureFont(fontId) {
   useEffect(() => { ensureFont(fontId); }, [fontId]);
 }
 
-// ───── আরবি লেখার ধরন (Simple / উসমানি) ─────
+// ───── আরবি লেখার ধরন (Simple / উসমানি ...) ─────
 // বদলালে পাঠ-পর্দা নতুন লেখা নামায়; ফন্ট বেমানান হলে ওই ধরনের ডিফল্ট ফন্ট বসে। বুকমার্ক/শেষ পাঠ সূরা:আয়াত ধরে, তাই অক্ষত।
-export function ScriptPicker({ prefs, th, accent, onPrefs }) {
-  return h("div", null,
-    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "আরবি লেখার ধরন"),
-    h("div", { role: "radiogroup", "aria-label": "আরবি লেখার ধরন", style: { display: "flex", flexDirection: "column", gap: 6 } },
-      SCRIPTS.map((sc) => {
-        const on = prefs.arScript === sc.id;
-        return h("button", {
-          key: sc.id, type: "button", role: "radio", "aria-checked": on, onClick: () => { if (!on) onPrefs(switchScript(prefs, sc.id)); },
-          style: { display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "6px 12px", borderRadius: 12, textAlign: "left", color: th.fg, background: "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
-        },
-          h("span", null, h("span", { style: { display: "block", fontSize: 14, fontWeight: 600 } }, sc.name), h("span", { style: { display: "block", fontSize: 11, opacity: 0.6 } }, sc.note)),
-          h("span", { style: { fontSize: 12, color: accent } }, on ? "বাছা ✓" : ""));
-      })));
+export function ScriptPicker({ prefs, accent, th, onPrefs }) {
+  return h(Section, { title: "আরবি লেখার ধরন", th },
+    SCRIPTS.map((sc) => {
+      const on = prefs.arScript === sc.id;
+      return h(OptionRow, { key: sc.id, on, accent, title: sc.name, sub: sc.note, onClick: () => { if (!on) onPrefs(switchScript(prefs, sc.id)); } });
+    }));
 }
 
 // রিডিং/মুসহাফের লাইন-সাজানো: এলাইন ও লাইন-ফাঁক (তালিকা-মোডে প্রযোজ্য নয়)।
 export function LayoutPicker({ prefs, th, accent, onPrefs }) {
-  const row = (title, key, list) => h("div", { style: { marginBottom: 8 } },
-    h("div", { style: { fontSize: 13, opacity: 0.8, marginBottom: 6 } }, title),
-    h("div", { role: "radiogroup", "aria-label": title, style: { display: "flex", gap: 6 } },
-      list.map(([id, label]) => {
-        const on = prefs[key] === id;
-        return h("button", {
-          key: id, type: "button", role: "radio", "aria-checked": on, onClick: () => !on && onPrefs({ ...prefs, [key]: id }),
-          style: { flex: 1, minHeight: 44, borderRadius: 12, fontSize: 13, fontWeight: 600, color: on ? accent : th.fg, background: on ? th.bar : "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
-        }, label);
-      })));
-  return h("div", null,
-    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "রিডিং ও মুসহাফের লাইন-সাজানো"),
-    row("এলাইন", "arAlign", ALIGNS),
-    row("লাইনের ফাঁক", "arGap", GAPS));
+  return h(Section, { title: "লাইন-সাজানো", th, note: "শুধু রিডিং ও মুসহাফে কাজ করে; তালিকা-মোডে নয়।" },
+    h(Field, { label: "এলাইন" }, h(Segmented, { label: "এলাইন", value: prefs.arAlign, list: ALIGNS, th, accent, onChange: (v) => onPrefs({ ...prefs, arAlign: v }) })),
+    h(Field, { label: "লাইনের ফাঁক" }, h(Segmented, { label: "লাইনের ফাঁক", value: prefs.arGap, list: GAPS, th, accent, onChange: (v) => onPrefs({ ...prefs, arGap: v }) })));
 }
 
 export function FontPicker({ prefs, th, accent, script, onPrefs }) {
@@ -130,21 +173,14 @@ export function FontPicker({ prefs, th, accent, script, onPrefs }) {
   };
   const sc = scriptById(script) || scriptById(DEFAULT_SCRIPT);
   const list = fontsForScript(sc.id);
-  return h("div", null,
-    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "আরবি ফন্ট"),
-    h("div", { dir: "rtl", lang: "ar", "aria-label": "ফন্টের প্রিভিউ", style: { fontFamily: fontStack(prefs.arFont), fontSize: Math.min(prefs.arSize, 34), lineHeight: 2.1, textAlign: "center", padding: "6px 8px", borderRadius: 12, background: th.bar, color: th.fg } }, sc.sample),
-    h("div", { role: "radiogroup", "aria-label": "আরবি ফন্ট", style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } },
-      list.map((f) => {
-        const on = prefs.arFont === f.id;
-        return h("button", {
-          key: f.id, type: "button", role: "radio", "aria-checked": on, onClick: () => pick(f.id),
-          style: { display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "0 12px", borderRadius: 12, textAlign: "left", color: th.fg, background: "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
-        },
-          h("span", null, h("span", { style: { fontSize: 14, fontWeight: 600 } }, f.name), h("span", { style: { fontSize: 11, opacity: 0.6, marginLeft: 8 } }, f.family)),
-          h("span", { style: { fontSize: 12, color: accent } }, on ? (st.id === f.id && st.status === "loading" ? "নামছে…" : "বাছা ✓") : ""));
-      })),
-    st.status === "fail" && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 6 } }, "ফন্টটা নামানো যায়নি (ইন্টারনেট দেখুন)। আপাতত আমিরি কুরআনে দেখানো হচ্ছে।")
-  );
+  return h(Section, { title: "আরবি ফন্ট", th },
+    h("div", { style: { padding: "14px 0" } },
+      h("div", { dir: "rtl", lang: "ar", "aria-label": "ফন্টের প্রিভিউ", style: { fontFamily: fontStack(prefs.arFont), fontSize: Math.min(prefs.arSize, 34), lineHeight: 2.1, textAlign: "center", padding: "6px 8px", borderRadius: 12, background: th.bg, color: th.fg, boxShadow: "0 0 0 1px " + LINE } }, sc.sample),
+      st.status === "fail" && h("div", { style: { color: "#D64545", fontSize: 12, marginTop: 8 } }, "ফন্টটা নামানো যায়নি (ইন্টারনেট দেখুন)। আপাতত আমিরি কুরআনে দেখানো হচ্ছে।")),
+    list.map((f) => {
+      const on = prefs.arFont === f.id;
+      return h(OptionRow, { key: f.id, on, accent, title: f.name, extra: f.family, right: on && st.id === f.id && st.status === "loading" ? "নামছে…" : "", onClick: () => pick(f.id) });
+    }));
 }
 
 // ───── পাঠ-সেটিংস (রিডার ও কুরআন-হোম একই অংশ ব্যবহার করে; পছন্দ একটাই, সব সূরায় প্রযোজ্য) ─────
@@ -152,81 +188,60 @@ export function readerTheme(prefs) {
   return { th: THEMES[prefs.theme] || THEMES[0], accent: prefs.theme === 2 ? "#9FD4C4" : PRIMARY };
 }
 
-const rule = (margin) => h("div", { style: { borderTop: "1px solid " + LINE, margin } });
-
+// পাতার রং: তিনটা ছোট নমুনা-পাতা।
 function ThemePicker({ prefs, accent, onPrefs }) {
-  return h("div", { style: { display: "flex", gap: 8 } },
+  return h("div", { role: "radiogroup", "aria-label": "পাতার রং", style: { display: "flex", gap: 10, padding: "14px 0" } },
     ["সাদা", "সেপিয়া", "ডার্ক"].map((label, idx) => {
       const t = THEMES[idx];
       const on = prefs.theme === idx;
       return h("button", {
-        key: idx, type: "button", onClick: () => onPrefs({ ...prefs, theme: idx }), "aria-pressed": on,
-        style: { flex: 1, minHeight: 44, borderRadius: 12, background: t.bg, color: t.fg, fontSize: 13, fontWeight: 600, border: on ? "2px solid " + accent : "1px solid " + LINE },
-      }, label);
+        key: idx, type: "button", role: "radio", "aria-checked": on, onClick: () => onPrefs({ ...prefs, theme: idx }),
+        style: { flex: 1, minHeight: 78, borderRadius: 14, background: t.bg, color: t.fg, border: on ? "2.5px solid " + accent : "1px solid " + LINE, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 },
+      },
+        h("span", { style: { fontSize: 22, fontWeight: 700, lineHeight: 1.2 } }, "আ"),
+        h("span", { style: { fontSize: 12.5, fontWeight: on ? 700 : 500 } }, label + (on ? " ✓" : "")));
     }));
 }
 
 function ModePicker({ prefs, th, accent, onPrefs }) {
-  return h("div", { style: { display: "flex", gap: 8 } },
-    [["list", "তালিকা (অনুবাদসহ)"], ["read", "রিডিং (শুধু আরবি)"]].map(([id, label]) => {
-      const on = prefs.mode === id;
-      return h("button", {
-        key: id, type: "button", onClick: () => !on && onPrefs({ ...prefs, mode: id }), "aria-pressed": on,
-        style: { flex: 1, minHeight: 44, borderRadius: 12, fontSize: 13, fontWeight: 600, color: on ? accent : th.fg, background: on ? th.bar : "transparent", border: on ? "2px solid " + accent : "1px solid " + LINE },
-      }, label);
-    }));
+  return h("div", { style: { padding: "12px 0" } },
+    h(Segmented, { label: "পড়ার ধরন", value: prefs.mode, th, accent, list: [["list", "তালিকা (অনুবাদসহ)"], ["read", "রিডিং (শুধু আরবি)"]], onChange: (v) => onPrefs({ ...prefs, mode: v }) }));
 }
 
 // switches: আরবি/অনুবাদ সুইচ দেখাবে কি; showMode: "তালিকা/রিডিং" বাছাই দেখাবে কি।
 export function ReaderPrefsBody({ prefs, th, accent, onPrefs, switches, showMode }) {
-  const toggle = (key, other, label) => {
-    const lastOne = prefs[key] && !prefs[other]; // একমাত্র চালু সুইচটা বন্ধ করা যাবে না
-    return h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", fontSize: 14, opacity: lastOne ? 0.6 : 1 } },
-      label,
-      h("input", { type: "checkbox", checked: prefs[key], disabled: lastOne, onChange: (e) => onPrefs({ ...prefs, [key]: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
-    );
-  };
+  const set = (patch) => onPrefs({ ...prefs, ...patch });
+  const wbwOk = wbwSupported(prefs.arScript);
+  const toggle = (key, other, label) => h(ToggleRow, { label, accent, on: !!prefs[key], disabled: !!prefs[key] && !prefs[other], onChange: (v) => set({ [key]: v }) }); // একমাত্র চালু সুইচটা বন্ধ করা যাবে না
   return h(React.Fragment, null,
-    h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, arSize: v }) }),
-    h(Stepper, { label: "অনুবাদের আকার", value: prefs.trSize, lim: TR_SIZE, th, onChange: (v) => onPrefs({ ...prefs, trSize: v }) }),
-    showMode && rule("6px 0 10px"),
-    showMode && h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পড়ার ধরন"),
-    showMode && h(ModePicker, { prefs, th, accent, onPrefs }),
-    switches && rule("6px 0 0"),
-    switches && toggle("showAr", "showTr", "আরবি দেখান"),
-    switches && toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
-    switches && h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", fontSize: 14, opacity: wbwSupported(prefs.arScript) ? 1 : 0.6 } },
-      "শব্দে শব্দে অর্থ (ইংরেজি)",
-      h("input", { type: "checkbox", checked: !!prefs.wbw && wbwSupported(prefs.arScript), disabled: !wbwSupported(prefs.arScript), onChange: (e) => onPrefs({ ...prefs, wbw: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
-    ),
-    switches && h("p", { style: { fontSize: 11, opacity: 0.6, lineHeight: 1.6, margin: "0 0 4px" } }, wbwSupported(prefs.arScript) ? "শুধু তালিকা-মোডে দেখায়। কিছু আয়াতে শব্দ মেলে না, সেগুলো সাধারণভাবে দেখায়।" : "এটা উসমানি বা ইন্দো-পাক লেখায় চালু করা যায়।"),
-    switches && h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", fontSize: 14 } },
-      "তাফসির দেখান (ইবনে কাসীর)",
-      h("input", { type: "checkbox", checked: prefs.tafsir !== false, onChange: (e) => onPrefs({ ...prefs, tafsir: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
-    ),
-    switches && h("p", { style: { fontSize: 11, opacity: 0.6, lineHeight: 1.6, margin: "0 0 4px" } }, "চালু থাকলে প্রতি আয়াতে \"তাফসির\" বোতাম আসে। প্রথমবার খুললে ওই সূরার তাফসির নামে।"),
-    rule("6px 0 10px"),
-    h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
-    h(ThemePicker, { prefs, accent, onPrefs }),
-    rule("14px 0 10px"),
+    h(Section, { title: "লেখার আকার", th },
+      h(Stepper, { label: "আরবি লেখার আকার", value: prefs.arSize, lim: AR_SIZE, th, onChange: (v) => set({ arSize: v }) }),
+      h(Stepper, { label: "অনুবাদের আকার", value: prefs.trSize, lim: TR_SIZE, th, onChange: (v) => set({ trSize: v }) })),
+    showMode && h(Section, { title: "পড়ার ধরন", th }, h(ModePicker, { prefs, th, accent, onPrefs })),
+    switches && h(Section, { title: "যা দেখাবেন", th },
+      toggle("showAr", "showTr", "আরবি"),
+      toggle("showTr", "showAr", "বাংলা অনুবাদ"),
+      h(ToggleRow, { label: "শব্দে শব্দে অর্থ (ইংরেজি)", sub: wbwOk ? "শুধু তালিকা-মোডে দেখায়। কিছু আয়াতে শব্দ মেলে না, সেগুলো সাধারণভাবে দেখায়।" : "উসমানি বা ইন্দো-পাক লেখায় চালু করা যায়।", accent, on: !!prefs.wbw && wbwOk, disabled: !wbwOk, onChange: (v) => set({ wbw: v }) }),
+      h(ToggleRow, { label: "তাফসির", sub: "ইবনে কাসীর ও ফাতহুল মাজীদ। প্রতি আয়াতে “তাফসির” বোতাম আসে; প্রথমবার খুললে ওই সূরার তাফসির নামে।", accent, on: prefs.tafsir !== false, onChange: (v) => set({ tafsir: v }) })),
+    h(Section, { title: "পাতার রং", th }, h(ThemePicker, { prefs, accent, onPrefs })),
     h(LayoutPicker, { prefs, th, accent, onPrefs }),
-    rule("10px 0"),
     h(ScriptPicker, { prefs, th, accent, onPrefs }),
-    rule("10px 0"),
     h(FontPicker, { prefs, th, accent, script: prefs.arScript, onPrefs })
   );
 }
 
-// নিচ থেকে ওঠা শিট। children = শিটের শেষে বাড়তি অংশ (যেমন রিডারে "আয়াতে যান")।
+// নিচ থেকে ওঠা শিট: হ্যান্ডেল + স্থির শিরোনাম, ভেতরটা স্ক্রল। children = শেষে বাড়তি অংশ (যেমন রিডারে "আয়াতে যান")।
 export function SettingsSheet({ title, prefs, th, accent, onPrefs, onClose, switches, showMode, children }) {
-  return h("div", { style: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.4)" }, onClick: onClose },
-    h("div", { onClick: (e) => e.stopPropagation(), style: { background: th.bg, color: th.fg, borderRadius: "18px 18px 0 0", padding: "14px 18px 22px", maxHeight: "85%", overflowY: "auto" } },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
-        h("strong", { style: { fontSize: 16 } }, title),
-        h("button", { type: "button", onClick: onClose, style: { minHeight: 40, padding: "0 12px", color: accent, fontWeight: 600 } }, "বন্ধ করুন")
-      ),
-      h(ReaderPrefsBody, { prefs, th, accent, onPrefs, switches, showMode }),
-      children
+  return h("div", { style: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.45)" }, onClick: onClose },
+    h("div", { role: "dialog", "aria-label": title, onClick: (e) => e.stopPropagation(), style: { background: th.bg, color: th.fg, borderRadius: "24px 24px 0 0", maxHeight: "90%", display: "flex", flexDirection: "column", boxShadow: "0 -10px 32px rgba(0,0,0,0.25)" } },
+      h("div", { style: { flexShrink: 0, padding: "8px 18px 10px" } },
+        h("div", { "aria-hidden": "true", style: { width: 40, height: 4, borderRadius: 2, background: "rgba(128,128,128,0.45)", margin: "0 auto 10px" } }),
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+          h("strong", { style: { fontSize: 19 } }, title),
+          h("button", { type: "button", onClick: onClose, style: { minHeight: 40, padding: "0 16px", borderRadius: 999, color: accent, fontWeight: 600, fontSize: 14, background: th.bar, border: "none" } }, "বন্ধ করুন"))),
+      h("div", { style: { overflowY: "auto", overscrollBehavior: "contain", padding: "0 18px calc(26px + env(safe-area-inset-bottom, 0px))" } },
+        h(ReaderPrefsBody, { prefs, th, accent, onPrefs, switches, showMode }),
+        children)
     )
   );
 }
@@ -238,7 +253,7 @@ export function QuranSettingsOverlay({ prefs, onPrefs, onClose }) {
   const { th, accent } = readerTheme(prefs);
   return h("div", { style: { position: "fixed", inset: 0, zIndex: 80, fontFamily: "'Hind Siliguri', sans-serif" } },
     h(SettingsSheet, { title: "কুরআন-সেটিংস", prefs, th, accent, onPrefs, onClose, switches: true, showMode: true },
-      h("p", { style: { fontSize: 11, opacity: 0.6, marginTop: 14, lineHeight: 1.6 } }, "এই পছন্দ সব সূরা ও মুসহাফে একই থাকবে।"))
+      h("p", { style: { fontSize: 11.5, opacity: 0.6, marginTop: 18, lineHeight: 1.6, textAlign: "center" } }, "এই পছন্দ সব সূরা ও মুসহাফে একই থাকবে।"))
   );
 }
 
