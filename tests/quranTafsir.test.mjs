@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { sanitizePrefs, DEFAULT_PREFS } from "../src/legacy/quranCore.js";
 import { validateTafsirPayload, findTafsir, tafsirBlocks, tafsirRangeNote } from "../src/legacy/quranTafsir.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,4 +65,13 @@ test("আসল ডেটা: ১১৪ সূরার সব আয়াত �
   }
   assert.equal(ayahs, 6236);
   assert.equal(Object.keys(integ.files).length, 114);
+});
+
+test("prefs.tafsir: ডিফল্ট চালু; পুরনো সেভে নেই ⇒ চালু; শুধু স্পষ্ট false হলে বন্ধ", () => {
+  assert.equal(DEFAULT_PREFS.tafsir, true);
+  assert.equal(sanitizePrefs(null).tafsir, true);
+  assert.equal(sanitizePrefs({ theme: 2 }).tafsir, true);
+  assert.equal(sanitizePrefs({ tafsir: "no" }).tafsir, true);
+  assert.equal(sanitizePrefs({ tafsir: false }).tafsir, false);
+  assert.equal(sanitizePrefs({ tafsir: true }).tafsir, true);
 });

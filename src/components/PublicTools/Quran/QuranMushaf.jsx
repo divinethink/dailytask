@@ -182,7 +182,7 @@ export function QuranMushaf({ meta, markers, prefs, onPrefs, startPage, onClose,
       navBtn("পরের ›", page + 1, page >= PAGE_COUNT)
     ),
     sel && h(AyahSheet, {
-      surah: selSurah, ayah: sel, th, accent, trSize: prefs.trSize,
+      surah: selSurah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false,
       flash: actions.flash.key === selKey ? actions.flash.kind : "",
       bm: marked.has(markKey(sel.s, sel.n, "b")), fav: marked.has(markKey(sel.s, sel.n, "f")),
       onCopy: actions.onCopy, onShare: actions.onShare, onMark: actions.toggle,

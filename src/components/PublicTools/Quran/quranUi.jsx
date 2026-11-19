@@ -199,6 +199,11 @@ export function ReaderPrefsBody({ prefs, th, accent, onPrefs, switches, showMode
       h("input", { type: "checkbox", checked: !!prefs.wbw && wbwSupported(prefs.arScript), disabled: !wbwSupported(prefs.arScript), onChange: (e) => onPrefs({ ...prefs, wbw: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
     ),
     switches && h("p", { style: { fontSize: 11, opacity: 0.6, lineHeight: 1.6, margin: "0 0 4px" } }, wbwSupported(prefs.arScript) ? "শুধু তালিকা-মোডে দেখায়। কিছু আয়াতে শব্দ মেলে না, সেগুলো সাধারণভাবে দেখায়।" : "এটা উসমানি বা ইন্দো-পাক লেখায় চালু করা যায়।"),
+    switches && h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", fontSize: 14 } },
+      "তাফসির দেখান (ইবনে কাসীর)",
+      h("input", { type: "checkbox", checked: prefs.tafsir !== false, onChange: (e) => onPrefs({ ...prefs, tafsir: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
+    ),
+    switches && h("p", { style: { fontSize: 11, opacity: 0.6, lineHeight: 1.6, margin: "0 0 4px" } }, "চালু থাকলে প্রতি আয়াতে \"তাফসির\" বোতাম আসে। প্রথমবার খুললে ওই সূরার তাফসির নামে।"),
     rule("6px 0 10px"),
     h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
     h(ThemePicker, { prefs, accent, onPrefs }),
@@ -325,7 +330,7 @@ function TafsirBody({ surah, ayah, th, accent, trSize }) {
       segs.map((x, j) => (x.b ? h("strong", { key: j }, x.t) : x.t)))));
 }
 
-export function AyahSheet({ surah, ayah, th, accent, trSize, flash, bm, fav, onCopy, onShare, onMark, onClose }) {
+export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, flash, bm, fav, onCopy, onShare, onMark, onClose }) {
   useBackLayer(true, onClose);
   const [showTafsir, setShowTafsir] = useState(false);
   const n = toBnDigits(ayah.n);
@@ -338,7 +343,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, flash, bm, fav, onC
       h("p", { style: { fontSize: trSize, lineHeight: 1.8, opacity: 0.92, margin: "4px 0 8px" } }, ayah.tr),
       h("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 6 } }, "অনুবাদ: " + TRANSLATOR),
       h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid " + LINE, paddingTop: 6 } },
-        h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: { ...actBtn(accent), fontWeight: showTafsir ? 700 : 400 }, "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, showTafsir ? "তাফসির ▲" : "তাফসির"),
+        tafsir && h("button", { type: "button", onClick: () => setShowTafsir((v) => !v), style: { ...actBtn(accent), fontWeight: showTafsir ? 700 : 400 }, "aria-expanded": showTafsir, "aria-label": "আয়াত " + n + (showTafsir ? " তাফসির লুকান" : " তাফসির দেখুন") }, showTafsir ? "তাফসির ▲" : "তাফসির"),
         h("button", { type: "button", onClick: () => onCopy(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" },
           h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
         h("button", { type: "button", onClick: () => onShare(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 17 }), "শেয়ার"),
@@ -346,7 +351,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, flash, bm, fav, onC
         h("button", { type: "button", onClick: () => onMark(ayah, "f"), style: actBtn(accent), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav }), "পছন্দ")
       ),
       flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।"),
-      showTafsir && h(TafsirBody, { surah, ayah, th, accent, trSize })
+      tafsir && showTafsir && h(TafsirBody, { surah, ayah, th, accent, trSize })
     )
   );
 }

@@ -64,7 +64,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP, wbw: false };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP, wbw: false, tafsir: true };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -90,6 +90,7 @@ export function sanitizePrefs(raw) {
     arAlign: isValidAlign(r.arAlign) ? r.arAlign : DEFAULT_ALIGN, // রিডিং/মুসহাফের এলাইন
     arGap: isValidGap(r.arGap) ? r.arGap : DEFAULT_GAP, // লাইন-ফাঁক
     wbw: r.wbw === true, // শব্দে শব্দে অর্থ (ঐচ্ছিক; পুরনো সেভে নেই ⇒ বন্ধ)
+    tafsir: r.tafsir !== false, // তাফসির-বোতাম (পুরনো সেভে নেই ⇒ চালু; শুধু স্পষ্ট false হলে বন্ধ)
     arFont: fontFitsScript(r.arFont, arScript) ? r.arFont : scriptById(arScript).defaultFont, // অজানা বা লেখার সাথে বেমানান ফন্ট → ওই লেখার ডিফল্ট
   };
 }

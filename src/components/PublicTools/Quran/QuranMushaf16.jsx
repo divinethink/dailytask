@@ -228,7 +228,7 @@ export function QuranMushaf16({ meta, prefs, onPrefs, startPage, onClose, onSwit
       navBtn("পরের ›", page + 1, page >= M16_PAGES)
     ),
     sel && h(AyahSheet, {
-      surah: selSurah, ayah: sel, th, accent, trSize: prefs.trSize,
+      surah: selSurah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false,
       flash: actions.flash.key === selKey ? actions.flash.kind : "",
       bm: marked.has(markKey(sel.s, sel.n, "b")), fav: marked.has(markKey(sel.s, sel.n, "f")),
       onCopy: actions.onCopy, onShare: actions.onShare, onMark: actions.toggle,
