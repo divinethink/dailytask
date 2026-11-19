@@ -11,3 +11,6 @@ digitalkhatt-indopak.otf       — "DigitalKhatt IndoPak", Copyright (c) 2024 Am
 noto-naskh-arabic-400.woff2    — Noto Naskh Arabic (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/noto-naskh-arabic; ফাইল অপরিবর্তিত।
 scheherazade-new-400.woff2     — Scheherazade New (আরবি-subset), SIL Open Font License 1.1, উৎস: npm @fontsource/scheherazade-new; ফাইল অপরিবর্তিত।
                                   (OFL-এর পূর্ণ পাঠ: LICENSE-OFL.txt)
+kfgqpc-nastaleeq-regular.ttf   — "KFGQPC Nastaleeq Regular", King Fahd Glorious Quran Printing Complex (মদীনা)।
+                                  শর্ত: বিনামূল্যে ব্যবহার/বিতরণ চলে, কিন্তু ফন্ট অপরিবর্তিত রাখতে হবে — তাই subset/রূপান্তর/সম্পাদনা করা হয়নি।
+

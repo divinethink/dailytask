@@ -54,7 +54,7 @@ test("৬গ-২: লেখার ধরন — ডিফল্ট simple, অ�
   assert.deepEqual([u.arScript, u.arFont], ["uthmani", "kfgqpc-hafs"]);
   assert.equal(switchScript({ ...DEFAULT_PREFS, arFont: "amiri-quran" }, "uthmani").arFont, "amiri-quran"); // মানানসই হলে থাকে
   assert.equal(switchScript(DEFAULT_PREFS, "bogus"), DEFAULT_PREFS);
-  for (const sc of SCRIPTS) { assert.ok(fontFitsScript(sc.defaultFont, sc.id)); assert.ok(fontsForScript(sc.id).length >= (sc.id === "indopak" ? 1 : 2)); }
+  for (const sc of SCRIPTS) { assert.ok(fontFitsScript(sc.defaultFont, sc.id)); assert.ok(fontsForScript(sc.id).length >= (sc.id === "indopak" || sc.id === "nastaleeq" ? 1 : 2)); }
   assert.equal(fontsForScript("uthmani").some((f) => f.id === "kfgqpc-hafs") && fontsForScript("uthmani").some((f) => f.id === "me-quran"), true);
 });
 
@@ -111,6 +111,36 @@ test("৬গ-৩ পছন্দ: IndoPak বাছলে মানানসই 
   assert.equal(sanitizePrefs({ arScript: "uthmani", arFont: "me-quran" }).arFont, "me-quran");
 });
 
+test("নাস্তালিক ডেটা: ১১৪ ফাইল, আয়াত-সংখ্যা meta-র সাথে মিল, মোট ৬২৩৬, sha256 ও বিসমিল্লাহ manifest-এর সাথে মিল, নম্বর-শব্দ নেই", async () => {
+  const { createHash } = await import("node:crypto");
+  const base = path.join(root, "public/quran/v1");
+  const meta = JSON.parse(fs.readFileSync(path.join(base, "meta.json"), "utf8"));
+  const man = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
+  const font = JSON.parse(JSON.stringify(QURAN_FONTS.find((f) => f.id === "kfgqpc-nastaleeq")));
+  assert.deepEqual(font.scripts, ["nastaleeq"]);
+  const all = [];
+  for (const su of meta.surahs) {
+    const j = JSON.parse(fs.readFileSync(path.join(base, "ar-nastaleeq", String(su.n).padStart(3, "0") + ".json"), "utf8"));
+    assert.equal(j.s, su.n);
+    assert.equal(j.a.length, su.ayahs);
+    assert.ok(j.a.every((x) => typeof x === "string" && x.trim() && !/[\u0660-\u0669]\s*$/.test(x) && !x.includes("\u00a0")), "সূরা " + su.n);
+    all.push(...j.a);
+  }
+  assert.equal(all.length, 6236);
+  assert.equal(createHash("sha256").update(all.join("\n")).digest("hex"), man.arabicNastaleeq.sha256);
+  assert.equal(scriptById("nastaleeq").bismillah, man.arabicNastaleeq.bismillah);
+  assert.equal(all[0], man.arabicNastaleeq.bismillah); // ১:১ নিজেই বিসমিল্লাহ
+  assert.ok(!all[7].includes(man.arabicNastaleeq.bismillah)); // ২:১-এ জোড়া নেই
+});
+
+test("নাস্তালিক পছন্দ: মানানসই ফন্ট; বেমানান ফন্ট → ডিফল্ট; পুরনো ধরনগুলো অক্ষত", () => {
+  assert.equal(sanitizePrefs({ arScript: "nastaleeq" }).arFont, "kfgqpc-nastaleeq");
+  assert.equal(sanitizePrefs({ arScript: "nastaleeq", arFont: "alquran-indopak" }).arFont, "kfgqpc-nastaleeq");
+  assert.equal(sanitizePrefs({ arScript: "indopak", arFont: "kfgqpc-nastaleeq" }).arFont, "alquran-indopak");
+  assert.equal(switchScript({ ...DEFAULT_PREFS, arFont: "noto-naskh" }, "nastaleeq").arFont, "kfgqpc-nastaleeq");
+  assert.ok(flowLayout("nastaleeq").sizeScale > 1);
+});
+
 test("flowLayout: ডিফল্ট দুই-পাশ-সমান, শেষ লাইন মাঝে; ইন্দো-পাক বড় ও বেশি ফাঁক; এলাইন/ফাঁক বদলায়", () => {
   for (const id of ["simple", "uthmani"]) assert.deepEqual(flowLayout(id), { sizeScale: 1, lineHeight: 2.1, textAlign: "justify", textAlignLast: "center" });
   const ip = flowLayout("indopak");
@@ -155,7 +185,7 @@ test("প্রতিটা ফন্টের নিজের ফাইল আ�
 
 test("উসমানি ও IndoPak: প্রতিটা সূরা-ফাইলের SHA-256 integrity-uthmani/integrity-indopak.json-এর সাথে মেলে", async () => {
   const { createHash } = await import("node:crypto");
-  for (const [name, dir] of [["integrity-uthmani.json", "ar-uthmani"], ["integrity-indopak.json", "ar-indopak-dk"]]) {
+  for (const [name, dir] of [["integrity-uthmani.json", "ar-uthmani"], ["integrity-indopak.json", "ar-indopak-dk"], ["integrity-nastaleeq.json", "ar-nastaleeq"]]) {
     const integ = JSON.parse(fs.readFileSync(path.join(root, "tools", "quran", name), "utf8"));
     const rels = Object.keys(integ.files);
     assert.equal(rels.length, 114, name);
