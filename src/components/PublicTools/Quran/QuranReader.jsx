@@ -18,7 +18,7 @@ const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
-const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, wbwRaw, onCopy, onShare, onMark }) {
+const AyahRow = memo(function AyahRow({ a, surah, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, wbwRaw, onCopy, onShare, onMark }) {
   const muted = { color: th.fg, opacity: 0.62 };
   // শব্দে শব্দে অর্থ: শুধু সমর্থিত লেখায় ও শব্দ-সংখ্যা মিললে; নইলে সাধারণ আয়াত (alignWords null)।
   const words = prefs.showAr && prefs.wbw && wbwSupported(prefs.arScript) ? alignWords(a.ar, wbwRaw) : null;
@@ -38,7 +38,7 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, ruk
       ))
     ),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
-    h(AyahActions, { a, accent, flash, bm, fav, onCopy, onShare, onMark }),
+    h(AyahActions, { a, surah, th, trSize: prefs.trSize, accent, flash, bm, fav, onCopy, onShare, onMark }),
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
@@ -269,7 +269,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       !reading && ayahs.map((a) => {
         const k = surah.n + ":" + a.n;
         return h(AyahRow, {
-          key: a.n, a, prefs, th, accent,
+          key: a.n, a, surah, prefs, th, accent,
           juzNo: markers.juz.get(k) || 0,
           pageNo: markers.page.get(k) || 0,
           rukuNo: markers.page.get(k) || markers.juz.get(k) ? rukuOf(meta, surah.n, a.n) : 0,
