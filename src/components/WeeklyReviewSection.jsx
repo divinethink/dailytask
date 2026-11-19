@@ -56,7 +56,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
   const [errCode, setErrCode] = useState(""); // সর্বশেষ Firestore error code (যেমন permission-denied)
-  const [closed, setClosed] = useState([]); // বদ্ধ ঘর — কখনো সেভ হয় না
+  const [closedPicks, setClosedPicks] = useState([]); // বদ্ধ ঘর — কখনো সেভ হয় না
   const isProxy = !!(member && "googleUid" in member && member.googleUid === null);
   const weekKey = chunkWeekKey(year, month0, week);
   // ধাপ ৪: সপ্তাহের শেষ দিন রাত ৮টার আগে ফর্ম লক (শেষ হওয়া সপ্তাহ খোলা); মিনিটে একবার হালনাগাদ।
@@ -78,7 +78,7 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
   }, [year, month0, maxWeek]);
 
   useEffect(() => {
-    setClosed([]); setStep(1); setSaveState("idle");
+    setClosedPicks([]); setStep(1); setSaveState("idle");
     if (!open || locked || migrationState !== "v2" || !memberId) { setStatus("idle"); return undefined; }
     let alive = true;
     setStatus("loading"); setErrCode("");
@@ -350,11 +350,11 @@ export function WeeklyReviewSection({ fold, onShiftMonth, migrationState, member
             <p className="font-bold text-sm mb-2">{T.closedRoom.prompt}</p>
             {T.closedRoom.items.map(it => (
               <label key={it.id} className="flex items-start gap-2 py-2 border-b border-dashed border-slate-200 text-sm">
-                <input type="checkbox" checked={closed.includes(it.id)} onChange={() => setClosed(c => toggle(c, it.id))} className="mt-1" />
+                <input type="checkbox" checked={closedPicks.includes(it.id)} onChange={() => setClosedPicks(c => toggle(c, it.id))} className="mt-1" />
                 <span>{it.text}{it.src && <span className="block text-[11px] text-slate-400">{it.src}</span>}</span>
               </label>
             ))}
-            {closed.length > 0 && (
+            {closedPicks.length > 0 && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 mt-3 text-sm">
                 <b>🤲 {T.closedRoom.tawba.title}</b>
                 <p className="my-1">{T.closedRoom.tawba.ayah}। {T.closedRoom.tawba.lead}</p>
