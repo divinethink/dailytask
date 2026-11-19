@@ -205,8 +205,8 @@ export function QuranMushaf16({ meta, prefs, onPrefs, startPage, onClose, onSwit
     h("div", { style: { background: headBg, color: "#fff", padding: "10px 8px 10px 12px", display: "flex", alignItems: "center", gap: 8 } },
       h("button", { type: "button", onClick: onClose, "aria-label": "ফিরে যান", style: { padding: 8, color: "#fff" } }, h(ChevronLeft, { size: 22 })),
       h("div", { style: { minWidth: 0, flex: 1 } },
-        h("div", { style: { fontWeight: 600, fontSize: 17, lineHeight: 1.3 } }, page ? "পৃষ্ঠা " + toBnDigits(page) + " / " + toBnDigits(M16_PAGES) : "মুসহাফ"),
-        h("div", { style: { fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, (juz ? "পারা " + toBnDigits(juz) + " \u00b7 " : "") + (names || "১৬ লাইন ইন্দো-পাক"))),
+        h("div", { style: { fontWeight: 600, fontSize: 17, lineHeight: 1.3, whiteSpace: "nowrap" } }, page ? "পৃষ্ঠা " + toBnDigits(page) : "মুসহাফ"),
+        h("div", { style: { fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, (juz ? "পারা " + toBnDigits(juz) + " \u00b7 " : "") + (names || "১৬ লাইন"))),
       onSwitchMode && h("div", { role: "group", "aria-label": "পড়ার ধরন", style: { display: "flex", alignItems: "center", background: "rgba(255,255,255,0.18)", borderRadius: 999, padding: 2 } },
         seg("list", "তালিকা", false, "list"), seg("read", "রিডিং", false, "read"), seg("mushaf", "মুসহাফ", true, "mushaf")),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "মুসহাফ-সেটিংস ও পৃষ্ঠায় যান", style: { minHeight: 44, minWidth: 44, color: "#fff", fontWeight: 700, fontSize: 18 } }, "Aa")

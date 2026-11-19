@@ -1,6 +1,6 @@
 // quranFonts.js — আরবি লেখার ধরন ও ফন্টের তালিকা (pure, node --test-যোগ্য)। ধাপ ৬গ-১/৬গ-২/৬গ-৩।
 // scripts: কোন লেখার ধরনের সাথে ফন্টটা মানানসই। ফন্ট শুধু তার নিজের লেখার সাথেই দেখানো হয় (জোড়া ভুল হলে অক্ষর ভাঙে)।
-//   "simple" = Tanzil Simple (/quran/v1/ar), "uthmani" = Tanzil Uthmani (/quran/v1/ar-uthmani); "indopak" = IndoPak/নাস্তালিক (/quran/v1/ar-indopak-dk, DigitalKhatt)।
+//   "simple" = Tanzil Simple (/quran/v1/ar), "uthmani" = Tanzil Uthmani (/quran/v1/ar-uthmani); "indopak" = IndoPak (/quran/v1/ar-indopak-dk, DigitalKhatt)।
 // file: নিজেদের সার্ভারের ফাইল (অফলাইনেও চলে); google: (এখন সব ফন্টেরই নিজের ফাইল আছে; এই ক্ষেত্র ভবিষ্যতের জন্য, বর্তমানে null)।
 // লাইসেন্স: Amiri/Noto/Scheherazade = SIL OFL 1.1; KFGQPC/Me Quran = অপরিবর্তিত রাখার শর্তে; DigitalKhatt IndoPak = SIL OFL 1.1, অপরিবর্তিত (NOTICE-fonts.txt)।
 
@@ -10,7 +10,7 @@ export const FONT_SAMPLE = "بِسْمِ اللَّهِ الرَّحْمَٰنِ
 export const SCRIPTS = [
   { id: "simple", name: "সরল (Simple)", note: "সহজে পড়া যায়; খোঁজা এই লেখাতেই চলে", dir: "ar", sample: FONT_SAMPLE, bismillah: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", defaultFont: "amiri-quran" },
   { id: "uthmani", name: "উসমানি", note: "মাদানী মুসহাফের রীতি (Tanzil Uthmani)", dir: "ar-uthmani", sample: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", bismillah: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", defaultFont: "kfgqpc-hafs" },
-  { id: "indopak", name: "ইন্দো-পাক (নাস্তালিক)", note: "উপমহাদেশের মুসহাফের রীতি (DigitalKhatt)", dir: "ar-indopak-dk", sample: "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", bismillah: "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", defaultFont: "alquran-indopak" },
+  { id: "indopak", name: "ইন্দো-পাক", note: "উপমহাদেশের মুসহাফের রীতি (DigitalKhatt)", dir: "ar-indopak-dk", v: "2", sample: "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", bismillah: "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", defaultFont: "alquran-indopak" },
 ];
 export const DEFAULT_SCRIPT = "simple";
 export const scriptById = (id) => SCRIPTS.find((s) => s.id === id) || null;

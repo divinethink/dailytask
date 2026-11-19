@@ -9,6 +9,9 @@ const TIMEOUT_MS = 15000;
 let metaPromise = null;
 const surahCache = new Map();
 
+// আরবি লেখার ফাইলের ঠিকানা। sw.js কুরআনের ফাইল চিরকাল ক্যাশ রাখে, তাই ডেটা বদলালে scripts-এর `v` বাড়ালে নতুন ঠিকানা হয়ে সবার ফোনে নতুন ফাইল আসে।
+const arUrl = (sc, n) => QURAN_BASE + "/" + sc.dir + "/" + pad3(n) + ".json" + (sc.v ? "?v=" + sc.v : "");
+
 async function getJson(url) {
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -46,7 +49,7 @@ export async function loadSurah(surah, trId = DEFAULT_TRANSLATION, script = DEFA
   const key = trId + ":" + sc.id + ":" + surah.n;
   if (surahCache.has(key)) return surahCache.get(key);
   const [ar, tr] = await Promise.all([
-    getJson(QURAN_BASE + "/" + sc.dir + "/" + pad3(surah.n) + ".json"),
+    getJson(arUrl(sc, surah.n)),
     getJson(QURAN_BASE + "/tr/" + trId + "/" + pad3(surah.n) + ".json"),
   ]);
   const ayahs = parseSurahPayload(ar, tr, surah);
@@ -149,7 +152,7 @@ export async function warmScript(surahs, script, fontId, onProgress, isAlive) {
       while (next < surahs.length) {
         if (isAlive && !isAlive()) return;
         const su = surahs[next++];
-        const j = await getJson(QURAN_BASE + "/" + sc.dir + "/" + pad3(su.n) + ".json");
+        const j = await getJson(arUrl(sc, su.n));
         if (!j || j.s !== su.n || !Array.isArray(j.a) || j.a.length !== su.ayahs) throw new Error("quran data: " + sc.id + " সূরা " + su.n);
         done++;
         if (onProgress) onProgress(done, surahs.length);
