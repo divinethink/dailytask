@@ -6,10 +6,10 @@
 
 import { ChevronLeft } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
-import { loadSurah } from "../../../legacy/quranData.js";
+import { loadSurah, loadWbw } from "../../../legacy/quranData.js";
 import {
   PAGE_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
-  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf,
+  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf, alignWords, wbwSupported,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
 import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SurahBanner, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
@@ -18,8 +18,10 @@ const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
-const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, onCopy, onShare, onMark }) {
+const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, wbwRaw, onCopy, onShare, onMark }) {
   const muted = { color: th.fg, opacity: 0.62 };
+  // শব্দে শব্দে অর্থ: শুধু সমর্থিত লেখায় ও শব্দ-সংখ্যা মিললে; নইলে সাধারণ আয়াত (alignWords null)।
+  const words = prefs.showAr && prefs.wbw && wbwSupported(prefs.arScript) ? alignWords(a.ar, wbwRaw) : null;
   return h("div", { id: "q-a-" + a.n, "data-a": a.n, style: { padding: "14px 0", borderBottom: "1px solid " + LINE } },
     (juzNo > 0 || pageNo > 0) && h("div", { style: { textAlign: "center", margin: "0 0 10px", padding: "3px 10px", borderRadius: 8, background: th.bar, color: accent, fontSize: 11.5, fontWeight: 600 } },
       [juzNo > 0 ? "পারা " + toBnDigits(juzNo) + " · " + PARA_NAMES[juzNo - 1] : "", pageNo > 0 ? "পৃষ্ঠা " + toBnDigits(pageNo) : "", rukuNo > 0 ? "রুকু " + toBnDigits(rukuNo) : ""].filter(Boolean).join(" · ")
@@ -28,7 +30,13 @@ const AyahRow = memo(function AyahRow({ a, prefs, th, accent, juzNo, pageNo, ruk
       h("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 26, padding: "0 7px", borderRadius: 13, background: th.bar, color: accent, fontSize: 12, fontWeight: 600 } }, toBnDigits(a.n)),
       sajda && h("span", { style: { fontSize: 11, ...muted } }, "۩ সিজদার আয়াত")
     ),
-    prefs.showAr && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
+    prefs.showAr && !words && h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 2.2, color: th.fg } }, a.ar),
+    words && h("div", { dir: "rtl", style: { display: "flex", flexWrap: "wrap", gap: "10px 14px", color: th.fg } },
+      words.map((w, i) => h("div", { key: i, style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", maxWidth: 110 } },
+        h("span", { lang: "ar", style: { fontFamily: fontStack(prefs.arFont), fontSize: prefs.arSize, lineHeight: 1.9 } }, w.ar),
+        h("span", { dir: "ltr", lang: "en", style: { fontSize: Math.max(11, prefs.trSize - 4), lineHeight: 1.35, opacity: 0.75, marginTop: 2 } }, w.en)
+      ))
+    ),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
     h(AyahActions, { a, accent, flash, bm, fav, onCopy, onShare, onMark }),
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
@@ -96,6 +104,16 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       .catch(() => { if (alive) setState({ status: "error", ayahs: null }); });
     return () => { alive = false; };
   }, [surah.n, tries, prefs.arScript]);
+
+  // শব্দে শব্দে অর্থ: চালু + সমর্থিত লেখা + তালিকা-মোডে হলে তবেই লোড; ব্যর্থ হলে চুপচাপ সাধারণ আয়াত (পড়া আটকায় না)।
+  const [wbw, setWbw] = useState(null);
+  const wantWbw = !!prefs.wbw && wbwSupported(prefs.arScript) && prefs.mode !== "read";
+  useEffect(() => {
+    let alive = true;
+    setWbw(null);
+    if (wantWbw) loadWbw(surah).then((w) => { if (alive) setWbw(w); }).catch(() => {});
+    return () => { alive = false; };
+  }, [surah.n, wantWbw]);
 
   const ready = state.status === "ready";
   const total = surah.ayahs;
@@ -259,6 +277,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
           flash: flash.n === a.n ? flash.kind : "",
           bm: marked.has(markKey(surah.n, a.n, "b")),
           fav: marked.has(markKey(surah.n, a.n, "f")),
+          wbwRaw: wbw ? wbw[a.n - 1] : null,
           onCopy, onShare, onMark: toggleMarkAt,
         });
       }),

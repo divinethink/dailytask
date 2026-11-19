@@ -64,7 +64,7 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP };
+export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP, wbw: false };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -89,8 +89,34 @@ export function sanitizePrefs(raw) {
     arScript,
     arAlign: isValidAlign(r.arAlign) ? r.arAlign : DEFAULT_ALIGN, // রিডিং/মুসহাফের এলাইন
     arGap: isValidGap(r.arGap) ? r.arGap : DEFAULT_GAP, // লাইন-ফাঁক
+    wbw: r.wbw === true, // শব্দে শব্দে অর্থ (ঐচ্ছিক; পুরনো সেভে নেই ⇒ বন্ধ)
     arFont: fontFitsScript(r.arFont, arScript) ? r.arFont : scriptById(arScript).defaultFont, // অজানা বা লেখার সাথে বেমানান ফন্ট → ওই লেখার ডিফল্ট
   };
+}
+
+// ── শব্দে শব্দে অর্থ (ইংরেজি) ──
+// অর্থ-ফাইল (/quran/v1/wbw-en/NNN.json) = {v:1, s, w:[আয়াত → [শব্দের অর্থ…] | null]}; null = ওই আয়াতের অর্থ-ডেটা অসম্পূর্ণ।
+// আরবি শব্দ আলাদা ফাইলে নেই — বিদ্যমান আয়াত-লেখা ফাঁকা দিয়ে ভাগ করে মেলানো হয়।
+// শুধু উসমানি ও ইন্দো-পাকে শব্দ-সংখ্যা অর্থ-ডেটার সাথে প্রায় হুবহু মেলে; সরল লেখায় "ইয়া আইয়ুহা" দুই শব্দ হয়ে যায় বলে ৫০০+ আয়াত মেলে না।
+export const WBW_SCRIPTS = ["uthmani", "indopak"];
+export const wbwSupported = (script) => WBW_SCRIPTS.includes(script);
+
+// আরবি আয়াত + অর্থ-তালিকা → [{ar, en}]। সংখ্যা না মিললে বা তথ্য অবৈধ হলে null (UI তখন সাধারণ আয়াত দেখায়) — ভুল জোড়া দেখানোর চেয়ে না দেখানো নিরাপদ।
+export function alignWords(arText, meanings) {
+  if (typeof arText !== "string" || !Array.isArray(meanings) || meanings.length === 0) return null;
+  const words = arText.split(/\s+/).filter(Boolean);
+  if (words.length !== meanings.length) return null;
+  const out = [];
+  for (let i = 0; i < words.length; i++) {
+    if (typeof meanings[i] !== "string" || !meanings[i]) return null;
+    out.push({ ar: words[i], en: meanings[i] });
+  }
+  return out;
+}
+
+export function parseWbwPayload(j, surah) {
+  if (!j || j.s !== surah.n || !Array.isArray(j.w) || j.w.length !== surah.ayahs) throw new Error("quran data: অর্থ ফাইল অবৈধ");
+  return j.w;
 }
 
 // লেখার ধরন বদলালে ফন্ট মানানসই না হলে ওই ধরনের ডিফল্ট ফন্ট বসে (পুরনো পছন্দ অক্ষত থাকে)।

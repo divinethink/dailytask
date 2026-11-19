@@ -1,7 +1,7 @@
 // quranData.js — কুরআন-ডেটার data-layer: অ্যাপের নিজের হোস্ট (/quran/v1/…) থেকে on-demand fetch।
 // ক্যাশ: ব্রাউজারে in-memory + sw.js-এর আলাদা `quran-v1` cache (অফলাইনে পড়া যায়)।
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
-import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, buildSearchIndex } from "./quranCore.js";
+import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, parseWbwPayload, buildSearchIndex } from "./quranCore.js";
 import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
 import { sanitizeIndex, sanitizePage, clamp16, M16_VER } from "./mushaf16.js";
 
@@ -83,6 +83,17 @@ export async function loadMushaf16Page(p) {
   if (m16Pages.size > 40) m16Pages.delete(m16Pages.keys().next().value);
   m16Pages.set(n, lines);
   return lines;
+}
+
+// শব্দে শব্দে অর্থ (ইংরেজি): সূরা-ভিত্তিক, on-demand; ফল = প্রতি আয়াতের অর্থ-তালিকা (বা null)। ব্যর্থ হলে throw — UI শুধু অর্থ-ছাড়া সাধারণ আয়াত দেখায়।
+// sw.js-এর বিদ্যমান `/quran/v1/` cache-first নিয়মেই অফলাইনে পড়া যায় (একবার খোলা সূরা)। ডেটা শোধরালে `?v=`-এর সংখ্যা বাড়াতে হবে (arUrl-এর মতো)।
+const WBW_VER = 1;
+const wbwCache = new Map();
+export async function loadWbw(surah) {
+  if (wbwCache.has(surah.n)) return wbwCache.get(surah.n);
+  const w = parseWbwPayload(await getJson(QURAN_BASE + "/wbw-en/" + pad3(surah.n) + ".json?v=" + WBW_VER), surah);
+  wbwCache.set(surah.n, w);
+  return w;
 }
 
 // ── ধাপ ৫: পুরো কুরআন নামানো (অফলাইন) ও সার্চ-ইনডেক্স ──

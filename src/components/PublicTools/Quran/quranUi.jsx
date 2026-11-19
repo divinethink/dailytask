@@ -6,7 +6,7 @@
 import { CopyIcon, ShareIcon, Icon } from "../../icons.jsx";
 import { useBackLayer } from "../../../legacy/backNav.js";
 import { fontStack, fontsForScript, SCRIPTS, scriptById, DEFAULT_SCRIPT, flowLayout, ALIGNS, GAPS } from "../../../legacy/quranFonts.js";
-import { switchScript, AR_SIZE, TR_SIZE } from "../../../legacy/quranCore.js";
+import { switchScript, AR_SIZE, TR_SIZE, wbwSupported } from "../../../legacy/quranCore.js";
 import { THEMES } from "../../../legacy/readerCore.js";
 import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
@@ -190,6 +190,11 @@ export function ReaderPrefsBody({ prefs, th, accent, onPrefs, switches, showMode
     switches && rule("6px 0 0"),
     switches && toggle("showAr", "showTr", "আরবি দেখান"),
     switches && toggle("showTr", "showAr", "বাংলা অনুবাদ দেখান"),
+    switches && h("label", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", fontSize: 14, opacity: wbwSupported(prefs.arScript) ? 1 : 0.6 } },
+      "শব্দে শব্দে অর্থ (ইংরেজি)",
+      h("input", { type: "checkbox", checked: !!prefs.wbw && wbwSupported(prefs.arScript), disabled: !wbwSupported(prefs.arScript), onChange: (e) => onPrefs({ ...prefs, wbw: e.target.checked }), style: { width: 22, height: 22, accentColor: "#2F9E44" } })
+    ),
+    switches && h("p", { style: { fontSize: 11, opacity: 0.6, lineHeight: 1.6, margin: "0 0 4px" } }, wbwSupported(prefs.arScript) ? "শুধু তালিকা-মোডে দেখায়। কিছু আয়াতে শব্দ মেলে না, সেগুলো সাধারণভাবে দেখায়।" : "এটা উসমানি বা ইন্দো-পাক লেখায় চালু করা যায়।"),
     rule("6px 0 10px"),
     h("div", { style: { fontSize: 14, marginBottom: 8 } }, "পাতার রং"),
     h(ThemePicker, { prefs, accent, onPrefs }),
