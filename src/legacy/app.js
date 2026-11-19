@@ -1750,7 +1750,7 @@ function App() {
     if (activeTab === TAB_TOOLS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null })
+          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN) })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

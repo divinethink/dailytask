@@ -12,6 +12,7 @@ import {
   parseRef, buildMarkers, sanitizePrefs, locateAyah, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, markKey,
   searchSurahNames, searchIndex, SEARCH_MIN, SEARCH_LIMIT,
 } from "../../../legacy/quranCore.js";
+import { GOTO_KEY, countsOf, readGoto } from "../../../legacy/hifzPlan.js";
 import { QuranReader } from "./QuranReader.jsx";
 import { QuranSettingsOverlay } from "./quranUi.jsx";
 
@@ -229,6 +230,18 @@ export function QuranScreen({ settingsOpen, onSettingsClose }) {
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [tries]);
+
+  // হিফজ প্ল্যানার থেকে আসা "এই আয়াতে খুলুন" — তাজা ও বৈধ হলে একবার খুলে চাবি মুছে ফেলা হয়।
+  useEffect(() => {
+    if (!meta) return;
+    try {
+      const raw = window.localStorage.getItem(GOTO_KEY);
+      if (!raw) return;
+      window.localStorage.removeItem(GOTO_KEY);
+      const g = readGoto(JSON.parse(raw), countsOf(meta.surahs), Date.now());
+      if (g) setOpen({ s: g.s, a: g.a });
+    } catch (e) { /* ignore */ }
+  }, [meta]);
 
   // ক্লাউডে পাঠানো। ব্যর্থ হলে dirty থাকে; পরের খোলায় আবার চেষ্টা (মিলন, ওভাররাইট নয়)।
   const push = useCallback(async () => {
