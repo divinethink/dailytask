@@ -3,6 +3,8 @@
 // ইনডেক্স = { v:1, pages:548, lines:16, begin:[[সূরা, আয়াত] × ৫৪৮] } — begin[p-1] = ওই পৃষ্ঠায় যে প্রথম আয়াত শুরু হয়।
 
 export const M16_PAGES = 548;
+// sw.js কুরআনের ফাইল চিরকাল ক্যাশ রাখে; mushaf16 ডেটা বদলালে এই সংখ্যা বাড়ালে ঠিকানা নতুন হয়ে সবার ফোনে নতুন ফাইল আসে।
+export const M16_VER = "2";
 export const M16_GAP_EM = 0.3; // শব্দের মধ্যে ন্যূনতম ফাঁক (em) — মাপ ও CSS দুই জায়গায় একই
 export const M16_MIN_SIZE = 12;
 export const M16_MAX_SIZE = 40;

@@ -3,7 +3,7 @@
 // ব্যর্থ হলে throw — UI error-state দেখায়; অনির্দিষ্ট loading নয় (timeout + এক বার retry)।
 import { QURAN_BASE, DEFAULT_TRANSLATION, pad3, parseSurahPayload, buildSearchIndex } from "./quranCore.js";
 import { scriptById, DEFAULT_SCRIPT, fontById } from "./quranFonts.js";
-import { sanitizeIndex, sanitizePage, clamp16 } from "./mushaf16.js";
+import { sanitizeIndex, sanitizePage, clamp16, M16_VER } from "./mushaf16.js";
 
 const TIMEOUT_MS = 15000;
 let metaPromise = null;
@@ -64,7 +64,7 @@ const m16Pages = new Map();
 
 export function loadMushaf16Index() {
   if (!m16IndexPromise) {
-    m16IndexPromise = getJson(QURAN_BASE + "/mushaf16/index.json").then((raw) => {
+    m16IndexPromise = getJson(QURAN_BASE + "/mushaf16/index.json?v=" + M16_VER).then((raw) => {
       const idx = sanitizeIndex(raw);
       if (!idx) throw new Error("mushaf16 index অবৈধ");
       return idx;
@@ -78,7 +78,7 @@ export function loadMushaf16Index() {
 export async function loadMushaf16Page(p) {
   const n = clamp16(p);
   if (m16Pages.has(n)) return m16Pages.get(n);
-  const lines = sanitizePage(await getJson(QURAN_BASE + "/mushaf16/" + pad3(n) + ".json"), n);
+  const lines = sanitizePage(await getJson(QURAN_BASE + "/mushaf16/" + pad3(n) + ".json?v=" + M16_VER), n);
   if (!lines) throw new Error("mushaf16 পৃষ্ঠা অবৈধ: " + n);
   if (m16Pages.size > 40) m16Pages.delete(m16Pages.keys().next().value);
   m16Pages.set(n, lines);

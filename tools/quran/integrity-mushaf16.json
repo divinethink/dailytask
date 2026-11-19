@@ -2,8 +2,8 @@
  "input": "51d6ff9120a1d374f07d8f51482b8400d09a1af0ce570a8475a666b973a8072e",
  "files": {
   "mushaf16/001.json": {
-   "bytes": 801,
-   "sha256": "c0d07f31b4dd54ca13900e852f9742f31527ccf18944e5729134559188aa5b13"
+   "bytes": 793,
+   "sha256": "e4d0f63adcee0f75e8dca43826d233d1d86af1f788145159a4679a279c548658"
   },
   "mushaf16/002.json": {
    "bytes": 723,

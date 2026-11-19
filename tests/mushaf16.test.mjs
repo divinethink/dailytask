@@ -62,8 +62,8 @@ test("পাঠানো ডেটা: ৫৪৮টি পৃষ্ঠা-ফা
     assert.ok(lines.some((l) => l.t === "a"), "পৃষ্ঠা " + p + " আয়াত-লাইন");
     for (const l of lines) if (l.t === "a") for (const g of l.segs) words += g.words.length;
   }
-  // ৮৩৬৬৮ শব্দ + ১:৭-এর মাঝের চিহ্ন আলাদা শব্দ (+১) + ৭২:১৬-এর প্রথম শব্দে ভেতরের ফাঁকা (+১)
-  assert.equal(words, 83670);
+  // ৮৩৬৬৮ শব্দ + ৭২:১৬-এর প্রথম শব্দে ভেতরের ফাঁকা (+১)
+  assert.equal(words, 83669);
 });
 
 test("পাঠানো ডেটা: ৬২৩৬ আয়াতই আছে, আয়াত ক্রমানুসারে, প্রতিটার শেষ শব্দ আয়াত-চিহ্ন", () => {
@@ -88,7 +88,7 @@ test("পাঠানো ডেটা: ৬২৩৬ আয়াতই আছে
   }
 });
 
-test("পাঠানো ডেটা: প্রতিটা আয়াত ar-indopak-dk-এর সাথে হুবহু (১:৭-এর মাঝের চিহ্ন ছাড়া)", () => {
+test("পাঠানো ডেটা: প্রতিটা আয়াত ar-indopak-dk-এর সাথে হুবহু", () => {
   const seen = new Map();
   for (let p = 1; p <= M16_PAGES; p++) for (const l of sanitizePage(readJson("mushaf16/" + pad3(p) + ".json"), p)) if (l.t === "a") for (const g of l.segs) {
     const k = g.s + ":" + g.a; if (!seen.has(k)) seen.set(k, []); seen.get(k).push(...g.words);
@@ -96,9 +96,7 @@ test("পাঠানো ডেটা: প্রতিটা আয়াত ar-
   for (const su of meta.surahs) {
     const ar = readJson("ar-indopak-dk/" + pad3(su.n) + ".json").a;
     for (let a = 1; a <= su.ayahs; a++) {
-      let mine = seen.get(su.n + ":" + a).slice(0, -1).join(" ");
-      if (su.n === 1 && a === 7) mine = mine.replace(/ \u06dd\u0666\S*/u, "");
-      assert.equal(mine, ar[a - 1], su.n + ":" + a);
+      assert.equal(seen.get(su.n + ":" + a).slice(0, -1).join(" "), ar[a - 1], su.n + ":" + a);
     }
   }
 });
@@ -124,4 +122,16 @@ test("পৃষ্ঠার সহায়ক: সূরা-তালিকা,
   assert.equal(bismillahUnderBanner(p2, 0), false); // আলাদা বিসমিল্লাহ-লাইন আছে
   assert.equal(bismillahUnderBanner([{ t: "s", s: 3 }, { t: "a", c: 0, segs: [] }], 0), true);
   assert.equal(bismillahUnderBanner([{ t: "s", s: 9 }, { t: "a", c: 0, segs: [] }], 0), false);
+});
+
+test("ফাতিহা: ১৬-লাইনের আয়াত-চিহ্নের নম্বর অ্যাপের আয়াত-নম্বরের সমান (বিসমিল্লাহ ১ … ১:৭ একটাই)", () => {
+  const AR = "٠١٢٣٤٥٦٧٨٩";
+  const ends = new Map();
+  const p1 = sanitizePage(readJson("mushaf16/001.json"), 1);
+  for (const l of p1) if (l.t === "a") for (const g of l.segs) {
+    const m = /^\u06dd([\u0660-\u0669]+)/u.exec(g.words[g.words.length - 1]);
+    if (m) ends.set(g.a, [...m[1]].map((c) => AR.indexOf(c)).join(""));
+    assert.ok(!g.words.some((w) => /^\u06dd/.test(w) && w !== g.words[g.words.length - 1]), "মাঝে অতিরিক্ত আয়াত-চিহ্ন: ১:" + g.a);
+  }
+  assert.deepEqual([...ends.entries()], [1, 2, 3, 4, 5, 6, 7].map((n) => [n, String(n)]));
 });

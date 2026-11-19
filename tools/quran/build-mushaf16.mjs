@@ -36,8 +36,12 @@ const W = new Array(rows.length + 1); // W[id] = { s, a, t }
 rows.forEach((r, i) => {
   if (r.id !== i + 1) fail("শব্দ-আইডি ক্রমহীন: " + r.id);
   let t = String(r.text);
-  // ১:৭-এর মাঝের চিহ্ন: RLO + ٦ (+ চিহ্ন) → আলাদা শব্দ "۝٦…" (বাকি চিহ্নের মতোই রূপ)
-  t = t.replace(/\u202e(\u0666[^\s]*)/u, " \u06dd$1");
+  // ফাতিহা: এই লেখা বিসমিল্লাহকে গোনে না ও শেষ আয়াত দুই ভাগ করে; কিন্তু অ্যাপের আয়াত-নম্বর (অনুবাদ/বুকমার্ক/শেষ-পাঠ) Tanzil-এর হিসাবে (বিসমিল্লাহ = ১, ১:৭ একটাই)।
+  // তাই ১৬-লাইনেও নম্বর অ্যাপের হিসাবে বসানো হয়: ১:৭-এর মাঝের চিহ্ন (RLO + ٦ + চিহ্ন) বাদ, আর প্রতিটা আয়াত-চিহ্নের নম্বর = অ্যাপের আয়াত-নম্বর (থামার-চিহ্ন অপরিবর্তিত)।
+  if (+r.surah === 1) {
+    t = t.replace(/\u202e\u0666[^\s]*/u, "");
+    if (t.startsWith("\u06dd")) t = "\u06dd" + String(+r.ayah).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[+d]) + t.replace(/^\u06dd[\u0660-\u0669]*/u, "");
+  }
   t = t.replace(/[\u200b\ufeff]/g, "").trim();
   if (/[\u202a-\u202e\u2066-\u2069]/.test(t)) fail("অপ্রত্যাশিত bidi-অক্ষর: " + r.location);
   if (!t) fail("খালি শব্দ: " + r.location);
@@ -106,7 +110,6 @@ for (const su of meta.surahs) {
     if (!ws) fail("আয়াত নেই: " + su.n + ":" + a);
     if (!/^\u06dd/.test(ws[ws.length - 1])) fail("শেষ শব্দ আয়াত-চিহ্ন নয়: " + su.n + ":" + a);
     let mine = ws.slice(0, -1).join(" ");
-    if (su.n === 1 && a === 7) mine = mine.replace(/ \u06dd\u0666[^\s]*/u, "");
     if (mine !== ar[a - 1]) fail("ar-indopak-dk-এর সাথে অমিল: " + su.n + ":" + a);
     checked++;
   }
