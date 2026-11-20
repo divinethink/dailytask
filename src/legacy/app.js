@@ -163,7 +163,7 @@ import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
 import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
 const TazkirahManagerScreen = lazyRetry(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
 const FieldManagerScreen = lazyRetry(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
-import { taskFields } from "./customTasks.js";
+import { taskFields, sanitizeTasks, planTaskChange } from "./customTasks.js";
 const TabLayoutScreen = lazyRetry(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
 const HomeLayoutScreen = lazyRetry(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const PopupMessagesScreen = lazyRetry(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
@@ -823,6 +823,23 @@ function App() {
   async function handleSaveCustomTasks(next) {
     await saveCustomTasks(migrationState, selectedId, next);
     setMembers(prev => (prev || []).map(x => x.id === selectedId ? { ...x, customTasks: next } : x));
+  }
+  // কুরআন-প্ল্যানার → নিজের (লগইন-করা সদস্যের) কাস্টম টাস্কে "কুরআন খতম/হিফজ"। selectedId নয়, কারণ এডমিন অন্য সদস্যের পাতায় থাকতে পারেন।
+  // ফেরত: added|restored|exists|archived|none|full|error|guest।
+  async function handlePlanTask(mode, on) {
+    try {
+      if (isGuestMode || !auth.currentUser) return "guest";
+      const me = (members || []).find(x => x.googleUid === auth.currentUser.uid);
+      if (!me) return "error";
+      const cur = sanitizeTasks(me.customTasks);
+      const r = planTaskChange(cur, mode, on);
+      if (r.tasks === cur) return r.status;
+      await saveCustomTasks(migrationState, me.id, r.tasks);
+      setMembers(prev => (prev || []).map(x => x.id === me.id ? { ...x, customTasks: r.tasks } : x));
+      return r.status;
+    } catch (e) {
+      return "error";
+    }
   }
   async function handleSaveTazkirah(next) {
     await saveDesignPart("tazkirah", next);
@@ -1751,7 +1768,7 @@ function App() {
     if (activeTab === TAB_TOOLS) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN) })
+          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

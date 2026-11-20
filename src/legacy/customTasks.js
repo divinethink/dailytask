@@ -8,6 +8,11 @@ export const MAX_TOTAL = 40; // সক্রিয় + আর্কাইভ; R
 export const MAX_LABEL = 60;
 export const TASK_KEY_PREFIX = "ctask_";
 
+// প্ল্যান থেকে নিজে-তৈরি টাস্কের চিহ্ন (ঐচ্ছিক ফিল্ড src)। নতুন কিছু যোগ হলে এখানেই; অচেনা মান বাদ পড়ে।
+export const PLAN_SRC = { khatam: "plan_khatam", hifz: "plan_hifz" };
+export const PLAN_LABEL = { khatam: "কুরআন খতম", hifz: "কুরআন হিফজ" };
+const VALID_SRC = new Set(Object.values(PLAN_SRC));
+
 const isObj = v => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** সেভ-করা মান → বৈধ তালিকা। অবৈধ/ডুপ্লিকেট-id/খালি-নাম বাদ; নাম ছাঁটা ও দৈর্ঘ্য-সীমিত। */
@@ -20,7 +25,10 @@ export function sanitizeTasks(raw) {
     const label = typeof it.label === "string" ? it.label.trim().slice(0, MAX_LABEL) : "";
     if (!label) continue;
     seen.add(it.id);
-    out.push(it.archived === true ? { id: it.id, label, archived: true } : { id: it.id, label });
+    const o = { id: it.id, label };
+    if (typeof it.src === "string" && VALID_SRC.has(it.src)) o.src = it.src;
+    if (it.archived === true) o.archived = true;
+    out.push(o);
   }
   return out;
 }
@@ -57,8 +65,33 @@ export function setArchived(tasks, id, archived) {
   if (!archived && activeTasks(tasks).length >= MAX_ACTIVE) return tasks;
   return tasks.map(t => {
     if (t.id !== id) return t;
-    return archived ? { id: t.id, label: t.label, archived: true } : { id: t.id, label: t.label };
+    const { archived: _a, ...rest } = t;
+    return archived ? { ...rest, archived: true } : rest;
   });
+}
+
+/**
+ * খতম/হিফজ প্ল্যানের সাথে যুক্ত কাস্টম টাস্ক।
+ * on=true: নেই → যোগ; আর্কাইভ করা থাকলে → ফিরিয়ে আনা; সক্রিয় আছে (বা একই নামের নিজের বানানো টাস্ক আছে) → অপরিবর্তিত।
+ * on=false: সক্রিয় প্ল্যান-টাস্ক আর্কাইভ (এন্ট্রির ডেটা অক্ষত)।
+ * ফেরত { tasks, status }: status = added | restored | exists | full | archived | none। সীমা পার হলে tasks অপরিবর্তিত ("full")।
+ */
+export function planTaskChange(tasks, mode, on, id) {
+  const src = PLAN_SRC[mode];
+  if (!src) return { tasks, status: "none" };
+  const mine = tasks.find(t => t.src === src);
+  if (!on) {
+    if (!mine || mine.archived) return { tasks, status: "none" };
+    return { tasks: setArchived(tasks, mine.id, true), status: "archived" };
+  }
+  if (mine && !mine.archived) return { tasks, status: "exists" };
+  if (activeTasks(tasks).length >= MAX_ACTIVE || tasks.length >= MAX_TOTAL) {
+    return { tasks, status: mine ? "full" : "full" };
+  }
+  if (mine) return { tasks: setArchived(tasks, mine.id, false), status: "restored" };
+  const label = PLAN_LABEL[mode];
+  if (activeTasks(tasks).some(t => t.label === label)) return { tasks, status: "exists" };
+  return { tasks: [...tasks, { id: id || newTaskId(), label, src }], status: "added" };
 }
 
 /** হিসাবের জন্য ফিল্ড-তালিকা (শুধু সক্রিয়)। বাকি ফিল্ডের মতোই bool; কী = ctask_<id>। */

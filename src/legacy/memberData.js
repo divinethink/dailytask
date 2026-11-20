@@ -186,7 +186,7 @@ async function saveCustomTasks(migrationState, memberId, tasks) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
   await setDoc(memberRef, {
-    customTasks: tasks.map(t => (t.archived ? { id: t.id, label: t.label, archived: true } : { id: t.id, label: t.label })),
+    customTasks: tasks.map(t => ({ id: t.id, label: t.label, ...(t.src ? { src: t.src } : {}), ...(t.archived ? { archived: true } : {}) })),
     updatedAt: Date.now()
   }, { merge: true });
 }

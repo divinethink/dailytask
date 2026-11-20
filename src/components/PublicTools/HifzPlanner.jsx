@@ -127,13 +127,22 @@ function Setup({ mode, surahs, counts, onCreate }) {
       h("button", { type: "button", disabled: !plan, onClick: () => plan && onCreate(plan), style: btnStyle("primary", { width: "100%", marginTop: 12, minHeight: 46, opacity: plan ? 1 : 0.5 }) }, "প্ল্যান শুরু করুন")));
 }
 
-export function HifzPlanner({ onOpenQuran }) {
+// প্ল্যান-টাস্কের ফল → ছোট বার্তা (সফল হলে সবুজ, সমস্যায় কমলা); কিছু বলার না থাকলে null
+const TASK_NOTE = {
+  added: ["হোমের কাস্টম টাস্কে যোগ হয়েছে ✓", true],
+  restored: ["হোমের কাস্টম টাস্ক আবার চালু হয়েছে ✓", true],
+  full: ["কাস্টম টাস্ক ২০টা পূর্ণ, তাই হোমে যোগ হয়নি। প্ল্যান ঠিকই চলবে।", false],
+  error: ["হোমের কাস্টম টাস্কে যোগ করা যায়নি। প্ল্যান ঠিকই চলবে।", false],
+};
+
+export function HifzPlanner({ onOpenQuran, onPlanTask }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [mode, setMode] = useState("khatam");
   const [plans, setPlans] = useState({ hifz: null, khatam: null });
   const [confirmDel, setConfirmDel] = useState(false);
+  const [taskNote, setTaskNote] = useState(null);
   const [editN, setEditN] = useState(null); // "অন্য পরিমাণ" সম্পাদনা: null = বন্ধ, নইলে আয়াত-সংখ্যা
 
   useEffect(() => {
@@ -159,7 +168,20 @@ export function HifzPlanner({ onOpenQuran }) {
   const counts = countsOf(surahs);
   const W = WORDS[mode];
   const plan = plans[mode];
-  const save = (p) => { setPlans((x) => ({ ...x, [mode]: p })); writePlan(mode, p); };
+  const syncTask = async (m, on) => {
+    if (!onPlanTask) return;
+    const r = await onPlanTask(m, on);
+    setTaskNote(on && TASK_NOTE[r] ? TASK_NOTE[r] : null);
+  };
+  const save = (p) => {
+    const had = !!plans[mode];
+    setPlans((x) => ({ ...x, [mode]: p }));
+    writePlan(mode, p);
+    // হোমের কাস্টম টাস্ক: নতুন প্ল্যানে যোগ; মুছলে বা শেষ হলে আর্কাইভ (এন্ট্রির ডেটা অক্ষত)
+    if (p && !had) syncTask(mode, true);
+    else if (!p) syncTask(mode, false);
+    else if (statsOf(p, counts).finished) syncTask(mode, false);
+  };
 
   const modeBar = h("div", { role: "group", "aria-label": "প্ল্যানের ধরন", style: { display: "flex", gap: 6, padding: 4, borderRadius: 16, background: SOFT, marginBottom: 10 } },
     Object.keys(WORDS).map((k) => {
@@ -167,7 +189,7 @@ export function HifzPlanner({ onOpenQuran }) {
       const started = plans[k] && !statsOf(plans[k], counts).finished;
       return h("button", {
         key: k, type: "button", "aria-pressed": on,
-        onClick: () => { setMode(k); setConfirmDel(false); setEditN(null); },
+        onClick: () => { setMode(k); setConfirmDel(false); setEditN(null); setTaskNote(null); },
         style: {
           flex: 1, minHeight: 42, borderRadius: 13, cursor: "pointer", lineHeight: 1.25,
           border: "1px solid " + (on ? PRIMARY : LINE),
@@ -181,6 +203,7 @@ export function HifzPlanner({ onOpenQuran }) {
     }));
 
   if (!plan) return h("div", null, modeBar, h(Setup, { key: mode, mode, surahs, counts, onCreate: save }));
+
 
   const st = statsOf(plan, counts);
   const portion = todayPortion(plan, counts);
@@ -208,6 +231,7 @@ export function HifzPlanner({ onOpenQuran }) {
       h(Stat, { value: toBnDigits(st.daysLeft), label: "বাকি দিন" }),
       h(Stat, { value: toBnDigits(plan.perDay), label: "দৈনিক লক্ষ্য" })));
 
+  const noteEl = taskNote && h("div", { role: "status", style: { fontSize: 12, fontWeight: 600, padding: "6px 10px", borderRadius: 10, marginBottom: 8, color: taskNote[1] ? PRIMARY : "#9A5B00", background: taskNote[1] ? SOFT : "#FFF3DC" } }, taskNote[0]);
   const smallBtn = (kind, extra) => btnStyle(kind, { minHeight: 44, fontSize: 14, padding: "0 12px", ...extra });
   const editing = editN !== null && portion;
   const editEnd = editing ? posAfterN(plan, counts, editN) : null;
@@ -243,6 +267,7 @@ export function HifzPlanner({ onOpenQuran }) {
   return h("div", null,
     modeBar,
     hero,
+    noteEl,
     today,
     h("div", { style: { ...cardBase, padding: "10px 12px", marginBottom: 8 } },
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
