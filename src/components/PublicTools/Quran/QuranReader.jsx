@@ -90,37 +90,81 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   const onPrefsRef = useRef(onPrefs);
   onPrefsRef.current = onPrefs;
 
-  // দুই-আঙুল পিঞ্চ → আরবি ও অনুবাদের আকার একসাথে (সেটিংসের সীমার ভেতরে)
+  // দুই-আঙুল পিঞ্চ → আরবি ও অনুবাদের আকার একসাথে (সেটিংসের সীমার ভেতরে)।
+  // মসৃণতার জন্য: আঙুল নাড়ার সময় শুধু CSS scale (GPU, কোনো re-render/reflow/সেভ নেই);
+  // আঙুল তুললে একবারই আসল আকার বসে এবং পিঞ্চের জায়গার লেখা একই স্থানে থাকে।
+  const zoomRef = useRef(null);
+  const pendingRef = useRef(null);
   useEffect(() => {
     const el = bodyRef.current;
-    if (!el) return undefined;
-    let d0 = 0, a0 = 0, t0 = 0;
+    const z = zoomRef.current;
+    if (!el || !z) return undefined;
+    let d0 = 0, a0 = 0, t0 = 0, r = 1, lo = 1, hi = 1, raf = 0, midX = 0, midY = 0, anchor = null;
     const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const clamp = (v, lim, step) => Math.min(lim.max, Math.max(lim.min, Math.round(v / step) * step));
+    const paint = () => { raf = 0; z.style.transform = "scale(" + r.toFixed(4) + ")"; };
+    const reset = () => { z.style.transform = ""; z.style.transformOrigin = ""; z.style.willChange = ""; };
     const ts = (e) => {
-      if (e.touches.length === 2) { d0 = dist(e.touches); a0 = prefsRef.current.arSize; t0 = prefsRef.current.trSize; }
+      if (e.touches.length !== 2) return;
+      const p = prefsRef.current;
+      d0 = dist(e.touches); a0 = p.arSize; t0 = p.trSize; r = 1;
+      const reading = p.mode === "read";
+      lo = reading ? AR_SIZE.min / a0 : Math.min(AR_SIZE.min / a0, TR_SIZE.min / t0);
+      hi = reading ? AR_SIZE.max / a0 : Math.max(AR_SIZE.max / a0, TR_SIZE.max / t0);
+      const box = el.getBoundingClientRect();
+      const zb = z.getBoundingClientRect();
+      midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const hit = document.elementFromPoint(midX, midY);
+      const node = hit && hit.closest ? hit.closest("[data-a]") : null;
+      anchor = node ? { n: node.getAttribute("data-a"), top: node.getBoundingClientRect().top - box.top } : null;
+      z.style.transformOrigin = (midX - zb.left) + "px " + (midY - zb.top) + "px";
+      z.style.willChange = "transform";
+      pendingRef.current = { h0: z.offsetHeight, st: el.scrollTop, y: midY - box.top, anchor };
     };
     const tm = (e) => {
       if (e.touches.length !== 2 || d0 <= 0) return;
       e.preventDefault();
-      const r = dist(e.touches) / d0;
+      r = Math.min(hi, Math.max(lo, dist(e.touches) / d0));
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const te = (e) => {
+      if (e.touches.length >= 2 || d0 <= 0) return;
+      d0 = 0;
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       const ar = clamp(a0 * r, AR_SIZE, AR_SIZE.step);
       const tr = clamp(t0 * r, TR_SIZE, TR_SIZE.step);
       const p = prefsRef.current;
       if (ar !== p.arSize || tr !== p.trSize) onPrefsRef.current({ ...p, arSize: ar, trSize: tr });
+      else { reset(); pendingRef.current = null; }
     };
-    const te = (e) => { if (e.touches.length < 2) d0 = 0; };
     el.addEventListener("touchstart", ts, { passive: true });
     el.addEventListener("touchmove", tm, { passive: false });
     el.addEventListener("touchend", te, { passive: true });
     el.addEventListener("touchcancel", te, { passive: true });
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       el.removeEventListener("touchstart", ts);
       el.removeEventListener("touchmove", tm);
       el.removeEventListener("touchend", te);
       el.removeEventListener("touchcancel", te);
     };
   }, []);
+  // নতুন আকার বসার পর (painting-এর আগে) scale সরানো ও পিঞ্চের জায়গার লেখা একই স্থানে ধরে রাখা
+  React.useLayoutEffect(() => {
+    const el = bodyRef.current;
+    const z = zoomRef.current;
+    const pd = pendingRef.current;
+    if (!el || !z || !pd) return;
+    pendingRef.current = null;
+    z.style.transform = ""; z.style.transformOrigin = ""; z.style.willChange = "";
+    const node = pd.anchor ? z.querySelector('[data-a="' + pd.anchor.n + '"]') : null;
+    if (node) {
+      el.scrollTop += (node.getBoundingClientRect().top - el.getBoundingClientRect().top) - pd.anchor.top;
+    } else if (pd.h0 > 0) {
+      el.scrollTop = (pd.st + pd.y) * (z.offsetHeight / pd.h0) - pd.y;
+    }
+  }, [prefs.arSize, prefs.trSize]);
   const onMarkRef = useRef(onMark);
   onMarkRef.current = onMark;
 
@@ -286,7 +330,8 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       ),
       h("button", { type: "button", onClick: () => setSheet(true), "aria-label": "পাঠ-সেটিংস", style: { minWidth: 44, minHeight: 44, color: "#fff", fontSize: 19, fontWeight: 600 } }, "Aa")
     ),
-    h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", padding: "0 16px 40px", touchAction: "pan-y" } },
+    h("div", { ref: bodyRef, style: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 16px 40px", touchAction: "pan-y" } },
+    h("div", { ref: zoomRef },
       state.status === "loading" && h("p", { className: "text-center text-sm py-16", style: { opacity: 0.6 } }, "লোড হচ্ছে…"),
       state.status === "error" && h("div", { className: "text-center py-16" },
         h("p", { className: "text-sm mb-3" }, "সূরাটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
@@ -326,7 +371,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
           " · বাংলা অনুবাদ: " + TRANSLATOR
         )
       )
-    ),
+    )),
     reading && sel && h(AyahSheet, {
       surah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false, extraTafsir: true, arFont: prefs.arFont,
       flash: flash.n === sel.n ? flash.kind : "",
