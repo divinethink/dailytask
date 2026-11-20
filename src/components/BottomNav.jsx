@@ -10,7 +10,7 @@
 // রঙ বদলায় (brand-green), filled-shape না। HomeIcon/TasbihIcon/CompassIcon নতুন,
 // standalone, নিজস্ব `filled` prop-সহ (active=filled+brand-green, inactive=outline+muted)।
 import { TAB_FAMILY, TAB_MUHASABA, TAB_QURAN, TAB_PRAYER_TIMES, TAB_TOOLS, TAB_SETTINGS } from "../legacy/tabs.js";
-import { ClockIcon, MenuIcon, HomeIcon, CompassIcon, BookIcon } from "./icons.jsx";
+import { ClockIcon, MenuIcon, HomeIcon, AmolIcon, BookIcon } from "./icons.jsx";
 
 const ACTIVE_COLOR = "var(--theme-primary, #0E4B43)";
 const INACTIVE_COLOR = "#8A9A8F";
@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { id: TAB_FAMILY, label: "হোম", Icon: HomeIcon, supportsFilled: true },
   { id: TAB_PRAYER_TIMES, label: "সময়সূচি", Icon: ClockIcon, supportsFilled: false },
   { id: TAB_QURAN, label: "কুরআন", Icon: BookIcon, supportsFilled: false },
-  { id: TAB_TOOLS, label: "সহায়িকা", Icon: CompassIcon, supportsFilled: true },
+  { id: TAB_TOOLS, label: "আমল", Icon: AmolIcon, supportsFilled: true },
   { id: TAB_SETTINGS, label: "মেনু", Icon: MenuIcon, supportsFilled: false }
 ];
 
