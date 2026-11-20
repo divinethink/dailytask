@@ -64,7 +64,10 @@ export function pushLastRead(list, s, a, now) {
 
 export const AR_SIZE = { min: 22, max: 48, step: 2, def: 28 };
 export const TR_SIZE = { min: 13, max: 26, step: 1, def: 16 };
-export const DEFAULT_PREFS = { arSize: AR_SIZE.def, trSize: TR_SIZE.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP, wbw: false, tafsir: true };
+// কুরআন-রিডারের জুম-সীমা (পিঞ্চ ও সেটিংস)। AR_SIZE/TR_SIZE অপরিবর্তিত, কারণ হিসনুল মুসলিমও AR_SIZE ব্যবহার করে।
+export const AR_ZOOM = { min: 18, max: 72, step: 1, def: 28 };
+export const TR_ZOOM = { min: 11, max: 34, step: 1, def: 16 };
+export const DEFAULT_PREFS = { arSize: AR_ZOOM.def, trSize: TR_ZOOM.def, showAr: true, showTr: true, theme: 0, mode: "list", arFont: DEFAULT_FONT, arScript: DEFAULT_SCRIPT, arAlign: DEFAULT_ALIGN, arGap: DEFAULT_GAP, wbw: false, tafsir: true };
 
 const clampNum = (v, lim) => {
   const n = Number(v);
@@ -80,8 +83,8 @@ export function sanitizePrefs(raw) {
   if (!showAr && !showTr) showAr = true;
   const arScript = isValidScript(r.arScript) ? r.arScript : DEFAULT_SCRIPT;
   return {
-    arSize: clampNum(r.arSize, AR_SIZE),
-    trSize: clampNum(r.trSize, TR_SIZE),
+    arSize: clampNum(r.arSize, AR_ZOOM),
+    trSize: clampNum(r.trSize, TR_ZOOM),
     showAr,
     showTr,
     theme: [0, 1, 2].includes(r.theme) ? r.theme : 0, // 0=সাদা, 1=সেপিয়া, 2=ডার্ক (readerCore THEMES)

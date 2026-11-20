@@ -9,16 +9,16 @@ import { useBackLayer } from "../../../legacy/backNav.js";
 import { loadSurah, loadWbw } from "../../../legacy/quranData.js";
 import {
   PAGE_SIZE, PARA_NAMES, showBismillahHeader, surahTypeLabel, toBnDigits,
-  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf, alignWords, wbwSupported, AR_SIZE, TR_SIZE,
+  locateAyah, ayahShareText, markKey, MARKS_MAX, rukuOf, alignWords, wbwSupported, AR_ZOOM as AR_SIZE, TR_ZOOM as TR_SIZE,
 } from "../../../legacy/quranCore.js";
 import { fontStack, scriptById, DEFAULT_SCRIPT } from "../../../legacy/quranFonts.js";
-import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, SurahBanner, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
+import { PRIMARY, TRANSLATOR, LINE, copyText, AyahActions, AyahFlow, AyahSheet, TafsirSheet, SurahBanner, SettingsSheet, readerTheme, useEnsureFont } from "./quranUi.jsx";
 
 const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 const h = React.createElement;
 
 // প্রতিটা আয়াত আলাদা memo: পাঠের অবস্থান বদলালে ২৮৬টা আয়াত আবার আঁকা হয় না।
-const AyahRow = memo(function AyahRow({ a, surah, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, wbwRaw, onCopy, onShare, onMark }) {
+const AyahRow = memo(function AyahRow({ a, surah, prefs, th, accent, juzNo, pageNo, rukuNo, sajda, flash, bm, fav, wbwRaw, onCopy, onShare, onMark, onTafsir }) {
   const muted = { color: th.fg, opacity: 0.62 };
   // শব্দে শব্দে অর্থ: শুধু সমর্থিত লেখায় ও শব্দ-সংখ্যা মিললে; নইলে সাধারণ আয়াত (alignWords null)।
   const words = prefs.showAr && prefs.wbw && wbwSupported(prefs.arScript) ? alignWords(a.ar, wbwRaw) : null;
@@ -38,7 +38,7 @@ const AyahRow = memo(function AyahRow({ a, surah, prefs, th, accent, juzNo, page
       ))
     ),
     prefs.showTr && h("p", { style: { fontSize: prefs.trSize, lineHeight: 1.85, color: th.fg, opacity: 0.92, marginTop: prefs.showAr ? 8 : 0, paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, a.tr),
-    h(AyahActions, { a, surah: prefs.tafsir !== false ? surah : null, th, trSize: prefs.trSize, accent, flash, bm, fav, onCopy, onShare, onMark, extraTafsir: true, arFont: prefs.arFont }),
+    h(AyahActions, { a, surah: prefs.tafsir !== false ? surah : null, th, trSize: prefs.trSize, accent, flash, bm, fav, onCopy, onShare, onMark, onTafsir, extraTafsir: true, arFont: prefs.arFont }),
     flash === "full" && h("div", { style: { fontSize: 12, color: "#D64545", marginTop: 2 } }, "সংরক্ষণের সীমা (" + toBnDigits(MARKS_MAX) + "টি) পূর্ণ। আগে কিছু সরান।")
   );
 });
@@ -79,6 +79,8 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
   const [cur, setCur] = useState(start);
   const [flash, setFlash] = useState({ n: 0, kind: "" });
   const [sel, setSel] = useState(null); // রিডিং মোডে ট্যাপ করা আয়াত
+  const [tafAyah, setTafAyah] = useState(null); // তাফসির-শিটে খোলা আয়াত
+  const openTafsir = useCallback((a) => { setSel(null); setTafAyah(a); }, []);
   const bodyRef = useRef(null);
   const sentinelRef = useRef(null);
   const posRef = useRef(0);
@@ -138,6 +140,21 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       if (ar !== p.arSize || tr !== p.trSize) onPrefsRef.current({ ...p, arSize: ar, trSize: tr });
       else { reset(); pendingRef.current = null; }
     };
+    // ডাবল-ট্যাপ → ডিফল্ট আকারে ফেরা (শুধু তালিকা-মোডে; রিডিং-মোডে ট্যাপে শিট খোলে)
+    let lt = 0, lx = 0, ly = 0;
+    const dt = (e) => {
+      if (e.touches.length > 0 || d0 > 0 || e.changedTouches.length !== 1) return;
+      const p = prefsRef.current;
+      if (p.mode === "read") return;
+      const tg = e.target && e.target.closest ? e.target.closest("button,a,input,select,textarea,[role=button]") : null;
+      if (tg) { lt = 0; return; }
+      const t = e.changedTouches[0], now = Date.now();
+      if (now - lt < 300 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) {
+        lt = 0;
+        if (p.arSize !== AR_SIZE.def || p.trSize !== TR_SIZE.def) onPrefsRef.current({ ...p, arSize: AR_SIZE.def, trSize: TR_SIZE.def });
+      } else { lt = now; lx = t.clientX; ly = t.clientY; }
+    };
+    el.addEventListener("touchend", dt, { passive: true });
     el.addEventListener("touchstart", ts, { passive: true });
     el.addEventListener("touchmove", tm, { passive: false });
     el.addEventListener("touchend", te, { passive: true });
@@ -147,6 +164,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       el.removeEventListener("touchstart", ts);
       el.removeEventListener("touchmove", tm);
       el.removeEventListener("touchend", te);
+      el.removeEventListener("touchend", dt);
       el.removeEventListener("touchcancel", te);
     };
   }, []);
@@ -356,7 +374,7 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
           bm: marked.has(markKey(surah.n, a.n, "b")),
           fav: marked.has(markKey(surah.n, a.n, "f")),
           wbwRaw: wbw ? wbw[a.n - 1] : null,
-          onCopy, onShare, onMark: toggleMarkAt,
+          onCopy, onShare, onMark: toggleMarkAt, onTafsir: openTafsir,
         });
       }),
       ready && shown < total && h("div", { ref: sentinelRef, style: { height: 40 }, "aria-hidden": "true" }),
@@ -376,7 +394,11 @@ export function QuranReader({ surah, meta, markers, prefs, onPrefs, startAyah, b
       surah, ayah: sel, th, accent, trSize: prefs.trSize, tafsir: prefs.tafsir !== false, extraTafsir: true, arFont: prefs.arFont,
       flash: flash.n === sel.n ? flash.kind : "",
       bm: marked.has(markKey(surah.n, sel.n, "b")), fav: marked.has(markKey(surah.n, sel.n, "f")),
-      onCopy, onShare, onMark: toggleMarkAt, onClose: () => setSel(null),
+      onCopy, onShare, onMark: toggleMarkAt, onTafsir: openTafsir, onClose: () => setSel(null),
+    }),
+    tafAyah && ready && h(TafsirSheet, {
+      surah, ayahs: state.ayahs, ayah: tafAyah, th, accent, trSize: prefs.trSize, arSize: prefs.arSize, arFont: prefs.arFont,
+      onAyah: setTafAyah, onClose: () => setTafAyah(null),
     }),
     sheet && h(SettingsSheet, {
       title: "পাঠ-সেটিংস", prefs, th, accent, onPrefs, switches: prefs.mode !== "read",

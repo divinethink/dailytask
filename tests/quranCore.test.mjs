@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   toBnDigits, pad3, surahTypeLabel, showBismillahHeader, refLabel, parseSurahPayload,
   sanitizeLastRead, pushLastRead, LAST_READ_MAX, QUICK_SURAHS,
-  DEFAULT_PREFS, AR_SIZE, TR_SIZE, sanitizePrefs, PARA_NAMES, parseRef, locateAyah, buildMarkers, ayahShareText,
+  DEFAULT_PREFS, AR_ZOOM, TR_ZOOM, sanitizePrefs, PARA_NAMES, parseRef, locateAyah, buildMarkers, ayahShareText,
   MARKS_MAX, markKey, sanitizeMarks, toggleMark, mergeMarks, mergeLastRead, sanitizeCloudState,
   hasArabic, normalizeArabic, normalizeText, searchSurahNames, buildSearchIndex, searchIndex, SEARCH_LIMIT,
 } from "../src/legacy/quranCore.js";
@@ -94,13 +94,13 @@ test("sanitizePrefs: ডিফল্ট, সীমা, দুটোই বন্
   assert.deepEqual(sanitizePrefs(null), DEFAULT_PREFS);
   assert.deepEqual(sanitizePrefs("x"), DEFAULT_PREFS);
   const p = sanitizePrefs({ arSize: 999, trSize: 1, showAr: false, showTr: false, theme: 7 });
-  assert.equal(p.arSize, AR_SIZE.max);
-  assert.equal(p.trSize, TR_SIZE.min);
+  assert.equal(p.arSize, AR_ZOOM.max);
+  assert.equal(p.trSize, TR_ZOOM.min);
   assert.equal(p.showAr, true); // দুটোই false হলে আরবি ফেরে
   assert.equal(p.theme, 0);
   assert.equal(sanitizePrefs({ showAr: false, showTr: true, theme: 2 }).showAr, false);
   assert.equal(sanitizePrefs({ theme: 2 }).theme, 2);
-  assert.equal(sanitizePrefs({ arSize: "abc" }).arSize, AR_SIZE.def);
+  assert.equal(sanitizePrefs({ arSize: "abc" }).arSize, AR_ZOOM.def);
 });
 
 test("পারার নাম ৩০টি", () => {
