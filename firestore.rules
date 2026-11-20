@@ -444,7 +444,8 @@ service cloud.firestore {
       // security boundary field-scope দিয়েই বজায় থাকছে (*শুধু* lastActiveAt
       // affected হতে পারবে, অন্য কোনো field না — পুরো family root doc নয়)।
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt'])
+        && request.resource.data.lastActiveAt is timestamp;
 
       // --- §Google-Login Identity Migration(2_4_1 §৩/§৫, dual-path) ---
       // সম্পূর্ণ additive, নতুন optional field-সেট। বিদ্যমান কোনো clause-এ
@@ -479,7 +480,12 @@ service cloud.firestore {
       // দিয়ে সীমাবদ্ধ করা হলো(orphaned সেট হওয়ার মুহূর্তে family-তে আর কোনো
       // active admin নাও থাকতে পারে — isAdminOfFamily() তখন false হয়ে
       // legitimate soft-delete-ই ব্লক করে দিত)।
+      // §Audit-fix(২০ নভেম্বর ২০২৬): এখন admin-only। ক্লায়েন্ট কোড এই field আদৌ লেখে না
+      // (grep যাচাই), তাই আচরণ বদলায় না; আগে যেকোনো signed-in ইউজার অন্য পরিবারকে
+      // orphaned করতে পারত। isAdminOfFamily() pre-write অবস্থা দেখে — শেষ admin leave
+      // করার transaction-এও কাজ করবে।
       allow update: if request.auth != null
+        && isAdminOfFamily(familyId)
         && !('status' in resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'orphanedAt', 'updatedAt'])
         && request.resource.data.status == 'orphaned';
@@ -497,6 +503,7 @@ service cloud.firestore {
       // manual TTL cleanup script grace-period-পরে ভুলবশত delete করে
       // ফেলতে পারে(rules-change লাগে না, শুধু client discipline)।
       allow update: if request.auth != null
+        && isApprovedMember(familyId)
         && 'status' in resource.data
         && resource.data.status == 'orphaned'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'orphanedAt', 'updatedAt'])
@@ -882,9 +889,17 @@ service cloud.firestore {
     // --- PWA ইনস্টল কাউন্টার (গ্লোবাল, কোনো নির্দিষ্ট পরিবারের ডাটা নয়) ---
     match /app_stats/{statId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null
+      // §Audit-fix(২০ নভেম্বর ২০২৬): শুধু একটি doc, count শুধু +১ করে বাড়ে।
+      allow create: if request.auth != null
+        && statId == 'pwa_installs'
         && request.resource.data.keys().hasOnly(['count', 'lastInstalledAt'])
-        && request.resource.data.count is number;
+        && request.resource.data.count == 1
+        && request.resource.data.lastInstalledAt is number;
+      allow update: if request.auth != null
+        && statId == 'pwa_installs'
+        && request.resource.data.keys().hasOnly(['count', 'lastInstalledAt'])
+        && request.resource.data.count == resource.data.count + 1
+        && request.resource.data.lastInstalledAt is number;
       allow delete: if false;
     }
   }

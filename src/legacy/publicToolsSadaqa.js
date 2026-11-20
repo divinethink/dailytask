@@ -2,6 +2,8 @@
 // array(3_2 §৩ key: dt_pt_sadaqa_log), কোনো Firestore/family-data touch করে না।
 // data/ layer(Dev Rule ২): এই ফাইল শুধু CRUD করে, কোনো UI/JSX নেই।
 
+import { dateKey } from "./appHelpers.js";
+
 const SADAQA_LOG_KEY = "dt_pt_sadaqa_log";
 
 function getSadaqaLog() {
@@ -26,7 +28,7 @@ function addSadaqaEntry({ amount, note, date }) {
     id: `sdq_${Date.now()}`,
     amount: Number(amount) || 0,
     note: note || "",
-    date: date || new Date().toISOString().slice(0, 10),
+    date: date || dateKey(new Date()),
     createdAt: Date.now(),
   };
   const updated = [entry, ...entries];

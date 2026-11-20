@@ -4,14 +4,14 @@
 // Dashboard-এর কোনো ফিল্ডের সাথে duplicate না)।
 // React global(window.React, globals.js)।
 
-import { toBn } from "../../legacy/appHelpers.js";
+import { toBn, dateKey } from "../../legacy/appHelpers.js";
 import { getSadaqaLog, addSadaqaEntry, deleteSadaqaEntry } from "../../legacy/publicToolsSadaqa.js";
 import { Trash } from "../icons.jsx";
 
 const { useState } = React;
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKey(new Date()); // স্থানীয় তারিখ (UTC নয়)
 }
 
 function formatTaka(n) {
