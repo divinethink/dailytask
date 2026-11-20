@@ -25,6 +25,22 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+// Boot-এ আবশ্যক config যাচাই: মিসিং থাকলে Firebase-এর অস্পষ্ট `invalid-api-key`-এর বদলে
+// সাথে সাথে স্পষ্ট বার্তা। (measurementId/storageBucket/messagingSenderId ঐচ্ছিক।)
+const REQUIRED_ENV = {
+  VITE_FIREBASE_API_KEY: firebaseConfig.apiKey,
+  VITE_FIREBASE_AUTH_DOMAIN: firebaseConfig.authDomain,
+  VITE_FIREBASE_PROJECT_ID: firebaseConfig.projectId,
+  VITE_FIREBASE_APP_ID: firebaseConfig.appId
+};
+const missingEnv = Object.keys(REQUIRED_ENV).filter(k => !REQUIRED_ENV[k] || !String(REQUIRED_ENV[k]).trim());
+if (missingEnv.length) {
+  throw new Error("Firebase config মিসিং — Cloudflare Pages/.env-এ এই ভেরিয়েবল দিন: " + missingEnv.join(", "));
+}
+// API key সাধারণত "AIza" দিয়ে শুরু, ৩৯ অক্ষর — কপি করতে একটা অক্ষর বাদ পড়লে এখানেই ধরা পড়ে (শুধু সতর্কতা)।
+if (!/^AIza[0-9A-Za-z_-]{35}$/.test(String(firebaseConfig.apiKey).trim())) {
+  console.error("VITE_FIREBASE_API_KEY-এর দৈর্ঘ্য/ধরন সন্দেহজনক — কপি করার সময় অক্ষর বাদ পড়েছে কিনা দেখুন।");
+}
 const app = initializeApp(firebaseConfig);
 
 // --- Firestore + অফলাইন persistence(একই সাথে, একবারই) ---

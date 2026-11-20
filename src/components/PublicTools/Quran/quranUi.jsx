@@ -12,9 +12,9 @@ import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { loadTafsir, loadFmIndex, loadFm } from "../../../legacy/quranData.js";
 import { findTafsir, tafsirBlocks, tafsirRangeNote, TAFSIR_NAME } from "../../../legacy/quranTafsir.js";
 import { findFmRange, fmForAyah, fmBlocks, fmRangeNote, FM_NAME } from "../../../legacy/quranTafsirFm.js";
-import { PARA_NAMES, showBismillahHeader, toBnDigits, ayahShareText, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
+import { PARA_NAMES, showBismillahHeader, toBnDigits, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
 
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 const h = React.createElement;
 
 export const PRIMARY = "var(--theme-primary, #0E4B43)";
@@ -418,36 +418,5 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, extr
   );
 }
 
-// মুসহাফের জন্য কপি/শেয়ার/মার্ক-হুক। আয়াত = {s, n, ar, tr}; surahs = meta.surahs।
-export function useAyahActions(surahs, onMark) {
-  const [flash, setFlash] = useState({ key: "", kind: "" });
-  const timer = useRef(null);
-  const onMarkRef = useRef(onMark);
-  onMarkRef.current = onMark;
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const flashFor = useCallback((key, kind) => {
-    setFlash({ key, kind });
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setFlash({ key: "", kind: "" }), 1500);
-  }, []);
-  const textOf = (a) => ayahShareText(surahs[a.s - 1], a, { showAr: true, showTr: true }, TRANSLATOR);
-  const onCopy = useCallback(async (a) => {
-    flashFor(a.s + ":" + a.n, (await copyText(textOf(a))) ? "copy" : "fail");
-  }, [surahs, flashFor]);
-  const onShare = useCallback(async (a) => {
-    const text = textOf(a);
-    if (navigator.share) {
-      try { await navigator.share({ text }); return; } catch (e) {
-        if (e && e.name === "AbortError") return;
-      }
-    }
-    flashFor(a.s + ":" + a.n, (await copyText(text)) ? "copy" : "fail");
-  }, [surahs, flashFor]);
-  const toggle = useCallback((a, kind) => {
-    const r = onMarkRef.current(a.s, a.n, kind);
-    if (r && r.full) flashFor(a.s + ":" + a.n, "full");
-  }, [flashFor]);
-  return { flash, onCopy, onShare, toggle };
-}
 
 export { markKey };

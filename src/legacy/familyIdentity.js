@@ -32,7 +32,7 @@ async function enterFamilyAsCreator(code) {
     }
     const targetFamilyId = snap.data() ? snap.data().familyId : null;
     if (!targetFamilyId) return { aborted: true, reason: "not-found" };
-    console.log(`[Creator override] সুইচ হচ্ছে — কোড: ${normalized}, familyId: ${targetFamilyId}। রিলোড হচ্ছে...`);
+    console.log("[Creator override] সুইচ হচ্ছে। রিলোড হচ্ছে...");
     localStorage.setItem("family_code", normalized);
     localStorage.setItem("family_id", targetFamilyId);
     localStorage.setItem(CREATOR_OVERRIDE_KEY, normalized);
@@ -150,7 +150,7 @@ async function changeFamilyCodeForExistingFamily(newCode) {
         }
       }
     });
-    console.log(`[Family Code change] সফল — পুরনো কোড: ${oldCode || "(ছিল না)"}, নতুন কোড: ${normalized}। dataCollectionName অপরিবর্তিত (আসল ডেটা একই কালেকশনে)। রিলোড হচ্ছে...`);
+    console.log("[Family Code change] সফল। dataCollectionName অপরিবর্তিত (আসল ডেটা একই কালেকশনে)। রিলোড হচ্ছে...");
     // §৫ fix — Google-linked হলে account-এর সাথে সংরক্ষিত familyCode-ও
     // (users/{uid}.familyCode) আপডেট করা হচ্ছে, নইলে পরের বুটে
     // syncFamilyCodeWithAccount() পুরনো account-linked কোড দেখে এই
@@ -237,7 +237,7 @@ async function createNewFamily(newCode) {
     } else {
       console.error("[New Family] auth.currentUser নেই — admin claim স্কিপ হলো।");
     }
-    console.log(`[New Family] সফল — নতুন familyId: ${newFamilyId}, কোড: ${normalized}। রিলোড হচ্ছে...`);
+    console.log("[New Family] সফল। রিলোড হচ্ছে...");
     localStorage.setItem("family_id", newFamilyId);
     localStorage.setItem("family_code", normalized);
     localStorage.setItem("family_code_is_custom", "1");
@@ -334,7 +334,7 @@ async function createNewFamilyGoogleOnly(newCode, name, gender) {
       updatedAt: Date.now()
     });
     await writeUserMapping(uid, newFamilyId, memberId);
-    console.log(`[New Family/Google] সফল — familyId: ${newFamilyId}, memberId: ${memberId}। রিলোড হচ্ছে...`);
+    console.log("[New Family/Google] সফল। রিলোড হচ্ছে...");
     localStorage.setItem("family_id", newFamilyId);
     localStorage.setItem("family_code", normalized);
     localStorage.setItem("family_code_is_custom", "1");
@@ -407,7 +407,7 @@ async function joinExistingFamily(code) {
     }
     return { aborted: true, reason: resolved.reason, error: resolved.error };
   }
-  console.log(`[Join Family] সফল লুকআপ — কোড: ${normalized}, familyId: ${resolved.familyId}। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...`);
+  console.log("[Join Family] সফল লুকআপ। এই ডিভাইস সুইচ হচ্ছে, রিলোড হচ্ছে...");
   localStorage.setItem("family_id", resolved.familyId);
   localStorage.setItem("family_code", normalized);
   localStorage.setItem("family_code_is_custom", "1");

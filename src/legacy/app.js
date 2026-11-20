@@ -12,7 +12,7 @@ import {
   editOwnProfile, leaveFamily, loadActiveInviteToken, removeLegacyInviteToken,
   startGoogleAccountChange
 } from "./googleIdentity.js";
-import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveTomorrowFocus, saveCustomTasks } from "./memberData.js";
+import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveCustomTasks } from "./memberData.js";
 import { importBackupFromFile } from "./importBackup.js";
 import { exportBackupToDevice } from "./exportBackup.js";
 import { createDriveBackupActions } from "./driveBackupActions.js";
@@ -107,10 +107,18 @@ import { DashboardHeader } from "../components/DashboardHeader.jsx";
 // wrapper লাগে। ব্যবহারের জায়গায় (নিচে, printMode-branch) React.Suspense-এ
 // wrap করা হয়েছে।
 const PrintReport = lazyRetry(() => import("../components/PrintReport.jsx").then(m => ({ default: m.PrintReport })));
-import { WeeklyReviewSection } from "../components/WeeklyReviewSection.jsx";
 import { GoogleRelinkGate } from "../components/GoogleRelinkGate.jsx";
-import { MonthlyReportSection } from "../components/MonthlyReportSection.jsx";
-import { TrendReviewSection } from "../components/TrendReviewSection.jsx";
+// §Lazy-load (২০ নভেম্বর ২০২৬): সাপ্তাহিক/মাসিক/ট্রেন্ড রিভিউ শুধু "মুহাসাবা" ট্যাবে লাগে
+// (হোমে নয়) — প্রথম পেইন্টের bundle থেকে বাদ। props অপরিবর্তিত; লোডের সময় ছোট spinner।
+const reviewFallback = () => React.createElement("div", { className: "py-8 flex items-center justify-center" },
+  React.createElement(Loader2, { className: "animate-spin", color: "var(--theme-primary)", size: 24 }));
+const lazyReview = (factory) => {
+  const Lazy = lazyRetry(factory);
+  return (props) => React.createElement(React.Suspense, { fallback: reviewFallback() }, React.createElement(Lazy, props));
+};
+const WeeklyReviewSection = lazyReview(() => import("../components/WeeklyReviewSection.jsx").then(m => ({ default: m.WeeklyReviewSection })));
+const MonthlyReportSection = lazyReview(() => import("../components/MonthlyReportSection.jsx").then(m => ({ default: m.MonthlyReportSection })));
+const TrendReviewSection = lazyReview(() => import("../components/TrendReviewSection.jsx").then(m => ({ default: m.TrendReviewSection })));
 import { WeeklyPulseCard } from "../components/WeeklyPulseCard.jsx";
 import { SwipeMonth } from "../components/SwipeMonth.jsx";
 import { shiftMonthCursor } from "./swipeMonth.js";
@@ -129,7 +137,7 @@ import { DailyEntrySection } from "../components/DailyEntrySection.jsx";
 // §Motivational Layer — Phase 1(নতুন, owner-approved plan): "আজকের বিশেষ দিক"
 // rotating card। selectDailyInsight() pure-compute(কোনো নতুন Firestore read/
 // schema লাগেনি, existing monthEntries/streak reuse) — বিস্তারিত dailyInsight.js।
-import { selectDailyInsight, suggestTomorrowFocus } from "./dailyInsight.js";
+import { selectDailyInsight } from "./dailyInsight.js";
 import { DailyInsightCard } from "../components/DailyInsightCard.jsx";
 // §Motivational Layer — Phase 2(নতুন, owner-approved): "আগামীকালের Focus"
 // — DailyInsightCard থেকে ইচ্ছাকৃতভাবে আলাদা component(isolated rollback)।
@@ -232,7 +240,11 @@ function App() {
       [
         () => import("../components/PublicTools/PrayerTimes.jsx"),
         () => import("../components/PublicTools/PublicToolsShell.jsx"),
-        () => import("../components/MenuPage.jsx")
+        () => import("../components/MenuPage.jsx"),
+        // মুহাসাবা ট্যাবের রিভিউ সেকশন — প্রথম পেইন্টের পরে অবসর সময়ে (ট্যাব খুললে সাথে সাথে)
+        () => import("../components/WeeklyReviewSection.jsx"),
+        () => import("../components/MonthlyReportSection.jsx"),
+        () => import("../components/TrendReviewSection.jsx")
       ].forEach(load => { try { load().catch(() => {}); } catch {} });
     };
     if (window.requestIdleCallback) {
@@ -1208,25 +1220,11 @@ function App() {
     cursorMonth0: monthCursor.month0,
     streak
   }), [monthEntries, selectedMember, allFields, monthCursor, streak]);
-  // §Motivational Layer — Phase 2: আগামীকালের auto-suggested Focus(শুধু আজ
-  // real-month-এ browse করলে অর্থবহ — dailyInsight-এর একই month-scope guard)।
-  const tomorrowKey = useMemo(() => dateKey(new Date(Date.now() + 86400000)), []);
   // "আজকের মুহাসাবা" কার্ডের "গতকাল ভরা হয়নি" ব্যানার: শুধু আজকের দিন দেখার সময়, চলতি মাসে, মাসের ২ তারিখ থেকে,
   // গতকালের এন্ট্রি-ডক না থাকলে, আর এই মাসে অন্তত একটা এন্ট্রি থাকলে (নতুন সদস্যকে বিরক্ত না করতে)। নতুন Firestore read নেই।
   // "গতকালের মতো বসান" শর্টকাটের উৎস: একই শর্তে (চলতি মাস, ২ তারিখ থেকে) গতকালের সেভ-করা এন্ট্রি, নইলে null।
   const yesterdayEntry = useMemo(() => yesterdayEntryOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
   const yesterdayMissing = useMemo(() => yesterdayMissingOf({ viewDate, cursor: monthCursor, entries: monthEntries, now: new Date() }, STATS_H), [viewDate, monthCursor, monthEntries]);
-  const suggestedFocusKey = useMemo(() => {
-    const now = new Date();
-    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0) return null;
-    return suggestTomorrowFocus(monthEntries, selectedMember, allFields, now.getDate());
-  }, [monthEntries, selectedMember, allFields, monthCursor]);
-  // সকাল/দুপুরে বাছা ফোকাস না থাকলে গতকালের সবচেয়ে দুর্বল আমল "আজকের Focus (পরামর্শ)" হিসেবে (মাসের ১ তারিখে নয়)।
-  const suggestedTodayFocusKey = useMemo(() => {
-    const now = new Date();
-    if (now.getFullYear() !== monthCursor.year || now.getMonth() !== monthCursor.month0 || now.getDate() < 2) return null;
-    return suggestTomorrowFocus(monthEntries, selectedMember, allFields, now.getDate() - 1);
-  }, [monthEntries, selectedMember, allFields, monthCursor]);
   const [milestoneToast, setMilestoneToast] = useState(null);
   useEffect(() => {
     if (!selectedId || !streak) return;

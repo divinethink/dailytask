@@ -246,19 +246,6 @@ export function LogOutIcon({
     y2: "12"
   }));
 }
-export function KeyIcon({
-  size,
-  color,
-  className
-}) {
-  return /*#__PURE__*/React.createElement(Icon, {
-    size: size,
-    color: color,
-    className: className
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
-  }));
-}
 export function EyeIcon({
   size,
   color,
@@ -442,29 +429,6 @@ export function InfoIcon({
     y1: "8",
     x2: "12.01",
     y2: "8"
-  }));
-}
-export function GoogleIcon({
-  size = 14,
-  className
-}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    className: className
-  }, /*#__PURE__*/React.createElement("path", {
-    fill: "#4285F4",
-    d: "M23.49 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.54-5.17 3.54-8.82z"
-  }), /*#__PURE__*/React.createElement("path", {
-    fill: "#34A853",
-    d: "M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.1A12 12 0 0 0 12 24z"
-  }), /*#__PURE__*/React.createElement("path", {
-    fill: "#FBBC05",
-    d: "M5.27 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.27a12 12 0 0 0 0 10.78l4-3.1z"
-  }), /*#__PURE__*/React.createElement("path", {
-    fill: "#EA4335",
-    d: "M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.61l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"
   }));
 }
 export function RefreshIcon({
@@ -858,25 +822,6 @@ export function GoogleGIcon({ size = 20 }) {
   );
 }
 
-// মুহাসাবা নেভ-আইকন: তিনটা বার (stroke-based; active হলে ঘন রঙ, অন্য আইকনের মতো)।
-export function ChartBarIcon({
-  size = 18,
-  color = "currentColor",
-  className,
-  style
-}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    className: className,
-    style: { stroke: color, ...style }
-  }, /*#__PURE__*/React.createElement("path", { d: "M3 20h18" }), /*#__PURE__*/React.createElement("path", { d: "M6 20v-6" }), /*#__PURE__*/React.createElement("path", { d: "M11 20V8" }), /*#__PURE__*/React.createElement("path", { d: "M16 20v-9" }), /*#__PURE__*/React.createElement("path", { d: "M21 20V4" }));
-}
 export function SettingsGear({
   size,
   color,

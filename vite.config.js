@@ -13,7 +13,6 @@ export default defineConfig({
           if (!id.includes("node_modules")) return;
           if (id.includes("firestore")) return "firestore";
           if (id.includes("firebase")) return "firebase";
-          if (id.includes("chart.js")) return "chartjs";
           if (id.includes("react")) return "react";
         },
       },

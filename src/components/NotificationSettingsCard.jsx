@@ -45,7 +45,6 @@ function Chip({ on, onClick, children }) {
   }, children);
 }
 const Lb = ({ children }) => h("div", { className: "text-[11px] text-slate-400 mt-2 mb-1" }, children);
-const toggleIn = (arr, id) => (arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
 
 function Row({ icon, title, hint, on, onToggle, open, onOpen, disabled, children }) {
   return h("div", { className: "border-t" + (disabled ? " opacity-50" : ""), style: LINE },

@@ -53,7 +53,6 @@ export function BlogSection({ onBack }) {
   const [q, setQ] = useState(""); // সার্চ: শিরোনাম বা ট্যাগ
   const [selectedCategory, setSelectedCategory] = useState(null); // null = ক্যাটাগরি-গ্রিড; নইলে লেখার তালিকা
   const [selectedPost, setSelectedPost] = useState(null); // full post object
-  const [expandedPost, setExpandedPost] = useState({}); // { [postId]: true } — "আরো পড়ুন" দেখানো হয়েছে
   const [view, setView] = useState("list"); // list | detail | form | writerAdmin
   const [editingPost, setEditingPost] = useState(null);
 

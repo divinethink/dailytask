@@ -27,19 +27,6 @@ async function loadWeekly(migrationState, memberId, year, month0) {
     return {};
   }
 }
-async function saveWeekly(migrationState, memberId, year, month0, data, ownerUid) {
-  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const batch = writeBatch(db);
-  batch.set(doc(ctx.weeklyRef, ctx.weeklyDocId(memberId, monthPrefix(year, month0))), {
-    value: JSON.stringify(data),
-    updatedAt: Date.now(),
-    ownerUid: ownerUid ?? null
-  }, {
-    merge: true
-  });
-  stampLastActive(batch, doc(ctx.membersRef, ctx.memberDocId(memberId)), getFamilyId(), auth.currentUser ? auth.currentUser.uid : null);
-  await batch.commit();
-}
 function stampLastActive(batch, memberRef, familyId, uid) {
   const ts = Timestamp.now();
   if (memberRef) {
@@ -73,29 +60,6 @@ async function loadMembersV2(migrationState) {
     return [];
   }
 }
-// entry:/weekly: ডকুমেন্টের মতোই member: ডকুমেন্টেও প্রতিটি লেখায় updatedAt
-// (Date.now()) স্ট্যাম্প করা হয় — এটাই Drive Restore-এর mergeBackupData()-কে
-// entry/weekly-এর মতো updatedAt-ভিত্তিক conflict resolution করতে দেয়।
-// পুরনো (এই পরিবর্তনের আগে তৈরি) সদস্য ডকুমেন্টে updatedAt না-ও থাকতে
-// পারে — mergeBackupData() সেটাকে 0 ধরে নিরাপদ fallback আচরণ করে।
-async function saveMemberDoc(migrationState, member) {
-  const {
-    id,
-    ...fields
-  } = member;
-  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const memberRef = doc(ctx.membersRef, ctx.memberDocId(id));
-  const batch = writeBatch(db);
-  batch.set(memberRef, {
-    ...fields,
-    updatedAt: Date.now(),
-    lastActiveAt: Timestamp.now()
-  }, {
-    merge: true
-  });
-  stampLastActive(batch, null, getFamilyId());
-  await batch.commit();
-}
 async function deleteMemberDoc(migrationState, id) {
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   await deleteDoc(doc(ctx.membersRef, ctx.memberDocId(id)));
@@ -114,9 +78,6 @@ async function loadCustomFields() {
     return [];
   }
 }
-async function saveCustomFields(fields) {
-  await appStorage.set("custom_fields", JSON.stringify(fields), true);
-}
 
 // §লেবেল ম্যানেজ (ধাপ গ, owner-approved): family-স্তরের ঐচ্ছিক "field_overrides" doc —
 // custom_fields-এর হুবহু একই storage-পথ (appStorage shared), তাই নতুন Rules লাগে না।
@@ -128,9 +89,6 @@ async function loadFieldOverrides() {
     return {};
   }
 }
-async function saveFieldOverrides(overrides) {
-  await appStorage.set("field_overrides", JSON.stringify(overrides), true);
-}
 
 // §তাযকিরাহ ম্যানেজ (ধাপ খ, owner-approved): family-স্তরের ঐচ্ছিক "tazkirah_custom" doc —
 // custom_fields/field_overrides-এর হুবহু একই storage-পথ (appStorage shared), তাই নতুন Rules লাগে না।
@@ -141,9 +99,6 @@ async function loadTazkirahCustom() {
   } catch {
     return null;
   }
-}
-async function saveTazkirahCustom(data) {
-  await appStorage.set("tazkirah_custom", JSON.stringify(data), true);
 }
 
 async function loadEntry(migrationState, memberId, key) {
@@ -275,19 +230,14 @@ export {
   meetingKey,
   saveMeetingData,
   loadWeekly,
-  saveWeekly,
   stampLastActive,
   memberDocId,
   loadMembersV2,
-  saveMemberDoc,
   deleteMemberDoc,
   migrateMembersIfNeeded,
   loadCustomFields,
-  saveCustomFields,
   loadFieldOverrides,
-  saveFieldOverrides,
   loadTazkirahCustom,
-  saveTazkirahCustom,
   loadEntry,
   saveEntry,
   entryDocId,
