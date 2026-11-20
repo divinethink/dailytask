@@ -7,7 +7,7 @@ import { loadMeta } from "../../legacy/quranData.js";
 import { toBnDigits, refLabel } from "../../legacy/quranCore.js";
 import {
   planKey, GOTO_KEY, PER_DAY, perDayForDays, clampPerDay, countsOf, makePlan, sanitizePlan,
-  todayPortion, markDone, undoDone, setPerDay, statsOf, makeGoto,
+  todayPortion, markDone, markDoneN, posAfterN, undoDone, setPerDay, statsOf, makeGoto,
 } from "../../legacy/hifzPlan.js";
 
 const { useState, useEffect } = React;
@@ -66,29 +66,30 @@ const btnStyle = (kind, extra) => {
 };
 const selectStyle = { minHeight: 44, borderRadius: 12, border: "1px solid " + LINE, padding: "0 10px", fontSize: 15, background: "#fff", color: "#1A2621" };
 
-// ── বৃত্তাকার অগ্রগতি ──
+// ── বৃত্তাকার অগ্রগতি (compact) ──
 function Ring({ percent }) {
-  const size = 108, r = 45, c = 2 * Math.PI * r;
+  const size = 68, r = 28, c = 2 * Math.PI * r;
   return h("div", { style: { position: "relative", width: size, height: size, flexShrink: 0 } },
-    h("svg", { width: size, height: size, viewBox: "0 0 108 108", "aria-hidden": "true" },
-      h("circle", { cx: 54, cy: 54, r, fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: 9 }),
-      h("circle", { cx: 54, cy: 54, r, fill: "none", stroke: GOLD_LIGHT, strokeWidth: 9, strokeLinecap: "round", strokeDasharray: c, strokeDashoffset: c * (1 - percent / 100), transform: "rotate(-90 54 54)" })),
-    h("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 24, fontWeight: 700 }, role: "progressbar", "aria-valuenow": percent, "aria-valuemin": 0, "aria-valuemax": 100 }, toBnDigits(percent) + "%"));
+    h("svg", { width: size, height: size, viewBox: "0 0 68 68", "aria-hidden": "true" },
+      h("circle", { cx: 34, cy: 34, r, fill: "none", stroke: "rgba(255,255,255,0.18)", strokeWidth: 6 }),
+      h("circle", { cx: 34, cy: 34, r, fill: "none", stroke: GOLD_LIGHT, strokeWidth: 6, strokeLinecap: "round", strokeDasharray: c, strokeDashoffset: c * (1 - percent / 100), transform: "rotate(-90 34 34)" })),
+    h("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 16, fontWeight: 700 }, role: "progressbar", "aria-valuenow": percent, "aria-valuemin": 0, "aria-valuemax": 100 }, toBnDigits(percent) + "%"));
 }
 
-function Stat({ value, label }) {
-  return h("div", { style: { flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 14, background: "rgba(255,255,255,0.12)" } },
-    h("div", { style: { fontSize: 18, fontWeight: 700, color: "#fff" } }, value),
-    h("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.8)", marginTop: 2 } }, label));
+// হিরোর নিচের পাতলা পরিসংখ্যান-সারি (বক্স নেই, শুধু বিভাজক)
+function Stat({ value, label, first }) {
+  return h("div", { style: { flex: 1, textAlign: "center", borderLeft: first ? "none" : "1px solid rgba(255,255,255,0.18)" } },
+    h("div", { style: { fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.2 } }, value),
+    h("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.78)", marginTop: 1 } }, label));
 }
 
 // + / − স্টেপার (≥৪৪px)
-function Stepper({ value, step, onChange, label }) {
-  const b = { width: 44, height: 44, borderRadius: 12, border: "1px solid " + LINE, background: "#fff", color: PRIMARY, fontSize: 22, fontWeight: 600, cursor: "pointer" };
+function Stepper({ value, step, onChange, label, min = PER_DAY.min, max = PER_DAY.max, size = 44 }) {
+  const b = { width: size, height: size, borderRadius: 12, border: "1px solid " + LINE, background: "#fff", color: PRIMARY, fontSize: 22, fontWeight: 600, cursor: "pointer" };
   return h("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-    h("button", { type: "button", "aria-label": label + " কমান", disabled: value <= PER_DAY.min, onClick: () => onChange(clampPerDay(value - step)), style: { ...b, opacity: value <= PER_DAY.min ? 0.4 : 1 } }, "−"),
-    h("div", { style: { minWidth: 56, textAlign: "center", fontSize: 21, fontWeight: 700, color: PRIMARY } }, toBnDigits(value)),
-    h("button", { type: "button", "aria-label": label + " বাড়ান", disabled: value >= PER_DAY.max, onClick: () => onChange(clampPerDay(value + step)), style: { ...b, opacity: value >= PER_DAY.max ? 0.4 : 1 } }, "+"));
+    h("button", { type: "button", "aria-label": label + " কমান", disabled: value <= min, onClick: () => onChange(Math.max(min, value - step)), style: { ...b, opacity: value <= min ? 0.4 : 1 } }, "−"),
+    h("div", { style: { minWidth: 48, textAlign: "center", fontSize: 19, fontWeight: 700, color: PRIMARY } }, toBnDigits(value)),
+    h("button", { type: "button", "aria-label": label + " বাড়ান", disabled: value >= max, onClick: () => onChange(Math.min(max, value + step)), style: { ...b, opacity: value >= max ? 0.4 : 1 } }, "+"));
 }
 
 function PosPicker({ label, surahs, value, onChange }) {
@@ -133,6 +134,7 @@ export function HifzPlanner({ onOpenQuran }) {
   const [mode, setMode] = useState("khatam");
   const [plans, setPlans] = useState({ hifz: null, khatam: null });
   const [confirmDel, setConfirmDel] = useState(false);
+  const [editN, setEditN] = useState(null); // "অন্য পরিমাণ" সম্পাদনা: null = বন্ধ, নইলে আয়াত-সংখ্যা
 
   useEffect(() => {
     let alive = true;
@@ -159,15 +161,15 @@ export function HifzPlanner({ onOpenQuran }) {
   const plan = plans[mode];
   const save = (p) => { setPlans((x) => ({ ...x, [mode]: p })); writePlan(mode, p); };
 
-  const modeBar = h("div", { role: "group", "aria-label": "প্ল্যানের ধরন", style: { display: "flex", gap: 8, padding: 6, borderRadius: 18, background: SOFT, marginBottom: 12 } },
+  const modeBar = h("div", { role: "group", "aria-label": "প্ল্যানের ধরন", style: { display: "flex", gap: 6, padding: 4, borderRadius: 16, background: SOFT, marginBottom: 10 } },
     Object.keys(WORDS).map((k) => {
       const on = mode === k;
       const started = plans[k] && !statsOf(plans[k], counts).finished;
       return h("button", {
         key: k, type: "button", "aria-pressed": on,
-        onClick: () => { setMode(k); setConfirmDel(false); },
+        onClick: () => { setMode(k); setConfirmDel(false); setEditN(null); },
         style: {
-          flex: 1, minHeight: 46, borderRadius: 14, cursor: "pointer", lineHeight: 1.25,
+          flex: 1, minHeight: 42, borderRadius: 13, cursor: "pointer", lineHeight: 1.25,
           border: "1px solid " + (on ? PRIMARY : LINE),
           background: on ? HERO_BG : "#fff",
           color: on ? "#fff" : PRIMARY,
@@ -194,46 +196,65 @@ export function HifzPlanner({ onOpenQuran }) {
     if (onOpenQuran) onOpenQuran();
   };
 
-  const hero = h("div", { style: { background: HERO_BG, borderRadius: 22, padding: 18, color: "#fff", marginBottom: 14, boxShadow: "0 12px 28px -14px rgba(14,75,67,0.7)" } },
-    h("div", { style: { display: "flex", alignItems: "center", gap: 16 } },
+  const hero = h("div", { style: { background: HERO_BG, borderRadius: 18, padding: "12px 14px", color: "#fff", marginBottom: 10, boxShadow: "0 10px 22px -14px rgba(14,75,67,0.75)", border: "1px solid rgba(233,196,106,0.35)" } },
+    h("div", { style: { display: "flex", alignItems: "center", gap: 12 } },
       h(Ring, { percent: st.percent }),
       h("div", { style: { minWidth: 0 } },
-        h("div", { style: { fontSize: 12, letterSpacing: 0.3, color: GOLD_LIGHT, fontWeight: 600 } }, W.tab + " প্ল্যান"),
-        h("div", { style: { fontSize: 15, fontWeight: 600, lineHeight: 1.5, margin: "2px 0 6px" } }, ref(plan.from) + " → " + ref(plan.to)),
-        h("div", { style: { fontSize: 13, opacity: 0.9 } }, W.done + " " + toBnDigits(st.done) + " / " + toBnDigits(st.total) + " আয়াত"))),
-    h("div", { style: { display: "flex", gap: 8, marginTop: 16 } },
-      h(Stat, { value: toBnDigits(st.remaining), label: "বাকি আয়াত" }),
+        h("div", { style: { fontSize: 11.5, letterSpacing: 0.3, color: GOLD_LIGHT, fontWeight: 600 } }, W.tab + " প্ল্যান"),
+        h("div", { style: { fontSize: 14, fontWeight: 600, lineHeight: 1.4, margin: "1px 0 2px" } }, ref(plan.from) + " → " + ref(plan.to)),
+        h("div", { style: { fontSize: 12.5, opacity: 0.9 } }, W.done + " " + toBnDigits(st.done) + " / " + toBnDigits(st.total) + " আয়াত"))),
+    h("div", { style: { display: "flex", marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.18)" } },
+      h(Stat, { first: true, value: toBnDigits(st.remaining), label: "বাকি আয়াত" }),
       h(Stat, { value: toBnDigits(st.daysLeft), label: "বাকি দিন" }),
       h(Stat, { value: toBnDigits(plan.perDay), label: "দৈনিক লক্ষ্য" })));
 
+  const smallBtn = (kind, extra) => btnStyle(kind, { minHeight: 44, fontSize: 14, padding: "0 12px", ...extra });
+  const editing = editN !== null && portion;
+  const editEnd = editing ? posAfterN(plan, counts, editN) : null;
+  const maxN = st.remaining;
+
   const today = st.finished
-    ? h("div", { style: { ...cardBase, textAlign: "center", padding: "26px 18px", marginBottom: 14, borderColor: GOLD } },
-      h("div", { style: { fontSize: 32 } }, "🌙"),
-      h("div", { style: { fontWeight: 700, color: PRIMARY, fontSize: 17, margin: "6px 0" } }, W.finished),
-      h("div", { style: { fontSize: 13, color: "#5B6B64" } }, "নতুন প্ল্যান নিতে নিচে থেকে এই প্ল্যান মুছুন।"))
-    : h("div", { style: { ...cardBase, padding: 18, marginBottom: 14, borderLeft: "5px solid " + GOLD } },
+    ? h("div", { style: { ...cardBase, textAlign: "center", padding: "18px 16px", marginBottom: 10, borderColor: GOLD } },
+      h("div", { style: { fontSize: 26 } }, "🌙"),
+      h("div", { style: { fontWeight: 700, color: PRIMARY, fontSize: 16, margin: "4px 0" } }, W.finished),
+      h("div", { style: { fontSize: 12.5, color: "#5B6B64" } }, "নতুন প্ল্যান নিতে নিচে থেকে এই প্ল্যান মুছুন।"))
+    : h("div", { style: { ...cardBase, padding: "12px 14px", marginBottom: 10, borderLeft: "4px solid " + GOLD } },
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        h("span", { style: { fontSize: 12.5, fontWeight: 700, color: GOLD, letterSpacing: 0.3 } }, "আজকের পাঠ"),
-        h("span", { style: { fontSize: 12.5, fontWeight: 600, color: PRIMARY, background: SOFT, padding: "3px 10px", borderRadius: 999 } }, toBnDigits(portion.n) + " আয়াত")),
-      h("div", { style: { fontSize: 20, fontWeight: 700, color: "#1A2621", lineHeight: 1.5, margin: "10px 0 16px" } }, portionText),
-      h("button", { type: "button", onClick: openQuran, style: btnStyle("ghost", { width: "100%", marginBottom: 10 }) }, BookIcon(20), "কুরআনে খুলুন"),
-      h("button", { type: "button", onClick: () => save(markDone(plan, counts)), style: btnStyle("primary", { width: "100%" }) }, CheckIcon(20), W.btn));
+        h("span", { style: { fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: 0.3 } }, "আজকের পাঠ"),
+        h("span", { style: { fontSize: 12, fontWeight: 600, color: PRIMARY, background: SOFT, padding: "2px 10px", borderRadius: 999 } }, toBnDigits(portion.n) + " আয়াত")),
+      h("div", { style: { fontSize: 16.5, fontWeight: 700, color: "#1A2621", lineHeight: 1.45, margin: "6px 0 10px" } }, portionText),
+      editing
+        ? h("div", { style: { padding: 10, borderRadius: 14, background: SOFT } },
+          h("div", { style: { fontSize: 13, fontWeight: 600, color: PRIMARY, marginBottom: 8 } }, "আজ আসলে কত আয়াত " + (mode === "khatam" ? "পড়লেন?" : "মুখস্থ করলেন?")),
+          h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
+            h(Stepper, { value: editN, step: 1, min: 1, max: maxN, onChange: setEditN, label: "আজকের আয়াত" }),
+            h("div", { style: { display: "flex", gap: 6 } },
+              [5, 10].map((d) => h("button", { key: d, type: "button", onClick: () => setEditN(Math.min(maxN, Math.max(1, editN + d))), style: { minHeight: 40, padding: "0 10px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "1px solid " + LINE, background: "#fff", color: PRIMARY } }, "+" + toBnDigits(d))))),
+          editEnd && h("div", { style: { fontSize: 12.5, color: "#5B6B64", marginTop: 8 } }, "এই পর্যন্ত: " + ref(editEnd) + " · পরের পাঠ এর পর থেকে"),
+          h("div", { style: { display: "flex", gap: 8, marginTop: 10 } },
+            h("button", { type: "button", onClick: () => { save(markDoneN(plan, counts, editN)); setEditN(null); }, style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), "রেকর্ড করুন"),
+            h("button", { type: "button", onClick: () => setEditN(null), style: smallBtn("ghost", { flex: 1 }) }, "বাতিল")))
+        : h("div", null,
+          h("div", { style: { display: "flex", gap: 8 } },
+            h("button", { type: "button", onClick: openQuran, style: smallBtn("ghost", { flex: 1 }) }, BookIcon(18), "কুরআনে খুলুন"),
+            h("button", { type: "button", onClick: () => save(markDone(plan, counts)), style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), W.btn)),
+          h("button", { type: "button", onClick: () => setEditN(portion.n), style: { width: "100%", minHeight: 40, marginTop: 4, background: "transparent", border: "none", color: PRIMARY, fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer" } }, "কম বা বেশি " + (mode === "khatam" ? "পড়েছেন?" : "মুখস্থ করেছেন?") + " নিজে বসান")));
 
   return h("div", null,
     modeBar,
     hero,
     today,
-    plan.last > 0 && h("button", { type: "button", onClick: () => save(undoDone(plan)), style: btnStyle("ghost", { width: "100%", marginBottom: 14, minHeight: 44, fontSize: 14 }) }, UndoIcon(18), "শেষ ধাপ বাতিল (ভুল টিপলে)"),
-    h("div", { style: { ...cardBase, padding: 18, marginBottom: 12 } },
-      h("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#5B6B64", marginBottom: 10 } }, "দৈনিক লক্ষ্য (আয়াত)"),
-      h(Stepper, { value: plan.perDay, step: W.step, onChange: (v) => save(setPerDay(plan, v)), label: "দৈনিক লক্ষ্য" }),
-      h("div", { style: { marginTop: 18, borderTop: "1px solid " + LINE, paddingTop: 14 } },
-        confirmDel
-          ? h("div", null,
-            h("div", { style: { fontSize: 13, color: "#C0392B", marginBottom: 10 } }, "প্ল্যান ও অগ্রগতি মুছে যাবে। নিশ্চিত?"),
-            h("div", { style: { display: "flex", gap: 8 } },
-              h("button", { type: "button", onClick: () => { save(null); setConfirmDel(false); }, style: btnStyle("primary", { flex: 1, background: "#C0392B", boxShadow: "none" }) }, "হ্যাঁ, মুছুন"),
-              h("button", { type: "button", onClick: () => setConfirmDel(false), style: btnStyle("ghost", { flex: 1 }) }, "বাতিল")))
-          : h("button", { type: "button", onClick: () => setConfirmDel(true), style: btnStyle("danger", { minHeight: 44, fontSize: 14 }) }, TrashIcon(18), "প্ল্যান মুছুন"))),
-    h("p", { style: { fontSize: 11.5, color: "#8A9A8F", textAlign: "center", lineHeight: 1.6 } }, "খতম ও হিফজ আলাদাভাবে চলে। অগ্রগতি শুধু এই ফোনে সংরক্ষিত থাকে।"));
+    h("div", { style: { ...cardBase, padding: "10px 12px", marginBottom: 8 } },
+      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
+        h("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#5B6B64", lineHeight: 1.3 } }, "দৈনিক লক্ষ্য", h("br"), "(আয়াত)"),
+        h(Stepper, { value: plan.perDay, step: W.step, onChange: (v) => save(setPerDay(plan, v)), label: "দৈনিক লক্ষ্য" }),
+        h("div", { style: { display: "flex", gap: 6 } },
+          plan.last > 0 && h("button", { type: "button", onClick: () => save(undoDone(plan)), "aria-label": "শেষ ধাপ বাতিল (ভুল টিপলে)", title: "শেষ ধাপ বাতিল", style: { ...btnStyle("ghost"), width: 44, minHeight: 44, padding: 0 } }, UndoIcon(18)),
+          h("button", { type: "button", onClick: () => setConfirmDel(true), "aria-label": "প্ল্যান মুছুন", style: { ...btnStyle("danger"), width: 44, minHeight: 44, padding: 0 } }, TrashIcon(18)))),
+      confirmDel && h("div", { style: { marginTop: 10, borderTop: "1px solid " + LINE, paddingTop: 10 } },
+        h("div", { style: { fontSize: 13, color: "#C0392B", marginBottom: 8 } }, "প্ল্যান ও অগ্রগতি মুছে যাবে। নিশ্চিত?"),
+        h("div", { style: { display: "flex", gap: 8 } },
+          h("button", { type: "button", onClick: () => { save(null); setConfirmDel(false); setEditN(null); }, style: smallBtn("primary", { flex: 1, background: "#C0392B", boxShadow: "none" }) }, "হ্যাঁ, মুছুন"),
+          h("button", { type: "button", onClick: () => setConfirmDel(false), style: smallBtn("ghost", { flex: 1 }) }, "বাতিল")))),
+    h("p", { style: { fontSize: 11, color: "#8A9A8F", textAlign: "center", lineHeight: 1.5, margin: 0 } }, "খতম ও হিফজ আলাদাভাবে চলে। অগ্রগতি শুধু এই ফোনে সংরক্ষিত থাকে।"));
 }

@@ -81,6 +81,23 @@ export function markDone(plan, counts) {
   return { ...plan, done: plan.done + p.n, last: p.n };
 }
 
+// আসলে n আয়াত পড়া/মুখস্থ হলে সেটাই বসানো (লক্ষ্যের চেয়ে কম/বেশি); n বাকির বেশি হলে বাকিটুকুই ধরা। অবৈধ n হলে প্ল্যান অপরিবর্তিত।
+export function markDoneN(plan, counts, n) {
+  const remaining = totalOf(plan, counts) - plan.done;
+  const k = Math.round(Number(n));
+  if (!Number.isFinite(k) || k < 1 || remaining < 1) return plan;
+  const m = Math.min(k, remaining);
+  return { ...plan, done: plan.done + m, last: m };
+}
+
+// n আয়াত বসালে শেষ পড়া আয়াত কোনটা হবে (প্রিভিউর জন্য); অবৈধ হলে null।
+export function posAfterN(plan, counts, n) {
+  const remaining = totalOf(plan, counts) - plan.done;
+  const k = Math.min(Math.round(Number(n)), remaining);
+  if (!Number.isFinite(k) || k < 1) return null;
+  return idxToPos(counts, posToIdx(counts, plan.from.s, plan.from.a) + plan.done + k - 1);
+}
+
 // শেষ ধাপ বাতিল (ভুল টিপ ঠিক করতে); একবারই।
 export function undoDone(plan) {
   if (!plan.last) return plan;

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone,
+  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN,
   setPerDay, statsOf, perDayForDays, planKey, HIFZ_KEY, KHATAM_KEY, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
 } from "../src/legacy/hifzPlan.js";
 
@@ -105,4 +105,32 @@ test("খতম: পুরো কুরআন ৩০ দিনে → দৈন�
   assert.equal(planKey("khatam"), KHATAM_KEY);
   assert.equal(planKey("hifz"), HIFZ_KEY);
   assert.notEqual(KHATAM_KEY, HIFZ_KEY);
+});
+
+test("markDoneN: আসল পরিমাণ বসে, পরের পাঠ সেখান থেকেই শুরু", () => {
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 208, 0);
+  const q = markDoneN(p, C, 150);
+  assert.equal(q.done, 150);
+  assert.equal(q.last, 150);
+  assert.deepEqual(todayPortion(q, C).from, idxToPos(C, 150));
+  assert.equal(markDoneN(q, C, 300).done, 450);
+  assert.equal(undoDone(markDoneN(q, C, 300)).done, 150);
+});
+
+test("markDoneN: অবৈধ মান অপরিবর্তিত, বাকির বেশি হলে বাকিটুকুই", () => {
+  const p = makePlan(C, { s: 113, a: 1 }, { s: 114, a: 6 }, 5, 0); // মোট ১১
+  assert.equal(markDoneN(p, C, 0), p);
+  assert.equal(markDoneN(p, C, -3), p);
+  assert.equal(markDoneN(p, C, "abc"), p);
+  const q = markDoneN(p, C, 500);
+  assert.equal(q.done, 11);
+  assert.equal(statsOf(q, C).finished, true);
+  assert.equal(markDoneN(q, C, 1), q);
+});
+
+test("posAfterN: n আয়াত পরে শেষ পড়া আয়াত", () => {
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 208, 0);
+  assert.deepEqual(posAfterN(p, C, 7), { s: 1, a: 7 });
+  assert.deepEqual(posAfterN(p, C, 8), { s: 2, a: 1 });
+  assert.equal(posAfterN(p, C, 0), null);
 });
