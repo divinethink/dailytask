@@ -6,7 +6,7 @@ import { DEFAULT_FONT, DEFAULT_SCRIPT, isValidScript, scriptById, fontFitsScript
 export const QURAN_BASE = "/quran/v1"; // ডেটা বদলাতে হলে নতুন ফোল্ডার (v2) — sw.js-এর cache-first নিয়মের কারণে।
 export const DEFAULT_TRANSLATION = "bn_khan";
 export const LAST_READ_MAX = 3;
-export const QUICK_SURAHS = [18, 36, 55, 56, 67]; // কাহফ, ইয়াসীন, রহমান, ওয়াকিয়াহ, মুলক
+export const QUICK_SURAHS = [18, 67, 36, 55, 56]; // কাহফ, মুলক, ইয়াসীন, রহমান, ওয়াকিয়াহ
 export const PAGE_SIZE = 30; // একসাথে কয়টা আয়াত রেন্ডার হবে
 
 const BN_DIGITS = "০১২৩৪৫৬৭৮৯";
