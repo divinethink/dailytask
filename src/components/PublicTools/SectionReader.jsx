@@ -37,7 +37,7 @@ function pointOffset(root, node, off) {
   }
   return null;
 }
-function readSelection(root) {
+export function readSelection(root) {
   const sel = window.getSelection();
   if (!root || !sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
   const r = sel.getRangeAt(0);

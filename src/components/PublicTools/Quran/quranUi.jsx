@@ -12,9 +12,11 @@ import { ensureFont } from "../../../legacy/quranFontLoader.js";
 import { loadTafsir, loadFmIndex, loadFm } from "../../../legacy/quranData.js";
 import { findTafsir, tafsirBlocks, tafsirRangeNote, TAFSIR_NAME } from "../../../legacy/quranTafsir.js";
 import { findFmRange, fmForAyah, fmBlocks, fmRangeNote, FM_NAME } from "../../../legacy/quranTafsirFm.js";
+import { MarkableTafsir } from "./MarkableTafsir.jsx";
+import { tafsirMarkKey, parasFromIk, parasFromFm } from "../../../legacy/tafsirMarks.js";
 import { PARA_NAMES, showBismillahHeader, toBnDigits, locateAyah, markKey, MARKS_MAX, rukuOf } from "../../../legacy/quranCore.js";
 
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useMemo } = React;
 const h = React.createElement;
 
 export const PRIMARY = "var(--theme-primary, #0E4B43)";
@@ -342,11 +344,19 @@ function TafsirBody({ surah, ayah, th, accent, trSize }) {
       h("button", { type: "button", onClick: () => setTick((t) => t + 1), style: actBtn(accent) }, "আবার চেষ্টা"));
   }
   const note = tafsirRangeNote(st.item, toBnDigits);
-  const blocks = tafsirBlocks(st.item.html);
   return h("div", { style: box },
     h("div", { style: { fontSize: 12, opacity: 0.7, marginBottom: 6 } }, TAFSIR_NAME + (note ? " · " + note : "")),
-    blocks.map((segs, i) => h("p", { key: i, style: { fontSize: trSize, lineHeight: 1.95, margin: "0 0 10px" } },
-      segs.map((x, j) => (x.b ? h("strong", { key: j }, x.t) : x.t)))));
+    h(IkMarkable, { surahN: surah.n, item: st.item, th, accent, trSize }));
+}
+// ইবনে কাসীর: লেখা + সদস্যের হাইলাইট/আন্ডারলাইন (মার্ক-key = সূরা + তাফসির-ভাগের প্রথম আয়াত)।
+function IkMarkable({ surahN, item, th, accent, trSize }) {
+  const paras = useMemo(() => parasFromIk(tafsirBlocks(item.html)), [item.html]);
+  return h(MarkableTafsir, { storeKey: tafsirMarkKey("ik", surahN, item.from), paras, th, accent, trSize });
+}
+// ফাতহুল মাজীদ: একই, আরবি অনুচ্ছেদসহ।
+function FmMarkable({ surahN, item, th, accent, trSize, arFont }) {
+  const paras = useMemo(() => parasFromFm(fmBlocks(item.t)), [item.t]);
+  return h(MarkableTafsir, { storeKey: tafsirMarkKey("fm", surahN, item.a[0]), paras, th, accent, trSize, arFont });
 }
 
 // দ্বিতীয় তাফসির (ফাতহুল মাজীদ): শুধু সেই আয়াতে, যার ব্যাখ্যা আছে।
@@ -369,9 +379,7 @@ function FmBody({ surah, ayah, th, accent, trSize, arFont }) {
   const note = fmRangeNote(st.item.a, toBnDigits);
   return h("div", { style: box },
     h("div", { style: { fontSize: 12, opacity: 0.7, marginBottom: 6 } }, FM_NAME + (note ? " · " + note : "")),
-    fmBlocks(st.item.t).map((b, i) => (b.kind === "ar"
-      ? h("div", { key: i, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(arFont), fontSize: 22, lineHeight: 2.1, margin: "6px 0", color: th.fg } }, b.parts.map((p) => p.t).join(""))
-      : h("p", { key: i, style: { fontSize: trSize, lineHeight: 1.95, margin: "0 0 10px" } }, b.parts.map((p, j) => (p.b ? h("strong", { key: j }, p.t) : p.t))))));
+    h(FmMarkable, { surahN: surah.n, item: st.item, th, accent, trSize, arFont }));
 }
 
 // তাফসির-অংশের মোড়ক: extra বন্ধ (মুসহাফ) বা এই আয়াতে ফাতহুল মাজীদ না থাকলে আগের মতোই শুধু ইবনে কাসীর।
