@@ -350,7 +350,7 @@ export function MenuPage({
             onOpenHomeLayout && h(MenuTile, { icon: h(HomeIcon, { size: 17 }), title: "হোম", label: "হোম কাস্টমাইজ", onClick: () => { onOpenHomeLayout(); } }),
             onOpenPrayerLayout && h(MenuTile, { icon: h(ClockIcon, { size: 17 }), title: "সময়সূচি", label: "সময়সূচি কাস্টমাইজ", onClick: () => { onOpenPrayerLayout(); } }),
             onOpenAmolLayout && h(MenuTile, { icon: h(BookIcon, { size: 17 }), title: "আমল", label: "আমল কাস্টমাইজ", onClick: () => { onOpenAmolLayout(); } }),
-            onOpenToolsLayout && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "সহায়িকা", label: "সহায়িকা কাস্টমাইজ", onClick: () => { onOpenToolsLayout(); } }),
+            onOpenToolsLayout && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "আমল পাতা", label: "আমল পাতা কাস্টমাইজ", onClick: () => { onOpenToolsLayout(); } }),
             onOpenFieldManager && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "লেবেল", label: "লেবেল ম্যানেজ (নাম বদল/লুকান/নতুন)", onClick: () => { onOpenFieldManager(); } }),
             onOpenTazkirah && h(MenuTile, { icon: h(BookIcon, { size: 17 }), title: "তাযকিরাহ", label: "তাযকিরাহ ম্যানেজ (নিজের বাণী)", onClick: () => { onOpenTazkirah(); } }),
             onOpenPopupMessages && h(MenuTile, { icon: h(EditIcon, { size: 17 }), title: "পপআপ বার্তা", label: "পপআপ বার্তা সম্পাদনা (শুধু অ্যাপ ক্রিয়েটর)", onClick: () => { onOpenPopupMessages(); } })

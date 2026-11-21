@@ -319,5 +319,5 @@ export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan, onT
         h("div", { style: { display: "flex", gap: 8 } },
           h("button", { type: "button", onClick: () => { save(null); setConfirmDel(false); setEditN(null); }, style: smallBtn("primary", { flex: 1, background: "#C0392B", boxShadow: "none" }) }, "হ্যাঁ, মুছুন"),
           h("button", { type: "button", onClick: () => setConfirmDel(false), style: smallBtn("ghost", { flex: 1 }) }, "বাতিল")))),
-    h("p", { style: { fontSize: 11, color: "#8A9A8F", textAlign: "center", lineHeight: 1.5, margin: 0 } }, "খতম ও হিফজ আলাদাভাবে চলে। অগ্রগতি শুধু এই ফোনে সংরক্ষিত থাকে।"));
+    h("p", { style: { fontSize: 11, color: "#8A9A8F", textAlign: "center", lineHeight: 1.5, margin: 0 } }, "খতম ও হিফজ আলাদাভাবে চলে।"));
 }

@@ -129,7 +129,7 @@ export function QuizSection({ onBack }) {
             onClick: backToTopics,
             className: "px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 text-slate-700",
           },
-          "সহায়িকায় ফিরুন"
+          "আমলে ফিরুন"
         )
       )
     );
@@ -147,7 +147,7 @@ export function QuizSection({ onBack }) {
         {
           type: "button",
           onClick: onBack,
-          "aria-label": "সহায়িকা",
+          "aria-label": "আমল",
           className: "flex items-center gap-1 text-sm font-semibold text-emerald-950",
         },
         /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 })

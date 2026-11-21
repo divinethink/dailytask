@@ -20,7 +20,7 @@ export const TAB_DEFS = {
     ]
   },
   tools: {
-    title: "সহায়িকা",
+    title: "আমল পাতা",
     defs: [
       { id: "quran", title: "কুরআন প্ল্যানার" },
       { id: "salah", title: "সালাত ও পবিত্রতা" },

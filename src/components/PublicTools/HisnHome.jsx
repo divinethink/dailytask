@@ -92,7 +92,7 @@ export function HisnHome({ extras, onSelectItem, onBack }) {
   const showList = !searching && state.status !== "loading";
   const chev = (open) => h("span", { style: { display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" } }, h(ToolIcon, { name: "chevronRight", size: 15, color: GOLD }));
   return h("div", null,
-    onBack && h("button", { type: "button", onClick: onBack, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), "সহায়িকা"),
+    onBack && h("button", { type: "button", onClick: onBack, className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950" }, h(ChevronLeft, { size: 16 }), "আমল"),
     h(PageHeader, { title: "আমল, যিকির ও দু'আ", subtitle: "দৈনন্দিন জীবনে আল্লাহর স্মরণ" }),
 
     h("div", { className: "relative mb-3" },

@@ -170,7 +170,7 @@ export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask, ownPlans,
           className: "flex items-center gap-1 px-4 pt-4 pb-2 text-sm font-semibold text-emerald-950",
         },
         /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
-        "সহায়িকা"
+        "আমল"
       ),
       /*#__PURE__*/React.createElement(
         "div",
@@ -231,7 +231,7 @@ export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask, ownPlans,
           className: "flex items-center gap-1 mb-2 text-sm font-semibold text-emerald-950",
         },
         /*#__PURE__*/React.createElement(ChevronLeft, { size: 16 }),
-        "সহায়িকা"
+        "আমল"
       ),
       /*#__PURE__*/React.createElement(DetailHeader, { icon: cat.icon, title: cat.label }),
       /*#__PURE__*/React.createElement(ToolGridSection, {
@@ -245,7 +245,7 @@ export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask, ownPlans,
   return /*#__PURE__*/React.createElement(
     "div",
     { className: "min-h-screen pb-24 bg-[#F4F7F1] pt-4 px-4" },
-    /*#__PURE__*/React.createElement(PageHeader, { title: "সহায়িকা", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
+    /*#__PURE__*/React.createElement(PageHeader, { title: "আমল", subtitle: "ইবাদত • আমল • সুন্দর জীবন" }),
     // ৮ টাইলের গ্রিড (আয়াত-কার্ড এখন "সকল আমল ও দোয়া"-র ভেতরে), সবার নিচে তাসবীহ।
     /*#__PURE__*/React.createElement(ToolGridSection, {
       variant: "hero",

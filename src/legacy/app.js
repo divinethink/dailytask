@@ -1842,7 +1842,7 @@ function App() {
       const ownMemberForPlans = (!isGuestMode && auth.currentUser) ? (members || []).find(x => x.googleUid === auth.currentUser.uid) : null;
       const ownPlansForPlanner = ownMemberForPlans ? (ownMemberForPlans.quranPlans || {}) : null;
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
+        React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "আমল" }) },
           React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask, ownPlans: ownPlansForPlanner, onSavePlan: ownPlansForPlanner ? handleSavePlan : undefined, onTickToday: ownPlansForPlanner ? handleTickPlanTaskToday : undefined })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })

@@ -152,7 +152,7 @@ export function BlogSection({ onBack }) {
 
   const header = h("div", { className: "flex items-center justify-between gap-2 px-3 py-3", style: { background: PRIMARY, color: "#fff" } },
     h("div", { className: "flex items-center gap-2 min-w-0" },
-      h("button", { type: "button", onClick: () => (inListView ? setSelectedCategory(null) : onBack()), "aria-label": inListView ? "ক্যাটাগরি" : "সহায়িকা", className: "flex items-center justify-center flex-shrink-0", style: { width: 40, height: 40 } },
+      h("button", { type: "button", onClick: () => (inListView ? setSelectedCategory(null) : onBack()), "aria-label": inListView ? "ক্যাটাগরি" : "আমল", className: "flex items-center justify-center flex-shrink-0", style: { width: 40, height: 40 } },
         h(ChevronLeft, { size: 22, color: "#fff" })),
       h("button", { type: "button", onClick: () => setSidebarOpen(true), "aria-label": "ক্যাটাগরির তালিকা", className: "flex items-center justify-center flex-shrink-0", style: { width: 40, height: 40 } },
         h(MenuIcon, { size: 22, color: "#fff" })),
