@@ -584,24 +584,24 @@ service cloud.firestore {
         // Admin — 2_4 §৮ "অপরিবর্তিত" নীতি অনুযায়ী legacy ও google-only
         // উভয় state-এই কাজ করবে)। শুধু role+updatedAt affected হতে পারবে।
         allow update: if request.auth != null
-          && isAdminOfFamily(familyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt'])
+          && isAdminOfFamily(familyId);
 
         // Activity-stamp: saveEntry()/saveWeekly()-এর একই atomic batch-এ member-doc-এ
         // {lastActiveAt, updatedAt} merge-write হয় (memberData.js stampLastActive)।
         // এই clause না থাকলে batch-এর মূল entry/weekly write-ও ব্যর্থ হতো।
         // শুধু claimed সদস্য (googleUid == request.auth.uid), শুধু এই ২টা ফিল্ড।
         allow update: if request.auth != null
-          && isClaimedByGoogle(familyId, memberId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt'])
+          && isClaimedByGoogle(familyId, memberId);
 
         // Admin-proxy activity-stamp: Admin যখন unclaimed proxy (googleUid অনুপস্থিত/null)-এর
         // হয়ে entry সেভ করেন, একই batch-এর member-doc stamp-ও অনুমোদিত হতে হবে —
         // নইলে পুরো batch ব্যর্থ হয়। শুধু unclaimed member, একই ২টা ফিল্ড।
         allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt'])
           && isAdminOfFamily(familyId)
-          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'updatedAt']);
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null);
 
         // --- §Motivational Layer(নতুন, চ্যাট-approved plan, দুইটা clause) ---
         // দুটোই সম্পূর্ণ additive, saveEntry()/stampLastActive()-এর কোনো
@@ -617,8 +617,8 @@ service cloud.firestore {
         // হবে(কখনো কমতে পারবে না) — client bug/race-condition-এও পুরনো higher
         // score ভুলবশত overwrite হবে না।
         allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bestScoreEver', 'updatedAt'])
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.bestScoreEver is number
           && request.resource.data.bestScoreEver >= 0
           && request.resource.data.bestScoreEver <= 100
@@ -629,8 +629,8 @@ service cloud.firestore {
         // (member-ডকের সব clause-এ) একই caller-নিয়ম; শুধু homeLayout+updatedAt বদলাতে পারে,
         // ঠিক {entry, below} দুটো তালিকা(প্রতিটা সর্বোচ্চ ২০টি) — এর বাইরের কিছু অনুমোদিত নয়।
         allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['homeLayout', 'updatedAt'])
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.homeLayout.keys().hasOnly(['entry', 'below'])
           && request.resource.data.homeLayout.entry is list
           && request.resource.data.homeLayout.entry.size() <= 20
@@ -642,8 +642,8 @@ service cloud.firestore {
         // সক্রিয়+আর্কাইভ মিলিয়ে সর্বোচ্চ ৪০টি(client-এ সক্রিয় ২০টি সীমা)। আইটেমের গঠন rules-এ যাচাই হয় না
         // (list-iteration নেই) — client sanitize করে; এটা শুধু আকার-সীমা ও ফিল্ড-সীমা।
         allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customTasks', 'updatedAt'])
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.customTasks is list
           && request.resource.data.customTasks.size() <= 40;
 
@@ -652,8 +652,8 @@ service cloud.firestore {
         // প্রতিটা প্ল্যানের ফিল্ড-তালিকা ও সংখ্যা-সীমা validQuranPlan()-এ; from/to-র ভেতরের সূরা/আয়াত ও
         // পরিসর-সংগতি client sanitize করে (sanitizePlan), rules শুধু আকার/ফিল্ড/সীমা।
         allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quranPlans', 'updatedAt'])
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.get('quranPlans', {}) is map
           && request.resource.data.get('quranPlans', {}).keys().hasOnly(['khatam', 'hifz'])
           && validQuranPlan(request.resource.data.get('quranPlans', {}).get('khatam', {}))
@@ -664,8 +664,8 @@ service cloud.firestore {
         // homeLayout-clause-এর হুবহু একই caller-নিয়ম; শুধু tabLayout+updatedAt বদলাতে পারে, tabLayout-এর
         // কী শুধু এই ছয়টা(প্রতিটা id-তালিকা, সর্বোচ্চ ২০টি) — এর বাইরের কিছু অনুমোদিত নয়।
         allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tabLayout', 'updatedAt'])
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
           && request.resource.data.tabLayout.keys().hasOnly(['prayerOrder', 'prayerHidden', 'amolOrder', 'amolHidden', 'toolsOrder', 'toolsHidden'])
           && request.resource.data.tabLayout.get('prayerOrder', []) is list
           && request.resource.data.tabLayout.get('prayerOrder', []).size() <= 20
@@ -697,9 +697,9 @@ service cloud.firestore {
         // বা null) — claimed member-এর email field ইতিমধ্যে delete করা
         // (§৪), তাই এই clause claimed member-এ কখনো প্রযোজ্য না।
         allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'updatedAt'])
           && isAdminOfFamily(familyId)
-          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'updatedAt']);
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null);
 
         // Admin — unclaimed proxy-র নাম/জেন্ডার edit(functional-gap fix)।
         // নতুন-schema proxy member-এ ownerUids field-ই থাকে না বলে
@@ -707,9 +707,9 @@ service cloud.firestore {
         // doc-shape-এর জন্য নির্ভরযোগ্য না — তাই আলাদা explicit clause,
         // legacy/google-only উভয় state-এই সচল(ownerUids-নিরপেক্ষ)।
         allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt'])
           && isAdminOfFamily(familyId)
-          && (!('googleUid' in resource.data) || resource.data.googleUid == null)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt']);
+          && (!('googleUid' in resource.data) || resource.data.googleUid == null);
 
         // Claim(email-match auto-bind বা invite-link join, 2_4 §৫.১/§৫.২):
         // googleUid null→request.auth.uid সেট হওয়ার সাথে সাথে email field
@@ -735,13 +735,13 @@ service cloud.firestore {
         // email-কে .lower() করেই তুলনা যথেষ্ট(trim দরকার নেই — Google
         // account email-এ leading/trailing space থাকে না)।
         allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleUid', 'email', 'updatedAt'])
           && (!('googleUid' in resource.data) || resource.data.googleUid == null)
           && request.resource.data.googleUid == request.auth.uid
           && !('email' in request.resource.data)
           && 'email' in resource.data
           && request.auth.token.email is string
-          && request.auth.token.email.lower() == resource.data.email
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleUid', 'email', 'updatedAt']);
+          && request.auth.token.email.lower() == resource.data.email;
 
         // Claimed member নিজে(googleUid==request.auth.uid) — profile-edit
         // (নাম/জেন্ডার, 2_5 Screen E "প্রোফাইল এডিট")। role এখানে কখনো
@@ -749,8 +749,8 @@ service cloud.firestore {
         // clause-এও প্রযোজ্য, কারণ সেটা match-level AND, সব clause কভার
         // করে)।
         allow update: if request.auth != null
-          && isClaimedByGoogle(familyId, memberId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'gender', 'updatedAt'])
+          && isClaimedByGoogle(familyId, memberId);
 
         // Family ত্যাগ(self-leave, 2_4 §৫.৩) — claimed member নিজে নিজের
         // doc delete করতে পারবে, শুধু firstAdminUid না হলে(protection নিচের
