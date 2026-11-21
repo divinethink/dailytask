@@ -4,7 +4,7 @@
 // অ্যান্ড্রয়েড অ্যাপ (Capacitor) ধাপে যুক্ত হবে।
 export const NOTIF_PREFS_VERSION = 1;
 export const PRAYER_IDS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
-export const SPECIAL_IDS = ["jumuah", "ashura", "arafah", "qadr", "barat", "eid", "bidh"];
+export const SPECIAL_IDS = ["jumuah", "ashura", "arafah", "qadr", "eid", "bidh"];
 export const PRAYER_LEAD = ["start", "min10", "jamaat"];
 export const WEEKLY_TIMES = ["18:00", "20:00", "21:00"];
 export const MEETING_DAYS = ["1", "15", "25", "last"];

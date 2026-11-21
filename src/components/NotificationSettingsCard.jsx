@@ -13,7 +13,7 @@ const bn = s => String(s).replace(/[0-9]/g, d => BN[d]);
 
 const PRAYER_L = { fajr: "ফজর", dhuhr: "যোহর", asr: "আসর", maghrib: "মাগরিব", isha: "ইশা" };
 const LEAD_L = { start: "ওয়াক্ত শুরুতে", min10: "১০ মিনিট আগে", jamaat: "জামায়াতের সময়" };
-const SPECIAL_L = { jumuah: "জুমা", ashura: "আশুরা", arafah: "আরাফাহ", qadr: "শবে কদর", barat: "শবে বরাত", eid: "ঈদ", bidh: "আইয়ামে বীজ" };
+const SPECIAL_L = { jumuah: "জুমা", ashura: "আশুরা", arafah: "আরাফাহ", qadr: "শবে কদর", eid: "ঈদ", bidh: "আইয়ামে বীজ" };
 const MEETING_L = { "1": "১ম", "15": "১৫ই", "25": "২৫শে", last: "শেষ দিন" };
 const timeL = t => {
   const [hh, mm] = t.split(":").map(Number);
