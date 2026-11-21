@@ -427,6 +427,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, extr
 }
 
 // ───── তাফসির bottom sheet: নিচ থেকে ওঠে, হ্যান্ডেল টেনে নামিয়ে বন্ধ; ভেতরে আগের/পরের আয়াত ─────
+const TAFSIR_FONT_KEY = "dt_tafsir_font";
 export function TafsirSheet({ surah, ayahs, ayah, th, accent, trSize, arSize, arFont, onAyah, onClose }) {
   useBackLayer(true, onClose);
   const [dy, setDy] = useState(0);
@@ -436,6 +437,47 @@ export function TafsirSheet({ surah, ayahs, ayah, th, accent, trSize, arSize, ar
   const prev = idx > 0 ? ayahs[idx - 1] : null;
   const next = idx < ayahs.length - 1 ? ayahs[idx + 1] : null;
   useEffect(() => { if (bodyEl.current) bodyEl.current.scrollTop = 0; }, [ayah.n]);
+  // তাফসিরের লেখার আকার: দুই-আঙুল পিঞ্চে বদলায়, এই ডিভাইসে মনে থাকে (পাঠ-সেটিংসের অনুবাদ-আকার বদলায় না)।
+  const [tfSize, setTfSize] = useState(() => {
+    try { const v = Number(window.localStorage.getItem(TAFSIR_FONT_KEY)); return v >= TR_ZOOM.min && v <= TR_ZOOM.max ? v : null; } catch (e) { return null; }
+  });
+  const size = tfSize == null ? trSize : tfSize;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  useEffect(() => {
+    const el = bodyEl.current;
+    if (!el) return undefined;
+    let d0 = 0, f0 = 0, next = 0, raf = 0;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const apply = () => { raf = 0; setTfSize(next); };
+    const ts = (e) => { if (e.touches.length === 2) { d0 = dist(e.touches); f0 = sizeRef.current; next = f0; } };
+    const tm = (e) => {
+      if (e.touches.length !== 2 || d0 <= 0) return;
+      e.preventDefault();
+      next = Math.min(TR_ZOOM.max, Math.max(TR_ZOOM.min, Math.round((f0 * dist(e.touches) / d0) * 2) / 2));
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const te = (e) => {
+      if (e.touches.length >= 2 || d0 <= 0) return;
+      d0 = 0;
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (next !== f0) {
+        setTfSize(next);
+        try { window.localStorage.setItem(TAFSIR_FONT_KEY, String(next)); } catch (err) { /* ignore */ }
+      }
+    };
+    el.addEventListener("touchstart", ts, { passive: true });
+    el.addEventListener("touchmove", tm, { passive: false });
+    el.addEventListener("touchend", te, { passive: true });
+    el.addEventListener("touchcancel", te, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      el.removeEventListener("touchstart", ts);
+      el.removeEventListener("touchmove", tm);
+      el.removeEventListener("touchend", te);
+      el.removeEventListener("touchcancel", te);
+    };
+  }, []);
   const go = (a) => a && onAyah(a);
   const nb = (label, a) => h("button", { type: "button", disabled: !a, onClick: () => go(a), style: { flex: 1, minHeight: 44, borderRadius: 12, border: "1px solid " + LINE, fontSize: 13, fontWeight: 600, color: accent, background: "transparent", opacity: a ? 1 : 0.35 } }, label);
   const dragStart = (e) => { y0.current = e.touches[0].clientY; };
@@ -448,10 +490,10 @@ export function TafsirSheet({ surah, ayahs, ayah, th, accent, trSize, arSize, ar
         h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
           h("strong", { style: { fontSize: 15 } }, "সূরা " + surah.bn + " " + toBnDigits(surah.n) + ":" + toBnDigits(ayah.n)),
           h("button", { type: "button", onClick: onClose, "aria-label": "তাফসির বন্ধ করুন", style: { minHeight: 44, padding: "0 12px", color: accent, fontWeight: 600 } }, "বন্ধ করুন"))),
-      h("div", { ref: bodyEl, style: { flex: 1, overflowY: "auto", padding: "0 18px 12px", overscrollBehavior: "contain" } },
+      h("div", { ref: bodyEl, style: { flex: 1, overflowY: "auto", padding: "0 18px 12px", overscrollBehavior: "contain", touchAction: "pan-y" } },
         h("div", { dir: "rtl", lang: "ar", style: { fontFamily: fontStack(arFont), fontSize: Math.min(arSize, 40), lineHeight: 2.1, margin: "4px 0" } }, ayah.ar),
         h("p", { style: { fontSize: trSize, lineHeight: 1.8, opacity: 0.92, margin: "2px 0 6px", paddingLeft: 12, borderLeft: "3px solid rgba(200,155,60,0.7)" } }, ayah.tr),
-        h(TafsirPanel, { surah, ayah, th, accent, trSize, extra: true, arFont })),
+        h(TafsirPanel, { surah, ayah, th, accent, trSize: size, extra: true, arFont })),
       h("div", { style: { display: "flex", gap: 10, padding: "8px 18px 14px", borderTop: "1px solid " + LINE } }, nb("← আগের আয়াত", prev), nb("পরের আয়াত →", next))));
 }
 

@@ -95,7 +95,7 @@ export function MarkableTafsir({ storeKey, paras, th, accent, trSize, arFont }) 
       return h("span", props, text.slice(g.s, g.e));
     });
     return it.ar
-      ? h("div", { key: i, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(arFont), fontSize: 22, lineHeight: 2.1, margin: "6px 0", color: th.fg } }, kids)
+      ? h("div", { key: i, dir: "rtl", lang: "ar", style: { fontFamily: fontStack(arFont), fontSize: Math.min(44, Math.max(18, Math.round(22 * trSize / 16))), lineHeight: 2.1, margin: "6px 0", color: th.fg } }, kids)
       : h("p", { key: i, style: { fontSize: trSize, lineHeight: 1.95, margin: "0 0 10px" } }, kids);
   });
 
