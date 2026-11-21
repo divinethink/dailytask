@@ -70,6 +70,17 @@ service cloud.firestore {
         || isClaimedFamilyMember(familyId);
     }
 
+    // কুরআন প্ল্যান: খালি ম্যাপ ({}) বৈধ (মুছে ফেলা/অনুপস্থিত); নইলে নির্দিষ্ট ফিল্ড-তালিকা ও সংখ্যা-সীমা।
+    function validQuranPlan(p) {
+      return p is map
+        && p.keys().hasOnly(['v', 'from', 'to', 'perDay', 'done', 'last', 'createdAt'])
+        && p.get('from', {}) is map && p.get('to', {}) is map
+        && p.get('perDay', 1) is int && p.get('perDay', 1) >= 1 && p.get('perDay', 1) <= 1000
+        && p.get('done', 0) is int && p.get('done', 0) >= 0 && p.get('done', 0) <= 6236
+        && p.get('last', 0) is int && p.get('last', 0) >= 0 && p.get('last', 0) <= 6236
+        && p.get('createdAt', 0) is number;
+    }
+
     // --- §Google-Login Identity Migration(2_4/2_4_1, dual-path, transitioning) ---
     // সম্পূর্ণ additive — বিদ্যমান ownerUids/Member-Password-ভিত্তিক কোনো
     // rule/function স্পর্শ করা হয়নি। শুধু নতুন googleUid-ভিত্তিক দাবির
@@ -645,6 +656,18 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customTasks', 'updatedAt'])
           && request.resource.data.customTasks is list
           && request.resource.data.customTasks.size() <= 40;
+
+        // কুরআন প্ল্যান(খতম/হিফজ, owner-approved) — member-ডকের ঐচ্ছিক quranPlans ম্যাপ, কী শুধু khatam/hifz।
+        // homeLayout-clause-এর হুবহু একই caller-নিয়ম; শুধু quranPlans+updatedAt বদলাতে পারে।
+        // প্রতিটা প্ল্যানের ফিল্ড-তালিকা ও সংখ্যা-সীমা validQuranPlan()-এ; from/to-র ভেতরের সূরা/আয়াত ও
+        // পরিসর-সংগতি client sanitize করে (sanitizePlan), rules শুধু আকার/ফিল্ড/সীমা।
+        allow update: if request.auth != null
+          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quranPlans', 'updatedAt'])
+          && request.resource.data.get('quranPlans', {}) is map
+          && request.resource.data.get('quranPlans', {}).keys().hasOnly(['khatam', 'hifz'])
+          && validQuranPlan(request.resource.data.get('quranPlans', {}).get('khatam', {}))
+          && validQuranPlan(request.resource.data.get('quranPlans', {}).get('hifz', {}));
 
         // নেভ-ট্যাব কাস্টমাইজ(সময়সূচি/আমল/সহায়িকা, owner-approved ২ নভেম্বর ২০২৬) — member-ডকের ঐচ্ছিক
         // tabLayout ম্যাপ(memberData.js: saveTabLayout(), explicit user-action, saveEntry() batch-এর অংশ না)।

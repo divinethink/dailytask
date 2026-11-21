@@ -66,6 +66,21 @@ export function sanitizePlan(raw, counts) {
   return p;
 }
 
+// Firestore-এর member-ডকের quranPlans ও ফোনের পুরনো প্ল্যান মিলিয়ে চূড়ান্ত প্ল্যান ঠিক করা।
+// remote বৈধ হলে সেটাই জেতে; নইলে ফোনের প্ল্যান (আগে একবারও সিংক না হয়ে থাকলে) ক্লাউডে তোলা হয় (upload)।
+// synced[mode]=true মানে এই ডিভাইস আগেই সিংক হয়েছে — তখন remote-এ নেই মানে অন্য ডিভাইসে মোছা, ফোনের বাসি কপি আর তোলা হয় না।
+export function planMigration(remoteRaw, localPlans, synced, counts) {
+  const out = { plans: { khatam: null, hifz: null }, upload: [] };
+  const remote = remoteRaw && typeof remoteRaw === "object" ? remoteRaw : {};
+  for (const m of ["khatam", "hifz"]) {
+    const r = sanitizePlan(remote[m], counts);
+    const l = localPlans && localPlans[m] ? localPlans[m] : null;
+    if (r) out.plans[m] = r;
+    else if (l && !(synced && synced[m])) { out.plans[m] = l; out.upload.push(m); }
+  }
+  return out;
+}
+
 // আজকের পাঠ: এ পর্যন্ত মুখস্থের পরের perDay আয়াত (পরিসরের শেষে ছোট হতে পারে)। শেষ হলে null।
 export function todayPortion(plan, counts) {
   const total = totalOf(plan, counts);

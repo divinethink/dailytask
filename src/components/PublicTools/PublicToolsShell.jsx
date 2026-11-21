@@ -139,7 +139,7 @@ const FRONT_ITEMS = [
   { kind: "category", id: "toolsTracking", icon: "calculator", label: "ইসলামি টুলস ও ট্র্যাকিং" },
 ];
 
-export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask } = {}) {
+export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask, ownPlans, onSavePlan } = {}) {
   // "front" | { tool: {key,label} } | { single: {id,label} } |
   // { category: catObj } | { category: catObj, item: {key,label} }
   const [view, setView] = useState("front");
@@ -177,7 +177,7 @@ export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask } = {}) {
         { className: "px-4 pb-4" },
         /*#__PURE__*/React.createElement(DetailHeader, { icon: view.tool.icon, title: view.tool.label }),
         ActiveComponent
-          ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.tool.label }, /*#__PURE__*/React.createElement(ActiveComponent, { onOpenQuran, onPlanTask }))
+          ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.tool.label }, /*#__PURE__*/React.createElement(ActiveComponent, { onOpenQuran, onPlanTask, ownPlans, onSavePlan }))
           : /*#__PURE__*/React.createElement(
               "div",
               { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },
@@ -210,7 +210,7 @@ export function PublicToolsShell({ tabLayout, onOpenQuran, onPlanTask } = {}) {
           { className: "px-4 pb-4" },
           /*#__PURE__*/React.createElement(DetailHeader, { icon: view.item.icon, title: view.item.label, subtitle: cat.label }),
           ActiveComponent
-            ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.item.label }, /*#__PURE__*/React.createElement(ActiveComponent, { onOpenQuran, onPlanTask }))
+            ? /*#__PURE__*/React.createElement(ReaderTitleContext.Provider, { value: view.item.label }, /*#__PURE__*/React.createElement(ActiveComponent, { onOpenQuran, onPlanTask, ownPlans, onSavePlan }))
             : /*#__PURE__*/React.createElement(
                 "div",
                 { className: "flex flex-col items-center justify-center text-center gap-2 py-16" },

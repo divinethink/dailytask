@@ -12,7 +12,7 @@ import {
   editOwnProfile, leaveFamily, loadActiveInviteToken, removeLegacyInviteToken,
   startGoogleAccountChange
 } from "./googleIdentity.js";
-import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveCustomTasks } from "./memberData.js";
+import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveCustomTasks, saveQuranPlan } from "./memberData.js";
 import { importBackupFromFile } from "./importBackup.js";
 import { exportBackupToDevice } from "./exportBackup.js";
 import { createDriveBackupActions } from "./driveBackupActions.js";
@@ -839,6 +839,24 @@ function App() {
       return r.status;
     } catch (e) {
       return "error";
+    }
+  }
+  // কুরআন-প্ল্যান → নিজের (লগইন-করা সদস্যের) member-ডকের quranPlans। ফেরত: true = ক্লাউডে সেভ হয়েছে।
+  async function handleSavePlan(mode, plan) {
+    try {
+      if (isGuestMode || !auth.currentUser) return false;
+      const me = (members || []).find(x => x.googleUid === auth.currentUser.uid);
+      if (!me) return false;
+      await saveQuranPlan(migrationState, me.id, mode, plan);
+      setMembers(prev => (prev || []).map(x => {
+        if (x.id !== me.id) return x;
+        const qp = { ...(x.quranPlans || {}) };
+        if (plan) qp[mode] = plan; else delete qp[mode];
+        return { ...x, quranPlans: qp };
+      }));
+      return true;
+    } catch (e) {
+      return false;
     }
   }
   async function handleSaveTazkirah(next) {
@@ -1766,9 +1784,12 @@ function App() {
       );
     }
     if (activeTab === TAB_TOOLS) {
+      // প্ল্যানার ক্লাউড-সিংক: শুধু নিজের সদস্য-ডক পাওয়া গেলে (গেস্ট বা সদস্য-ডক লোডের আগে নয়)
+      const ownMemberForPlans = (!isGuestMode && auth.currentUser) ? (members || []).find(x => x.googleUid === auth.currentUser.uid) : null;
+      const ownPlansForPlanner = ownMemberForPlans ? (ownMemberForPlans.quranPlans || {}) : null;
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask })
+          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask, ownPlans: ownPlansForPlanner, onSavePlan: ownPlansForPlanner ? handleSavePlan : undefined })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

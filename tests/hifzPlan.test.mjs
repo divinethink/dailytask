@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN,
+  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN, planMigration,
   setPerDay, statsOf, perDayForDays, planKey, HIFZ_KEY, KHATAM_KEY, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
 } from "../src/legacy/hifzPlan.js";
 
@@ -133,4 +133,33 @@ test("posAfterN: n আয়াত পরে শেষ পড়া আয়া
   assert.deepEqual(posAfterN(p, C, 7), { s: 1, a: 7 });
   assert.deepEqual(posAfterN(p, C, 8), { s: 2, a: 1 });
   assert.equal(posAfterN(p, C, 0), null);
+});
+
+test("planMigration: ক্লাউডে বৈধ প্ল্যান থাকলে সেটাই জেতে, আপলোড নেই", () => {
+  const remote = { khatam: makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 5) };
+  const local = { khatam: makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 50, 9), hifz: null };
+  const r = planMigration(remote, local, {}, C);
+  assert.equal(r.plans.khatam.perDay, 100);
+  assert.deepEqual(r.upload, []);
+});
+
+test("planMigration: ক্লাউডে নেই + আগে সিংক হয়নি → ফোনের প্ল্যান ওঠে", () => {
+  const local = { khatam: makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 50, 9), hifz: null };
+  const r = planMigration({}, local, { khatam: false, hifz: false }, C);
+  assert.equal(r.plans.khatam.perDay, 50);
+  assert.deepEqual(r.upload, ["khatam"]);
+  assert.equal(r.plans.hifz, null);
+});
+
+test("planMigration: আগে সিংক হয়েছে + ক্লাউডে নেই → বাসি ফোনের কপি ফেরে না", () => {
+  const local = { khatam: makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 50, 9), hifz: null };
+  const r = planMigration({}, local, { khatam: true }, C);
+  assert.equal(r.plans.khatam, null);
+  assert.deepEqual(r.upload, []);
+});
+
+test("planMigration: অবৈধ ক্লাউড-ডেটা/null ইনপুটে crash নয়", () => {
+  assert.deepEqual(planMigration(null, null, null, C), { plans: { khatam: null, hifz: null }, upload: [] });
+  const r = planMigration({ khatam: { from: 1, to: 2 } }, { khatam: null, hifz: null }, {}, C);
+  assert.equal(r.plans.khatam, null);
 });

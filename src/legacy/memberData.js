@@ -1,6 +1,6 @@
 // memberData.js — Member/Entry/Weekly Firestore data-layer (CRUD, stampLastActive, entry history).
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, orderBy, limit } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, orderBy, limit, deleteField } from "firebase/firestore";
 import { monthPrefix } from "./appHelpers.js";
 import { getFamilyCode, getFamilyId, appStorage, resolvePathContext } from "./familyIdentity.js";
 
@@ -191,6 +191,18 @@ async function saveCustomTasks(migrationState, memberId, tasks) {
   }, { merge: true });
 }
 
+// §কুরআন প্ল্যান (খতম/হিফজ, owner-approved): member-ডকের ঐচ্ছিক quranPlans: { khatam?, hifz? }।
+// explicit user-action, saveEntry() batch-এর অংশ না। plan=null মানে ওই মোডের প্ল্যান মোছা। শুধু বদলানো মোড লেখা হয়।
+async function saveQuranPlan(migrationState, memberId, mode, plan) {
+  if (mode !== "khatam" && mode !== "hifz") throw new Error("bad plan mode");
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
+  await setDoc(memberRef, {
+    quranPlans: { [mode]: plan ? { v: 1, from: { s: plan.from.s, a: plan.from.a }, to: { s: plan.to.s, a: plan.to.a }, perDay: plan.perDay, done: plan.done, last: plan.last, createdAt: plan.createdAt } : deleteField() },
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
   try {
     const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
@@ -245,5 +257,6 @@ export {
   fetchEntryHistory,
   updateBestScoreIfNeeded,
   saveTomorrowFocus,
-  saveCustomTasks
+  saveCustomTasks,
+  saveQuranPlan
 };

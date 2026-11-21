@@ -6,11 +6,11 @@
 import { loadMeta } from "../../legacy/quranData.js";
 import { toBnDigits, refLabel } from "../../legacy/quranCore.js";
 import {
-  planKey, GOTO_KEY, PER_DAY, perDayForDays, clampPerDay, countsOf, makePlan, sanitizePlan,
+  planKey, GOTO_KEY, PER_DAY, perDayForDays, clampPerDay, countsOf, makePlan, sanitizePlan, planMigration,
   todayPortion, markDone, markDoneN, posAfterN, undoDone, setPerDay, statsOf, makeGoto,
 } from "../../legacy/hifzPlan.js";
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 const h = React.createElement;
 
 const PRIMARY = "var(--theme-primary, #0E4B43)";
@@ -49,6 +49,11 @@ function writePlan(mode, plan) {
     else window.localStorage.removeItem(planKey(mode));
   } catch (e) { /* ignore */ }
 }
+
+// এই ডিভাইস একবার ক্লাউডের সাথে সিংক হয়েছে কিনা (ফোনের বাসি প্ল্যান যেন ক্লাউডে ফিরে না তোলে)
+const syncedKey = (mode) => planKey(mode) + "_synced";
+const isSynced = (mode) => { try { return window.localStorage.getItem(syncedKey(mode)) === "1"; } catch (e) { return false; } };
+const markSynced = (mode) => { try { window.localStorage.setItem(syncedKey(mode), "1"); } catch (e) { /* ignore */ } };
 
 // ── ছোট SVG আইকন (monochrome, currentColor) ──
 const svg = (children, size) => h("svg", { width: size || 20, height: size || 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, children);
@@ -135,7 +140,7 @@ const TASK_NOTE = {
   error: ["হোমের কাস্টম টাস্কে যোগ করা যায়নি। প্ল্যান ঠিকই চলবে।", false],
 };
 
-export function HifzPlanner({ onOpenQuran, onPlanTask }) {
+export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
@@ -157,6 +162,22 @@ export function HifzPlanner({ onOpenQuran, onPlanTask }) {
     return () => { alive = false; };
   }, [tries]);
 
+  // ক্লাউড-সিংক: প্রথমবার নিজের সদস্য-ডক পাওয়া গেলে ক্লাউডের প্ল্যান ও ফোনের প্ল্যান মেলানো (একবারই)।
+  // ক্লাউডে বৈধ প্ল্যান থাকলে সেটাই জেতে; না থাকলে (এই ডিভাইস আগে সিংক না হলে) ফোনেরটা ক্লাউডে ওঠে। ফোনের কপি মোছা হয় না।
+  const syncedOnce = useRef(false);
+  const cloudReady = !!onSavePlan && !!ownPlans;
+  useEffect(() => {
+    if (!meta || !cloudReady || syncedOnce.current) return;
+    syncedOnce.current = true;
+    const c = countsOf(meta.surahs);
+    const r = planMigration(ownPlans, plans, { khatam: isSynced("khatam"), hifz: isSynced("hifz") }, c);
+    setPlans(r.plans);
+    ["khatam", "hifz"].forEach((m) => writePlan(m, r.plans[m]));
+    const mark = (m) => { markSynced(m); };
+    r.upload.forEach((m) => { onSavePlan(m, r.plans[m]).then((ok) => { if (ok) mark(m); }); });
+    ["khatam", "hifz"].filter((m) => !r.upload.includes(m)).forEach(mark);
+  }, [meta, cloudReady]);
+
   if (failed) {
     return h("div", { className: "text-center py-12" },
       h("p", { className: "text-sm text-gray-700 mb-3" }, "কুরআনের তালিকা লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"),
@@ -176,7 +197,13 @@ export function HifzPlanner({ onOpenQuran, onPlanTask }) {
   const save = (p) => {
     const had = !!plans[mode];
     setPlans((x) => ({ ...x, [mode]: p }));
-    writePlan(mode, p);
+    writePlan(mode, p); // ফোনের কপি = ব্যাকআপ-ক্যাশ; ক্লাউড (member-ডক) মূল সোর্স
+    if (onSavePlan) {
+      onSavePlan(mode, p).then((ok) => {
+        if (ok) markSynced(mode);
+        else setTaskNote(["ক্লাউডে সেভ করা যায়নি; ফোনে সংরক্ষিত আছে। ইন্টারনেট দেখে আবার সেভ করুন।", false]);
+      });
+    }
     // হোমের কাস্টম টাস্ক: নতুন প্ল্যানে যোগ; মুছলে বা শেষ হলে আর্কাইভ (এন্ট্রির ডেটা অক্ষত)
     if (p && !had) syncTask(mode, true);
     else if (!p) syncTask(mode, false);
