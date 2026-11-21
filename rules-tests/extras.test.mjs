@@ -7,7 +7,7 @@ import { doc, setDoc, updateDoc, getDoc, deleteDoc } from "firebase/firestore";
 const CREATOR = "yiirNJKJHlM27guiiS10zsp2FYT2";
 let env;
 before(async () => {
-  env = await initializeTestEnvironment({ projectId: "demo-dailytask", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
+  env = await initializeTestEnvironment({ projectId: "demo-dailytask-extras", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
 });
 after(async () => { await env.cleanup(); });
 

@@ -6,7 +6,7 @@ import { doc, setDoc, updateDoc, deleteField } from "firebase/firestore";
 
 let env;
 before(async () => {
-  env = await initializeTestEnvironment({ projectId: "demo-dailytask", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
+  env = await initializeTestEnvironment({ projectId: "demo-dailytask-qplans", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
 });
 after(async () => { await env.cleanup(); });
 
