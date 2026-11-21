@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN, planMigration,
+  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN, planMigration, localDateKey, sanitizeLog, todayCount,
   setPerDay, statsOf, perDayForDays, planKey, HIFZ_KEY, KHATAM_KEY, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
 } from "../src/legacy/hifzPlan.js";
 
@@ -162,4 +162,49 @@ test("planMigration: অবৈধ ক্লাউড-ডেটা/null ইনপ
   assert.deepEqual(planMigration(null, null, null, C), { plans: { khatam: null, hifz: null }, upload: [] });
   const r = planMigration({ khatam: { from: 1, to: 2 } }, { khatam: null, hifz: null }, {}, C);
   assert.equal(r.plans.khatam, null);
+});
+
+test("দিনের লগ: একই দিনের জমা এক জায়গায়, dayKey ছাড়া লগ-ফিল্ডই নেই", () => {
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0);
+  const a = markDone(p, C, "2026-11-21");
+  assert.deepEqual(a.log, { "2026-11-21": 100 });
+  assert.equal(a.lastDay, "2026-11-21");
+  const b = markDoneN(a, C, 30, "2026-11-21");
+  assert.equal(b.log["2026-11-21"], 130);
+  assert.equal(todayCount(b, "2026-11-21"), 130);
+  assert.equal(todayCount(b, "2026-11-22"), 0);
+  const c = markDone(p, C);
+  assert.equal("log" in c, false);
+  assert.equal("lastDay" in c, false);
+  assert.equal(markDoneN(p, C, 5, "bad-date").log, undefined);
+});
+
+test("দিনের লগ: শেষ ধাপ বাতিলে ওই দিনের সংখ্যা কমে, শূন্য হলে দিনটাই যায়", () => {
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0);
+  const a = markDoneN(markDone(p, C, "2026-11-20"), C, 30, "2026-11-21");
+  const u = undoDone(a);
+  assert.equal(u.done, 100);
+  assert.deepEqual(u.log, { "2026-11-20": 100 });
+  assert.equal("lastDay" in u, false);
+  const z = undoDone(markDone(p, C, "2026-11-21"));
+  assert.equal("log" in z, false);
+  assert.equal(z.done, 0);
+});
+
+test("sanitizeLog ও sanitizePlan: অবৈধ কী/মান বাদ, ৪০০ দিনের বেশি ছাঁটা, লগ টিকে থাকে", () => {
+  assert.deepEqual(sanitizeLog({ "2026-11-21": 5, "x": 3, "2026-11-22": 0, "2026-11-23": 1.5, "2026-11-24": 9999 }), { "2026-11-21": 5 });
+  assert.deepEqual(sanitizeLog(null), {});
+  const big = {};
+  for (let i = 0; i < 450; i++) big[new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)] = 1;
+  const out = sanitizeLog(big);
+  assert.equal(Object.keys(out).length, 400);
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0);
+  const a = markDone(p, C, "2026-11-21");
+  assert.deepEqual(sanitizePlan(JSON.parse(JSON.stringify(a)), C), a);
+  assert.equal("log" in sanitizePlan(p, C), false);
+});
+
+test("localDateKey: স্থানীয় YYYY-MM-DD", () => {
+  assert.equal(localDateKey(new Date(2026, 10, 5, 23, 59)), "2026-11-05");
+  assert.equal(localDateKey(new Date(2026, 0, 1, 0, 0)), "2026-01-01");
 });

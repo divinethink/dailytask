@@ -73,12 +73,14 @@ service cloud.firestore {
     // কুরআন প্ল্যান: খালি ম্যাপ ({}) বৈধ (মুছে ফেলা/অনুপস্থিত); নইলে নির্দিষ্ট ফিল্ড-তালিকা ও সংখ্যা-সীমা।
     function validQuranPlan(p) {
       return p is map
-        && p.keys().hasOnly(['v', 'from', 'to', 'perDay', 'done', 'last', 'createdAt'])
+        && p.keys().hasOnly(['v', 'from', 'to', 'perDay', 'done', 'last', 'createdAt', 'log', 'lastDay'])
         && p.get('from', {}) is map && p.get('to', {}) is map
         && p.get('perDay', 1) is int && p.get('perDay', 1) >= 1 && p.get('perDay', 1) <= 1000
         && p.get('done', 0) is int && p.get('done', 0) >= 0 && p.get('done', 0) <= 6236
         && p.get('last', 0) is int && p.get('last', 0) >= 0 && p.get('last', 0) <= 6236
-        && p.get('createdAt', 0) is number;
+        && p.get('createdAt', 0) is number
+        && p.get('log', {}) is map && p.get('log', {}).size() <= 400
+        && p.get('lastDay', '') is string && p.get('lastDay', '').size() <= 10;
     }
 
     // --- §Google-Login Identity Migration(2_4/2_4_1, dual-path, transitioning) ---

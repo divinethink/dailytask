@@ -2,7 +2,7 @@
 import test, { before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, deleteField } from "firebase/firestore";
 
 let env;
 before(async () => {
@@ -51,4 +51,21 @@ test("অচেনা কী/ফিল্ড বা সীমা-পার স�
 
 test("quranPlans-এর সাথে অন্য ফিল্ড (যেমন role) বদলানো যায় না", async () => {
   await assertFails(updateDoc(ref(as("uidM1")), { quranPlans: { khatam: plan() }, role: "admin", updatedAt: 2 }));
+});
+
+test("দিনের লগ ও lastDay বৈধ হলে লেখা যায়; অবৈধ ধরন/বড় আকার আটকায়", async () => {
+  const db = as("uidM1");
+  await assertSucceeds(updateDoc(ref(db), { "quranPlans.khatam": plan({ done: 208, last: 208, log: { "2026-11-21": 208 }, lastDay: "2026-11-21" }), updatedAt: 2 }));
+  await assertFails(updateDoc(ref(db), { "quranPlans.khatam": plan({ log: "x" }), updatedAt: 3 }));
+  await assertFails(updateDoc(ref(db), { "quranPlans.khatam": plan({ lastDay: 5 }), updatedAt: 3 }));
+  const big = {};
+  for (let i = 0; i < 401; i++) big["k" + i] = 1;
+  await assertFails(updateDoc(ref(db), { "quranPlans.khatam": plan({ log: big }), updatedAt: 3 }));
+});
+
+test("dotted-path দিয়ে এক মোড বদলালে/মুছলে অন্য মোড অক্ষত", async () => {
+  const db = as("uidM1");
+  await assertSucceeds(updateDoc(ref(db), { quranPlans: { khatam: plan(), hifz: plan({ perDay: 5 }) }, updatedAt: 2 }));
+  await assertSucceeds(updateDoc(ref(db), { "quranPlans.khatam": plan({ done: 10, last: 10 }), updatedAt: 3 }));
+  await assertSucceeds(updateDoc(ref(db), { "quranPlans.hifz": deleteField(), updatedAt: 4 }));
 });

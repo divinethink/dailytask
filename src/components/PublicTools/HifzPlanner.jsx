@@ -7,7 +7,7 @@ import { loadMeta } from "../../legacy/quranData.js";
 import { toBnDigits, refLabel } from "../../legacy/quranCore.js";
 import {
   planKey, GOTO_KEY, PER_DAY, perDayForDays, clampPerDay, countsOf, makePlan, sanitizePlan, planMigration,
-  todayPortion, markDone, markDoneN, posAfterN, undoDone, setPerDay, statsOf, makeGoto,
+  todayPortion, markDone, markDoneN, posAfterN, undoDone, localDateKey, todayCount, setPerDay, statsOf, makeGoto,
 } from "../../legacy/hifzPlan.js";
 
 const { useState, useEffect, useRef } = React;
@@ -260,6 +260,9 @@ export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
 
   const noteEl = taskNote && h("div", { role: "status", style: { fontSize: 12, fontWeight: 600, padding: "6px 10px", borderRadius: 10, marginBottom: 8, color: taskNote[1] ? PRIMARY : "#9A5B00", background: taskNote[1] ? SOFT : "#FFF3DC" } }, taskNote[0]);
   const smallBtn = (kind, extra) => btnStyle(kind, { minHeight: 44, fontSize: 14, padding: "0 12px", ...extra });
+  const dayKey = localDateKey(new Date());
+  const doneToday = todayCount(plan, dayKey);
+  const goalMet = doneToday >= plan.perDay;
   const editing = editN !== null && portion;
   const editEnd = editing ? posAfterN(plan, counts, editN) : null;
   const maxN = st.remaining;
@@ -271,8 +274,9 @@ export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
       h("div", { style: { fontSize: 12.5, color: "#5B6B64" } }, "নতুন প্ল্যান নিতে নিচে থেকে এই প্ল্যান মুছুন।"))
     : h("div", { style: { ...cardBase, padding: "12px 14px", marginBottom: 10, borderLeft: "4px solid " + GOLD } },
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        h("span", { style: { fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: 0.3 } }, "আজকের পাঠ"),
+        h("span", { style: { fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: 0.3 } }, goalMet ? "পরের পাঠ" : "আজকের পাঠ"),
         h("span", { style: { fontSize: 12, fontWeight: 600, color: PRIMARY, background: SOFT, padding: "2px 10px", borderRadius: 999 } }, toBnDigits(portion.n) + " আয়াত")),
+      doneToday > 0 && h("div", { style: { fontSize: 12, fontWeight: 600, marginTop: 6, color: goalMet ? "#1E7A3C" : PRIMARY } }, (goalMet ? "✓ আজকের লক্ষ্য পূর্ণ · " : "") + "আজ রেকর্ড: " + toBnDigits(doneToday) + " আয়াত"),
       h("div", { style: { fontSize: 16.5, fontWeight: 700, color: "#1A2621", lineHeight: 1.45, margin: "6px 0 10px" } }, portionText),
       editing
         ? h("div", { style: { padding: 10, borderRadius: 14, background: SOFT } },
@@ -283,12 +287,12 @@ export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
               [5, 10].map((d) => h("button", { key: d, type: "button", onClick: () => setEditN(Math.min(maxN, Math.max(1, editN + d))), style: { minHeight: 40, padding: "0 10px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "1px solid " + LINE, background: "#fff", color: PRIMARY } }, "+" + toBnDigits(d))))),
           editEnd && h("div", { style: { fontSize: 12.5, color: "#5B6B64", marginTop: 8 } }, "এই পর্যন্ত: " + ref(editEnd) + " · পরের পাঠ এর পর থেকে"),
           h("div", { style: { display: "flex", gap: 8, marginTop: 10 } },
-            h("button", { type: "button", onClick: () => { save(markDoneN(plan, counts, editN)); setEditN(null); }, style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), "রেকর্ড করুন"),
+            h("button", { type: "button", onClick: () => { save(markDoneN(plan, counts, editN, dayKey)); setEditN(null); }, style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), "রেকর্ড করুন"),
             h("button", { type: "button", onClick: () => setEditN(null), style: smallBtn("ghost", { flex: 1 }) }, "বাতিল")))
         : h("div", null,
           h("div", { style: { display: "flex", gap: 8 } },
             h("button", { type: "button", onClick: openQuran, style: smallBtn("ghost", { flex: 1 }) }, BookIcon(18), "কুরআনে খুলুন"),
-            h("button", { type: "button", onClick: () => save(markDone(plan, counts)), style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), W.btn)),
+            h("button", { type: "button", onClick: () => save(markDone(plan, counts, dayKey)), style: smallBtn("primary", { flex: 1 }) }, CheckIcon(18), W.btn)),
           h("button", { type: "button", onClick: () => setEditN(portion.n), style: { width: "100%", minHeight: 40, marginTop: 4, background: "transparent", border: "none", color: PRIMARY, fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer" } }, "কম বা বেশি " + (mode === "khatam" ? "পড়েছেন?" : "মুখস্থ করেছেন?") + " নিজে বসান")));
 
   return h("div", null,

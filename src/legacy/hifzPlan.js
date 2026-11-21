@@ -44,6 +44,28 @@ export function clampPerDay(n) {
   return Math.min(PER_DAY.max, Math.max(PER_DAY.min, v));
 }
 
+// ── দিনভিত্তিক লগ: log[YYYY-MM-DD] = সেদিন রেকর্ড-করা আয়াত। একই দিনের জমা এক জায়গায় ⇒ ডাবল গণনা/ভুল ধাপ ধরা যায়। ──
+export const LOG_MAX_DAYS = 400; // Rules-এর সীমার সাথে মেলে
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+export function localDateKey(d) {
+  const x = d instanceof Date ? d : new Date();
+  const p2 = (n) => String(n).padStart(2, "0");
+  return x.getFullYear() + "-" + p2(x.getMonth() + 1) + "-" + p2(x.getDate());
+}
+export function sanitizeLog(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  const keys = Object.keys(raw).filter((k) => DAY_RE.test(k) && isInt(raw[k]) && raw[k] >= 1 && raw[k] <= 6236).sort().slice(-LOG_MAX_DAYS);
+  for (const k of keys) out[k] = raw[k];
+  return out;
+}
+const addLog = (plan, dayKey, m) => {
+  if (typeof dayKey !== "string" || !DAY_RE.test(dayKey)) return {};
+  const log = sanitizeLog({ ...(plan.log || {}), [dayKey]: ((plan.log && plan.log[dayKey]) || 0) + m });
+  return { log, lastDay: dayKey };
+};
+export const todayCount = (plan, dayKey) => (plan.log && plan.log[dayKey]) || 0;
+
 // নতুন প্ল্যান; পরিসর অবৈধ/উল্টো হলে null।
 export function makePlan(counts, from, to, perDay, now) {
   const i = posToIdx(counts, from && from.s, from && from.a);
@@ -63,6 +85,9 @@ export function sanitizePlan(raw, counts) {
   const done = isInt(raw.done) ? raw.done : 0;
   p.done = Math.min(total, Math.max(0, done));
   p.last = isInt(raw.last) ? Math.min(p.done, Math.max(0, raw.last)) : 0;
+  const log = sanitizeLog(raw.log);
+  if (Object.keys(log).length) p.log = log; // ঐচ্ছিক: দিনভিত্তিক লগ; না থাকলে ফিল্ডই থাকে না (আগের আকার অক্ষত)
+  if (p.log && typeof raw.lastDay === "string" && DAY_RE.test(raw.lastDay)) p.lastDay = raw.lastDay;
   return p;
 }
 
@@ -90,19 +115,19 @@ export function todayPortion(plan, counts) {
   return { from: idxToPos(counts, base + plan.done), to: idxToPos(counts, base + plan.done + n - 1), n };
 }
 
-export function markDone(plan, counts) {
+export function markDone(plan, counts, dayKey) {
   const p = todayPortion(plan, counts);
   if (!p) return plan;
-  return { ...plan, done: plan.done + p.n, last: p.n };
+  return { ...plan, done: plan.done + p.n, last: p.n, ...addLog(plan, dayKey, p.n) };
 }
 
 // আসলে n আয়াত পড়া/মুখস্থ হলে সেটাই বসানো (লক্ষ্যের চেয়ে কম/বেশি); n বাকির বেশি হলে বাকিটুকুই ধরা। অবৈধ n হলে প্ল্যান অপরিবর্তিত।
-export function markDoneN(plan, counts, n) {
+export function markDoneN(plan, counts, n, dayKey) {
   const remaining = totalOf(plan, counts) - plan.done;
   const k = Math.round(Number(n));
   if (!Number.isFinite(k) || k < 1 || remaining < 1) return plan;
   const m = Math.min(k, remaining);
-  return { ...plan, done: plan.done + m, last: m };
+  return { ...plan, done: plan.done + m, last: m, ...addLog(plan, dayKey, m) };
 }
 
 // n আয়াত বসালে শেষ পড়া আয়াত কোনটা হবে (প্রিভিউর জন্য); অবৈধ হলে null।
@@ -116,7 +141,15 @@ export function posAfterN(plan, counts, n) {
 // শেষ ধাপ বাতিল (ভুল টিপ ঠিক করতে); একবারই।
 export function undoDone(plan) {
   if (!plan.last) return plan;
-  return { ...plan, done: Math.max(0, plan.done - plan.last), last: 0 };
+  const next = { ...plan, done: Math.max(0, plan.done - plan.last), last: 0 };
+  if (plan.lastDay && plan.log && plan.log[plan.lastDay]) {
+    const left = plan.log[plan.lastDay] - plan.last;
+    const log = { ...plan.log };
+    if (left > 0) log[plan.lastDay] = left; else delete log[plan.lastDay];
+    if (Object.keys(log).length) next.log = log; else delete next.log;
+  }
+  delete next.lastDay;
+  return next;
 }
 
 export function setPerDay(plan, n) {

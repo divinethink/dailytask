@@ -1,6 +1,6 @@
 // memberData.js — Member/Entry/Weekly Firestore data-layer (CRUD, stampLastActive, entry history).
 import { dbModular as db, authModular as auth } from "./firebaseConfig.js";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, orderBy, limit, deleteField } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, writeBatch, Timestamp, query, orderBy, limit, deleteField, updateDoc } from "firebase/firestore";
 import { monthPrefix } from "./appHelpers.js";
 import { getFamilyCode, getFamilyId, appStorage, resolvePathContext } from "./familyIdentity.js";
 
@@ -197,10 +197,14 @@ async function saveQuranPlan(migrationState, memberId, mode, plan) {
   if (mode !== "khatam" && mode !== "hifz") throw new Error("bad plan mode");
   const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
   const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
-  await setDoc(memberRef, {
-    quranPlans: { [mode]: plan ? { v: 1, from: { s: plan.from.s, a: plan.from.a }, to: { s: plan.to.s, a: plan.to.a }, perDay: plan.perDay, done: plan.done, last: plan.last, createdAt: plan.createdAt } : deleteField() },
-    updatedAt: Date.now()
-  }, { merge: true });
+  // dotted-path updateDoc: ওই মোডের পুরো প্ল্যান বদলে যায় (merge নয়), তাই দিনের লগ থেকে মোছা দিনও ক্লাউডে মোছে।
+  const val = plan ? {
+    v: 1, from: { s: plan.from.s, a: plan.from.a }, to: { s: plan.to.s, a: plan.to.a },
+    perDay: plan.perDay, done: plan.done, last: plan.last, createdAt: plan.createdAt,
+    ...(plan.log && Object.keys(plan.log).length ? { log: plan.log } : {}),
+    ...(plan.log && plan.lastDay ? { lastDay: plan.lastDay } : {}),
+  } : deleteField();
+  await updateDoc(memberRef, { ["quranPlans." + mode]: val, updatedAt: Date.now() });
 }
 
 async function pushEntryHistory(migrationState, memberId, key, oldData) {
