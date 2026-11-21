@@ -40,13 +40,15 @@ export async function copyText(text) {
 }
 
 // বুকমার্ক ও পছন্দের আইকন: সংরক্ষিত থাকলে ভরাট।
+// তাফসিরের খোলা-বই আইকন (একরঙা রেখা; রং = বোতামের accent)।
+export const BookSvg = ({ size = 20 }) => h(Icon, { size }, h("path", { d: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" }), h("path", { d: "M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" }));
 export const BookmarkSvg = ({ on, size = 17 }) => h(Icon, { size }, h("path", { d: "M6 3h12v18l-6-4-6 4z", fill: on ? "currentColor" : "none" }));
 export const HeartSvg = ({ on, size = 17 }) => h(Icon, { size }, h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z", fill: on ? "currentColor" : "none" }));
 
 export const actBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 10, fontSize: 13, color, background: "transparent", border: "none", cursor: "pointer" });
 
 // তাফসির-বোতাম: স্পষ্ট বর্ডার-পিল; খোলা থাকলে ভরাট।
-export const tafsirBtn = (accent, on) => ({ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 14px", margin: "0 4px", borderRadius: 999, fontSize: 13, fontWeight: 600, color: accent, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "1.5px solid " + accent, cursor: "pointer" });
+export const tafsirBtn = (accent, on) => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: 40, minWidth: 48, padding: "0 12px", margin: "0 4px", borderRadius: 999, fontSize: 13, fontWeight: 600, color: accent, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "1.5px solid " + accent, cursor: "pointer" });
 
 export const MoreSvg = () => h(Icon, { size: 20 }, [5, 12, 19].map((cx) => h("circle", { key: cx, cx, cy: 12, r: 1.7, fill: "currentColor" })));
 const iconBtn = (color, on) => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44, borderRadius: 12, color, background: on ? "rgba(128,128,128,0.16)" : "transparent", border: "none", cursor: "pointer" });
@@ -59,7 +61,7 @@ export function AyahActions({ a, surah, th, trSize, accent, flash, bm, fav, onCo
   return h("div", null, h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2, marginTop: 4, marginLeft: -10 } },
     h("button", { type: "button", onClick: () => onShare(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 20 })),
     h("button", { type: "button", onClick: () => onMark(a, "b"), style: iconBtn(accent, bm), "aria-pressed": bm, "aria-label": "আয়াত " + n + (bm ? " বুকমার্ক থেকে সরান" : " বুকমার্ক করুন") }, h(BookmarkSvg, { on: bm, size: 20 })),
-    surah && h("button", { type: "button", onClick: () => (onTafsir ? onTafsir(a) : setShowTafsir((v) => !v)), style: tafsirBtn(accent, !onTafsir && showTafsir), "aria-label": "আয়াত " + n + " তাফসির দেখুন" }, onTafsir ? "📖 তাফসির" : "📖 তাফসির " + (showTafsir ? "▴" : "▾")),
+    surah && h("button", { type: "button", onClick: () => (onTafsir ? onTafsir(a) : setShowTafsir((v) => !v)), style: tafsirBtn(accent, !onTafsir && showTafsir), "aria-label": "আয়াত " + n + " তাফসির দেখুন", title: "তাফসির", ...(onTafsir ? {} : { "aria-expanded": showTafsir }) }, h(BookSvg, { size: 20 })),
     h("button", { type: "button", onClick: () => setMore((v) => !v), style: iconBtn(accent, more), "aria-expanded": more, "aria-label": "আরও" }, h(MoreSvg)),
     more && h("button", { type: "button", onClick: () => onCopy(a), style: iconBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" }, h(CopyIcon, { size: 20 })),
     more && h("button", { type: "button", onClick: () => onMark(a, "f"), style: iconBtn(accent, fav), "aria-pressed": fav, "aria-label": "আয়াত " + n + (fav ? " পছন্দ থেকে সরান" : " পছন্দের তালিকায় রাখুন") }, h(HeartSvg, { on: fav, size: 20 })),
@@ -413,7 +415,7 @@ export function AyahSheet({ surah, ayah, th, accent, trSize, tafsir = true, extr
       h("p", { style: { fontSize: trSize, lineHeight: 1.8, opacity: 0.92, margin: "4px 0 8px" } }, ayah.tr),
       h("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 6 } }, "অনুবাদ: " + TRANSLATOR),
       h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid " + LINE, paddingTop: 6 } },
-        tafsir && h("button", { type: "button", onClick: () => (onTafsir ? onTafsir(ayah) : setShowTafsir((v) => !v)), style: tafsirBtn(accent, !onTafsir && showTafsir), "aria-label": "আয়াত " + n + " তাফসির দেখুন" }, onTafsir ? "📖 তাফসির" : "📖 তাফসির " + (showTafsir ? "▴" : "▾")),
+        tafsir && h("button", { type: "button", onClick: () => (onTafsir ? onTafsir(ayah) : setShowTafsir((v) => !v)), style: tafsirBtn(accent, !onTafsir && showTafsir), "aria-label": "আয়াত " + n + " তাফসির দেখুন", title: "তাফসির", ...(onTafsir ? {} : { "aria-expanded": showTafsir }) }, h(BookSvg, { size: 20 })),
         h("button", { type: "button", onClick: () => onCopy(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " কপি করুন" },
           h(CopyIcon, { size: 17 }), flash === "copy" ? "কপি হয়েছে ✓" : flash === "fail" ? "কপি করা যায়নি" : "কপি"),
         h("button", { type: "button", onClick: () => onShare(ayah), style: actBtn(accent), "aria-label": "আয়াত " + n + " শেয়ার করুন" }, h(ShareIcon, { size: 17 }), "শেয়ার"),
