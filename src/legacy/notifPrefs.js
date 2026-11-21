@@ -15,7 +15,7 @@ export function defaultNotifPrefs() {
     v: NOTIF_PREFS_VERSION,
     master: true,
     prayer: { on: false, which: [...PRAYER_IDS], lead: "start" },
-    weekly: { on: false, time: "20:00" },
+    weekly: { on: false, time: "21:00" },
     meeting: { on: false, day: "15" },
     special: { on: false, items: ["jumuah", "ashura", "arafah", "qadr", "eid"] },
     daily: { on: false, time: "21:00" }

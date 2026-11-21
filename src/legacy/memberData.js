@@ -169,25 +169,6 @@ async function updateBestScoreIfNeeded(migrationState, memberId, todayScorePct) 
   }
 }
 
-// §Motivational Layer — Phase 2(owner-approved, নতুন): tomorrowFocus —
-// সদস্য নিজে (বা admin, unclaimed proxy member-এর জন্য) পরদিনের Focus বেছে
-// নেন/বদলান। saveEntry()-এর batch-এর অংশ না, সরাসরি explicit user-action-এ
-// (TomorrowFocusPicker.jsx) ট্রিগার হয় — তাই ব্যর্থ হলে caller নিজেই error
-// দেখাবে (entry-save flow-এর সাথে কোনো সম্পর্ক নেই)।
-async function saveTomorrowFocus(migrationState, memberId, focus) {
-  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
-  const memberRef = doc(ctx.membersRef, ctx.memberDocId(memberId));
-  await setDoc(memberRef, {
-    tomorrowFocus: {
-      fieldKey: focus.fieldKey,
-      targetDateKey: focus.targetDateKey,
-      source: focus.source,
-      setAt: Date.now()
-    },
-    updatedAt: Date.now()
-  }, { merge: true });
-}
-
 // §কাস্টম টাস্ক (সদস্যভিত্তিক, owner-approved): member-ডকের ঐচ্ছিক customTasks ফিল্ড।
 // explicit user-action, saveEntry() batch-এর অংশ না।
 async function saveCustomTasks(migrationState, memberId, tasks) {
@@ -268,7 +249,6 @@ export {
   pushEntryHistory,
   fetchEntryHistory,
   updateBestScoreIfNeeded,
-  saveTomorrowFocus,
   saveCustomTasks,
   saveQuranPlan,
   loadEntryStrict

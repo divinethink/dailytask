@@ -624,21 +624,9 @@ service cloud.firestore {
           && request.resource.data.bestScoreEver <= 100
           && request.resource.data.bestScoreEver > (('bestScoreEver' in resource.data) ? resource.data.bestScoreEver : -1);
 
-        // Phase 2 — tomorrowFocus(পরদিনের auto-suggested/manual-override
-        // Focus field, memberData.js: saveTomorrowFocus(), explicit user-action
-        // থেকে সরাসরি ট্রিগার হয়, saveEntry() batch-এর অংশ না)।
-        allow update: if request.auth != null
-          && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tomorrowFocus', 'updatedAt'])
-          && request.resource.data.tomorrowFocus.keys().hasOnly(['fieldKey', 'targetDateKey', 'setAt', 'source'])
-          && request.resource.data.tomorrowFocus.fieldKey is string
-          && request.resource.data.tomorrowFocus.fieldKey.size() > 0
-          && request.resource.data.tomorrowFocus.targetDateKey is string
-          && request.resource.data.tomorrowFocus.source in ['auto', 'manual'];
-
         // Home layout(ধাপ ক, owner-approved) — সদস্যভিত্তিক হোম-কার্ডের ক্রম/দৃশ্যমানতা/ভাঁজ
         // (memberData.js: saveHomeLayout(), explicit user-action, saveEntry() batch-এর অংশ না)।
-        // tomorrowFocus-clause-এর হুবহু একই caller-নিয়ম; শুধু homeLayout+updatedAt বদলাতে পারে,
+        // (member-ডকের সব clause-এ) একই caller-নিয়ম; শুধু homeLayout+updatedAt বদলাতে পারে,
         // ঠিক {entry, below} দুটো তালিকা(প্রতিটা সর্বোচ্চ ২০টি) — এর বাইরের কিছু অনুমোদিত নয়।
         allow update: if request.auth != null
           && (isClaimedByGoogle(familyId, memberId) || isAdminOfFamily(familyId))

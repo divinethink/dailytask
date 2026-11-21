@@ -9,7 +9,7 @@ test("ভাঙা ইনপুটে ডিফল্ট", () => {
 });
 test("অবৈধ মান ডিফল্টে ফেরে, অজানা ফিল্ড বাদ", () => {
   const p = sanitizeNotifPrefs({ weekly: { on: true, time: "03:00" }, daily: { on: true, time: "22:00" }, prayer: { which: ["fajr", "zzz"], lead: "bad" }, hack: 1 });
-  assert.equal(p.weekly.time, "20:00");
+  assert.equal(p.weekly.time, "21:00");
   assert.equal(p.daily.time, "22:00");
   assert.deepEqual(p.prayer.which, ["fajr"]);
   assert.equal(p.prayer.lead, "start");
