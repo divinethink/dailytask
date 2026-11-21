@@ -111,6 +111,14 @@ async function loadEntry(migrationState, memberId, key) {
     return null;
   }
 }
+// প্ল্যানার-সিংকের জন্য: পড়া ব্যর্থ হলে throw করে (loadEntry-র মতো null নয়), যাতে ভুল করে পুরো এন্ট্রি overwrite না হয়।
+// ডক না থাকলে null।
+async function loadEntryStrict(migrationState, memberId, key) {
+  const ctx = resolvePathContext(migrationState, getFamilyCode(), getFamilyId());
+  const docSnap = await getDoc(doc(ctx.entriesRef, ctx.entryDocId(memberId, key)));
+  if (!docSnap.exists()) return null;
+  return JSON.parse(docSnap.data().value);
+}
 async function saveEntry(migrationState, memberId, key, data, ownerUid) {
   // ownerUid is stamped from the member's CURRENT ownerUid at save time (not
   // the writer's own uid) so the entry stays consistent with claim state and
@@ -262,5 +270,6 @@ export {
   updateBestScoreIfNeeded,
   saveTomorrowFocus,
   saveCustomTasks,
-  saveQuranPlan
+  saveQuranPlan,
+  loadEntryStrict
 };

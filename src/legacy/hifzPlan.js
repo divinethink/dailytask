@@ -152,6 +152,22 @@ export function undoDone(plan) {
   return next;
 }
 
+// হোমের কাস্টম-টাস্ক টিক → প্ল্যান। শুধু "আজ"-এর জন্য (dayKey)।
+// - টিক আছে ও আজ এখনো কিছু রেকর্ড নেই ও প্ল্যান বাকি → দৈনিক লক্ষ্য (perDay) রেকর্ড (markDone)।
+// - টিক ছিল (আগের সেভে) এখন নেই ও আজকের রেকর্ড আছে → ওই দিনের রেকর্ড বাতিল।
+// - বাকি সব ক্ষেত্রে অপরিবর্তিত (একই reference)। টিক কখনো ছিলই না এমন অবস্থায় প্ল্যানের অগ্রগতি কমে না (zero-data-loss)।
+export function planFromTick(plan, counts, dayKey, ticked, wasTicked) {
+  const today = todayCount(plan, dayKey);
+  if (ticked) return today === 0 ? markDone(plan, counts, dayKey) : plan;
+  if (!wasTicked || today === 0) return plan;
+  const next = { ...plan, done: Math.max(0, plan.done - today), last: 0 };
+  const log = { ...plan.log };
+  delete log[dayKey];
+  if (Object.keys(log).length) next.log = log; else delete next.log;
+  if (next.lastDay === dayKey || !next.log) delete next.lastDay;
+  return next;
+}
+
 export function setPerDay(plan, n) {
   return { ...plan, perDay: clampPerDay(n) };
 }

@@ -140,7 +140,7 @@ const TASK_NOTE = {
   error: ["হোমের কাস্টম টাস্কে যোগ করা যায়নি। প্ল্যান ঠিকই চলবে।", false],
 };
 
-export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
+export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan, onTickToday }) {
   const [meta, setMeta] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
@@ -198,6 +198,13 @@ export function HifzPlanner({ onOpenQuran, onPlanTask, ownPlans, onSavePlan }) {
     const had = !!plans[mode];
     setPlans((x) => ({ ...x, [mode]: p }));
     writePlan(mode, p); // ফোনের কপি = ব্যাকআপ-ক্যাশ; ক্লাউড (member-ডক) মূল সোর্স
+    // হোমের টিক: আজকের পড়া রেকর্ড হলে টিক বসে, আজকের রেকর্ড শূন্য হলে (বাতিলে) টিক উঠে যায়
+    if (p && onTickToday) {
+      const dk = localDateKey(new Date());
+      const before = todayCount(plans[mode] || {}, dk), after = todayCount(p, dk);
+      if (after > 0 && before === 0) onTickToday(mode, true);
+      else if (after === 0 && before > 0) onTickToday(mode, false);
+    }
     if (onSavePlan) {
       onSavePlan(mode, p).then((ok) => {
         if (ok) markSynced(mode);

@@ -12,7 +12,7 @@ import {
   editOwnProfile, leaveFamily, loadActiveInviteToken, removeLegacyInviteToken,
   startGoogleAccountChange
 } from "./googleIdentity.js";
-import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveCustomTasks, saveQuranPlan } from "./memberData.js";
+import { meetingKey, loadWeekly, migrateMembersIfNeeded, loadCustomFields, loadFieldOverrides, loadTazkirahCustom, loadEntry, saveEntry, pushEntryHistory, fetchEntryHistory, updateBestScoreIfNeeded, saveCustomTasks, saveQuranPlan, loadEntryStrict } from "./memberData.js";
 import { importBackupFromFile } from "./importBackup.js";
 import { exportBackupToDevice } from "./exportBackup.js";
 import { createDriveBackupActions } from "./driveBackupActions.js";
@@ -163,7 +163,8 @@ import { sanitizeOverrides, applyOverrides } from "./fieldOverrides.js";
 import { sanitizeTazkirah, pickInspiration } from "./tazkirah.js";
 const TazkirahManagerScreen = lazyRetry(() => import("../components/TazkirahManagerScreen.jsx").then(m => ({ default: m.TazkirahManagerScreen })));
 const FieldManagerScreen = lazyRetry(() => import("../components/FieldManagerScreen.jsx").then(m => ({ default: m.FieldManagerScreen })));
-import { taskFields, sanitizeTasks, planTaskChange } from "./customTasks.js";
+import { taskFields, sanitizeTasks, planTaskChange, TASK_KEY_PREFIX, PLAN_SRC } from "./customTasks.js";
+import { countsOf, sanitizePlan, planFromTick } from "./hifzPlan.js";
 const TabLayoutScreen = lazyRetry(() => import("../components/TabLayoutScreen.jsx").then(m => ({ default: m.TabLayoutScreen })));
 const HomeLayoutScreen = lazyRetry(() => import("../components/HomeLayoutScreen.jsx").then(m => ({ default: m.HomeLayoutScreen })));
 const PopupMessagesScreen = lazyRetry(() => import("../components/PopupMessagesScreen.jsx").then(m => ({ default: m.PopupMessagesScreen })));
@@ -859,6 +860,55 @@ function App() {
       return false;
     }
   }
+  // প্ল্যানার → হোম: প্ল্যানে আজকের পড়া রেকর্ড হলে (বা বাতিল হলে) আজকের এন্ট্রিতে "কুরআন খতম/হিফজ" টিক বসানো/তোলা।
+  // শুধু ওই একটা ফিল্ড বদলায়; এন্ট্রির বাকি অংশ ও হোমের অসেভ খসড়া অক্ষত। পড়া ব্যর্থ হলে কিছু লেখে না (overwrite-ঝুঁকি নেই)।
+  async function handleTickPlanTaskToday(mode, on) {
+    try {
+      if (isGuestMode || !auth.currentUser) return false;
+      const me = (members || []).find(x => x.googleUid === auth.currentUser.uid);
+      if (!me) return false;
+      const task = sanitizeTasks(me.customTasks).find(t => t.src === PLAN_SRC[mode] && !t.archived);
+      if (!task) return false;
+      const field = TASK_KEY_PREFIX + task.id;
+      const key = dateKey(new Date());
+      const base = await loadEntryStrict(migrationState, me.id, key);
+      if (!!(base && base[field]) === !!on) return true;
+      if (base) await pushEntryHistory(migrationState, me.id, key, base);
+      const toSave = { ...(base || {}), [field]: !!on, lastEditedAt: Date.now() };
+      await saveEntry(migrationState, me.id, key, toSave, me.ownerUid ?? null);
+      if (selectedId === me.id && dateKey(viewDate) === key) {
+        originalEntryRef.current = toSave;
+        setEntry(prev => ({ ...prev, [field]: !!on }));
+      }
+      const pct = dailyScore(toSave, me, [...deenFieldsView, ...duniyaFieldsView, ...customFieldsView, ...taskFields(me.customTasks)]);
+      if (pct !== null) updateBestScoreIfNeeded(migrationState, me.id, Math.round(pct * 100));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  // হোম → প্ল্যানার: আজকের এন্ট্রি সেভের পর প্ল্যান-টাস্কের টিক অনুযায়ী প্ল্যান মেলানো (best-effort, ব্যর্থ হলে কিছু বদলায় না)।
+  async function syncPlansFromTicks(prevSaved, saved, key) {
+    try {
+      if (key !== dateKey(new Date()) || isGuestMode || !auth.currentUser) return;
+      const me = (members || []).find(x => x.googleUid === auth.currentUser.uid);
+      if (!me || me.id !== selectedId) return;
+      const tasks = sanitizeTasks(me.customTasks).filter(t => t.src && !t.archived);
+      if (!tasks.length) return;
+      let counts = null;
+      for (const t of tasks) {
+        const mode = t.src === PLAN_SRC.khatam ? "khatam" : "hifz";
+        const raw = me.quranPlans && me.quranPlans[mode];
+        if (!raw) continue;
+        if (!counts) counts = countsOf((await import("./quranData.js").then(m => m.loadMeta())).surahs);
+        const plan = sanitizePlan(raw, counts);
+        if (!plan) continue;
+        const f = TASK_KEY_PREFIX + t.id;
+        const next = planFromTick(plan, counts, key, !!saved[f], !!(prevSaved && prevSaved[f]));
+        if (next !== plan) await handleSavePlan(mode, next);
+      }
+    } catch (e) { /* best-effort */ }
+  }
   async function handleSaveTazkirah(next) {
     await saveDesignPart("tazkirah", next);
     setDesign(d => ({ ...(d || {}), tazkirah: next }));
@@ -1200,8 +1250,10 @@ function App() {
         ...entry,
         lastEditedAt: Date.now()
       };
+      const prevSaved = originalEntryRef.current;
       await saveEntry(migrationState, selectedId, key, toSave, selectedMember?.ownerUid ?? null);
       originalEntryRef.current = toSave;
+      syncPlansFromTicks(prevSaved, toSave, key);
       setEntry(toSave);
       entryDirtyRef.current = false;
       try { localStorage.removeItem(draftStorageKey(selectedId, key)); } catch (e) {}
@@ -1789,7 +1841,7 @@ function App() {
       const ownPlansForPlanner = ownMemberForPlans ? (ownMemberForPlans.quranPlans || {}) : null;
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         React.createElement(React.Suspense, { fallback: React.createElement(PublicToolsPlaceholder, { title: "সহায়িকা" }) },
-          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask, ownPlans: ownPlansForPlanner, onSavePlan: ownPlansForPlanner ? handleSavePlan : undefined })
+          React.createElement(PublicToolsShell, { tabLayout: designSrc.tabLayout || null, onOpenQuran: () => setActiveTab(TAB_QURAN), onPlanTask: handlePlanTask, ownPlans: ownPlansForPlanner, onSavePlan: ownPlansForPlanner ? handleSavePlan : undefined, onTickToday: ownPlansForPlanner ? handleTickPlanTaskToday : undefined })
         ),
         React.createElement(BottomNav, { activeTab: activeTab, onChange: setActiveTab })
       );

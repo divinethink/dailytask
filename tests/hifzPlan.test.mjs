@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN, planMigration, localDateKey, sanitizeLog, todayCount,
+  countsOf, posToIdx, idxToPos, makePlan, sanitizePlan, todayPortion, markDone, undoDone, markDoneN, posAfterN, planMigration, localDateKey, sanitizeLog, todayCount, planFromTick,
   setPerDay, statsOf, perDayForDays, planKey, HIFZ_KEY, KHATAM_KEY, totalOf, makeGoto, readGoto, clampPerDay, GOTO_TTL_MS,
 } from "../src/legacy/hifzPlan.js";
 
@@ -207,4 +207,37 @@ test("sanitizeLog ও sanitizePlan: অবৈধ কী/মান বাদ, ৪
 test("localDateKey: স্থানীয় YYYY-MM-DD", () => {
   assert.equal(localDateKey(new Date(2026, 10, 5, 23, 59)), "2026-11-05");
   assert.equal(localDateKey(new Date(2026, 0, 1, 0, 0)), "2026-01-01");
+});
+
+test("planFromTick: টিক দিলে আজকের লক্ষ্য রেকর্ড, দ্বিতীয়বার নয়", () => {
+  const p = makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0);
+  const a = planFromTick(p, C, "2026-11-21", true, false);
+  assert.equal(a.done, 100);
+  assert.equal(a.log["2026-11-21"], 100);
+  assert.equal(planFromTick(a, C, "2026-11-21", true, true), a);
+});
+
+test("planFromTick: প্ল্যানারে আগেই রেকর্ড থাকলে টিকে ডাবল হয় না", () => {
+  const p = markDoneN(makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0), C, 40, "2026-11-21");
+  assert.equal(planFromTick(p, C, "2026-11-21", true, false), p);
+});
+
+test("planFromTick: টিক তুললে (আগে ছিল) আজকের রেকর্ড বাতিল; কখনো টিক না থাকলে অগ্রগতি কমে না", () => {
+  const p = markDoneN(markDone(makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0), C, "2026-11-20"), C, 40, "2026-11-21");
+  const u = planFromTick(p, C, "2026-11-21", false, true);
+  assert.equal(u.done, 100);
+  assert.deepEqual(u.log, { "2026-11-20": 100 });
+  assert.equal(u.last, 0);
+  assert.equal(planFromTick(p, C, "2026-11-21", false, false), p);
+  const only = markDone(makePlan(C, { s: 1, a: 1 }, { s: 114, a: 6 }, 100, 0), C, "2026-11-21");
+  const z = planFromTick(only, C, "2026-11-21", false, true);
+  assert.equal(z.done, 0);
+  assert.equal("log" in z, false);
+  assert.equal("lastDay" in z, false);
+});
+
+test("planFromTick: শেষ হওয়া প্ল্যানে টিকে কিছু বাড়ে না", () => {
+  const p = makePlan(C, { s: 114, a: 1 }, { s: 114, a: 6 }, 10, 0);
+  const f = markDone(p, C, "2026-11-20");
+  assert.equal(planFromTick(f, C, "2026-11-21", true, false), f);
 });
