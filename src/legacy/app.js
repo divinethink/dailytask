@@ -314,6 +314,7 @@ function App() {
   // মুহাসাবা-আনলকের স্থানীয় নোটিফিকেশন (সার্ভার/push নেই; অ্যাপ খোলা থাকলে বেলে আসে)
   const localNotices = useReviewNotices(!isGuestMode, auth.currentUser ? auth.currentUser.uid : "");
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [liveSyncError, setLiveSyncError] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   // accessPending: এই পরিবারের ডেটায় প্রবেশাধিকার নেই (permission-denied) — "অনুমোদনের অপেক্ষায়" স্ক্রিন দেখায়।
   const [accessPending, setAccessPending] = useState(false);
@@ -668,7 +669,7 @@ function App() {
             (nsnap) => {
               setNotifications(nsnap.docs.map(d => ({ id: d.id, ...d.data() })));
             },
-            () => {}
+            () => { setLiveSyncError(true); }
           );
         }
       } catch {}
@@ -873,7 +874,7 @@ function App() {
       const key = dateKey(new Date());
       const base = await loadEntryStrict(migrationState, me.id, key);
       if (!!(base && base[field]) === !!on) return true;
-      if (base) await pushEntryHistory(migrationState, me.id, key, base);
+      if (base) pushEntryHistory(migrationState, me.id, key, base); // best-effort, সেভ আটকায় না
       const toSave = { ...(base || {}), [field]: !!on, lastEditedAt: Date.now() };
       await saveEntry(migrationState, me.id, key, toSave, me.ownerUid ?? null);
       if (selectedId === me.id && dateKey(viewDate) === key) {
@@ -1011,7 +1012,8 @@ function App() {
         }
       });
       setMonthEntries(liveData);
-    }, () => {});
+      setLiveSyncError(false);
+    }, () => { setLiveSyncError(true); });
     return () => unsub();
   }, [selectedId, monthCursor, monthRefreshKey, migrationState]);
   const reviewEntries = useCursorEntries({ cursor: reviewCursor, mainCursor: monthCursor, mainEntries: monthEntries, migrationState, memberId: selectedId });
@@ -1244,7 +1246,7 @@ function App() {
     try {
       const key = dateKey(viewDate);
       if (originalEntryRef.current) {
-        await pushEntryHistory(migrationState, selectedId, key, originalEntryRef.current);
+        pushEntryHistory(migrationState, selectedId, key, originalEntryRef.current); // best-effort, সেভ আটকায় না
       }
       const toSave = {
         ...entry,
@@ -1966,7 +1968,10 @@ function App() {
     toBn: toBn
   }), /*#__PURE__*/React.createElement("div", {
     className: "max-w-2xl mx-auto"
-  }, React.createElement(DailyEntrySection, {
+  }, liveSyncError && !isGuestMode ? React.createElement("div", {
+    role: "status",
+    className: "mx-3 mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+  }, "সিংক হচ্ছে না — যা দেখছেন তা পুরনো হতে পারে। ইন্টারনেট দেখে অ্যাপ রিফ্রেশ করুন।") : null, React.createElement(DailyEntrySection, {
     designSrc: designSrc,
     codeChangeNotice: codeChangeNotice,
     customFields: customFieldsView,

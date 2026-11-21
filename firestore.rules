@@ -780,6 +780,22 @@ service cloud.firestore {
         allow read: if request.auth != null && isApprovedMember(familyId);
         allow create, update, delete: if request.auth != null
           && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, entryId)) || isAdminOfFamily(familyId));
+
+        // এন্ট্রি-ইতিহাস (সর্বশেষ ৫টি পূর্ববর্তী সংস্করণ, memberData.js pushEntryHistory)।
+        // আগে এই path-এর কোনো clause ছিল না ⇒ default-deny ⇒ ইতিহাস কখনো সেভ হতো না।
+        // লেখা/মোছা: এন্ট্রির মতোই শুধু মালিক বা admin; পড়া: এন্ট্রির মতোই। সম্পাদনা (update) বন্ধ।
+        match /history/{histId} {
+          allow read: if request.auth != null && isApprovedMember(familyId);
+          allow create: if request.auth != null
+            && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, entryId)) || isAdminOfFamily(familyId))
+            && request.resource.data.keys().hasOnly(['value', 'editedAt'])
+            && request.resource.data.value is string
+            && request.resource.data.value.size() <= 200000
+            && request.resource.data.editedAt is number;
+          allow update: if false;
+          allow delete: if request.auth != null
+            && (isUnownedOrMineArray(currentMemberOwnerV2(familyId, entryId)) || isAdminOfFamily(familyId));
+        }
       }
 
       match /weekly/{weeklyId} {
@@ -870,6 +886,7 @@ service cloud.firestore {
           && request.resource.data.targetUid is string
           && request.resource.data.type is string
           && request.resource.data.message is string
+          && request.resource.data.message.size() <= 500
           && request.resource.data.read == false
           && (
                (request.resource.data.type == 'admin_assigned' && isAdminOfFamily(familyId))

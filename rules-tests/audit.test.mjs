@@ -2,7 +2,7 @@
 import test, { before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc, getDoc, deleteField, Timestamp } from "firebase/firestore";
+import { doc, setDoc, updateDoc, getDoc, deleteDoc, deleteField, Timestamp } from "firebase/firestore";
 
 let env;
 before(async () => {
@@ -54,4 +54,30 @@ test("app_stats: শুধু pwa_installs, count +১", async () => {
   await assertFails(setDoc(doc(db, "app_stats/pwa_installs"), { count: 999, lastInstalledAt: Date.now() }, { merge: true }));
   await assertFails(setDoc(doc(db, "app_stats/other"), { count: 1, lastInstalledAt: Date.now() }));
   await assertSucceeds(getDoc(doc(db, "app_stats/pwa_installs")));
+});
+
+// ---- এন্ট্রি-ইতিহাস (entries/{id}/history) ও notification-আকার ----
+test("এন্ট্রি-ইতিহাস: মালিক ও admin লিখতে পারে, অন্য সদস্য/বাইরের ইউজার পারে না", async () => {
+  const hist = (uid, memberId, id = "h1") => doc(as(uid), `families/famA/entries/${memberId}_2026-11-21/history/${id}`);
+  const ok = { value: "{}", editedAt: 1 };
+  await assertSucceeds(setDoc(hist("uidC", "m2"), ok));          // নিজের এন্ট্রি
+  await assertSucceeds(setDoc(hist("uidA", "m2", "h2"), ok));    // admin
+  await assertFails(setDoc(hist("uidC", "m1"), ok));            // অন্য সদস্যের এন্ট্রি
+  await assertFails(setDoc(hist("uidX", "m2", "h3"), ok));      // বাইরের ইউজার
+});
+test("এন্ট্রি-ইতিহাস: ভুল গঠন/সম্পাদনা বন্ধ, মালিক মুছতে পারে, সদস্যরা পড়তে পারে", async () => {
+  const ref = (uid, id = "h1") => doc(as(uid), `families/famA/entries/m2_2026-11-21/history/${id}`);
+  await assertSucceeds(setDoc(ref("uidC"), { value: "{}", editedAt: 1 }));
+  await assertFails(setDoc(ref("uidC", "h2"), { value: "{}", editedAt: 1, extra: 1 }));
+  await assertFails(setDoc(ref("uidC", "h3"), { value: 5, editedAt: 1 }));
+  await assertFails(updateDoc(ref("uidC"), { editedAt: 2 }));
+  await assertSucceeds(getDoc(ref("uidA")));
+  await assertFails(getDoc(ref("uidX")));
+  await assertSucceeds(deleteDoc(ref("uidC")));
+});
+test("notification: message ≤৫০০ অক্ষর", async () => {
+  const col = (id) => doc(as("uidA"), `families/famA/notifications/${id}`);
+  const base = { targetUid: "uidC", type: "admin_assigned", createdAt: 1, read: false };
+  await assertSucceeds(setDoc(col("n1"), { ...base, message: "x".repeat(500) }));
+  await assertFails(setDoc(col("n2"), { ...base, message: "x".repeat(501) }));
 });
